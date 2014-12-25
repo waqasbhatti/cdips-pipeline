@@ -1221,6 +1221,7 @@ def get_magfit_frames(fitsdir,
                         photdata_f['per aperture'][2]['status flag']
                         )
                     }
+                del photdata_f
 
             elif '--binary-output' in header and not HAVEBINPHOT:
                 print('%sZ: %s is a binary fiphot file, '
@@ -1312,15 +1313,23 @@ def get_magfit_frames(fitsdir,
         if len(allgood_ind) > 0:
             selectedreference = goodframes[allgood_ind[0]]
             selectedind = allgood_ind[0]
+            print('%sZ: selected reference frame using photometry and headers' %
+                  (datetime.utcnow().isoformat(),))
         elif len(photgood_ind) > 0:
             selectedreference = goodframes[photgood_ind[0]]
             selectedind = photgood_ind[0]
+            print('%sZ: selected reference frame using photometry only' %
+                  (datetime.utcnow().isoformat(),))
         elif len(headergood_ind) > 0:
             selectedreference = goodframes[headergood_ind[0]]
             selectedind = headergood_ind[0]
+            print('%sZ: selected reference frame using headers only' %
+                  (datetime.utcnow().isoformat(),))
         else:
             selectedreference = None
             selectedind = None
+            print('%sZ: no reference frame could be selected!' %
+                  (datetime.utcnow().isoformat(),))
 
         print('%sZ: selected reference frame = %s' %
               (datetime.utcnow().isoformat(), selectedreference))
