@@ -21,6 +21,8 @@ from datetime import datetime
 import re
 import json
 import shutil
+import random
+import cPickle as pickle
 
 import numpy as np
 
@@ -33,6 +35,8 @@ from scipy.optimize import curve_fit
 import scipy.stats
 import numpy.random as nprand
 
+import matplotlib
+matplotlib.use('AGG')
 import matplotlib.pyplot as plt
 
 import pyfits
@@ -177,6 +181,156 @@ MPHOTREFCMD = ("python {mphotrefexec} {network} {sphotref_frame} "
                "--config-file={magfit_config_file} --nostat")
 
 
+###############################
+## ANET ASTROMETRY FUNCTIONS ##
+###############################
+
+def anet_solve_frame(srclist,
+                     wcsout,
+                     ra,
+                     dec,
+                     width=13,
+                     tweak=6,
+                     radius=4,
+                     cols=(2,3)):
+    '''
+    This uses anet to solve a frame by using its extracted sources and returns a
+    .wcs file containing the astrometric transformation between frame x,y and
+    RA/DEC.
+
+    Example anet command:
+
+    anet --ra 60. --dec -22.5 --radius 4 --width 13 --tweak 6 --cols 2,3 1-383272f_5.fistar --wcs 1-383272f_5.wcs
+
+    assuming an ~/.anetrc file with the following contents:
+
+    xsize = 2048
+    ysize = 2048
+    tweak = 3
+    xcol = 2
+    ycol = 3
+    verify = 1
+    log = 1
+    indexpath = /P/HP0/CAT/ANET_INDEX/ucac4_2014/
+
+    otherwise, we'll need to provide these as well as kwargs to the anet
+    executable.
+
+    The input sourcelist can come from fistar, with a fluxthreshold set 10000 to
+    just get the bright stars. This makes anet faster.
+
+    '''
+
+    ANETCMDSTR = ("anet -r {ra} -d {dec} -w {width} "
+               "--tweak {tweak} --radius {radius} "
+               "--cols {colx},{coly} --wcs {outwcsfile} {sourcelist}")
+
+
+    anetcmd = ANETCMDSTR.format(ra=ra,
+                                dec=dec,
+                                width=width,
+                                tweak=tweak,
+                                radius=radius,
+                                colx=cols[0],
+                                coly=cols[1],
+                                outwcsfile=wcsout,
+                                sourcelist=srclist)
+
+    if DEBUG:
+        print(anetcmd)
+
+    # execute the anet shell command
+    anetproc = subprocess.Popen(shlex.split(anetcmd),
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+
+    # get results
+    anet_stdout, anet_stderr = anetproc.communicate()
+
+    # get results if succeeded, log outcome, and return path of outfile
+    if anetproc.returncode == 0:
+
+        print('%sZ: anet WCS %s generated for frame sourcelist %s' %
+              (datetime.utcnow().isoformat(),
+               os.path.abspath(wcsout), os.path.abspath(srclist)))
+
+        return os.path.abspath(wcsout)
+
+    else:
+
+        print('%sZ: anet WCS %s failed for frame sourcelist %s! Error was: %s' %
+              (datetime.utcnow().isoformat(),
+               os.path.abspath(wcsout),
+               os.path.abspath(srclist),
+               anet_stderr))
+
+        return None
+
+
+def parallel_anet_worker(task):
+    '''
+    This expands the task arg into the args and kwargs necessary for
+    extract_frame_sources.
+
+    '''
+
+    return (task[0], anet_solve_frame(task[0],task[1], task[2], task[3],
+                                      **task[4]))
+
+
+
+def parallel_anet(srclistdir,
+                  outdir,
+                  ra, dec,
+                  nworkers=16,
+                  maxtasksperworker=1000,
+                  width=13,
+                  tweak=6,
+                  radius=4,
+                  cols=(2,3)):
+    '''
+    This does parallel anet astrometry for all frames in srclistdir and
+    generates their wcs files.
+
+    '''
+
+    # get a list of all fits files in the directory
+    fistarlist = glob.glob(os.path.join(srclistdir,'*_?.fistar'))
+
+    print('%sZ: found %s fistar files in %s, starting astrometry...' %
+          (datetime.utcnow().isoformat(),
+           len(fistarlist), srclistdir))
+
+    if outdir and not os.path.exists(outdir):
+
+        print('%sZ: making new output directory %s' %
+              (datetime.utcnow().isoformat(),
+               outdir))
+        os.mkdir(outdir)
+
+    pool = mp.Pool(nworkers, maxtasksperchild=maxtasksperworker)
+
+    tasks = [
+        [x, os.path.join(outdir, os.path.basename(x.replace('.fistar','.wcs'))),
+                         ra, dec, {'width':width,
+                                   'tweak':tweak,
+                                   'radius':radius,
+                                   'cols':cols}]
+        for x in fistarlist
+        ]
+
+    # fire up the pool of workers
+    results = pool.map(parallel_anet_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    # this is the return dictionary
+    returndict = {x:y for (x,y) in results}
+    return returndict
+
+
 
 ##########################
 ## PHOTOMETRY FUNCTIONS ##
@@ -188,6 +342,7 @@ def make_fov_catalog(ra=None, dec=None, size=None,
                      fits=None,
                      outfile=None,
                      catalog='2MASS',
+                     catalogpath=None,
                      columns=None):
     '''
     This function gets all the sources in the field of view of the frame, given
@@ -221,7 +376,7 @@ def make_fov_catalog(ra=None, dec=None, size=None,
         outfile = '%s-RA%s-DEC%s-SIZE%s.catalog' % (catalog,
                                                     catra,
                                                     catdec,
-                                                    catsize)
+                                                    catbox)
 
     print('%sZ: making FOV catalog for '
           'center RA, DEC = %.5f, %.5f with size = %.5f deg' %
@@ -233,7 +388,7 @@ def make_fov_catalog(ra=None, dec=None, size=None,
         ra=catra,
         dec=catdec,
         boxlen=catbox,
-        catalogpath=CATALOGS[catalog]['path'],
+        catalogpath=catalogpath if catalogpath else CATALOGS[catalog]['path'],
         brightrmag=brightrmag,
         faintrmag=faintrmag,
         outfile=outfile
@@ -273,7 +428,7 @@ def make_fov_catalog(ra=None, dec=None, size=None,
 
 def reform_fov_catalog(incat,
                        outcat,
-                       columns='id,ra,dec,xi,eta,J,K,qlt,I,r'):
+                       columns='id,ra,dec,xi,eta,J,K,qlt,I,r,i,z'):
     '''
     This converts the full output catalog from 2massread, etc. to the format
     required for magfit. Also useful for general reforming of the columns.
@@ -394,7 +549,7 @@ def parallel_extract_sources(fitsdir,
     '''
 
     # get a list of all fits files in the directory
-    fitslist = glob.glob(os.path.join(fitsdir,'*.fits'))
+    fitslist = glob.glob(os.path.join(fitsdir,'*_?.fits'))
 
     print('%sZ: found %s FITS files in %s, starting source extraction...' %
           (datetime.utcnow().isoformat(),
@@ -891,6 +1046,140 @@ def do_photometry(fits,
         return None
 
 
+def do_anet_photometry(fits,
+                       fovcatalog,
+                       extractsources=True,
+                       fovcat_xycols=(12,13),
+                       fiphot_xycols='7,8', # set for matched source list
+                       outdir=None,
+                       ccdextent=None,
+                       removesourcetemp=True,
+                       pixborders=0.0,
+                       aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
+                       removesourcelist=False,
+                       binaryoutput=True):
+    '''This rolls up the anet, sourcelist, and fiphot functions above.
+
+    Runs all stages on fits, and puts the output in outdir if it exists. If it
+    doesn't or is None, then puts the output in the same directory as fits.
+
+    fovcatalog is the path to the 2MASS/UCAC4 catalog for all sources in the
+    observed field.
+
+    '''
+
+    # first we do astrometry for the frame
+
+    # then we extract sources
+
+    # then we project the FOV catalog onto the frame
+
+    # then we match the extracted source list and projected source catalog to
+    # get a list of objects in the frame
+
+    # then we run fiphot for photometry on the frame
+
+
+
+    outprojcat = os.path.basename(fits).strip('.fits.fz') + '.projcatalog'
+    outsourcelist = os.path.basename(fits).strip('.fits.fz') + '.sourcelist'
+    outfiphot = os.path.basename(fits).strip('.fits.fz') + '.fiphot'
+
+    if outdir and os.path.exists(outdir):
+
+        outprojcat = os.path.join(outdir, outprojcat)
+        outsourcelist = os.path.join(outdir,outsourcelist)
+        outfiphot = os.path.join(outdir, outfiphot)
+
+    elif outdir and not os.path.exists(outdir):
+
+        print('%sZ: making new output directory %s' %
+              (datetime.utcnow().isoformat(),
+               outdir))
+        os.mkdir(outdir)
+        outprojcat = os.path.join(outdir, outprojcat)
+        outsourcelist = os.path.join(outdir,outsourcelist)
+        outfiphot = os.path.join(outdir, outfiphot)
+
+    else:
+
+        outprojcat, outsourcelist, outfiphot = None, None, None
+
+    if DEBUG:
+        print('output projected catalog will be %s' % outprojcat)
+        print('output source list will be %s' % outsourcelist)
+        print('output fiphot will be %s' % outfiphot)
+
+    # get the frame project catalog
+    projcatfile = make_frameprojected_catalog(fits,
+                                              fovcatalog,
+                                              ccdextent=ccdextent,
+                                              out=outprojcat,
+                                              removetemp=removesourcetemp,
+                                              pixborders=pixborders)
+
+    if projcatfile:
+
+        # if we're supposed to extract sources and run photometry on them
+        # instead of just the sources in the projected fovcatalog, do so
+        if extractsources:
+
+            # extract sources
+            framesources = extract_frame_sources(
+                fits,
+                os.path.join(
+                    outdir,
+                    os.path.basename(fits).strip('.fits.fz') + '.fistar'
+                    )
+                )
+
+            if framesources:
+
+                # match these to the projected fovcatalog
+                matchedsources = match_fovcatalog_framesources(
+                    framesources,
+                    projcatfile,
+                    outsourcelist
+                    )
+
+                fiphot_xycols = '7,8'
+
+            else:
+
+                print('%sZ: extracting sources failed for %s!' %
+                      (datetime.utcnow().isoformat(), fits))
+                return None
+
+        else:
+
+            outsourcelist = projcatfile
+
+
+        # run fiphot on the source list
+        fiphotfile = run_fiphot(fits,
+                                sourcelist=outsourcelist,
+                                aperturelist=aperturelist,
+                                outfile=outfiphot,
+                                xycols=fiphot_xycols,
+                                removesourcelist=removesourcelist,
+                                binaryoutput=binaryoutput)
+
+        if fiphotfile:
+
+            return fiphotfile
+
+        else:
+
+            print('%sZ: photometry failed for %s!' %
+                  (datetime.utcnow().isoformat(), fits))
+
+    else:
+
+        print('%sZ: creating a projected source catalog failed for %s!' %
+              (datetime.utcnow().isoformat(), fits))
+        return None
+
+
 
 def fitsdir_photometry(fitsdir,
                        outdir,
@@ -948,9 +1237,16 @@ def parallel_photometry_worker(task):
 
     '''
 
-    # task[0] is args and first arg is the path to the fits file
-    return (task[0][0], do_photometry(*task[0], **task[1]))
+    try:
 
+        # task[0] is args and first arg is the path to the fits file
+        result = (task[0][0], do_photometry(*task[0], **task[1]))
+
+    except Exception as e:
+        print('photometry failed! reason: %s' % e)
+        result = None
+
+    return result
 
 
 def parallel_fitsdir_photometry(
@@ -974,7 +1270,7 @@ def parallel_fitsdir_photometry(
     '''
 
     # get a list of all fits files in the directory
-    fitslist = glob.glob(os.path.join(fitsdir,'*.fits'))
+    fitslist = glob.glob(os.path.join(fitsdir,'*_?.fits'))
 
     print('%sZ: found %s FITS files in %s, starting photometry...' %
           (datetime.utcnow().isoformat(),
@@ -2295,7 +2591,8 @@ def choose_tfa_template(statsfile,
                         faintest_mag=12.0,
                         max_rms=0.1,
                         max_sigma_above_rmscurve=4.0,
-                        outprefix=None):
+                        outprefix=None,
+                        tfastage1=True):
     '''This chooses suitable stars for TFA template purposes.
 
     statsfile = the file to use to get LC statistics from
@@ -2367,6 +2664,9 @@ def choose_tfa_template(statsfile,
         print('aperture %s: median ndet = %s' % (aperture, median_ndet))
         print('aperture %s: target TFA template size = %s' %
               (aperture, int(median_ndet*TFA_TEMPLATE_FRACTION)))
+        outdict[aperture]['target_tfa_nstars'] = (
+            median_ndet*TFA_TEMPLATE_FRACTION
+        )
 
         stars_ndet_condition = obj_ndet >= median_ndet
         print('aperture %s: objects with ndet condition = %s' %
@@ -2469,7 +2769,7 @@ def choose_tfa_template(statsfile,
                 if os.path.exists(lcfile_searchpath):
 
                     tfa_stars_lcfile.append(
-                        lcfile_searchpath
+                        os.path.abspath(lcfile_searchpath)
                     )
                     tfa_stars_catmag.append(
                         fovcat['mag'][fovcat['objid'] == tfaobj]
@@ -2543,80 +2843,226 @@ def choose_tfa_template(statsfile,
         outf.close()
         print('aperture %s: wrote object info to %s' %
               (aperture, outfile))
+        outdict[aperture]['info_file'] = os.path.abspath(outfile)
+
+        # END OF PER APERTURE STUFF
+
+
+    # run TFAs stage 1 if we're supposed to do so
+    if tfastage1:
+
+        print('\nrunning TFA stage 1...')
+
+        # run TFA stage 1 to pick the good objects
+        tfa_stage1 = run_tfa_stage1(outdict)
+
+        for aperture in tfa_stage1:
+
+            outdict[aperture]['stage1_templatelist'] = tfa_stage1[aperture]
+
+            # make the TFA template list file for this aperture
+            if outdict[aperture]['stage1_templatelist']:
+                templatelistfname = os.path.join(
+                    outdict['lcdir'],
+                    'aperture-%s-tfa-template.list' % aperture
+                )
+                outf = open(templatelistfname,'wb')
+                for tfaobjid in outdict[aperture]['stage1_templatelist']:
+
+                    templatelc = os.path.join(
+                        outdict['lcdir'],
+                        tfaobjid + '.epdlc'
+                    )
+
+                    if os.path.exists(templatelc):
+                        outf.write('%s\n' % os.path.abspath(templatelc))
+
+                outf.close()
+                outdict[aperture]['stage1_tfa_templatefile'] = (
+                    templatelistfname
+                )
+                print('aperture %s: wrote TFA template list to %s' %
+                      (aperture, templatelistfname))
+
 
     return outdict
 
 
-def run_tfa_stage1(stage1_infofile):
-    '''
-    This just runs the TFA in fake mode to generate a list of template stars.
+def run_tfa_stage1(tfainfo):
+    '''This just runs the TFA in fake mode to generate a list of template
+    stars. Uses the tfainfo dict created in choose_tfa_template above.
 
-    '''
-
-
-
-
-
-
-
-
-def run_tfa():
-
-    '''
-    This runs TFA on the EPD lightcurves.
-
-    Uses the commandline tfa program.
-
-    steps for TFA for each aperture in the LCs:
-
-    1. use statistics in lightcurve_statistics.txt
-
-    2. pick some template stars:
-       - maximum 1000 stars
-       - with ndet >= the median number of ndets for the field
-       - rms < TFA_MAX_RMS
-       - median_mag < TFA_MAX_MAG
-       - fit a parabola to the median mag - MAD(mag) curve and get only stars
-         that are close to the curve
-
-    3. this gives us a file with ids, x, y, and NTEMPLATES_TO_USE
-
-    4. run tfa with -T flag to make it choose a template itself from the
-       reference file created in the previous step:
+    Communicates with the tfa program over pipe and then writes its output to a
+    tfa input file for the next stage.
 
        tfa -r <REFFILE> --col-ref-id <REFFILE_IDCOLNUM>
                         --col-ref-x <REFFILE_XCOLNUM>
                         --col-ref-y <REFFILE_YCOLNUM>
                         -n <NTEMPLATES_TO_USE>
-                        -T <output file>
+                        -T - (for stdout)
                         -i /dev/null (no input file?)
-
-    5. this gives us a list of ids to use as templates, which we then use to
-       make a list of LCs, checking that they exist and have nonzero ndet
-
-    6. make a list of stars that have at least 2 x ndet of TFA template
-
-    7. break up all stars into lists to run on each CPU
-
-    8. run real TFA on the lists, then repeat for each aperture:
-
-       tfa -t <output template file from step above>
-           -l <list of LCs to run TFA for this CPU>
-           --col-jd <JD column in LC>
-           --col-mag <magnitude column in LC>
-           --col-mag-out <mag column in output LC> (used to add tfalc cols
-                                                    to an epdlc)
-           --epsilon-time 1e-9
-           --join-by-time
-           --templ-filter
-           --templ-outl-limit 5.0 (outlier limit)
-           --lc-filter
-           --lc-outl-limit 5.0 (outlier limit)
-           --log-svn-version
 
     '''
 
+    tfa_stage1_results = {}
 
+    for aperture in [1,2,3]:
+
+        tfacmdstr = ("tfa -r {inputfile} --col-ref-id 1 "
+                     "--col-ref-x 6 --col-ref-y 7 "
+                     "-n {ntemplates} -T - -i /dev/null")
+
+        tfacmd = tfacmdstr.format(
+            inputfile=tfainfo[aperture]['info_file'],
+            ntemplates=int(tfainfo[aperture]['target_tfa_nstars'])
+        )
+
+        print('aperture %s: starting TFA stage 1...' % aperture)
+
+        if DEBUG:
+            print(tfacmd)
+
+        tfaproc = subprocess.Popen(shlex.split(tfacmd),
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
+
+        tfa_stdout, tfa_stderr = tfaproc.communicate()
+
+        # get results if succeeded, log outcome, and return path of outfile
+        if tfaproc.returncode == 0 or tfa_stdout:
+            tfaobjects = tfa_stdout.split('\n')
+            tfaobjects = [x for x in tfaobjects if x.startswith('HAT-')]
+            print('aperture %s: TFA stage 1 completed, %s templates selected' %
+                  (aperture, len(tfaobjects)))
+            tfa_stage1_results[aperture] = tfaobjects
+        else:
+            print('aperture %s: TFA stage 1 failed, error was: %s' %
+                  (aperture, tfa_stderr))
+            tfa_stage1_results[aperture] = None
+
+    return tfa_stage1_results
+
+
+
+def run_tfa_singlelc(epdlc,
+                     templatefiles,
+                     outfile=None,
+                     epdlc_jdcol=0,
+                     epdlc_magcol=(21,22,23),
+                     template_sigclip=5.0,
+                     epdlc_sigclip=5.0):
+    '''This runs TFA for all apertures defined in epdlc_magcol for the input epdlc
+    file, given an existing TFA template list in templatefile. If outfile is
+    None, the output TFA LC will be in the same directory as epdlc but with an
+    extension of .tfalc.
+
+    '''
+
+    tfacmdstr = ("tfa -i {epdlc} -t {templatefile} "
+                 "--col-jd {epdlc_jdcol} "
+                 "--col-mag {epdlc_magcol} "
+                 "--col-mag-out {tfalc_magcol} "
+                 "--epsilon-time 1e-9 "
+                 "--join-by-time "
+                 "--templ-filter --templ-outl-limit {template_sigclip} "
+                 "--lc-filter --lc-outl-limit {epdlc_sigclip} "
+                 "--log-svn-version "
+                 "-o {out_tfalc}")
+
+    if not outfile:
+        outfile = epdlc.replace('.epdlc','.tfalc')
+
+    tfalc_output = []
+
+    # run tfa for each aperture
+    for templatef, magcol, magind in zip(templatefiles,
+                                 epdlc_magcol,
+                                 range(len(epdlc_magcol))):
+
+        in_jdcol = epdlc_jdcol + 1
+        in_magcol = magcol + 1
+        out_magcol = in_magcol + 3
+
+        aperture_outfile = outfile + ('.TF%s' % (magind+1))
+
+        tfacmd = tfacmdstr.format(epdlc=epdlc,
+                                  templatefile=templatef,
+                                  epdlc_jdcol=in_jdcol,
+                                  epdlc_magcol=in_magcol,
+                                  tfalc_magcol=out_magcol,
+                                  template_sigclip=template_sigclip,
+                                  epdlc_sigclip=epdlc_sigclip,
+                                  out_tfalc=aperture_outfile)
+
+        if DEBUG:
+            print(tfacmd)
+
+        # execute the tfa shell command
+        tfaproc = subprocess.Popen(shlex.split(tfacmd),
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
+
+        # get results
+        tfa_stdout, tfa_stderr = tfaproc.communicate()
+
+        # get results if succeeded, log outcome, and return path of outfile
+        if tfaproc.returncode == 0:
+
+            tfalc_output.append(aperture_outfile)
+
+        else:
+
+            print('%sZ: aperture %s TFA failed for %s! Error was: %s' %
+                  (datetime.utcnow().isoformat(), magind+1, epdlc), tfa_stderr)
+
+            tfalc_output.append(None)
+
+    return tfalc_output
+
+
+def parallel_tfa_worker(task):
+    '''
+    This wraps run_tfa_singlelc above.
+
+    '''
+
+    return run_tfa_singlelc(task[0], task[1], **task[2])
+
+
+def parallel_run_tfa(lcdir,
+                     templatefiles,
+                     epdlc_glob='*.epdlc',
+                     epdlc_jdcol=0,
+                     epdlc_magcol=(21,22,23),
+                     template_sigclip=5.0,
+                     epdlc_sigclip=5.0,
+                     nworkers=16,
+                     workerntasks=500):
+    '''
+    This runs TFA on the EPD lightcurves.
+
+    '''
+
+    epdlcfiles = glob.glob(os.path.join(lcdir, epdlc_glob))
+
+    tasks = [(x, templatefiles, {'epdlc_jdcol':epdlc_jdcol,
+                                 'epdlc_magcol':epdlc_magcol,
+                                 'template_sigclip':template_sigclip,
+                                 'epdlc_sigclip':epdlc_sigclip})
+             for x in epdlcfiles]
+
+    print('%sZ: %s objects to process, starting parallel TFA...' %
+          (datetime.utcnow().isoformat(), len(epdlcfiles)))
+
+    pool = mp.Pool(nworkers, maxtasksperchild=workerntasks)
+    results = pool.map(parallel_tfa_worker, tasks)
+    pool.close()
+    pool.join()
+
+    print('%sZ: done. %s LCs processed.' %
+          (datetime.utcnow().isoformat(), len(epdlcfiles)))
+
+    return {x:y for x,y in zip(epdlcfiles, results)}
 
 
 #############################
@@ -2653,10 +3099,16 @@ def get_lc_statistics(lcfile,
 
         # get the reduced magnitude columns
         (rm1, rm2, rm3,
-         ep1, ep2, ep3,
-         tf1, tf2, tf3) = np.loadtxt(lcfile,
-                                     usecols=tuple(rmcols + epcols + tfcols),
+         ep1, ep2, ep3) = np.loadtxt(lcfile,
+                                     usecols=tuple(rmcols + epcols),
                                      unpack=True)
+
+        tf1 = np.loadtxt(lcfile.replace('.epdlc','.tfalc.TF1'),
+                         usecols=(24,), unpack=True)
+        tf2 = np.loadtxt(lcfile.replace('.epdlc','.tfalc.TF2'),
+                         usecols=(24,), unpack=True)
+        tf3 = np.loadtxt(lcfile.replace('.epdlc','.tfalc.TF3'),
+                         usecols=(24,), unpack=True)
 
     # if we don't have TF columns, cut down to RM and EP only
     except Exception as e:
@@ -2793,7 +3245,8 @@ def get_lc_statistics(lcfile,
 
     else:
 
-        median_rm3, mad_rm3, mean_rm3, stdev_rm3 = np.nan, np.nan, np.nan, np.nan
+        median_rm3, mad_rm3, mean_rm3, stdev_rm3 = (np.nan, np.nan,
+                                                    np.nan, np.nan)
         ndet_rm3 = np.nan
         median_sigclip_rm3, mad_sigclip_rm3 = np.nan, np.nan
         mean_sigclip_rm3, stdev_sigclip_rm3 = np.nan, np.nan
@@ -3137,7 +3590,11 @@ def lc_statistics_worker(task):
 
     '''
 
-    return get_lc_statistics(task[0], **task[1])
+    try:
+        return get_lc_statistics(task[0], **task[1])
+    except Exception as e:
+        print('SOMETHING WENT WRONG! task was %s' % task)
+        return None
 
 
 
@@ -3237,109 +3694,111 @@ def parallel_lc_statistics(lcdir,
 
     for stat in results:
 
-        outline = outlineformat % (
-            stat['lcobj'],
+        if stat is not None:
 
-            stat['median_rm1'],
-            stat['mad_rm1'],
-            stat['mean_rm1'],
-            stat['stdev_rm1'],
-            stat['ndet_rm1'],
-            stat['median_sigclip_rm1'],
-            stat['mad_sigclip_rm1'],
-            stat['mean_sigclip_rm1'],
-            stat['stdev_sigclip_rm1'],
-            stat['ndet_sigclip_rm1'],
+            outline = outlineformat % (
+                stat['lcobj'],
 
-            stat['median_rm2'],
-            stat['mad_rm2'],
-            stat['mean_rm2'],
-            stat['stdev_rm2'],
-            stat['ndet_rm2'],
-            stat['median_sigclip_rm2'],
-            stat['mad_sigclip_rm2'],
-            stat['mean_sigclip_rm2'],
-            stat['stdev_sigclip_rm2'],
-            stat['ndet_sigclip_rm2'],
+                stat['median_rm1'],
+                stat['mad_rm1'],
+                stat['mean_rm1'],
+                stat['stdev_rm1'],
+                stat['ndet_rm1'],
+                stat['median_sigclip_rm1'],
+                stat['mad_sigclip_rm1'],
+                stat['mean_sigclip_rm1'],
+                stat['stdev_sigclip_rm1'],
+                stat['ndet_sigclip_rm1'],
 
-            stat['median_rm3'],
-            stat['mad_rm3'],
-            stat['mean_rm3'],
-            stat['stdev_rm3'],
-            stat['ndet_rm3'],
-            stat['median_sigclip_rm3'],
-            stat['mad_sigclip_rm3'],
-            stat['mean_sigclip_rm3'],
-            stat['stdev_sigclip_rm3'],
-            stat['ndet_sigclip_rm3'],
+                stat['median_rm2'],
+                stat['mad_rm2'],
+                stat['mean_rm2'],
+                stat['stdev_rm2'],
+                stat['ndet_rm2'],
+                stat['median_sigclip_rm2'],
+                stat['mad_sigclip_rm2'],
+                stat['mean_sigclip_rm2'],
+                stat['stdev_sigclip_rm2'],
+                stat['ndet_sigclip_rm2'],
 
-            stat['median_ep1'],
-            stat['mad_ep1'],
-            stat['mean_ep1'],
-            stat['stdev_ep1'],
-            stat['ndet_ep1'],
-            stat['median_sigclip_ep1'],
-            stat['mad_sigclip_ep1'],
-            stat['mean_sigclip_ep1'],
-            stat['stdev_sigclip_ep1'],
-            stat['ndet_sigclip_ep1'],
+                stat['median_rm3'],
+                stat['mad_rm3'],
+                stat['mean_rm3'],
+                stat['stdev_rm3'],
+                stat['ndet_rm3'],
+                stat['median_sigclip_rm3'],
+                stat['mad_sigclip_rm3'],
+                stat['mean_sigclip_rm3'],
+                stat['stdev_sigclip_rm3'],
+                stat['ndet_sigclip_rm3'],
 
-            stat['median_ep2'],
-            stat['mad_ep2'],
-            stat['mean_ep2'],
-            stat['stdev_ep2'],
-            stat['ndet_ep2'],
-            stat['median_sigclip_ep2'],
-            stat['mad_sigclip_ep2'],
-            stat['mean_sigclip_ep2'],
-            stat['stdev_sigclip_ep2'],
-            stat['ndet_sigclip_ep2'],
+                stat['median_ep1'],
+                stat['mad_ep1'],
+                stat['mean_ep1'],
+                stat['stdev_ep1'],
+                stat['ndet_ep1'],
+                stat['median_sigclip_ep1'],
+                stat['mad_sigclip_ep1'],
+                stat['mean_sigclip_ep1'],
+                stat['stdev_sigclip_ep1'],
+                stat['ndet_sigclip_ep1'],
 
-            stat['median_ep3'],
-            stat['mad_ep3'],
-            stat['mean_ep3'],
-            stat['stdev_ep3'],
-            stat['ndet_ep3'],
-            stat['median_sigclip_ep3'],
-            stat['mad_sigclip_ep3'],
-            stat['mean_sigclip_ep3'],
-            stat['stdev_sigclip_ep3'],
-            stat['ndet_sigclip_ep3'],
+                stat['median_ep2'],
+                stat['mad_ep2'],
+                stat['mean_ep2'],
+                stat['stdev_ep2'],
+                stat['ndet_ep2'],
+                stat['median_sigclip_ep2'],
+                stat['mad_sigclip_ep2'],
+                stat['mean_sigclip_ep2'],
+                stat['stdev_sigclip_ep2'],
+                stat['ndet_sigclip_ep2'],
 
-            stat['median_tf1'],
-            stat['mad_tf1'],
-            stat['mean_tf1'],
-            stat['stdev_tf1'],
-            stat['ndet_tf1'],
-            stat['median_sigclip_tf1'],
-            stat['mad_sigclip_tf1'],
-            stat['mean_sigclip_tf1'],
-            stat['stdev_sigclip_tf1'],
-            stat['ndet_sigclip_tf1'],
+                stat['median_ep3'],
+                stat['mad_ep3'],
+                stat['mean_ep3'],
+                stat['stdev_ep3'],
+                stat['ndet_ep3'],
+                stat['median_sigclip_ep3'],
+                stat['mad_sigclip_ep3'],
+                stat['mean_sigclip_ep3'],
+                stat['stdev_sigclip_ep3'],
+                stat['ndet_sigclip_ep3'],
 
-            stat['median_tf2'],
-            stat['mad_tf2'],
-            stat['mean_tf2'],
-            stat['stdev_tf2'],
-            stat['ndet_tf2'],
-            stat['median_sigclip_tf2'],
-            stat['mad_sigclip_tf2'],
-            stat['mean_sigclip_tf2'],
-            stat['stdev_sigclip_tf2'],
-            stat['ndet_sigclip_tf2'],
+                stat['median_tf1'],
+                stat['mad_tf1'],
+                stat['mean_tf1'],
+                stat['stdev_tf1'],
+                stat['ndet_tf1'],
+                stat['median_sigclip_tf1'],
+                stat['mad_sigclip_tf1'],
+                stat['mean_sigclip_tf1'],
+                stat['stdev_sigclip_tf1'],
+                stat['ndet_sigclip_tf1'],
 
-            stat['median_tf3'],
-            stat['mad_tf3'],
-            stat['mean_tf3'],
-            stat['stdev_tf3'],
-            stat['ndet_tf3'],
-            stat['median_sigclip_tf3'],
-            stat['mad_sigclip_tf3'],
-            stat['mean_sigclip_tf3'],
-            stat['stdev_sigclip_tf3'],
-            stat['ndet_sigclip_tf3']
-            )
-        outf.write(outline)
+                stat['median_tf2'],
+                stat['mad_tf2'],
+                stat['mean_tf2'],
+                stat['stdev_tf2'],
+                stat['ndet_tf2'],
+                stat['median_sigclip_tf2'],
+                stat['mad_sigclip_tf2'],
+                stat['mean_sigclip_tf2'],
+                stat['stdev_sigclip_tf2'],
+                stat['ndet_sigclip_tf2'],
+
+                stat['median_tf3'],
+                stat['mad_tf3'],
+                stat['mean_tf3'],
+                stat['stdev_tf3'],
+                stat['ndet_tf3'],
+                stat['median_sigclip_tf3'],
+                stat['mad_sigclip_tf3'],
+                stat['mean_sigclip_tf3'],
+                stat['stdev_sigclip_tf3'],
+                stat['ndet_sigclip_tf3']
+                )
+            outf.write(outline)
 
     outf.close()
 
@@ -3405,22 +3864,743 @@ def read_stats_file(statsfile):
 ## LC BINNING FUNCTIONS ##
 ##########################
 
-def bin_lightcurve_in_time(lcfile,
-                           binsize=3000):
+def time_bin_lightcurve(lcprefix,
+                        lcexts=('epdlc',
+                                'tfalc.TF1','tfalc.TF2','tfalc.TF3'),
+                        jdcol=0,
+                        lcmagcols=([21,22,23],[24,],[24,],[24,]),
+                        binsize=540,
+                        minperbin=10,
+                        outfile=None):
     '''
     This bins a lightcurve in time using the binsize given. binsize is in
     seconds.
 
+    Needs only the lcprefix; figures out the fnames and cols using the lcexts
+    and lcmagcols kwargs.
+
     '''
+
+    collected_binned_mags = {}
+
+    for ext, magcolspec in zip(lcexts, lcmagcols):
+
+        lcfname = '%s.%s' % (lcprefix, ext)
+
+        if not os.path.exists(lcfname):
+            print('LC: %s does not exist! skipping...' % lcfname)
+            continue
+
+        lcmagcols = ['AP%s' % x for x in range(len(magcolspec))]
+
+        collected_binned_mags[ext] = {x:{} for x in lcmagcols}
+
+        # extract the JD and magnitude columns
+        lcdata = np.genfromtxt(lcfname,
+                               usecols=tuple([jdcol] + magcolspec),
+                               names=['rjd'] + lcmagcols)
+
+        if lcdata['rjd'].shape and len(lcdata['rjd']) > 10:
+
+            # convert binsize in seconds to JD units
+            binsizejd = binsize/(86400.0)
+            nbins = int(np.ceil((np.max(lcdata['rjd']) -
+                             np.min(lcdata['rjd']))/binsizejd) + 1)
+
+            minjd = np.min(lcdata['rjd'])
+            jdbins = [(minjd + x*binsizejd) for x in range(nbins)]
+
+            # make a KD-tree on the JDs so we can do fast distance calculations
+            rjd_coords = np.array([[x,1.0] for x in lcdata['rjd']])
+            jdtree = kdtree(rjd_coords)
+            binned_timeseries_indices = []
+
+            for jd in jdbins:
+                # find all bin indices close to within binsizejd of this point
+                # using the kdtree query. we use the p-norm = 1 (I think this
+                # means straight-up pairwise distance? FIXME: check this)
+                bin_indices = jdtree.query_ball_point(np.array([jd,1.0]),
+                                                      binsizejd/2.0, p=1.0)
+
+                # if the bin_indices have already been collected, then we're
+                # done with this bin, move to the next one. if they haven't,
+                # then this is the start of a new bin.
+                if (bin_indices not in binned_timeseries_indices and
+                    len(bin_indices)) > 0:
+                    binned_timeseries_indices.append(bin_indices)
+
+
+            # convert to ndarrays
+            binned_timeseries_indices = [np.array(x) for x in
+                                         binned_timeseries_indices]
+
+            collected_binned_mags[ext]['jdbins'] = binned_timeseries_indices
+            collected_binned_mags[ext]['nbins'] = len(binned_timeseries_indices)
+
+            # collect the JDs
+            binned_jd = np.array([np.median(lcdata['rjd'][x])
+                                  for x in binned_timeseries_indices])
+            collected_binned_mags[ext]['RJD'] = binned_jd
+
+            # now collect the mags
+            for magcol in lcmagcols:
+
+                print('%s.%s: binning aperture %s mags...' %
+                      (lcprefix,ext,magcol))
+
+                mags = lcdata[magcol]
+                collected_binned_mags[ext][magcol] = (
+                    np.array([np.median(lcdata[magcol][x])
+                              for x in binned_timeseries_indices])
+                    )
+
+
+    collected_binned_mags['binsize'] = binsize
+
+    # write everything to a file. This is a pickled file because we might have
+    # different row numbers for each column and I don't feel like handling this
+    # right now.
+    if not outfile:
+
+        outfile = lcprefix + '.binned-%ssec-lc.pkl' % binsize
+        outf = open(outfile,'wb')
+        pickle.dump(collected_binned_mags, outf, pickle.HIGHEST_PROTOCOL)
+        outf.close()
+
+    return outfile
+
+
+def serial_bin_lightcurves(lcdir,
+                           epdlc_glob='*.epdlc',
+                           binsizes=[540,3600],
+                           lcexts=('epdlc',
+                                   'tfalc.TF1','tfalc.TF2','tfalc.TF3'),
+                           jdcol=0,
+                           lcmagcols=([21,22,23],[24,],[24,],[24,]),
+                           nworkers=16,
+                           workerntasks=500):
+
+    epdlcfiles = glob.glob(os.path.join(lcdir, epdlc_glob))
+
+    tasks = [(os.path.splitext(x)[0],
+              binsizes,
+              {'lcexts':lcexts,
+               'jdcol':jdcol,
+               'lcmagcols':lcmagcols})
+             for x in epdlcfiles]
+
+    print('%sZ: %s objects to process, starting serial binning...' %
+          (datetime.utcnow().isoformat(), len(epdlcfiles)))
+
+    for epdlc in epdlcfiles:
+        lcprefix = os.path.splitext(epdlc)[0]
+        for binsize in binsizes:
+            binlc = time_bin_lightcurve(lcprefix,binsize=binsize)
+
+
+def parallel_lcbinning_worker(task):
+    '''
+    This calls time_bin_lightcurve above with all binsizes specified in
+    task[1]. task[0] contains the lcprefix, and task[3] is a dict containing
+    kwargs, which are expanded.
+
+    '''
+
+    try:
+        results = [time_bin_lightcurve(task[0],binsize=x,**task[2])
+                   for x in task[1]]
+    except Exception as e:
+        print('something went wrong with %s!' % task)
+        results = None
+
+    return results
+
+
+def parallel_bin_lightcurves(lcdir,
+                             epdlc_glob='*.epdlc',
+                             binsizes=[540,3600],
+                             lcexts=('epdlc',
+                                     'tfalc.TF1','tfalc.TF2','tfalc.TF3'),
+                             jdcol=0,
+                             lcmagcols=([21,22,23],[24,],[24,],[24,]),
+                             nworkers=16,
+                             workerntasks=500):
+
+
+    epdlcfiles = glob.glob(os.path.join(lcdir, epdlc_glob))
+
+    tasks = [(os.path.splitext(x)[0],
+              binsizes,
+              {'lcexts':lcexts,
+               'jdcol':jdcol,
+               'lcmagcols':lcmagcols})
+             for x in epdlcfiles]
+
+    print('%sZ: %s objects to process, starting parallel binning...' %
+          (datetime.utcnow().isoformat(), len(epdlcfiles)))
+
+    pool = mp.Pool(nworkers, maxtasksperchild=workerntasks)
+    results = pool.map(parallel_lcbinning_worker, tasks)
+    pool.close()
+    pool.join()
+
+    print('%sZ: done. %s LCs processed.' %
+          (datetime.utcnow().isoformat(), len(epdlcfiles)))
+
+
+def read_binned_lc(binnedlc):
+    '''
+    This reads back the binnedlc pkl file to a dictionary.
+    '''
+    with open(binnedlc,'rb') as lcf:
+        lcdict = pickle.load(lcf)
+    return lcdict
+
+
+def get_binnedlc_statistics(lcfile,
+                            sigclip=4.0):
+    '''
+    This collects stats for the binned LCs in the lcfile.
+
+    '''
+
+    # read in the lcfile
+    binnedlc = read_binned_lc(lcfile)
+
+    # read each lckey and get its statistics
+    stats_dict = {}
+
+    # get the EPDLC first
+    ep1 = binnedlc['epdlc']['AP0']
+    ep2 = binnedlc['epdlc']['AP1']
+    ep3 = binnedlc['epdlc']['AP2']
+
+    # then get the TFALC
+    tf1 = binnedlc['tfalc.TF1']['AP0']
+    tf2 = binnedlc['tfalc.TF2']['AP0']
+    tf3 = binnedlc['tfalc.TF3']['AP0']
+
+    # get stats for each column
+    # EP1
+    if len(ep1) > 4:
+
+        finiteind = np.isfinite(ep1)
+        ep1 = ep1[finiteind]
+        median_ep1 = np.median(ep1)
+        mad_ep1 = np.median(np.fabs(ep1 - median_ep1))
+        mean_ep1 = np.mean(ep1)
+        stdev_ep1 = np.std(ep1)
+        ndet_ep1 = len(ep1)
+
+        if sigclip:
+            sigclip_ep1, lo, hi = stats_sigmaclip(ep1,
+                                                  low=sigclip,
+                                                  high=sigclip)
+            median_sigclip_ep1 = np.median(sigclip_ep1)
+            mad_sigclip_ep1 = np.median(np.fabs(sigclip_ep1 -
+                                                median_sigclip_ep1))
+            mean_sigclip_ep1 = np.mean(sigclip_ep1)
+            stdev_sigclip_ep1 = np.std(sigclip_ep1)
+            ndet_sigclip_ep1 = len(sigclip_ep1)
+
+        else:
+            median_sigclip_ep1 = np.nan
+            mad_sigclip_ep1 = np.nan
+            mean_sigclip_ep1 = np.nan
+            stdev_sigclip_ep1 = np.nan
+            ndet_sigclip_ep1 = np.nan
+
+    else:
+
+        median_ep1, mad_ep1, mean_ep1, stdev_ep1 = np.nan, np.nan, np.nan, np.nan
+        ndet_ep1 = np.nan
+        median_sigclip_ep1, mad_sigclip_ep1 = np.nan, np.nan
+        mean_sigclip_ep1, stdev_sigclip_ep1 = np.nan, np.nan
+        ndet_sigclip_ep1 = np.nan
+
+    # EP2
+    if len(ep2) > 4:
+
+        finiteind = np.isfinite(ep2)
+        ep2 = ep2[finiteind]
+        median_ep2 = np.median(ep2)
+        mad_ep2 = np.median(np.fabs(ep2 - median_ep2))
+        mean_ep2 = np.mean(ep2)
+        stdev_ep2 = np.std(ep2)
+        ndet_ep2 = len(ep2)
+
+        if sigclip:
+            sigclip_ep2, lo, hi = stats_sigmaclip(ep2,
+                                                  low=sigclip,
+                                                  high=sigclip)
+            median_sigclip_ep2 = np.median(sigclip_ep2)
+            mad_sigclip_ep2 = np.median(np.fabs(sigclip_ep2 -
+                                                median_sigclip_ep2))
+            mean_sigclip_ep2 = np.mean(sigclip_ep2)
+            stdev_sigclip_ep2 = np.std(sigclip_ep2)
+            ndet_sigclip_ep2 = len(sigclip_ep2)
+
+        else:
+            median_sigclip_ep2 = np.nan
+            mad_sigclip_ep2 = np.nan
+            mean_sigclip_ep2 = np.nan
+            stdev_sigclip_ep2 = np.nan
+            ndet_sigclip_ep2 = np.nan
+
+    else:
+
+        median_ep2, mad_ep2, mean_ep2, stdev_ep2 = np.nan, np.nan, np.nan, np.nan
+        ndet_ep2 = np.nan
+        median_sigclip_ep2, mad_sigclip_ep2 = np.nan, np.nan
+        mean_sigclip_ep2, stdev_sigclip_ep2 = np.nan, np.nan
+        ndet_sigclip_ep2 = np.nan
+
+    # EP3
+    if len(ep3) > 4:
+
+        finiteind = np.isfinite(ep3)
+        ep3 = ep3[finiteind]
+        median_ep3 = np.median(ep3)
+        mad_ep3 = np.median(np.fabs(ep3 - median_ep3))
+        mean_ep3 = np.mean(ep3)
+        stdev_ep3 = np.std(ep3)
+        ndet_ep3 = len(ep3)
+
+        if sigclip:
+            sigclip_ep3, lo, hi = stats_sigmaclip(ep3,
+                                                  low=sigclip,
+                                                  high=sigclip)
+            median_sigclip_ep3 = np.median(sigclip_ep3)
+            mad_sigclip_ep3 = np.median(np.fabs(sigclip_ep3 -
+                                                median_sigclip_ep3))
+            mean_sigclip_ep3 = np.mean(sigclip_ep3)
+            stdev_sigclip_ep3 = np.std(sigclip_ep3)
+            ndet_sigclip_ep3 = len(sigclip_ep3)
+
+        else:
+            median_sigclip_ep3 = np.nan
+            mad_sigclip_ep3 = np.nan
+            mean_sigclip_ep3 = np.nan
+            stdev_sigclip_ep3 = np.nan
+            ndet_sigclip_ep3 = np.nan
+
+    else:
+
+        median_ep3, mad_ep3, mean_ep3, stdev_ep3 = np.nan, np.nan, np.nan, np.nan
+        ndet_ep3 = np.nan
+        median_sigclip_ep3, mad_sigclip_ep3 = np.nan, np.nan
+        mean_sigclip_ep3, stdev_sigclip_ep3 = np.nan, np.nan
+        ndet_sigclip_ep3 = np.nan
+
+    # TF1
+    if len(tf1) > 4:
+
+        finiteind = np.isfinite(tf1)
+        tf1 = tf1[finiteind]
+        median_tf1 = np.median(tf1)
+        mad_tf1 = np.median(np.fabs(tf1 - median_tf1))
+        mean_tf1 = np.mean(tf1)
+        stdev_tf1 = np.std(tf1)
+        ndet_tf1 = len(tf1)
+
+        if sigclip:
+            sigclip_tf1, lo, hi = stats_sigmaclip(tf1,
+                                                  low=sigclip,
+                                                  high=sigclip)
+            median_sigclip_tf1 = np.median(sigclip_tf1)
+            mad_sigclip_tf1 = np.median(np.fabs(sigclip_tf1 -
+                                                median_sigclip_tf1))
+            mean_sigclip_tf1 = np.mean(sigclip_tf1)
+            stdev_sigclip_tf1 = np.std(sigclip_tf1)
+            ndet_sigclip_tf1 = len(sigclip_tf1)
+
+        else:
+            median_sigclip_tf1 = np.nan
+            mad_sigclip_tf1 = np.nan
+            mean_sigclip_tf1 = np.nan
+            stdev_sigclip_tf1 = np.nan
+            ndet_sigclip_tf1 = np.nan
+
+    else:
+
+        median_tf1, mad_tf1, mean_tf1, stdev_tf1 = np.nan, np.nan, np.nan, np.nan
+        ndet_tf1 = np.nan
+        median_sigclip_tf1, mad_sigclip_tf1 = np.nan, np.nan
+        mean_sigclip_tf1, stdev_sigclip_tf1 = np.nan, np.nan
+        ndet_sigclip_tf1 = np.nan
+
+    # TF2
+    if len(tf2) > 4:
+
+        finiteind = np.isfinite(tf2)
+        tf2 = tf2[finiteind]
+        median_tf2 = np.median(tf2)
+        mad_tf2 = np.median(np.fabs(tf2 - median_tf2))
+        mean_tf2 = np.mean(tf2)
+        stdev_tf2 = np.std(tf2)
+        ndet_tf2 = len(tf2)
+
+        if sigclip:
+            sigclip_tf2, lo, hi = stats_sigmaclip(tf2,
+                                                  low=sigclip,
+                                                  high=sigclip)
+            median_sigclip_tf2 = np.median(sigclip_tf2)
+            mad_sigclip_tf2 = np.median(np.fabs(sigclip_tf2 -
+                                                median_sigclip_tf2))
+            mean_sigclip_tf2 = np.mean(sigclip_tf2)
+            stdev_sigclip_tf2 = np.std(sigclip_tf2)
+            ndet_sigclip_tf2 = len(sigclip_tf2)
+
+        else:
+            median_sigclip_tf2 = np.nan
+            mad_sigclip_tf2 = np.nan
+            mean_sigclip_tf2 = np.nan
+            stdev_sigclip_tf2 = np.nan
+            ndet_sigclip_tf2 = np.nan
+
+    else:
+
+        median_tf2, mad_tf2, mean_tf2, stdev_tf2 = np.nan, np.nan, np.nan, np.nan
+        ndet_tf2 = np.nan
+        median_sigclip_tf2, mad_sigclip_tf2 = np.nan, np.nan
+        mean_sigclip_tf2, stdev_sigclip_tf2 = np.nan, np.nan
+        ndet_sigclip_tf2 = np.nan
+
+    # TF3
+    if len(tf3) > 4:
+
+        finiteind = np.isfinite(tf3)
+        tf3 = tf3[finiteind]
+        median_tf3 = np.median(tf3)
+        mad_tf3 = np.median(np.fabs(tf3 - median_tf3))
+        mean_tf3 = np.mean(tf3)
+        stdev_tf3 = np.std(tf3)
+        ndet_tf3 = len(tf3)
+
+        if sigclip:
+            sigclip_tf3, lo, hi = stats_sigmaclip(tf3,
+                                                  low=sigclip,
+                                                  high=sigclip)
+            median_sigclip_tf3 = np.median(sigclip_tf3)
+            mad_sigclip_tf3 = np.median(np.fabs(sigclip_tf3 -
+                                                median_sigclip_tf3))
+            mean_sigclip_tf3 = np.mean(sigclip_tf3)
+            stdev_sigclip_tf3 = np.std(sigclip_tf3)
+            ndet_sigclip_tf3 = len(sigclip_tf3)
+
+        else:
+            median_sigclip_tf3 = np.nan
+            mad_sigclip_tf3 = np.nan
+            mean_sigclip_tf3 = np.nan
+            stdev_sigclip_tf3 = np.nan
+            ndet_sigclip_tf3 = np.nan
+
+    else:
+
+        median_tf3, mad_tf3, mean_tf3, stdev_tf3 = np.nan, np.nan, np.nan, np.nan
+        ndet_tf3 = np.nan
+        median_sigclip_tf3, mad_sigclip_tf3 = np.nan, np.nan
+        mean_sigclip_tf3, stdev_sigclip_tf3 = np.nan, np.nan
+        ndet_sigclip_tf3 = np.nan
+
+    ## COLLECT STATS
+
+    print('%sZ: done with statistics for %s' %
+          (datetime.utcnow().isoformat(), lcfile))
+
+    return {'lcfile':lcfile,
+            'lcobj':os.path.splitext(os.path.basename(lcfile))[0],
+            # EPD mags aperture 1
+            'median_ep1':median_ep1,
+            'mad_ep1':mad_ep1,
+            'mean_ep1':mean_ep1,
+            'stdev_ep1':stdev_ep1,
+            'ndet_ep1':ndet_ep1,
+            'median_sigclip_ep1':median_sigclip_ep1,
+            'mad_sigclip_ep1':mad_sigclip_ep1,
+            'mean_sigclip_ep1':mean_sigclip_ep1,
+            'stdev_sigclip_ep1':stdev_sigclip_ep1,
+            'ndet_sigclip_ep1':ndet_sigclip_ep1,
+            # EPD mags aperture 2
+            'median_ep2':median_ep2,
+            'mad_ep2':mad_ep2,
+            'mean_ep2':mean_ep2,
+            'stdev_ep2':stdev_ep2,
+            'ndet_ep2':ndet_ep2,
+            'median_sigclip_ep2':median_sigclip_ep2,
+            'mad_sigclip_ep2':mad_sigclip_ep2,
+            'mean_sigclip_ep2':mean_sigclip_ep2,
+            'stdev_sigclip_ep2':stdev_sigclip_ep2,
+            'ndet_sigclip_ep2':ndet_sigclip_ep2,
+            # EPD mags aperture 3
+            'median_ep3':median_ep3,
+            'mad_ep3':mad_ep3,
+            'mean_ep3':mean_ep3,
+            'stdev_ep3':stdev_ep3,
+            'ndet_ep3':ndet_ep3,
+            'median_sigclip_ep3':median_sigclip_ep3,
+            'mad_sigclip_ep3':mad_sigclip_ep3,
+            'mean_sigclip_ep3':mean_sigclip_ep3,
+            'stdev_sigclip_ep3':stdev_sigclip_ep3,
+            'ndet_sigclip_ep3':ndet_sigclip_ep3,
+            # TFA mags aperture 1
+            'median_tf1':median_tf1,
+            'mad_tf1':mad_tf1,
+            'mean_tf1':mean_tf1,
+            'stdev_tf1':stdev_tf1,
+            'ndet_tf1':ndet_tf1,
+            'median_sigclip_tf1':median_sigclip_tf1,
+            'mad_sigclip_tf1':mad_sigclip_tf1,
+            'mean_sigclip_tf1':mean_sigclip_tf1,
+            'stdev_sigclip_tf1':stdev_sigclip_tf1,
+            'ndet_sigclip_tf1':ndet_sigclip_tf1,
+            # TFA mags aperture 2
+            'median_tf2':median_tf2,
+            'mad_tf2':mad_tf2,
+            'mean_tf2':mean_tf2,
+            'stdev_tf2':stdev_tf2,
+            'ndet_tf2':ndet_tf2,
+            'median_sigclip_tf2':median_sigclip_tf2,
+            'mad_sigclip_tf2':mad_sigclip_tf2,
+            'mean_sigclip_tf2':mean_sigclip_tf2,
+            'stdev_sigclip_tf2':stdev_sigclip_tf2,
+            'ndet_sigclip_tf2':ndet_sigclip_tf2,
+            # TFA mags aperture 3
+            'median_tf3':median_tf3,
+            'mad_tf3':mad_tf3,
+            'mean_tf3':mean_tf3,
+            'stdev_tf3':stdev_tf3,
+            'ndet_tf3':ndet_tf3,
+            'median_sigclip_tf3':median_sigclip_tf3,
+            'mad_sigclip_tf3':mad_sigclip_tf3,
+            'mean_sigclip_tf3':mean_sigclip_tf3,
+            'stdev_sigclip_tf3':stdev_sigclip_tf3,
+            'ndet_sigclip_tf3':ndet_sigclip_tf3}
+
+
+def binnedlc_statistics_worker(task):
+    '''
+    This is a worker that runs the function above in a parallel worker pool.
+
+    '''
+
+    try:
+        return get_binnedlc_statistics(task[0], **task[1])
+    except Exception as e:
+        print('SOMETHING WENT WRONG! task was %s' % task)
+        return None
+
+
+
+def parallel_binnedlc_statistics(lcdir,
+                                 lcglob,
+                                 outfile=None,
+                                 nworkers=16,
+                                 workerntasks=500,
+                                 sigclip=4.0):
+    '''
+    This calculates statistics on all binned lc files in lcdir using lcglob to
+    find the files. Puts the results in text file outfile.
+
+    outfile contains the following columns:
+
+    object, ndet,
+    median EP[1-3], MAD EP[1-3], mean EP[1-3], stdev EP[1-3],
+    median TF[1-3], MAD TF[1-3], mean TF[1-3], stdev TF[1-3]
+
+    if a value is missing, it will be np.nan.
+
+    '''
+
+    lcfiles = glob.glob(os.path.join(lcdir, lcglob))
+
+    tasks = [[x, {'sigclip':sigclip}] for x in lcfiles]
+
+    pool = mp.Pool(nworkers,maxtasksperchild=workerntasks)
+    results = pool.map(binnedlc_statistics_worker, tasks)
+    pool.close()
+    pool.join()
+
+    print('%sZ: done. %s lightcurves processed.' %
+          (datetime.utcnow().isoformat(), len(lcfiles)))
+
+    if not outfile:
+        outfile = os.path.join(lcdir, 'binned-lightcurve-statistics.txt')
+
+    outf = open(outfile,'wb')
+
+    outlineformat = (
+        '%s  '
+        '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
+        '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
+        '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
+        '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
+        '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
+        '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s\n'
+        )
+
+    outheader = '# total objects: %s, sigmaclip used: %s\n' % (len(lcfiles),
+                                                               sigclip)
+    outf.write(outheader)
+
+    outcolumnkey = (
+        '# columns are:\n'
+        '# 0: object\n'
+        '# 1,2,3,4,5: median EP1, MAD EP1, mean EP1, stdev EP1, ndet EP1\n'
+        '# 6,7,8,9,10: sigma-clipped median EP1, MAD EP1, mean EP1, '
+        'stdev EP1, ndet EP1\n'
+        '# 11,12,13,14,15: median EP2, MAD EP2, mean EP2, stdev EP2, ndet EP2\n'
+        '# 16,17,18,19,20: sigma-clipped median EP2, MAD EP2, mean EP2, '
+        'stdev EP2, ndet EP2\n'
+        '# 21,22,23,24,25: median EP3, MAD EP3, mean EP3, stdev EP3, ndet EP3\n'
+        '# 26,27,28,29,30: sigma-clipped median EP3, MAD EP3, mean EP3, '
+        'stdev EP3, ndet EP3\n'
+        '# 31,32,33,34,35: median TF1, MAD TF1, mean TF1, stdev TF1, ndet TF1\n'
+        '# 36,37,38,39,40: sigma-clipped median TF1, MAD TF1, mean TF1, '
+        'stdev TF1, ndet TF1\n'
+        '# 41,42,43,44,45: median TF2, MAD TF2, mean TF2, stdev TF2, ndet TF2\n'
+        '# 46,47,48,49,50: sigma-clipped median TF2, MAD TF2, mean TF2, '
+        'stdev TF2, ndet TF2\n'
+        '# 51,52,53,54,55: median TF3, MAD TF3, mean TF3, stdev TF3, ndet TF3\n'
+        '# 56,57,58,59,60: sigma-clipped median TF3, MAD TF3, mean TF3, '
+        'stdev TF3, ndet TF3\n'
+        )
+    outf.write(outcolumnkey)
+
+    for stat in results:
+
+        if stat is not None:
+
+            outline = outlineformat % (
+                stat['lcobj'],
+
+                stat['median_ep1'],
+                stat['mad_ep1'],
+                stat['mean_ep1'],
+                stat['stdev_ep1'],
+                stat['ndet_ep1'],
+                stat['median_sigclip_ep1'],
+                stat['mad_sigclip_ep1'],
+                stat['mean_sigclip_ep1'],
+                stat['stdev_sigclip_ep1'],
+                stat['ndet_sigclip_ep1'],
+
+                stat['median_ep2'],
+                stat['mad_ep2'],
+                stat['mean_ep2'],
+                stat['stdev_ep2'],
+                stat['ndet_ep2'],
+                stat['median_sigclip_ep2'],
+                stat['mad_sigclip_ep2'],
+                stat['mean_sigclip_ep2'],
+                stat['stdev_sigclip_ep2'],
+                stat['ndet_sigclip_ep2'],
+
+                stat['median_ep3'],
+                stat['mad_ep3'],
+                stat['mean_ep3'],
+                stat['stdev_ep3'],
+                stat['ndet_ep3'],
+                stat['median_sigclip_ep3'],
+                stat['mad_sigclip_ep3'],
+                stat['mean_sigclip_ep3'],
+                stat['stdev_sigclip_ep3'],
+                stat['ndet_sigclip_ep3'],
+
+                stat['median_tf1'],
+                stat['mad_tf1'],
+                stat['mean_tf1'],
+                stat['stdev_tf1'],
+                stat['ndet_tf1'],
+                stat['median_sigclip_tf1'],
+                stat['mad_sigclip_tf1'],
+                stat['mean_sigclip_tf1'],
+                stat['stdev_sigclip_tf1'],
+                stat['ndet_sigclip_tf1'],
+
+                stat['median_tf2'],
+                stat['mad_tf2'],
+                stat['mean_tf2'],
+                stat['stdev_tf2'],
+                stat['ndet_tf2'],
+                stat['median_sigclip_tf2'],
+                stat['mad_sigclip_tf2'],
+                stat['mean_sigclip_tf2'],
+                stat['stdev_sigclip_tf2'],
+                stat['ndet_sigclip_tf2'],
+
+                stat['median_tf3'],
+                stat['mad_tf3'],
+                stat['mean_tf3'],
+                stat['stdev_tf3'],
+                stat['ndet_tf3'],
+                stat['median_sigclip_tf3'],
+                stat['mad_sigclip_tf3'],
+                stat['mean_sigclip_tf3'],
+                stat['stdev_sigclip_tf3'],
+                stat['ndet_sigclip_tf3']
+                )
+            outf.write(outline)
+
+    outf.close()
+
+    print('%sZ: wrote statistics to file %s' %
+          (datetime.utcnow().isoformat(), outfile))
+
+    return results
+
+
+def read_binnedlc_stats_file(statsfile):
+    '''
+    Reads the stats file into a numpy recarray.
+
+    '''
+
+    # open the statfile and read all the columns
+    stats = np.genfromtxt(
+        statsfile,
+        dtype=('S17,'
+               'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP1
+               'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP2
+               'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP3
+               'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF1
+               'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF2
+               'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8'), # TF3
+        names=['lcobj',
+               'med_ep1','mad_ep1','mean_ep1','stdev_ep1','ndet_ep1',
+               'med_sc_ep1','mad_sc_ep1','mean_sc_ep1','stdev_sc_ep1',
+               'ndet_sc_ep1',
+               'med_ep2','mad_ep2','mean_ep2','stdev_ep2','ndet_ep2',
+               'med_sc_ep2','mad_sc_ep2','mean_sc_ep2','stdev_sc_ep2',
+               'ndet_sc_ep2',
+               'med_ep3','mad_ep3','mean_ep3','stdev_ep3','ndet_ep3',
+               'med_sc_ep3','mad_sc_ep3','mean_sc_ep3','stdev_sc_ep3',
+               'ndet_sc_ep3',
+               'med_tf1','mad_tf1','mean_tf1','stdev_tf1','ndet_tf1',
+               'med_sc_tf1','mad_sc_tf1','mean_sc_tf1','stdev_sc_tf1',
+               'ndet_sc_tf1',
+               'med_tf2','mad_tf2','mean_tf2','stdev_tf2','ndet_tf2',
+               'med_sc_tf2','mad_sc_tf2','mean_sc_tf2','stdev_sc_tf2',
+               'ndet_sc_tf2',
+               'med_tf3','mad_tf3','mean_tf3','stdev_tf3','ndet_tf3',
+               'med_sc_tf3','mad_sc_tf3','mean_sc_tf3','stdev_sc_tf3',
+               'ndet_sc_tf3']
+        )
+
+    return stats
+
+
+def plot_binnedlc_stats(binned_stats_file):
+    '''
+    This makes plots of the binned LC stats.
+
+    '''
+
 
 
 ########################
 ## PLOTTING FUNCTIONS ##
 ########################
-
-# functions that roll up the parts of the pipeline into aggregate functions go
-# here, along with a main function
-
 
 # lists all plots to make plus columns to use and metadata
 STATS_PLOTS = {
@@ -3429,131 +4609,152 @@ STATS_PLOTS = {
         'ycol':'mad_rm1',
         'title':'RM1 median mag vs. RM1 median abs. dev.',
         'xlabel':'RM1 median magnitude',
-        'ylabel':'RM1 median abs. dev.'
+        'ylabel':'RM1 median abs. dev.',
+        'binned':False
         },
     'median-rm1-vs-mad-rm1-sigclipped':{
         'xcol':'med_sc_rm1',
         'ycol':'mad_sc_rm1',
         'title':'RM1 median mag vs. RM1 median abs. dev. (sigclip LCs)',
         'xlabel':'RM1 median magnitude',
-        'ylabel':'RM1 median abs. dev.'
+        'ylabel':'RM1 median abs. dev.',
+        'binned':False
         },
     'median-rm2-vs-mad-rm2':{
         'xcol':'med_rm2',
         'ycol':'mad_rm2',
         'title':'RM2 median mag vs. RM2 median abs. dev.',
         'xlabel':'RM2 median magnitude',
-        'ylabel':'RM2 median abs. dev.'
+        'ylabel':'RM2 median abs. dev.',
+        'binned':False
         },
     'median-rm2-vs-mad-rm2-sigclipped':{
         'xcol':'med_sc_rm2',
         'ycol':'mad_sc_rm2',
         'title':'RM2 median mag vs. RM2 median abs. dev. (sigclip LCs)',
         'xlabel':'RM2 median magnitude',
-        'ylabel':'RM2 median abs. dev.'
+        'ylabel':'RM2 median abs. dev.',
+        'binned':False
         },
     'median-rm3-vs-mad-rm3':{
         'xcol':'med_rm3',
         'ycol':'mad_rm3',
         'title':'RM3 median mag vs. RM3 median abs. dev.',
         'xlabel':'RM3 median magnitude',
-        'ylabel':'RM3 median abs. dev.'
+        'ylabel':'RM3 median abs. dev.',
+        'binned':False
         },
     'median-rm3-vs-mad-rm3-sigclipped':{
         'xcol':'med_sc_rm3',
         'ycol':'mad_sc_rm3',
         'title':'RM3 median mag vs. RM3 median abs. dev. (sigclip LCs)',
         'xlabel':'RM3 median magnitude',
-        'ylabel':'RM3 median abs. dev.'
+        'ylabel':'RM3 median abs. dev.',
+        'binned':False
         },
     'median-EP1-vs-mad-EP1':{
         'xcol':'med_ep1',
         'ycol':'mad_ep1',
         'title':'EP1 median mag vs. EP1 median abs. dev.',
         'xlabel':'EP1 median magnitude',
-        'ylabel':'EP1 median abs. dev.'
+        'ylabel':'EP1 median abs. dev.',
+        'binned':True
         },
     'median-EP1-vs-mad-EP1-sigclipped':{
         'xcol':'med_sc_ep1',
         'ycol':'mad_sc_ep1',
         'title':'EP1 median mag vs. EP1 median abs. dev. (sigclip LCs)',
         'xlabel':'EP1 median magnitude',
-        'ylabel':'EP1 median abs. dev.'
+        'ylabel':'EP1 median abs. dev.',
+        'binned':True
         },
     'median-EP2-vs-mad-EP2':{
         'xcol':'med_ep2',
         'ycol':'mad_ep2',
         'title':'EP2 median mag vs. EP2 median abs. dev.',
         'xlabel':'EP2 median magnitude',
-        'ylabel':'EP2 median abs. dev.'
+        'ylabel':'EP2 median abs. dev.',
+        'binned':True
         },
     'median-EP2-vs-mad-EP2-sigclipped':{
         'xcol':'med_sc_ep2',
         'ycol':'mad_sc_ep2',
         'title':'EP2 median mag vs. EP2 median abs. dev. (sigclip LCs)',
         'xlabel':'EP2 median magnitude',
-        'ylabel':'EP2 median abs. dev.'
+        'ylabel':'EP2 median abs. dev.',
+        'binned':True
         },
     'median-EP3-vs-mad-EP3':{
         'xcol':'med_ep3',
         'ycol':'mad_ep3',
         'title':'EP3 median mag vs. EP3 median abs. dev.',
         'xlabel':'EP3 median magnitude',
-        'ylabel':'EP3 median abs. dev.'
+        'ylabel':'EP3 median abs. dev.',
+        'binned':True
         },
     'median-EP3-vs-mad-EP3-sigclipped':{
         'xcol':'med_sc_ep3',
         'ycol':'mad_sc_ep3',
         'title':'EP3 median mag vs. EP3 median abs. dev. (sigclip LCs)',
         'xlabel':'EP3 median magnitude',
-        'ylabel':'EP3 median abs. dev.'
+        'ylabel':'EP3 median abs. dev.',
+        'binned':True
         },
-    # 'median-TF1-vs-mad-TF1':{
-    #     'xcol':'med_tf1',
-    #     'ycol':'mad_tf1',
-    #     'title':'TF1 median mag vs. TF1 median abs. dev.',
-    #     'xlabel':'TF1 median magnitude',
-    #     'ylabel':'TF1 median abs. dev.'
-    #     },
-    # 'median-TF1-vs-mad-TF1-sigclipped':{
-    #     'xcol':'med_sc_tf1',
-    #     'ycol':'mad_sc_tf1',
-    #     'title':'TF1 median mag vs. TF1 median abs. dev. (sigclip LCs)',
-    #     'xlabel':'TF1 median magnitude',
-    #     'ylabel':'TF1 median abs. dev.'
-    #     },
-    # 'median-TF2-vs-mad-TF2':{
-    #     'xcol':'med_tf2',
-    #     'ycol':'mad_tf2',
-    #     'title':'TF2 median mag vs. TF2 median abs. dev.',
-    #     'xlabel':'TF2 median magnitude',
-    #     'ylabel':'TF2 median abs. dev.'
-    #     },
-    # 'median-TF2-vs-mad-TF2-sigclipped':{
-    #     'xcol':'med_sc_tf2',
-    #     'ycol':'mad_sc_tf2',
-    #     'title':'TF2 median mag vs. TF2 median abs. dev. (sigclip LCs)',
-    #     'xlabel':'TF2 median magnitude',
-    #     'ylabel':'TF2 median abs. dev.'
-    #     },
-    # 'median-TF3-vs-mad-TF3':{
-    #     'xcol':'med_tf3',
-    #     'ycol':'mad_tf3',
-    #     'title':'TF3 median mag vs. TF3 median abs. dev.',
-    #     'xlabel':'TF3 median magnitude',
-    #     'ylabel':'TF3 median abs. dev.'
-    #     },
-    # 'median-TF3-vs-mad-TF3-sigclipped':{
-    #     'xcol':'med_sc_tf3',
-    #     'ycol':'mad_sc_tf3',
-    #     'title':'TF3 median mag vs. TF3 median abs. dev. (sigclip LCs)',
-    #     'xlabel':'TF3 median magnitude',
-    #     'ylabel':'TF3 median abs. dev.'
-    #     },
+    'median-TF1-vs-mad-TF1':{
+        'xcol':'med_tf1',
+        'ycol':'mad_tf1',
+        'title':'TF1 median mag vs. TF1 median abs. dev.',
+        'xlabel':'TF1 median magnitude',
+        'ylabel':'TF1 median abs. dev.',
+        'binned':True
+        },
+    'median-TF1-vs-mad-TF1-sigclipped':{
+        'xcol':'med_sc_tf1',
+        'ycol':'mad_sc_tf1',
+        'title':'TF1 median mag vs. TF1 median abs. dev. (sigclip LCs)',
+        'xlabel':'TF1 median magnitude',
+        'ylabel':'TF1 median abs. dev.',
+        'binned':True
+        },
+    'median-TF2-vs-mad-TF2':{
+        'xcol':'med_tf2',
+        'ycol':'mad_tf2',
+        'title':'TF2 median mag vs. TF2 median abs. dev.',
+        'xlabel':'TF2 median magnitude',
+        'ylabel':'TF2 median abs. dev.',
+        'binned':True
+        },
+    'median-TF2-vs-mad-TF2-sigclipped':{
+        'xcol':'med_sc_tf2',
+        'ycol':'mad_sc_tf2',
+        'title':'TF2 median mag vs. TF2 median abs. dev. (sigclip LCs)',
+        'xlabel':'TF2 median magnitude',
+        'ylabel':'TF2 median abs. dev.',
+        'binned':True
+        },
+    'median-TF3-vs-mad-TF3':{
+        'xcol':'med_tf3',
+        'ycol':'mad_tf3',
+        'title':'TF3 median mag vs. TF3 median abs. dev.',
+        'xlabel':'TF3 median magnitude',
+        'ylabel':'TF3 median abs. dev.',
+        'binned':True
+        },
+    'median-TF3-vs-mad-TF3-sigclipped':{
+        'xcol':'med_sc_tf3',
+        'ycol':'mad_sc_tf3',
+        'title':'TF3 median mag vs. TF3 median abs. dev. (sigclip LCs)',
+        'xlabel':'TF3 median magnitude',
+        'ylabel':'TF3 median abs. dev.',
+        'binned':True
+        },
     }
 
+
 def plot_stats_file(statsfile, outdir, outprefix,
-                    logy=False, logx=False,
+                    binned=False,
+                    logy=False,
+                    logx=False,
                     rangex=(5.9,14.1)):
     '''
     This makes all the plots for a stats file.
@@ -3561,9 +4762,16 @@ def plot_stats_file(statsfile, outdir, outprefix,
     '''
 
     # read the stats file
-    stats = read_stats_file(statsfile)
+    if binned:
+        stats = read_binnedlc_stats_file(statsfile)
+    else:
+        stats = read_stats_file(statsfile)
 
     for plot in STATS_PLOTS:
+
+        if binned and not STATS_PLOTS[plot]['binned']:
+            print('not making %s for binned LCs' % plot)
+            continue
 
         if logy:
             logypostfix = '-logy'
@@ -3592,6 +4800,174 @@ def plot_stats_file(statsfile, outdir, outprefix,
             plt.scatter(xcol, ycol,
                         s=1,
                         marker='.')
+            plt.yscale('log',basex=10.0)
+        elif logx:
+            plt.scatter(xcol, ycol,
+                        s=1,
+                        marker='.')
+            plt.xscale('log',basex=10.0)
+        elif logx and logy:
+            plt.scatter(xcol, ycol,
+                        s=1,
+                        marker='.')
+            plt.xscale('log',basex=10.0)
+            plt.yscale('log',basex=10.0)
+        else:
+            plt.scatter(xcol, ycol,
+                        s=1,
+                        marker='.')
+
+
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+        plt.title(title)
+        plt.xlim(rangex)
+
+        if binned:
+            plt.ylim((0.0001,1.0))
+            plt.hlines([0.0005,0.001,0.002,0.003,0.01],
+                       xmin=5.0,xmax=15.0,colors='b')
+
+        else:
+            # make the horizontal lines for 10, 5, 1 mmag
+            plt.ylim((0.001,1.0))
+            plt.hlines([0.001, 0.002, 0.003, 0.004, 0.005, 0.01],
+                       xmin=5.0,xmax=15.0,colors='b')
+
+        plt.savefig(outfile)
+        plt.close()
+
+        print('%sZ: made %s plot: %s' %
+              (datetime.utcnow().isoformat(), title, outfile))
+
+
+
+def plot_magrms_comparison(reference_stats_file,
+                           comparison_stats_file,
+                           ref_name, comp_name,
+                           outfile,
+                           ref_col='mad_tf3',
+                           comp_col='mad_tf3',
+                           logy=False, logx=False,
+                           rangex=(5.9,14.1)):
+    '''
+    This makes magrms comparison plots using two lightcurve stats files.
+
+    '''
+
+    ref_stats = read_stats_file(reference_stats_file)
+    comp_stats = read_stats_file(comparison_stats_file)
+
+    ref_objects = ref_stats['lcobj']
+    comp_objects = comp_stats['lcobj']
+
+    common_objects = np.intersect1d(ref_objects, comp_objects)
+
+    # put together the data for the common objects
+    ref_tf3_mag = [ref_stats['med_tf3'][ref_stats['lcobj'] == x]
+                   for x in common_objects]
+    ref_tf3_compcol = [ref_stats[ref_col][ref_stats['lcobj'] == x]
+                       for x in common_objects]
+
+    comp_tf3_mag = [comp_stats['med_tf3'][comp_stats['lcobj'] == x]
+                    for x in common_objects]
+    comp_tf3_compcol = [comp_stats[comp_col][comp_stats['lcobj'] == x]
+                        for x in common_objects]
+
+    tf3_compcol_ratios = np.array(ref_tf3_compcol)/np.array(comp_tf3_compcol)
+
+    xcol, ycol = ref_tf3_mag, tf3_compcol_ratios
+
+    xlabel, ylabel = ('r-band TF3 median magnitude',
+                      'TF3 median abs. dev. %s/%s' % (ref_name, comp_name))
+    title = 'comparison of TF3 median abs. dev. - %s/%s' % (ref_name, comp_name)
+
+    # make the plot
+    if logy:
+        plt.scatter(xcol, ycol,
+                    s=1,
+                    marker='.')
+        plt.yscale('log')
+    elif logx:
+        plt.scatter(xcol, ycol,
+                    s=1,
+                    marker='.')
+        plt.xscale('log')
+    elif logx and logy:
+        plt.scatter(xcol, ycol,
+                    s=1,
+                    marker='.')
+        plt.xscale('log')
+        plt.yscale('log')
+    else:
+        plt.scatter(xcol, ycol,
+                    s=1,
+                    marker='.')
+
+
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.xlim(rangex)
+    plt.ylim(-0.5,4)
+
+    # make the horizontal lines for 10, 5, 1 mmag
+    plt.hlines([-2.0,-1.5,1,1.5,2.0],
+               xmin=5.0,xmax=15.0,colors='r')
+
+    plt.savefig(outfile)
+    plt.close()
+
+
+
+def plot_ismphot_comparison(apphot_stats_file,
+                            ismphot_stats_file,
+                            ref_name, comp_name,
+                            outfile,
+                            comp_cols=(0,1,13),
+                            logy=False, logx=False,
+                            rangex=(5.9,14.1)):
+
+    ref_stats = read_stats_file(apphot_stats_file)
+    comp_stats = np.genfromtxt(ismphot_stats_file,
+                               usecols=comp_cols,
+                               dtype='S17,f8,f8',
+                               names=['lcobj','med_tf3','mad_tf3'])
+
+    ref_objects = ref_stats['lcobj']
+    comp_objects = comp_stats['lcobj']
+
+    common_objects = np.intersect1d(ref_objects, comp_objects)
+
+    print('common objects = %s' % len(common_objects))
+
+    if len(common_objects) > 0:
+
+        # put together the data for the common objects
+        ref_tf3_mag = [ref_stats['med_tf3'][ref_stats['lcobj'] == x]
+                       for x in common_objects]
+        ref_tf3_compcol = [ref_stats['mad_tf3'][ref_stats['lcobj'] == x]
+                           for x in common_objects]
+
+        comp_tf3_mag = [comp_stats['med_tf3'][comp_stats['lcobj'] == x]
+                        for x in common_objects]
+        comp_tf3_compcol = [comp_stats['mad_tf3'][comp_stats['lcobj'] == x]
+                            for x in common_objects]
+
+        tf3_compcol_ratios = np.array(comp_tf3_compcol)/np.array(ref_tf3_compcol)
+
+        xcol, ycol = ref_tf3_mag, tf3_compcol_ratios
+
+        xlabel, ylabel = ('r-band TF3 median magnitude',
+                          'TF3 median abs. dev. %s/%s' % (comp_name, ref_name))
+        title = 'comparison of TF3 median abs. dev. - %s/%s' % (comp_name,
+                                                                ref_name)
+
+        # make the plot
+        if logy:
+            plt.scatter(xcol, ycol,
+                        s=1,
+                        marker='.')
             plt.yscale('log')
         elif logx:
             plt.scatter(xcol, ycol,
@@ -3614,13 +4990,15 @@ def plot_stats_file(statsfile, outdir, outprefix,
         plt.ylabel(ylabel)
         plt.title(title)
         plt.xlim(rangex)
+        plt.ylim(-0.5,4)
 
         # make the horizontal lines for 10, 5, 1 mmag
-        plt.hlines([0.001, 0.002, 0.003, 0.004, 0.005, 0.01],
-                   xmin=5.0,xmax=15.0,colors='b')
+        plt.hlines([-2.0,-1.5,1,1.5,2.0],
+                   xmin=5.0,xmax=15.0,colors='r')
 
         plt.savefig(outfile)
         plt.close()
 
-        print('%sZ: made %s plot: %s' %
-              (datetime.utcnow().isoformat(), title, outfile))
+    else:
+
+        print('no common objects to use for comparison!')
