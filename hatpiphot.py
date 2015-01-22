@@ -221,8 +221,8 @@ def anet_solve_frame(srclist,
     '''
 
     ANETCMDSTR = ("anet -r {ra} -d {dec} -w {width} "
-               "--tweak {tweak} --radius {radius} "
-               "--cols {colx},{coly} --wcs {outwcsfile} {sourcelist}")
+                  "--tweak {tweak} --radius {radius} "
+                  "--cols {colx},{coly} --wcs {outwcsfile} {sourcelist}")
 
 
     anetcmd = ANETCMDSTR.format(ra=ra,
