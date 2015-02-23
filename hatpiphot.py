@@ -90,7 +90,7 @@ UCAC4READCMD = ("ucac4read -r {ra:f} -d {dec:f} -s {boxlen:f} "
 # locations of catalogs
 CATALOGS = {
     '2MASS':{'cmd':TWOMASSREADCMD,
-             'path':'/S/CAT/2MASS/2MASS_JH_AP/data'},
+             'path':'/nfs/lcohpsrv1/ar0/P/HP0/CAT/2MASS/2MASS_JH_AP/data'},
     'UCAC4':{'cmd':UCAC4READCMD,
              'path':'/S/CAT/UCAC4'}
     }
@@ -2244,9 +2244,18 @@ def lightcurve_collection_worker(task):
     below.
 
     '''
+    try:
 
-    return collect_lightcurve(*task)
+        result =  collect_lightcurve(*task)
 
+    except Exception as e:
+
+        print('%sZ: failed to collect LC for task %s' %
+              (datetime.utcnow().isoformat(), task))
+        result = None
+
+    return result
+        
 
 def parallel_collect_lightcurves(finalsourcesfile,
                                  fitsdir,
