@@ -213,8 +213,7 @@ def anet_solve_frame(srclist,
     log = 1
     indexpath = /P/HP0/CAT/ANET_INDEX/ucac4_2014/
 
-    otherwise, we'll need to provide these as well as kwargs to the anet
-    executable.
+    otherwise, we'll need to provide these as kwargs to the anet executable.
 
     The input sourcelist can come from fistar, with a fluxthreshold set 10000 to
     just get the bright stars. This makes anet faster.
@@ -222,8 +221,8 @@ def anet_solve_frame(srclist,
     '''
 
     ANETCMDSTR = ("anet -r {ra} -d {dec} -w {width} "
-               "--tweak {tweak} --radius {radius} "
-               "--cols {colx},{coly} --wcs {outwcsfile} {sourcelist}")
+                  "--tweak {tweak} --radius {radius} "
+                  "--cols {colx},{coly} --wcs {outwcsfile} {sourcelist}")
 
 
     anetcmd = ANETCMDSTR.format(ra=ra,
@@ -2960,10 +2959,10 @@ def run_tfa_singlelc(epdlc,
                      epdlc_magcol=(21,22,23),
                      template_sigclip=5.0,
                      epdlc_sigclip=5.0):
-    '''This runs TFA for all apertures defined in epdlc_magcol for the input epdlc
-    file, given an existing TFA template list in templatefile. If outfile is
-    None, the output TFA LC will be in the same directory as epdlc but with an
-    extension of .tfalc.
+    '''This runs TFA for all apertures defined in epdlc_magcol for the input
+    epdlc file, given an existing TFA template list in templatefile. If outfile
+    is None, the output TFA LC will be in the same directory as epdlc but with
+    an extension of .tfalc.
 
     '''
 
