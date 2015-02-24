@@ -2188,6 +2188,10 @@ def serial_collect_lightcurves(finalsourcesfile,
 
     The output LC format is:
 
+    jd rstfc x y bgv bge s d k
+    im1 ie1 iq1 im2 ie2 iq2 im3 ie3 iq3
+    rm1 rm2 rm3 ep1 ep2 ep3 tf1 tf2 tf3
+
 
     '''
 
@@ -2319,6 +2323,9 @@ def parallel_collect_lightcurves(finalsourcesfile,
 
     The output LC format is:
 
+    jd rstfc x y bgv bge s d k
+    im1 ie1 iq1 im2 ie2 iq2 im3 ie3 iq3
+    rm1 rm2 rm3 ep1 ep2 ep3 tf1 tf2 tf3
 
     '''
 
