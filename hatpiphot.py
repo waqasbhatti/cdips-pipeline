@@ -3777,11 +3777,11 @@ def parallel_lc_statistics(lcdir,
                 if not catmag:
                     print('no catalog mag for %s, using median TF3 mag' %
                           stat['lcobj'])
-                    catmag = stat['med_tf3']
+                    catmag = stat['median_tf3']
             except Exception as e:
                 print('no catalog mag for %s, using median TF3 mag' %
                       stat['lcobj'])
-                catmag = stat['med_tf3']
+                catmag = stat['median_tf3']
 
             outline = outlineformat % (
                 stat['lcobj'],
@@ -4574,11 +4574,11 @@ def parallel_binnedlc_statistics(lcdir,
                 if not catmag:
                     print('no catalog mag for %s, using median TF3 mag' %
                           stat['lcobj'])
-                    catmag = stat['med_tf3']
+                    catmag = stat['median_tf3']
             except Exception as e:
                 print('no catalog mag for %s, using median TF3 mag' %
                       stat['lcobj'])
-                catmag = stat['med_tf3']
+                catmag = stat['median_tf3']
 
             outline = outlineformat % (
                 stat['lcobj'],
