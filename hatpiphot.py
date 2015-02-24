@@ -3664,6 +3664,9 @@ def lc_statistics_worker(task):
 
 def parallel_lc_statistics(lcdir,
                            lcglob,
+                           fovcatalog,
+                           fovcatcols=(0,9), # objectid, magcol to use
+                           fovcatmaglabel='r',
                            outfile=None,
                            nworkers=16,
                            workerntasks=500,
@@ -3673,7 +3676,8 @@ def parallel_lc_statistics(lcdir,
                            sigclip=4.0):
     '''
     This calculates statistics on all lc files in lcdir using lcglob to find the
-    files. Puts the results in text file outfile.
+    files. Puts the results in text file outfile. Needs the fovcatalog to get
+    the catalog magnitude to use as the canonical magnitude.
 
     outfile contains the following columns:
 
@@ -3707,7 +3711,7 @@ def parallel_lc_statistics(lcdir,
     outf = open(outfile,'wb')
 
     outlineformat = (
-        '%s  '
+        '%s %.3f  '
         '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
         '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
         '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
@@ -3725,43 +3729,63 @@ def parallel_lc_statistics(lcdir,
 
     outcolumnkey = (
         '# columns are:\n'
-        '# 0: object\n'
-        '# 1,2,3,4,5: median RM1, MAD RM1, mean RM1, stdev RM1, ndet RM1\n'
-        '# 6,7,8,9,10: sigma-clipped median RM1, MAD RM1, mean RM1, stdev RM1, '
+        '# 0,1: object, catalog mag %s\n'
+        '# 2,3,4,5,6: median RM1, MAD RM1, mean RM1, stdev RM1, ndet RM1\n'
+        '# 7,8,9,10,11: sigma-clipped median RM1, MAD RM1, mean RM1, stdev RM1, '
         'ndet RM1\n'
-        '# 11,12,13,14,15: median RM2, MAD RM2, mean RM2, stdev RM2, ndet RM2\n'
-        '# 16,17,18,19,20: sigma-clipped median RM2, MAD RM2, mean RM2, '
+        '# 12,13,14,15,16: median RM2, MAD RM2, mean RM2, stdev RM2, ndet RM2\n'
+        '# 17,18,19,20,21: sigma-clipped median RM2, MAD RM2, mean RM2, '
         'stdev RM2, ndet RM2\n'
-        '# 21,22,23,24,25: median RM3, MAD RM3, mean RM3, stdev RM3, ndet RM3\n'
-        '# 26,27,28,29,30: sigma-clipped median RM3, MAD RM3, mean RM3, '
+        '# 22,23,24,25,26: median RM3, MAD RM3, mean RM3, stdev RM3, ndet RM3\n'
+        '# 27,28,29,30,31: sigma-clipped median RM3, MAD RM3, mean RM3, '
         'stdev RM3, ndet RM3\n'
-        '# 31,32,33,34,35: median EP1, MAD EP1, mean EP1, stdev EP1, ndet EP1\n'
-        '# 36,37,38,39,40: sigma-clipped median EP1, MAD EP1, mean EP1, '
+        '# 32,33,34,35,36: median EP1, MAD EP1, mean EP1, stdev EP1, ndet EP1\n'
+        '# 37,38,39,40,41: sigma-clipped median EP1, MAD EP1, mean EP1, '
         'stdev EP1, ndet EP1\n'
-        '# 41,42,43,44,45: median EP2, MAD EP2, mean EP2, stdev EP2, ndet EP2\n'
-        '# 46,47,48,49,50: sigma-clipped median EP2, MAD EP2, mean EP2, '
+        '# 42,43,44,45,46: median EP2, MAD EP2, mean EP2, stdev EP2, ndet EP2\n'
+        '# 47,48,49,50,51: sigma-clipped median EP2, MAD EP2, mean EP2, '
         'stdev EP2, ndet EP2\n'
-        '# 51,52,53,54,55: median EP3, MAD EP3, mean EP3, stdev EP3, ndet EP3\n'
-        '# 56,57,58,59,60: sigma-clipped median EP3, MAD EP3, mean EP3, '
+        '# 52,53,54,55,56: median EP3, MAD EP3, mean EP3, stdev EP3, ndet EP3\n'
+        '# 57,58,59,60,61: sigma-clipped median EP3, MAD EP3, mean EP3, '
         'stdev EP3, ndet EP3\n'
-        '# 61,62,63,64,65: median TF1, MAD TF1, mean TF1, stdev TF1, ndet TF1\n'
-        '# 66,67,68,69,70: sigma-clipped median TF1, MAD TF1, mean TF1, '
+        '# 62,63,64,65,66: median TF1, MAD TF1, mean TF1, stdev TF1, ndet TF1\n'
+        '# 67,68,69,70,71: sigma-clipped median TF1, MAD TF1, mean TF1, '
         'stdev TF1, ndet TF1\n'
-        '# 71,72,73,74,75: median TF2, MAD TF2, mean TF2, stdev TF2, ndet TF2\n'
-        '# 76,77,78,79,80: sigma-clipped median TF2, MAD TF2, mean TF2, '
+        '# 72,73,74,75,76: median TF2, MAD TF2, mean TF2, stdev TF2, ndet TF2\n'
+        '# 77,78,79,80,81: sigma-clipped median TF2, MAD TF2, mean TF2, '
         'stdev TF2, ndet TF2\n'
-        '# 81,82,83,84,85: median TF3, MAD TF3, mean TF3, stdev TF3, ndet TF3\n'
-        '# 86,87,88,89,90: sigma-clipped median TF3, MAD TF3, mean TF3, '
+        '# 82,83,84,85,86: median TF3, MAD TF3, mean TF3, stdev TF3, ndet TF3\n'
+        '# 87,88,89,90,91: sigma-clipped median TF3, MAD TF3, mean TF3, '
         'stdev TF3, ndet TF3\n'
-        )
+        ) % fovcatmaglabel
     outf.write(outcolumnkey)
+
+    # open the fovcatalog and read in the column magnitudes and hatids
+    fovcat = np.genfromtxt(fovcatalog,
+                           usecols=fovcatcols,
+                           dtype='S17,f8',
+                           names=['objid','mag'])
+
 
     for stat in results:
 
         if stat is not None:
 
+            # find the catalog mag for this object
+            try:
+                catmag = fovcat['mag'][np.where(fovcat['objid'] == stat['lcobj'])]
+                if not catmag:
+                    print('no catalog mag for %s, using median TF3 mag' %
+                          stat['lcobj'])
+                    catmag = stat['med_tf3']
+            except Exception as e:
+                print('no catalog mag for %s, using median TF3 mag' %
+                      stat['lcobj'])
+                catmag = stat['med_tf3']
+
             outline = outlineformat % (
                 stat['lcobj'],
+                catmag,
 
                 stat['median_rm1'],
                 stat['mad_rm1'],
@@ -3881,7 +3905,7 @@ def read_stats_file(statsfile):
     # open the statfile and read all the columns
     stats = np.genfromtxt(
         statsfile,
-        dtype=('S17,'
+        dtype=('S17,f8,'
                'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM1
                'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM2
                'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM3
@@ -3891,7 +3915,7 @@ def read_stats_file(statsfile):
                'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF1
                'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF2
                'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8'), # TF3
-        names=['lcobj',
+        names=['lcobj','cat_mag',
                'med_rm1','mad_rm1','mean_rm1','stdev_rm1','ndet_rm1',
                'med_sc_rm1','mad_sc_rm1','mean_sc_rm1','stdev_sc_rm1',
                'ndet_sc_rm1',
@@ -4458,6 +4482,9 @@ def binnedlc_statistics_worker(task):
 
 def parallel_binnedlc_statistics(lcdir,
                                  lcglob,
+                                 fovcatalog,
+                                 fovcatcols=(0,9), # objectid, magcol to use
+                                 fovcatmaglabel='r',
                                  outfile=None,
                                  nworkers=16,
                                  workerntasks=500,
@@ -4494,7 +4521,7 @@ def parallel_binnedlc_statistics(lcdir,
     outf = open(outfile,'wb')
 
     outlineformat = (
-        '%s  '
+        '%s %.3f  '
         '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
         '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
         '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
@@ -4509,34 +4536,53 @@ def parallel_binnedlc_statistics(lcdir,
 
     outcolumnkey = (
         '# columns are:\n'
-        '# 0: object\n'
-        '# 1,2,3,4,5: median EP1, MAD EP1, mean EP1, stdev EP1, ndet EP1\n'
-        '# 6,7,8,9,10: sigma-clipped median EP1, MAD EP1, mean EP1, '
+        '# 0,1: object, catalog mag %s\n'
+        '# 2,3,4,5,6: median EP1, MAD EP1, mean EP1, stdev EP1, ndet EP1\n'
+        '# 7,8,9,10,11: sigma-clipped median EP1, MAD EP1, mean EP1, '
         'stdev EP1, ndet EP1\n'
-        '# 11,12,13,14,15: median EP2, MAD EP2, mean EP2, stdev EP2, ndet EP2\n'
-        '# 16,17,18,19,20: sigma-clipped median EP2, MAD EP2, mean EP2, '
+        '# 12,13,14,15,16: median EP2, MAD EP2, mean EP2, stdev EP2, ndet EP2\n'
+        '# 17,18,19,20,21: sigma-clipped median EP2, MAD EP2, mean EP2, '
         'stdev EP2, ndet EP2\n'
-        '# 21,22,23,24,25: median EP3, MAD EP3, mean EP3, stdev EP3, ndet EP3\n'
-        '# 26,27,28,29,30: sigma-clipped median EP3, MAD EP3, mean EP3, '
+        '# 22,23,24,25,26: median EP3, MAD EP3, mean EP3, stdev EP3, ndet EP3\n'
+        '# 27,28,29,30,31: sigma-clipped median EP3, MAD EP3, mean EP3, '
         'stdev EP3, ndet EP3\n'
-        '# 31,32,33,34,35: median TF1, MAD TF1, mean TF1, stdev TF1, ndet TF1\n'
-        '# 36,37,38,39,40: sigma-clipped median TF1, MAD TF1, mean TF1, '
+        '# 32,33,34,35,36: median TF1, MAD TF1, mean TF1, stdev TF1, ndet TF1\n'
+        '# 37,38,39,40,41: sigma-clipped median TF1, MAD TF1, mean TF1, '
         'stdev TF1, ndet TF1\n'
-        '# 41,42,43,44,45: median TF2, MAD TF2, mean TF2, stdev TF2, ndet TF2\n'
-        '# 46,47,48,49,50: sigma-clipped median TF2, MAD TF2, mean TF2, '
+        '# 42,43,44,45,46: median TF2, MAD TF2, mean TF2, stdev TF2, ndet TF2\n'
+        '# 47,48,49,50,51: sigma-clipped median TF2, MAD TF2, mean TF2, '
         'stdev TF2, ndet TF2\n'
-        '# 51,52,53,54,55: median TF3, MAD TF3, mean TF3, stdev TF3, ndet TF3\n'
-        '# 56,57,58,59,60: sigma-clipped median TF3, MAD TF3, mean TF3, '
+        '# 52,53,54,55,56: median TF3, MAD TF3, mean TF3, stdev TF3, ndet TF3\n'
+        '# 57,58,59,60,61: sigma-clipped median TF3, MAD TF3, mean TF3, '
         'stdev TF3, ndet TF3\n'
-        )
+        ) % fovcatmaglabel
     outf.write(outcolumnkey)
+
+    # open the fovcatalog and read in the column magnitudes and hatids
+    fovcat = np.genfromtxt(fovcatalog,
+                           usecols=fovcatcols,
+                           dtype='S17,f8',
+                           names=['objid','mag'])
 
     for stat in results:
 
         if stat is not None:
 
+            # find the catalog mag for this object
+            try:
+                catmag = fovcat['mag'][np.where(fovcat['objid'] == stat['lcobj'])]
+                if not catmag:
+                    print('no catalog mag for %s, using median TF3 mag' %
+                          stat['lcobj'])
+                    catmag = stat['med_tf3']
+            except Exception as e:
+                print('no catalog mag for %s, using median TF3 mag' %
+                      stat['lcobj'])
+                catmag = stat['med_tf3']
+
             outline = outlineformat % (
                 stat['lcobj'],
+                catmag,
 
                 stat['median_ep1'],
                 stat['mad_ep1'],
@@ -4623,14 +4669,14 @@ def read_binnedlc_stats_file(statsfile):
     # open the statfile and read all the columns
     stats = np.genfromtxt(
         statsfile,
-        dtype=('S17,'
+        dtype=('S17,f8,'
                'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP1
                'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP2
                'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP3
                'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF1
                'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF2
                'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8'), # TF3
-        names=['lcobj',
+        names=['lcobj','cat_mag',
                'med_ep1','mad_ep1','mean_ep1','stdev_ep1','ndet_ep1',
                'med_sc_ep1','mad_sc_ep1','mean_sc_ep1','stdev_sc_ep1',
                'ndet_sc_ep1',
@@ -4652,13 +4698,6 @@ def read_binnedlc_stats_file(statsfile):
         )
 
     return stats
-
-
-def plot_binnedlc_stats(binned_stats_file):
-    '''
-    This makes plots of the binned LC stats.
-
-    '''
 
 
 
