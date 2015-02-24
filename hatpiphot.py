@@ -2249,8 +2249,8 @@ def lightcurve_collection_worker(task):
 
     except Exception as e:
 
-        print('%sZ: failed to collect LC for task %s' %
-              (datetime.utcnow().isoformat(), task))
+        print('%sZ: failed to collect LC for %s' %
+              (datetime.utcnow().isoformat(), task[0]))
         result = None
 
     return result
