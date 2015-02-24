@@ -2040,7 +2040,7 @@ def collect_lightcurve(hatid,
                        photfiles,
                        jdlist,
                        outdir,
-                       ignorecollected=True):
+                       ignorecollected=False):
     '''
     This collects all photometric info into an LC for a given HATID. Returns
     path of collected LC.
