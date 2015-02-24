@@ -2336,7 +2336,6 @@ def parallel_collect_lightcurves(finalsourcesfile,
                      '%s.fiphot' % os.path.basename(x).strip('.fits.fz'))
         for x in fitsfiles
         ]
-    fiphotfiles = [x for x in fiphotfiles if os.path.exists(x)]
 
     # list the .sourcelist files
     sourcelistfiles = [
@@ -2344,7 +2343,25 @@ def parallel_collect_lightcurves(finalsourcesfile,
                      '%s.sourcelist' % os.path.basename(x).strip('.fits.fz'))
         for x in fitsfiles
         ]
-    sourcelistfiles = [x for x in sourcelistfile if os.path.exists(x)]
+
+    # filter all the FITs, .sourcelist and fiphot files to make sure all three
+    # files exist for a frame
+    final_fits_files, final_fiphot_files, final_sourcelist_files = [], [], []
+
+    for fits, fiphot, sourcelist in zip(fitsfiles, fiphotfiles, sourcelistfiles):
+
+        if (os.path.exists(fits) and
+            os.path.exists(fiphot) and
+            os.path.exists(sourcelist)):
+
+            final_fits_files.append(fits)
+            final_fiphot_files.append(fiphot)
+            final_sourcelist_files.append(sourcelist)
+
+        else:
+
+            print('%sZ: sourcelist/fiphot missing for %s, ignoring...' %
+                  (datetime.utcnow().isoformat(), fits))
 
     # read the finalsourcesfile and get the HAT IDs to use
     hatid_list = np.loadtxt(finalsourcesfile,usecols=(0,),dtype='S17')
@@ -2353,10 +2370,13 @@ def parallel_collect_lightcurves(finalsourcesfile,
           (datetime.utcnow().isoformat(), len(hatid_list)))
 
     # create a task list for the parallel collection processes
-    collect_tasks = [(str(x), fitsfiles, sourcelistfiles,
-                      fiphotfiles, jds, outdir)
+    collect_tasks = [(str(x), final_fits_files, final_sourcelist_files,
+                      final_fiphot_files, jds, outdir)
                      for x in hatid_list]
 
+    # make the output directory if not ready
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
     # make the output directory if not ready
     if not os.path.exists(outdir):
         os.mkdir(outdir)
