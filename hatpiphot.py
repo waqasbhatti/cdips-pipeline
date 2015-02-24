@@ -5,6 +5,59 @@ hatpiphot.py - Waqas Bhatti (wbhatti@astro.princeton.edu) - Dec 2014
 
 Contains aperture photometry routines for HATPI.
 
+The usual sequence is:
+
+1. run parallel_extract_sources on all frames with threshold ~ 10000 to get
+   bright stars for astrometry.
+
+2. run parallel_anet to get WCS headers for all frames.
+
+3. run make_fov_catalog to get a FOV source catalog for the field.
+
+4. run reform_fov_catalog to cut this down to the columns needed for magfit
+   only.
+
+5. run parallel_fitsdir_photometry for photometry on all frames
+
+6. run get_magfit_frames to select a single magfit photometry reference and set
+   up per-CCD work directories, symlinks, etc. for the next steps.
+
+7. run make_magfit_config to generate magfit config files for
+   MagnitudeFitting.py
+
+8. run make_fiphot_list to make lists of fiphot files for each CCD.
+
+9. run MagnitudeFitting.py in single reference mode.
+
+10. run do_masterphotref.py to get the master mag fit reference.
+
+11. run MagnitudeFitting.py in master reference mode.
+
+12. run parallel_collect_lightcurves to collect all lightcurves into .rlc files.
+
+13. run serial_run_epd or parallel_run_epd to do EPD on all LCs.
+
+14. run parallel_lc_statistics to collect stats on .epdlc files.
+
+15. run choose_tfa_template to choose TFA template stars using the .epdlc stats.
+
+16. run parallel_run_tfa for TFA to get .tfalc.TF{1,2,3} files (FIXME: still
+    need to collect into single .tfalc files for all apertures)
+
+17. run parallel_lc_statistics to collect stats on .tfalc files.
+
+18. run parallel_bin_lightcurves to bin LCs to desired time-bins.
+
+19. run parallel_binnedlc_statistics to collect stats for the binned LCs.
+
+20. run plot_stats_file to make RMS vs. mag plots for all unbinned and binned
+    LCs.
+
+21. run plot_magrms_comparison to compare the mag-RMS relation for various CCDs.
+
+22. run plot_ismphot_comparison to compare against ISM photometry statistics for
+    the same field (requires common stars).
+
 '''
 
 #############
@@ -4992,12 +5045,12 @@ def plot_magrms_comparison(reference_stats_file,
     common_objects = np.intersect1d(ref_objects, comp_objects)
 
     # put together the data for the common objects
-    ref_tf3_mag = [ref_stats['med_tf3'][ref_stats['lcobj'] == x]
+    ref_tf3_mag = [ref_stats['cat_mag'][ref_stats['lcobj'] == x]
                    for x in common_objects]
     ref_tf3_compcol = [ref_stats[ref_col][ref_stats['lcobj'] == x]
                        for x in common_objects]
 
-    comp_tf3_mag = [comp_stats['med_tf3'][comp_stats['lcobj'] == x]
+    comp_tf3_mag = [comp_stats['cat_mag'][comp_stats['lcobj'] == x]
                     for x in common_objects]
     comp_tf3_compcol = [comp_stats[comp_col][comp_stats['lcobj'] == x]
                         for x in common_objects]
@@ -5006,7 +5059,7 @@ def plot_magrms_comparison(reference_stats_file,
 
     xcol, ycol = ref_tf3_mag, tf3_compcol_ratios
 
-    xlabel, ylabel = ('r-band TF3 median magnitude',
+    xlabel, ylabel = ('FOV catalog SDSS r mag',
                       'TF3 median abs. dev. %s/%s' % (ref_name, comp_name))
     title = 'comparison of TF3 median abs. dev. - %s/%s' % (ref_name, comp_name)
 
@@ -5060,7 +5113,7 @@ def plot_ismphot_comparison(apphot_stats_file,
     comp_stats = np.genfromtxt(ismphot_stats_file,
                                usecols=comp_cols,
                                dtype='S17,f8,f8',
-                               names=['lcobj','med_tf3','mad_tf3'])
+                               names=['lcobj','cat_mag','mad_tf3'])
 
     ref_objects = ref_stats['lcobj']
     comp_objects = comp_stats['lcobj']
@@ -5086,7 +5139,7 @@ def plot_ismphot_comparison(apphot_stats_file,
 
         xcol, ycol = ref_tf3_mag, tf3_compcol_ratios
 
-        xlabel, ylabel = ('r-band TF3 median magnitude',
+        xlabel, ylabel = ('FOV catalog SDSS r mag',
                           'TF3 median abs. dev. %s/%s' % (comp_name, ref_name))
         title = 'comparison of TF3 median abs. dev. - %s/%s' % (comp_name,
                                                                 ref_name)
