@@ -4570,7 +4570,9 @@ def parallel_binnedlc_statistics(lcdir,
 
             # find the catalog mag for this object
             try:
-                catmag = fovcat['mag'][np.where(fovcat['objid'] == stat['lcobj'])]
+                catmag = fovcat['mag'][
+                    np.where(fovcat['objid'] == stat['lcobj'][:15])
+                    ]
                 if not catmag:
                     print('no catalog mag for %s, using median TF3 mag' %
                           stat['lcobj'])
