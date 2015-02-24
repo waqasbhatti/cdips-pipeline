@@ -92,7 +92,7 @@ CATALOGS = {
     '2MASS':{'cmd':TWOMASSREADCMD,
              'path':'/nfs/lcohpsrv1/ar0/P/HP0/CAT/2MASS/2MASS_JH_AP/data'},
     'UCAC4':{'cmd':UCAC4READCMD,
-             'path':'/S/CAT/UCAC4'}
+             'path':'/nfs/lcohpsrv1/ar0/P/HP0/CAT/UCAC4'}
     }
 
 # command string to run fistar
@@ -4857,6 +4857,22 @@ STATS_PLOTS = {
         'ycol':'mad_sc_tf3',
         'title':'TF3 median mag vs. TF3 median abs. dev. (sigclip LCs)',
         'xlabel':'TF3 median magnitude',
+        'ylabel':'TF3 median abs. dev.',
+        'binned':True
+        },
+    'catalog-r-mag-vs-mad-TF3':{
+        'xcol':'cat_mag',
+        'ycol':'mad_tf3',
+        'title':'FOV catalog SDSS r mag vs. TF3 median abs. dev.',
+        'xlabel':'FOV catalog SDSS r mag',
+        'ylabel':'TF3 median abs. dev.',
+        'binned':True
+        },
+    'catalog-r-mag-vs-mad-TF3-sigclipped':{
+        'xcol':'cat_mag',
+        'ycol':'mad_sc_tf3',
+        'title':'FOV catalog SDSS r mag vs. TF3 median abs. dev. (sigclip LCs)',
+        'xlabel':'FOV catalog SDSS r mag',
         'ylabel':'TF3 median abs. dev.',
         'binned':True
         },
