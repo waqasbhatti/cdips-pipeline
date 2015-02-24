@@ -2254,7 +2254,7 @@ def lightcurve_collection_worker(task):
         result = None
 
     return result
-        
+
 
 def parallel_collect_lightcurves(finalsourcesfile,
                                  fitsdir,
@@ -3034,7 +3034,17 @@ def parallel_tfa_worker(task):
 
     '''
 
-    return run_tfa_singlelc(task[0], task[1], **task[2])
+    try:
+
+        result = run_tfa_singlelc(task[0], task[1], **task[2])
+
+    except Exception as e:
+
+        print('%sZ: TFA failed for %s! Error was: %s' %
+              (datetime.utcnow().isoformat(), task[0], e))
+        result = None
+
+    return result
 
 
 def parallel_run_tfa(lcdir,
