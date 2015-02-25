@@ -3,7 +3,7 @@
 '''
 hatpiphot.py - Waqas Bhatti (wbhatti@astro.princeton.edu) - Dec 2014
 
-Contains aperture photometry routines for HATPI.
+Contains aperture photometry routines for HATPI. Needs reduced frames.
 
 The usual sequence is:
 
