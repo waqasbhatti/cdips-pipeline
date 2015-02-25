@@ -5125,12 +5125,12 @@ def plot_ismphot_comparison(apphot_stats_file,
     if len(common_objects) > 0:
 
         # put together the data for the common objects
-        ref_tf3_mag = [ref_stats['med_tf3'][ref_stats['lcobj'] == x]
+        ref_tf3_mag = [ref_stats['cat_mag'][ref_stats['lcobj'] == x]
                        for x in common_objects]
         ref_tf3_compcol = [ref_stats['mad_tf3'][ref_stats['lcobj'] == x]
                            for x in common_objects]
 
-        comp_tf3_mag = [comp_stats['med_tf3'][comp_stats['lcobj'] == x]
+        comp_tf3_mag = [comp_stats['cat_mag'][comp_stats['lcobj'] == x]
                         for x in common_objects]
         comp_tf3_compcol = [comp_stats['mad_tf3'][comp_stats['lcobj'] == x]
                             for x in common_objects]
