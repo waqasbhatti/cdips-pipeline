@@ -5044,61 +5044,71 @@ def plot_magrms_comparison(reference_stats_file,
 
     common_objects = np.intersect1d(ref_objects, comp_objects)
 
-    # put together the data for the common objects
-    ref_tf3_mag = [ref_stats['cat_mag'][ref_stats['lcobj'] == x]
-                   for x in common_objects]
-    ref_tf3_compcol = [ref_stats[ref_col][ref_stats['lcobj'] == x]
+    print('common objects = %s' % len(common_objects))
+
+    if len(common_objects) > 0:
+
+        # put together the data for the common objects
+        ref_tf3_mag = [ref_stats['cat_mag'][ref_stats['lcobj'] == x]
                        for x in common_objects]
+        ref_tf3_compcol = [ref_stats[ref_col][ref_stats['lcobj'] == x]
+                           for x in common_objects]
 
-    comp_tf3_mag = [comp_stats['cat_mag'][comp_stats['lcobj'] == x]
-                    for x in common_objects]
-    comp_tf3_compcol = [comp_stats[comp_col][comp_stats['lcobj'] == x]
+        comp_tf3_mag = [comp_stats['cat_mag'][comp_stats['lcobj'] == x]
                         for x in common_objects]
+        comp_tf3_compcol = [comp_stats[comp_col][comp_stats['lcobj'] == x]
+                            for x in common_objects]
 
-    tf3_compcol_ratios = np.array(ref_tf3_compcol)/np.array(comp_tf3_compcol)
+        tf3_compcol_ratios = (
+            np.array(ref_tf3_compcol)/np.array(comp_tf3_compcol)
+            )
 
-    xcol, ycol = ref_tf3_mag, tf3_compcol_ratios
+        xcol, ycol = ref_tf3_mag, tf3_compcol_ratios
 
-    xlabel, ylabel = ('FOV catalog SDSS r mag',
-                      'TF3 median abs. dev. %s/%s' % (ref_name, comp_name))
-    title = 'comparison of TF3 median abs. dev. - %s/%s' % (ref_name, comp_name)
+        xlabel, ylabel = ('FOV catalog SDSS r mag',
+                          'TF3 median abs. dev. %s/%s' % (ref_name, comp_name))
+        title = 'comparison of TF3 median abs. dev. - %s/%s' % (ref_name,
+                                                                comp_name)
 
-    # make the plot
-    if logy:
-        plt.scatter(xcol, ycol,
-                    s=1,
-                    marker='.')
-        plt.yscale('log')
-    elif logx:
-        plt.scatter(xcol, ycol,
-                    s=1,
-                    marker='.')
-        plt.xscale('log')
-    elif logx and logy:
-        plt.scatter(xcol, ycol,
-                    s=1,
-                    marker='.')
-        plt.xscale('log')
-        plt.yscale('log')
+        # make the plot
+        if logy:
+            plt.scatter(xcol, ycol,
+                        s=1,
+                        marker='.')
+            plt.yscale('log')
+        elif logx:
+            plt.scatter(xcol, ycol,
+                        s=1,
+                        marker='.')
+            plt.xscale('log')
+        elif logx and logy:
+            plt.scatter(xcol, ycol,
+                        s=1,
+                        marker='.')
+            plt.xscale('log')
+            plt.yscale('log')
+        else:
+            plt.scatter(xcol, ycol,
+                        s=1,
+                        marker='.')
+
+
+        plt.xlabel(xlabel)
+        plt.ylabel(ylabel)
+        plt.title(title)
+        plt.xlim(rangex)
+        plt.ylim(-0.5,4)
+
+        # make the horizontal lines for 10, 5, 1 mmag
+        plt.hlines([-2.0,-1.5,1,1.5,2.0],
+                   xmin=5.0,xmax=15.0,colors='r')
+
+        plt.savefig(outfile)
+        plt.close()
+
     else:
-        plt.scatter(xcol, ycol,
-                    s=1,
-                    marker='.')
 
-
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.title(title)
-    plt.xlim(rangex)
-    plt.ylim(-0.5,4)
-
-    # make the horizontal lines for 10, 5, 1 mmag
-    plt.hlines([-2.0,-1.5,1,1.5,2.0],
-               xmin=5.0,xmax=15.0,colors='r')
-
-    plt.savefig(outfile)
-    plt.close()
-
+        print('no common objects to use for comparison!')
 
 
 def plot_ismphot_comparison(apphot_stats_file,
