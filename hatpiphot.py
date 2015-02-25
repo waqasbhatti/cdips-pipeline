@@ -5100,7 +5100,7 @@ def plot_magrms_comparison(reference_stats_file,
         plt.ylim(-0.5,4)
 
         # make the horizontal lines for 10, 5, 1 mmag
-        plt.hlines([-2.0,-1.5,1,1.5,2.0],
+        plt.hlines([-2.0,-1.5,0.5,1,1.5,2.0],
                    xmin=5.0,xmax=15.0,colors='r')
 
         plt.savefig(outfile)
@@ -5184,7 +5184,7 @@ def plot_ismphot_comparison(apphot_stats_file,
         plt.ylim(-0.5,4)
 
         # make the horizontal lines for 10, 5, 1 mmag
-        plt.hlines([-2.0,-1.5,1,1.5,2.0],
+        plt.hlines([-2.0,-1.5,0.5,1,1.5,2.0],
                    xmin=5.0,xmax=15.0,colors='r')
 
         plt.savefig(outfile)
