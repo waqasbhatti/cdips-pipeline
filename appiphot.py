@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 '''
-hatpiphot.py - Waqas Bhatti (wbhatti@astro.princeton.edu) - Dec 2014
+appiphot.py - Waqas Bhatti (wbhatti@astro.princeton.edu) - Dec 2014
 
 Contains aperture photometry routines for HATPI. Needs reduced frames.
 
