@@ -300,7 +300,7 @@ def anet_solve_frame(srclist,
     anet_stdout, anet_stderr = anetproc.communicate()
 
     # get results if succeeded, log outcome, and return path of outfile
-    if anetproc.returncode == 0:
+    if anetproc.returncode == 0 and os.path.exists(os.path.abspath(wcsout)):
 
         print('%sZ: anet WCS %s generated for frame sourcelist %s' %
               (datetime.utcnow().isoformat(),
