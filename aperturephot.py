@@ -334,6 +334,7 @@ def parallel_anet_worker(task):
 def parallel_anet(srclistdir,
                   outdir,
                   ra, dec,
+                  fistarglob='*_?.fistar',
                   nworkers=16,
                   maxtasksperworker=1000,
                   width=13,
@@ -347,7 +348,7 @@ def parallel_anet(srclistdir,
     '''
 
     # get a list of all fits files in the directory
-    fistarlist = glob.glob(os.path.join(srclistdir,'*_?.fistar'))
+    fistarlist = glob.glob(os.path.join(srclistdir, fistarglob))
 
     print('%sZ: found %s fistar files in %s, starting astrometry...' %
           (datetime.utcnow().isoformat(),
