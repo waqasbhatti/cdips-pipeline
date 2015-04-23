@@ -300,7 +300,9 @@ def anet_solve_frame(srclist,
     anet_stdout, anet_stderr = anetproc.communicate()
 
     # get results if succeeded, log outcome, and return path of outfile
-    if anetproc.returncode == 0 and os.path.exists(os.path.abspath(wcsout)):
+    if (anetproc.returncode == 0 and
+        os.path.exists(os.path.abspath(wcsout)) and
+        os.stat(os.path.abspath(wcsout)).st_size > 0):
 
         print('%sZ: anet WCS %s generated for frame sourcelist %s' %
               (datetime.utcnow().isoformat(),
@@ -308,6 +310,8 @@ def anet_solve_frame(srclist,
 
         return os.path.abspath(wcsout)
 
+    # if astrometry did not succeed, complain and remove the zero-size wcs file
+    # anet inexplicably makes anyway
     else:
 
         print('%sZ: anet WCS %s failed for frame sourcelist %s! Error was: %s' %
@@ -315,6 +319,11 @@ def anet_solve_frame(srclist,
                os.path.abspath(wcsout),
                os.path.abspath(srclist),
                anet_stderr))
+
+        # remove the zero-size broken wcs if astrometry failed
+        if (os.path.exists(os.path.abspath(wcsout)) and
+            os.stat(os.path.abspath(wcsout)).st_size == 0):
+            os.remove(os.path.abspath(wcsout))
 
         return None
 
