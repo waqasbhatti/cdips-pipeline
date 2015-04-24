@@ -276,9 +276,15 @@ def select_astromref_frame(fitsdir,
         assume_unique=True
         )
 
+    sdndet_ind = np.intersect1d(sd_ind,
+                                good_detections_ind,
+                                assume_unique=True)
+
     # pick a good astrometric reference frame
     goodframes = np.array(goodframes)
 
+
+    # if all selectors produced a result, use that one
     if len(best_frame_ind) > 0:
 
         selectedreference = goodframes[best_frame_ind[0]]
@@ -288,22 +294,37 @@ def select_astromref_frame(fitsdir,
 
         return selectedreference
 
+    # otherwise, fall back to to the frames with the best values of S, D and
+    # a large number of detections
+    elif len(sdndet_ind) > 0:
+
+        selectedreference = goodframes[sdndet_ind[0]]
+
+        print('WRN! %sZ: selected best astrometric reference frame '
+              '(using S, D, and ndet only) is %s' %
+              (datetime.utcnow().isoformat(), selectedreference))
+
+        return selectedreference
+
+
+    # otherwise, fall back to to the frames with the best values of S and D
     elif len(sd_ind) > 0:
 
         selectedreference = goodframes[sd_ind[0]]
 
         print('WRN! %sZ: selected best astrometric reference frame '
-              '(using S and D only)  is %s' %
+              '(using S and D only) is %s' %
               (datetime.utcnow().isoformat(), selectedreference))
 
         return selectedreference
 
+    # if that fails, fail back to the best S value frame
     elif len(median_sval_ind) > 0:
 
         selectedreference = goodframes[median_sval_ind[0]]
 
         print('WRN! %sZ: selected best astrometric reference frame '
-              '(using S only)  is %s' %
+              '(using S only) is %s' %
               (datetime.utcnow().isoformat(), selectedreference))
 
         return selectedreference
