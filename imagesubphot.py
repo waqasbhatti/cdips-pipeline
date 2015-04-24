@@ -169,7 +169,8 @@ def photometry_on_stacked_photref(
 
 def generate_photref_registration(stackedphotref):
     '''
-    This generates a registration file for use with convolution later.
+    This generates a registration file for use with convolution later. The
+    convolution and subtraction step below needs this.
 
     '''
 
