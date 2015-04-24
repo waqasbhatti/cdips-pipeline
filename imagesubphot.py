@@ -128,6 +128,16 @@ def select_photometric_reference_frames(photdir,
     This selects a group of photometric reference frames that will later be
     stacked and medianed to form the single photometric reference frame.
 
+    Should be similar to the aperturephot version.
+
+    - best median scatter of photometry
+    - lowest median error in photometry
+    - lowest median background measurement
+    - low zenith distance
+    - high moon and sun distance
+    - large number of stars detected
+    - fewest number of failed source photometry extractions
+
     '''
 
 
@@ -148,7 +158,7 @@ def photometry_on_stacked_photref(
     ):
     '''
     This runs fiphot in the special iphot mode on the stacked photometric
-    reference frame.
+    reference frame. See cmrawphot.sh for the correct commandline to use.
 
     '''
 
