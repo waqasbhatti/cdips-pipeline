@@ -790,68 +790,79 @@ def make_frameprojected_catalog(fits,
     if DEBUG:
         print(transformcmd)
 
-    # execute the transformer shell command
-    transformproc = subprocess.Popen(shlex.split(transformcmd),
-                                     stdout=subprocess.PIPE,
-                                     stderr=subprocess.PIPE)
+    # make sure the wcs file makes sense before trying the transform
+    if (framewcsfile and
+        os.path.exists(os.path.abspath(framewcsfile)) and
+        os.stat(os.path.abspath(framewcsfile)).st_size > 0):
 
-    # get results
-    transform_stdout, transform_stderr = transformproc.communicate()
+        # execute the transformer shell command
+        transformproc = subprocess.Popen(shlex.split(transformcmd),
+                                         stdout=subprocess.PIPE,
+                                         stderr=subprocess.PIPE)
 
-    # get results if succeeded, log outcome, and return path of outfile
-    if transformproc.returncode == 0:
+        # get results
+        transform_stdout, transform_stderr = transformproc.communicate()
 
-        # now we need to take out sources outside the CCD extent
-        sourcelist_x, sourcelist_y = np.loadtxt(temppath,
-                                                usecols=catalogxycols,
-                                                unpack=True)
+        # get results if succeeded, log outcome, and return path of outfile
+        if transformproc.returncode == 0:
 
-        # get the extent of the CCD
-        if not ccdextent:
-            ccdextent = CCDEXTENT
+            # now we need to take out sources outside the CCD extent
+            sourcelist_x, sourcelist_y = np.loadtxt(temppath,
+                                                    usecols=catalogxycols,
+                                                    unpack=True)
 
-        # get indices for the lines to be kept
-        # optionally, remove all sources within pixborders pixels of the edges
-        # of the image.
-        keep_ind = np.where(
-            (sourcelist_x > (ccdextent['x'][0] + pixborders)) &
-            (sourcelist_x < (ccdextent['x'][1] - pixborders)) &
-            (sourcelist_y > (ccdextent['y'][0] + pixborders)) &
-            (sourcelist_y < (ccdextent['y'][1] - pixborders))
-        )[0].tolist()
+            # get the extent of the CCD
+            if not ccdextent:
+                ccdextent = CCDEXTENT
 
-        # output the lines to be kept
-        outf = open(outfile, 'wb')
-        with open(temppath,'rb') as tempf:
+            # get indices for the lines to be kept
+            # optionally, remove all sources within pixborders pixels of the edges
+            # of the image.
+            keep_ind = np.where(
+                (sourcelist_x > (ccdextent['x'][0] + pixborders)) &
+                (sourcelist_x < (ccdextent['x'][1] - pixborders)) &
+                (sourcelist_y > (ccdextent['y'][0] + pixborders)) &
+                (sourcelist_y < (ccdextent['y'][1] - pixborders))
+            )[0].tolist()
 
-            templines = tempf.readlines()
-            templines = [x for x in templines if '#' not in x]
-            for ind in keep_ind:
-                outf.write(templines[ind])
+            # output the lines to be kept
+            outf = open(outfile, 'wb')
+            with open(temppath,'rb') as tempf:
 
-        outf.close()
+                templines = tempf.readlines()
+                templines = [x for x in templines if '#' not in x]
+                for ind in keep_ind:
+                    outf.write(templines[ind])
 
-        if removetemp:
-            os.remove(temppath)
+            outf.close()
 
-        print('%sZ: frame source list generation OK for %s' %
-              (datetime.utcnow().isoformat(),
-               fits))
-
-        return outfile
-    else:
-        print('%sZ: frame source list generation '
-              'failed for %s: error was %s' %
-              (datetime.utcnow().isoformat(),
-               fits,
-               transform_stderr))
-        if removetemp:
-            try:
+            if removetemp:
                 os.remove(temppath)
-            except:
-                pass
-        return None
 
+            print('%sZ: frame source list generation OK for %s' %
+                  (datetime.utcnow().isoformat(),
+                   fits))
+
+            return outfile
+        else:
+            print('%sZ: frame source list generation '
+                  'failed for %s: error was %s' %
+                  (datetime.utcnow().isoformat(),
+                   fits,
+                   transform_stderr))
+            if removetemp:
+                try:
+                    os.remove(temppath)
+                except:
+                    pass
+            return None
+
+    # the wcs file doesn't make sense for this FITS image, complain and return
+    else:
+        print('%sZ: WCS transform file does not work for %s, '
+              'skipping this frame...' %
+              (datetime.utcnow().isoformat(), fits))
+        return None
 
 
 def run_fiphot(fits,
