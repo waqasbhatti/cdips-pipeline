@@ -88,7 +88,7 @@ XYSDKCMD = ('grtrans {fistarfile} --col-xy 2,3 --col-fit 6,7,8 '
             '--iterations 3 --rejection-level 3 '
             '--comment --output-transformation {xysdkfile}')
 
-FRAMESHIFTCMD = (
+FRAMESHIFTCALCCMD = (
     'grmatch --match-points '
     '-r {astromref} --col-ref 2,3 --col-ref-ordering +9 '
     '-i {fistartoshift} --col-inp 2,3 --col-inp-ordering +9 '
@@ -98,6 +98,10 @@ FRAMESHIFTCMD = (
     '--output-transformation {outtransfile} '
     '--output /dev/null'
     )
+
+FRAMETRANSFORMCMD = ('fitrans {frametoshift} -k '
+                     '--input-transformation {itransfile} '
+                     '--reverse -o {outtransframe}')
 
 
 
@@ -391,28 +395,28 @@ def astromref_shift_worker(task):
     if outdir:
         outfile = os.path.join(
             os.path.abspath(outdir),
-            os.path.basename(targetframe).replace('fistar','itrans')
+            os.path.basename(fistartoshift).replace('fistar','itrans')
             )
 
     else:
-        outfile = targetframe.replace('fistar','itrans')
+        outfile = fistartoshift.replace('fistar','itrans')
 
-    cmdtorun = FRAMESHIFTCMD.format(astromref=astromref,
-                                    fistartoshift=fistartoshift,
-                                    outtransfile=outfile)
+    cmdtorun = FRAMESHIFTCALCCMD.format(astromref=astromref,
+                                        fistartoshift=fistartoshift,
+                                        outtransfile=outfile)
 
     returncode = os.system(cmdtorun)
 
     if returncode == 0:
         print('%sZ: shift transform calc OK: %s -> %s' %
               (datetime.utcnow().isoformat(), fistartoshift, outfile))
-        return fistar, outfile
+        return fistartoshift, outfile
     else:
         print('ERR! %sZ: shift transform calc failed for %s' %
               (datetime.utcnow().isoformat(), fistartoshift))
         if os.path.exists(outfile):
             os.remove(outfile)
-        return fistar, None
+        return fistartoshift, None
 
 
 
@@ -448,7 +452,7 @@ def get_astromref_shifts(fistardir,
 
 
 
-def frame_to_astromref_work(task):
+def frame_to_astromref_worker(task):
     '''
     This is a parallel worker for the frame shift to astromref frame operation.
 
