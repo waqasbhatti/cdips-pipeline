@@ -147,7 +147,12 @@ def stack_photometric_reference_frames(framelist):
     This stacks the photometric reference frames in median mode.
 
     - first, transform all of them to the astrometric reference frame
+
     - then use fiarith in median mode to stack them
+
+    - (or actually, use scipy to do this instead, making sure to copy over the
+      first frame's header + adding a new keyword listing all the component
+      frames)
 
     '''
 
