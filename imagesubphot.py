@@ -75,12 +75,11 @@ FRAMEREGEX = re.compile(r'(\d{1})\-(\d{6}\w{0,1})_(\d{1})')
 ##################################
 
 def select_astromref_frame(fitsdir,
-                                       fitsglob,
-                                       srclistdir=None,
-                                       srclistext='.fistar',
-                                       photdir=None,
-                                       photext='.fiphot',
-                                       photisbinary=True):
+                           fitsglob,
+                           srclistdir=None,
+                           srclistext='.fistar',
+                           photdir=None,
+                           photext='.fiphot'):
     '''
     This picks an astrometric reference frame.
 
@@ -282,7 +281,7 @@ def transform_frames_to_astromref():
 ##################################
 
 def select_photref_frames(photdir,
-                                        minframes=80):
+                          minframes=80):
     '''
     This selects a group of photometric reference frames that will later be
     stacked and medianed to form the single photometric reference frame.
