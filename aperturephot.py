@@ -321,7 +321,7 @@ def anet_solve_frame(srclist,
                anet_stderr))
 
         # remove the broken wcs if astrometry failed
-        if os.path.exists(os.path.abspath(wcsout):
+        if os.path.exists(os.path.abspath(wcsout)):
             os.remove(os.path.abspath(wcsout))
 
         return None
