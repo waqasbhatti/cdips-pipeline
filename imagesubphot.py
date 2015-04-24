@@ -74,7 +74,7 @@ FRAMEREGEX = re.compile(r'(\d{1})\-(\d{6}\w{0,1})_(\d{1})')
 ## ASTROMETRIC REFERENCE FRAMES ##
 ##################################
 
-def select_astrometric_reference_frame(fitsdir,
+def select_astromref_frame(fitsdir,
                                        fitsglob,
                                        srclistdir=None,
                                        srclistext='.fistar',
@@ -262,7 +262,7 @@ def get_smoothed_xysdk_coeffs(fistardir):
     '''
 
 
-def get_reference_frame_shifts():
+def get_astromref_shifts():
     '''
     This gets shifts between the astrometric reference frame and all other
     frames.
@@ -270,7 +270,7 @@ def get_reference_frame_shifts():
     '''
 
 
-def transform_frames_to_astrometric_reference():
+def transform_frames_to_astromref():
     '''
     This shifts all frames to the astrometric reference.
 
@@ -281,7 +281,7 @@ def transform_frames_to_astrometric_reference():
 ## PHOTOMETRIC REFERENCE FRAMES ##
 ##################################
 
-def select_photometric_reference_frames(photdir,
+def select_photref_frames(photdir,
                                         minframes=80):
     '''
     This selects a group of photometric reference frames that will later be
@@ -301,7 +301,7 @@ def select_photometric_reference_frames(photdir,
 
 
 
-def stack_photometric_reference_frames(framelist):
+def stack_photref_frames(framelist):
     '''
     This stacks the photometric reference frames in median mode.
 
