@@ -74,20 +74,179 @@ FRAMEREGEX = re.compile(r'(\d{1})\-(\d{6}\w{0,1})_(\d{1})')
 ## ASTROMETRIC REFERENCE FRAMES ##
 ##################################
 
-def select_astrometric_reference_frame(photdir):
+def select_astrometric_reference_frame(fitsdir,
+                                       fitsglob,
+                                       srclistdir=None,
+                                       srclistext='.fistar',
+                                       photdir=None,
+                                       photext='.fiphot',
+                                       photisbinary=True):
     '''
     This picks an astrometric reference frame.
 
-    We're looking for:
+    We're looking for (in order):
 
     - highest median S (smallest FWHM)
+    - median D value closest to zero (roundest stars)
     - lowest median background
-    - smallest Z
-
-    TODO:
+    - largest number of sources with good extractions
 
 
     '''
+
+    # first, get the frames
+    fitslist = glob.glob(os.path.join(fitsdir, fitsglob))
+
+    if not srclistdir:
+        srclistdir = fitsdir
+    if not photdir:
+        photdir = fitsdir
+
+    print('%sZ: %s FITS files found in %s matching glob %s, '
+          'finding photometry and source lists...' %
+          (datetime.utcnow().isoformat(),
+           len(fitslist), fitsdir, fitsglob))
+
+    goodframes = []
+    goodphots = []
+    goodsrclists = []
+
+    # associate the frames with their fiphot files
+    for fits in fitslist:
+
+        photpath = os.path.join(
+            photdir,
+            os.path.basename(fits).strip('.fits.fz') + photext
+            )
+        srclistpath = os.path.join(
+            srclistdir,
+            os.path.basename(fits).strip('.fits.fz') + srclistext
+            )
+
+        if os.path.exists(photpath) and os.path.exists(srclistpath):
+            goodframes.append(fits)
+            goodphots.append(photpath)
+            goodsrclists.append(srlistpath)
+
+
+    # we only work on goodframes now
+    print('%sZ: selecting an astrometric reference frame...' %
+          (datetime.utcnow().isoformat(),))
+
+
+    median_sval = []
+    median_dval = []
+    median_background = []
+    good_detections = []
+
+    # go through all the frames and find their properties
+    for frame, phot, srclist in zip(goodframes, goodphots, goodsrclists):
+
+        # decide if the phot file is binary or not. read the first 600
+        # bytes and look for the '--binary-output' text
+        with open(phot,'rb') as photf:
+            header = photf.read(600)
+
+        if '--binary-output' in header and HAVEBINPHOT:
+
+            photdata_f = read_fiphot(phot)
+            photdata = {
+                'mag':np.array(photdata_f['per aperture'][2]['mag']),
+                'err':np.array(photdata_f['per aperture'][2]['mag err']),
+                'flag':np.array(
+                    photdata_f['per aperture'][2]['status flag']
+                    )
+                }
+            del photdata_f
+
+        elif '--binary-output' in header and not HAVEBINPHOT:
+
+            print('%sZ: %s is a binary phot file, '
+                  'but no binary phot reader is present, skipping...' %
+                  (datetime.utcnow().isoformat(), phot))
+            continue
+
+        else:
+
+            # read in the phot file
+            photdata = np.genfromtxt(
+                phot,
+                usecols=(12,13,14),
+                dtype='f8,f8,S5',
+                names=['mag','err','flag']
+                )
+
+        # now, get the data from the associated fistar file
+        srcdata = np.genfromtxt(srclist,
+                                usecols=(3,5,6),
+                                dtype='f8,f8,f8',
+                                names=['background',
+                                       'svalue',
+                                       'dvalue'])
+
+        # number of good detections
+        good_detind = (photdata['flag'] == 'G') | (photdata['flag'] == '0')
+        good_detections.append(len(photdata['mags'][good_detind]))
+
+        # median background, d, and s
+        median_background.append(np.nanmedian(srcdata['background']))
+        median_dval.append(np.nanmedian(srcdata['dvalue']))
+        median_sval.append(np.nanmedian(srcdata['svalue']))
+
+    # now find the best astrometric reference frame
+
+    # to np.arrays first
+    median_sval = np.array(median_sval)
+    median_dval = np.array(median_dval)
+    median_background = np.array(median_background)
+    good_detections = np.array(good_detections)
+
+    # get the best S --> largest S at the top
+    median_sval_ind = np.argsort(median_sval)[::-1]
+
+    # here, we want the values closest to zero to be at the top
+    median_dval_ind = np.argsort(np.fabs(median_dval))
+
+    # want the smallest background
+    median_background_ind = np.argsort(median_background)
+
+    # and the most number of detections
+    good_detections_ind = np.argsort(good_detections)[::-1]
+
+    # get the top 200 of each index
+    median_sval_ind = median_sval_ind[:200]
+    median_dval_ind = median_dval_ind[:200]
+    median_background_ind = median_background_ind[:200]
+    good_detections_ind = good_detections_ind[:200]
+
+    # now intersect all of these arrays to find the best candidates for the
+    # astrometric reference frame
+    best_frame_ind = np.intersect1d(
+        np.intersect1d(median_sval_ind,
+                       median_dval_ind,
+                       assume_unique=True),
+        np.intersect1d(median_background_ind,
+                       good_detections_ind,
+                       assume_unique=True),
+        assume_unique=True
+        )
+
+    if len(best_frame_ind) > 0:
+        goodframes = np.array(goodframes)
+        selectedreference = goodframes[best_frame_ind[0]]
+
+        print('%sZ: selected best astrometric reference frame is %s' %
+              (datetime.utcnow().isoformat(), selectedreference))
+
+        return selectedreference
+
+    else:
+
+        print('ERR! %sZ: could not select a good astrometric reference frame!' %
+              (datetime.utcnow().isoformat(), ))
+
+        return
+
 
 
 def get_smoothed_xysdk_coeffs(fistardir):
