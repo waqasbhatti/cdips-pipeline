@@ -44,6 +44,15 @@ import pyfits
 import imageutils
 from imageutils import get_header_keyword
 
+# get fiphot binary reader
+try:
+    from HATpipepy.Common.BinPhot import read_fiphot
+    HAVEBINPHOT = True
+except:
+    print("can't import binary fiphot reading functions from "
+          "HATpipe, binary fiphot files will be unreadable!")
+    HAVEBINPHOT = False
+
 
 #################
 ## DEFINITIONS ##
@@ -68,6 +77,28 @@ ZEROPOINTS = {5:17.11,
 
 # used to get the station ID, frame number, and CCD number from a FITS filename
 FRAMEREGEX = re.compile(r'(\d{1})\-(\d{6}\w{0,1})_(\d{1})')
+
+
+#######################
+## COMMAND TEMPLATES ##
+#######################
+
+XYSDKCMD = ('grtrans {fistarfile} --col-xy 2,3 --col-fit 6,7,8 '
+            '--col-weight 10 --order 4 '
+            '--iterations 3 --rejection-level 3 '
+            '--comment --output-transformation {xysdkfile}')
+
+FRAMESHIFTCMD = (
+    'grmatch --match-points '
+    '-r {astromref} --col-ref 2,3 --col-ref-ordering +9 '
+    '-i {fistartoshift} --col-inp 2,3 --col-inp-ordering +9 '
+    '--weight reference,column=9 '
+    '--triangulation maxinp=5000,maxref=5000,conformable,auto,unitarity=0.01 '
+    '--order 4 --max-distance 1 --comment '
+    '--output-transformation {outtransfile} '
+    '--output /dev/null'
+    )
+
 
 
 ##################################
@@ -125,7 +156,7 @@ def select_astromref_frame(fitsdir,
         if os.path.exists(photpath) and os.path.exists(srclistpath):
             goodframes.append(fits)
             goodphots.append(photpath)
-            goodsrclists.append(srlistpath)
+            goodsrclists.append(srclistpath)
 
 
     # we only work on goodframes now
@@ -140,6 +171,9 @@ def select_astromref_frame(fitsdir,
 
     # go through all the frames and find their properties
     for frame, phot, srclist in zip(goodframes, goodphots, goodsrclists):
+
+        if DEBUG:
+            print('working on frame %s' % frame)
 
         # decide if the phot file is binary or not. read the first 600
         # bytes and look for the '--binary-output' text
@@ -183,9 +217,13 @@ def select_astromref_frame(fitsdir,
                                        'svalue',
                                        'dvalue'])
 
+        # find good frames
+        if '--binary-output' in header:
+            goodind = np.where(photdata['flag'] == 0)
+        else:
+            goodind = np.where(photdata['flag'] == 'G')
         # number of good detections
-        good_detind = (photdata['flag'] == 'G') | (photdata['flag'] == '0')
-        good_detections.append(len(photdata['mags'][good_detind]))
+        good_detections.append(len(photdata['mag'][goodind]))
 
         # median background, d, and s
         median_background.append(np.nanmedian(srcdata['background']))
@@ -220,21 +258,48 @@ def select_astromref_frame(fitsdir,
 
     # now intersect all of these arrays to find the best candidates for the
     # astrometric reference frame
+
+    sd_ind =  np.intersect1d(median_sval_ind,
+                             median_dval_ind,
+                             assume_unique=True)
+
+
     best_frame_ind = np.intersect1d(
-        np.intersect1d(median_sval_ind,
-                       median_dval_ind,
-                       assume_unique=True),
+        sd_ind,
         np.intersect1d(median_background_ind,
                        good_detections_ind,
                        assume_unique=True),
         assume_unique=True
         )
 
+    # pick a good astrometric reference frame
+    goodframes = np.array(goodframes)
+
     if len(best_frame_ind) > 0:
-        goodframes = np.array(goodframes)
+
         selectedreference = goodframes[best_frame_ind[0]]
 
         print('%sZ: selected best astrometric reference frame is %s' %
+              (datetime.utcnow().isoformat(), selectedreference))
+
+        return selectedreference
+
+    elif len(sd_ind) > 0:
+
+        selectedreference = goodframes[sd_ind[0]]
+
+        print('WRN! %sZ: selected best astrometric reference frame '
+              '(using S and D only)  is %s' %
+              (datetime.utcnow().isoformat(), selectedreference))
+
+        return selectedreference
+
+    elif len(median_sval_ind) > 0:
+
+        selectedreference = goodframes[median_sval_ind[0]]
+
+        print('WRN! %sZ: selected best astrometric reference frame '
+              '(using S only)  is %s' %
               (datetime.utcnow().isoformat(), selectedreference))
 
         return selectedreference
@@ -248,10 +313,40 @@ def select_astromref_frame(fitsdir,
 
 
 
-def get_smoothed_xysdk_coeffs(fistardir):
+def xysdk_coeffs_worker(task):
+    '''
+    This is a parallel worker to run the xysdk coeff operation.
+
+    '''
+
+    fistar, fistarglob = task
+
+    outxysdk = fistar.replace(fistarglob.split('.')[-1], 'xysdk')
+
+    cmdtorun = XYSDKCMD.format(fistarfile=fistar,
+                               xysdkfile=outxysdk)
+
+    returncode = os.system(cmdtorun)
+
+    if returncode == 0:
+        print('%sZ: XYSDK coeffs OK: %s -> %s' %
+              (datetime.utcnow().isoformat(), fistar, outxysdk))
+        return fistar, outxysdk
+    else:
+        print('ERR! %sZ: XYSDK coeffs failed for %s' %
+              (datetime.utcnow().isoformat(), fistar))
+        if os.path.exists(outxysdk):
+            os.remove(outxysdk)
+        return fistar, None
+
+
+def get_smoothed_xysdk_coeffs(fistardir,
+                              fistarglob='*.fistar',
+                              nworkers=16,
+                              maxworkertasks=1000):
     '''
     This generates smoothed xy and sdk coefficents for use with iphot later
-    (these go into the output photometry file).
+    (these go into the output photometry file or something).
 
     grtrans ${APPHOT}/$base.${EXT_FISTAR} --col-xy 2,3 --col-fit 6,7,8 \
                   --col-weight 10 --order 4 \
@@ -260,11 +355,102 @@ def get_smoothed_xysdk_coeffs(fistardir):
 
     '''
 
+    fistarlist = glob.glob(os.path.join(os.path.abspath(fistardir), fistarglob))
 
-def get_astromref_shifts():
+    print('%sZ: %s files to process in %s' %
+          (datetime.utcnow().isoformat(), len(fistarlist), fistardir))
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+    tasks = [(x, fistarglob) for x in fistarlist]
+
+    # fire up the pool of workers
+    results = pool.map(xysdk_coeffs_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    return {x:y for (x,y) in results}
+
+
+
+def astromref_shift_worker(task):
+    '''
+    This is a parallel worker for getting the shifts between the astromref frame
+    and the frame in the task definition.
+
+    task[0] = target frame fistar
+    task[1] = astromref frame fistar
+    task[2] = outdir
+
+    '''
+
+    fistartoshift, astromref, outdir = task
+
+    if outdir:
+        outfile = os.path.join(
+            os.path.abspath(outdir),
+            os.path.basename(targetframe).replace('fistar','itrans')
+            )
+
+    else:
+        outfile = targetframe.replace('fistar','itrans')
+
+    cmdtorun = FRAMESHIFTCMD.format(astromref=astromref,
+                                    fistartoshift=fistartoshift,
+                                    outtransfile=outfile)
+
+    returncode = os.system(cmdtorun)
+
+    if returncode == 0:
+        print('%sZ: shift transform calc OK: %s -> %s' %
+              (datetime.utcnow().isoformat(), fistartoshift, outfile))
+        return fistar, outfile
+    else:
+        print('ERR! %sZ: shift transform calc failed for %s' %
+              (datetime.utcnow().isoformat(), fistartoshift))
+        if os.path.exists(outfile):
+            os.remove(outfile)
+        return fistar, None
+
+
+
+def get_astromref_shifts(fistardir,
+                         astromrefframe,
+                         fistarglob='*.fistar',
+                         outdir=None,
+                         nworkers=16,
+                         maxworkertasks=1000):
     '''
     This gets shifts between the astrometric reference frame and all other
     frames.
+
+    '''
+
+    fistarlist = glob.glob(os.path.join(os.path.abspath(fistardir), fistarglob))
+
+    print('%sZ: %s files to process in %s' %
+          (datetime.utcnow().isoformat(), len(fistarlist), fistardir))
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+    tasks = [(x, astromrefframe, outdir) for x in fistarlist]
+
+    # fire up the pool of workers
+    results = pool.map(astromref_shift_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    return {x:y for (x,y) in results}
+
+
+
+def frame_to_astromref_work(task):
+    '''
+    This is a parallel worker for the frame shift to astromref frame operation.
 
     '''
 
