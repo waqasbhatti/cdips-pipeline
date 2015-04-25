@@ -563,6 +563,25 @@ def transform_frames_to_astromref(fitsdir,
     return {x:y for (x,y) in results}
 
 
+def generate_astromref_registration_info(astromrefsrclist,
+                                         outfile=None):
+    '''This generates a registration information file using the astrometry
+    reference frame. This file is then used by the convolution step somehow to
+    figure out the convolution kernel? In any case, it's needed for:
+
+    - generating convolved reference frames to be ultimately stacked into a
+      single photometric reference frame
+
+    - do the convolution of the reference frame to each -xtrns target frame when
+      doing the image subtraction
+
+    '''
+
+    # get the x and y coordinate columns from the source list (fistar)
+
+
+
+
 
 ##################################
 ## PHOTOMETRIC REFERENCE FRAMES ##
@@ -572,11 +591,14 @@ def select_photref_frames(fitsdir,
                           photdir,
                           fistardir,
                           minframes=80):
-    '''
-    This selects a group of photometric reference frames that will later be
+    '''This selects a group of photometric reference frames that will later be
     stacked and medianed to form the single photometric reference frame.
 
-    Should be similar to the aperturephot version.
+    0. this is run on the transformed frames (the ones with -xtrns.fits)
+
+    1. returns a list that is at least minframes long of frames suitable for
+    combining into a median reference frame, using the following list of
+    selectors (on the original versions (?; probably)):
 
     - best median scatter of photometry
     - lowest median error in photometry
@@ -585,6 +607,37 @@ def select_photref_frames(fitsdir,
     - high moon and sun distance
     - large number of stars detected
     - fewest number of failed source photometry extractions
+
+    for all selected frames, we will get the median of the background values
+    near the center 512x512 pixels. then, we'll enforce that the median of
+    background values of each frames be within some delta of the overall
+    median. this is basically a slacker way to get rid of cloudy nights
+
+    2. the best frame out of all these selectors is the one every other frame of
+    these photref frames will be convolved to.
+
+    FIXME! check if it's actually the astrometric we convolve all these
+    photometric references to
+
+    3. now that all the frames are in the same coordinate system, and have been
+    convolved to the same PSF, we can median-stack them (using scipy or ficombine)
+
+    so we return:
+
+    - a list of selected frames suitable for use as photometric references the
+    - best frame among these to use as the convolution target
+
+    - (or nothing, if we're convolving to the best astrometric reference instead
+      -- which would make more sense)
+
+    '''
+
+
+def convolve_photref_frames(photreflist,
+                            targetframe,
+                            outdir=None):
+    '''This convolves all photref frames to the targetframe. See getref() in
+    run_ficonv.py.
 
     '''
 
@@ -596,7 +649,7 @@ def stack_photref_frames(framelist):
 
     - first, transform all of them to the astrometric reference frame
 
-    - then use fiarith in median mode to stack them
+    - then use ficombine in median mode to stack them
 
     - (or actually, use scipy to do this instead, making sure to copy over the
       first frame's header + adding a new keyword listing all the component
@@ -613,14 +666,16 @@ def photometry_on_stacked_photref(
     This runs fiphot in the special iphot mode on the stacked photometric
     reference frame. See cmrawphot.sh for the correct commandline to use.
 
+    fiphot --input $Refframe --input-list $Inlist --col-id 1 --col-xy 5,6
+           --gain 2.725 --mag-flux $zp,30
+           --apertures '2.5:7.0:6.0,2.95:7.0:6.0,3.35:7.0:6.0,3.95:7.0:6.0'
+           --sky-fit 'mode,sigma=3,iterations=2' --disjoint-radius 2
+           --serial $seriel --format 'IXY-----,sMm' --nan-string 'NaN'
+           --aperture-mask-ignore 'saturated' --comment '--comment'
+           --single-background 3 -op $output -k
+
     '''
 
-def generate_photref_registration(stackedphotref):
-    '''
-    This generates a registration file for use with convolution later. The
-    convolution and subtraction step below needs this.
-
-    '''
 
 
 #################################
