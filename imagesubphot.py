@@ -593,10 +593,10 @@ def generate_astromref_registration_info(astromrefsrclist,
     ma = np.zeros(BX*BY)
     xsize = 2048.
     ysize = 2048.
-    bx = (x*BX/xsize).astype(int)
-    by = (y*BY/ysize).astype(int)
-    mx[by*bx+bx] = x
-    my[by*bx+bx] = y
+    bx = (srcxy['x']*BX/xsize).astype(int)
+    by = (srcxy['y']*BY/ysize).astype(int)
+    mx[by*bx+bx] = srcxy['x']
+    my[by*bx+bx] = srcxy['y']
 
     outf = open(outfile,'wb')
 
