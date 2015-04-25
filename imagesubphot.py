@@ -611,7 +611,7 @@ def select_photref_frames(fitsdir,
     for all selected frames, we will get the median of the background values
     near the center 512x512 pixels. then, we'll enforce that the median of
     background values of each frames be within some delta of the overall
-    median. this is basically a slacker way to get rid of cloudy nights
+    median. this is basically a slacker way to get rid of cloudy nights.
 
     2. the best frame out of all these selectors is the one every other frame of
     these photref frames will be convolved to.
