@@ -477,21 +477,100 @@ def frame_to_astromref_worker(task):
     '''
     This is a parallel worker for the frame shift to astromref frame operation.
 
+    task[0] = FITS frame to shift
+    task[1] = directory where transform files are
+    task[2] = output directory
+
     '''
 
+    frametoshift, transdir, outdir = task
 
-def transform_frames_to_astromref():
+    # figure out the transfile path
+    if transdir:
+        itransfile = os.path.join(
+            os.path.join(
+                os.path.abspath(transpath),
+                os.path.basename(frametoshift).replace('.fits','.itrans')
+            )
+        )
+
+    else:
+        itransfile = frametoshift.replace('.fits','.itrans')
+
+    # make sure the itransfile for this frame exists before we proceed
+    if not os.path.exists(itransfile):
+        print('ERR! %sZ: frame transform to astromref failed for %s, '
+              'no itrans file found' %
+              (datetime.utcnow().isoformat(), frametoshift))
+        return frametoshift, None
+
+    # figure out the output path
+    if outdir:
+        outtransframe = os.path.join(
+            os.path.abspath(outdir),
+            os.path.basename(frametoshift).replace('.fits','-xtrns.fits')
+            )
+
+    else:
+        outtransframe = frametoshift.replace('.fits','-xtrns.fits')
+
+    cmdtorun = FRAMETRANSFORMCMD.format(itransfile=itransfile,
+                                        frametoshift=frametoshift,
+                                        outtransframe=outtransframe)
+
+    returncode = os.system(cmdtorun)
+
+    if returncode == 0:
+        print('%sZ: transform to astromref OK: %s -> %s' %
+              (datetime.utcnow().isoformat(), frametoshift, outtransframe))
+        return frametoshift, outtransframe
+    else:
+        print('ERR! %sZ: transform to astromref failed for %s' %
+              (datetime.utcnow().isoformat(), frametoshift))
+        if os.path.exists(outtransframe):
+            os.remove(outtransframe)
+        return frametoshift, None
+
+
+
+def transform_frames_to_astromref(fitsdir,
+                                  fitsglob='*.fits',
+                                  itransdir=None,
+                                  outdir=None,
+                                  nworkers=16,
+                                  maxworkertasks=1000):
     '''
     This shifts all frames to the astrometric reference.
 
     '''
+
+    fitslist = glob.glob(os.path.join(os.path.abspath(fitsdir), fitsglob))
+
+    print('%sZ: %s files to process in %s' %
+          (datetime.utcnow().isoformat(), len(fitslist), fitsdir))
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+    tasks = [(x, itransdir, outdir) for x in fitslist]
+
+    # fire up the pool of workers
+    results = pool.map(frame_to_astromref_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    return {x:y for (x,y) in results}
+
 
 
 ##################################
 ## PHOTOMETRIC REFERENCE FRAMES ##
 ##################################
 
-def select_photref_frames(photdir,
+def select_photref_frames(fitsdir,
+                          photdir,
+                          fistardir,
                           minframes=80):
     '''
     This selects a group of photometric reference frames that will later be
@@ -568,4 +647,3 @@ def photometry_on_subtracted_frames(subtractedframelist,
     See run_iphot.py and IMG-3-PHOT_st5.sh for what this is supposed to do.
 
     '''
-
