@@ -564,8 +564,8 @@ def transform_frames_to_astromref(fitsdir,
 
 
 def generate_astromref_registration_info(astromrefsrclist,
-                                         xycols=(2,3),
-                                         outfile=None):
+                                         outfile,
+                                         xycols=(2,3)):
     '''This generates a registration information file using the astrometry
     reference frame. This file is then used by the convolution step somehow to
     figure out the convolution kernel? In any case, it's needed for:
@@ -584,11 +584,26 @@ def generate_astromref_registration_info(astromrefsrclist,
                            dtype='f8,f8',
                            names=['x','y'])
 
-    # set up the grid
+    # set up the grid (this weirdness is transcribed directly from Chelsea's
+    # regslct.py) TODO: figure out WTF this does
 
+    BX = 30.; BY = 30.
+    mx = np.zeros(BX*BY)-1
+    my = np.zeros(BX*BY)-1
+    ma = np.zeros(BX*BY)
+    xsize = 2048.
+    ysize = 2048.
+    bx = (xcoor*BX/xsize).astype(int)
+    by = (ycoor*BY/ysize).astype(int)
+    mx[by*bx+bx] = x
+    my[by*bx+bx] = y
 
+    outf = open(outfile,'wb')
 
+    for i in xrange(int(BX*BY)):
+        outf.write("%8.0f %8.0f %8.0f\n" % (mx[i],my[i],20))
 
+    outf.close()
 
 
 ##################################
