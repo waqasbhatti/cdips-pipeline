@@ -564,6 +564,7 @@ def transform_frames_to_astromref(fitsdir,
 
 
 def generate_astromref_registration_info(astromrefsrclist,
+                                         xycols=(2,3),
                                          outfile=None):
     '''This generates a registration information file using the astrometry
     reference frame. This file is then used by the convolution step somehow to
@@ -578,6 +579,13 @@ def generate_astromref_registration_info(astromrefsrclist,
     '''
 
     # get the x and y coordinate columns from the source list (fistar)
+    srcxy = np.genfromtext(astromrefsrclist,
+                           usecols=xycols,
+                           dtype='f8,f8',
+                           names=['x','y'])
+
+    # set up the grid
+
 
 
 
