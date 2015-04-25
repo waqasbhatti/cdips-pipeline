@@ -579,10 +579,10 @@ def generate_astromref_registration_info(astromrefsrclist,
     '''
 
     # get the x and y coordinate columns from the source list (fistar)
-    srcxy = np.genfromtext(astromrefsrclist,
-                           usecols=xycols,
-                           dtype='f8,f8',
-                           names=['x','y'])
+    srcxy = np.genfromtxt(astromrefsrclist,
+                          usecols=xycols,
+                          dtype='f8,f8',
+                          names=['x','y'])
 
     # set up the grid (this weirdness is transcribed directly from Chelsea's
     # regslct.py) TODO: figure out WTF this does
