@@ -619,6 +619,10 @@ def select_photref_frames(fitsdir,
                           srclistdir=None,
                           srclistext='.fistar',
                           minframes=80,
+                          maxhourangle=3.0,
+                          maxmoonphase=25.0,
+                          maxmoonelev=-10.0,
+                          maxzenithdist=30.0,
                           forcecollectinfo=False):
     '''This selects a group of photometric reference frames that will later be
     stacked and medianed to form the single photometric reference frame.
@@ -861,7 +865,7 @@ def select_photref_frames(fitsdir,
     # if the imagesub photref info file exists already, load it up
     else:
 
-        print('%sZ: wrote the photref select info to %s' %
+        print('%sZ: loading existing photref select info from %s' %
               (datetime.utcnow().isoformat(),
                os.path.join(fitsdir, 'TM-imagesub-photref.pkl')))
 
@@ -874,20 +878,109 @@ def select_photref_frames(fitsdir,
     #
 
     # filter on hour angle
-    haind = np.where(np.fabs(infodict['hourangle']) < 3.0)
-    haind = haind[0]
+    haind = np.fabs(infodict['hourangle']) < maxhourangle
 
     # get dark nights
-    moonind = np.where((np.fabs(infodict['moonphase']) < 25.0) |
-                       (moonelev < -15.0))
-    moonind = moonind[0]
+    moonind = ((np.fabs(infodict['moonphase']) < maxmoonphase) |
+               (infodict['moonelev'] < maxmoonelev))
 
-    selectind = haind & moonind
+    # get low zenith distance nights
+    zenithind = infodict['zenithdist'] < maxzenithdist
 
-    print selectind, len(selectind)
-    return infodict
+    # this is the final operating set of frames that will be sorted for the
+    # following tests
+    selectind = haind & moonind & zenithdist
 
+    selected_frames = infodict['frames'][selectind]
 
+    selected_ngoodobj = infodict['ngoodobj'][selectind]
+    selected_medmagerr = infodict['medmagerr'][selectind]
+    selected_magerrmad = infodict['magerrmad'][selectind]
+    selected_medsrcbkg = infodict['medsrcbkg'][selectind]
+
+    print('%sZ: selected %s frames with acceptable '
+          'HA, Z, moon phase, and elevation for further filtering...' %
+          (datetime.utcnow().isoformat(), len(selected_frames)))
+
+    # do the more strict selection only if we have at least 2 x minframes
+    if len(selected_frames) >= 2*minframes:
+
+        # now sort these by the required order
+        sorted_ngoodobj_ind = (np.argsort(selected_ngoodobj)[::-1])[:2*minframes]
+        sorted_medmagerr_ind = (np.argsort(selected_medmagerr))[:2*minframes]
+        sorted_magerrmad_ind = (np.argsort(selected_magerrmad))[:2*minframes]
+        sorted_medsrcbkg_ind = (np.argsort(selected_medsrcbkg))[:2*minframes]
+
+        select_ind1 = np.intersect1d(
+            sorted_medmagerr_ind,
+            sorted_magerrmad_ind,
+            assume_unique=True
+        )
+        select_ind2 = np.intersect1d(
+            sorted_ngoodobj_ind,
+            sorted_medsrcbkg_ind,
+            assume_unique=True
+        )
+
+        best_ind = np.intersect1d(
+            select_ind1,
+            select_ind2,
+            assume_unique=True
+        )
+
+        if len(best_ind) >= minframes:
+
+            print('%sZ: selecting frames based on '
+                  'detections, med mag err, med mag MAD, background' %
+                  (datetime.utcnow().isoformat(), ))
+
+            final_ind = best_ind[:minframes]
+
+        elif len(select_ind2) >= minframes:
+
+            print('WRN! %sZ: selecting frames based on '
+                  'detections, background' %
+                  (datetime.utcnow().isoformat(), ))
+
+            final_ind = select_ind2[:minframes]
+
+        elif len(select_ind1) >= minframes:
+
+            print('WRN! %sZ: selecting frames based on '
+                  'med mag err, med mag MAD' %
+                  (datetime.utcnow().isoformat(), ))
+
+            final_ind = select_ind1[:minframes]
+
+        elif len(sorted_medsrcbkg_ind) >= minframes:
+
+            print('WRN! %sZ: selecting frames based on '
+                  'background only' %
+                  (datetime.utcnow().isoformat(), ))
+
+            final_ind = sorted_medsrcbkg_ind[:minframes]
+
+        else:
+
+            print('ERR! %sZ: not enough frames to select photref!.' %
+                  (datetime.utcnow().isoformat(), ))
+            return None, infodict
+
+        # the final set of frames
+        final_frames = selected_frames[final_ind]
+
+    else:
+
+        print('WRN! %sZ: not enough pre-selected frames to cut down '
+              'to a minimum set, selecting those with lowest background...' %
+              (datetime.utcnow().isoformat(), ))
+
+        final_ind = (np.argsort(selected_medsrcbkg))[:minframes]
+        final_frames = selected_frames[final_ind]
+
+    # finally return the best frames for use with the photref convolution and
+    # the infodict
+    return final_frames, infodict
 
 
 
