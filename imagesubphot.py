@@ -212,6 +212,23 @@ CONVOLVESUBFRAMESCMD = ('ficonv -r {frametoconvolve} '
                         '-ok {outputkernel} '
                         '-os {outputfile}')
 
+COMBINEDREFPHOTCMD = (
+    "fiphot --input {photref} "
+    "--input-list {srclist} "
+    "--col-id {srclist_idcol} "
+    "--col-xy {srclist_xycol} "
+    "--gain {ccdgain} "
+    "--mag-flux {zeropoint},{exptime} "
+    "--apertures '{aperturestring}' "
+    "--sky-fit 'mode,sigma=3,iterations=2' --disjoint-radius 2 "
+    "--serial {photrefbase} "
+    "--format 'IXY-----,sMm' --nan-string 'NaN' "
+    "--aperture-mask-ignore 'saturated' "
+    "--comment '--comment' --single-background 3 "
+    "--op {outfile} -k"
+)
+
+
 ##################################
 ## ASTROMETRIC REFERENCE FRAMES ##
 ##################################
@@ -1213,7 +1230,7 @@ def combine_frames(framelist,
         return framelist, outfile
     else:
         print('ERR! %sZ: framelist combine failed!' %
-              (datetime.utcnow().isoformat(), frametoconvolve,))
+              (datetime.utcnow().isoformat(),))
         if os.path.exists(outfile):
             os.remove(outfile)
         return framelist, None
@@ -1221,8 +1238,15 @@ def combine_frames(framelist,
 
 
 def photometry_on_combined_photref(
-        combinedphotref,
-        apertures='2.95:7.0:6.0,3.35:7.0:6.0,3.95:7.0:6.0'
+        photref_frame,
+        photref_sourcelist,  # this is the matched source list (.sourcelist)
+        srclist_idcol='1',
+        srclist_xycol='7,8',
+        ccdgain=None,
+        zeropoint=None,
+        ccdexptime=None,
+        apertures='2.95:7.0:6.0,3.35:7.0:6.0,3.95:7.0:6.0',
+        outfile=None
 ):
     '''This runs fiphot in the special iphot mode on the combined photometric
     reference frame. See cmrawphot.sh for the correct commandline to use.
@@ -1236,6 +1260,83 @@ def photometry_on_combined_photref(
            --single-background 3 -op $output -k
 
     '''
+
+    # get the required header keywords from the FITS file
+    header = imageutils.get_header_keyword_list(photref_frame,
+                                                ['GAIN',
+                                                 'GAIN1',
+                                                 'GAIN2',
+                                                 'EXPTIME'])
+
+    # handle the gain and exptime parameters
+    if not ccdgain:
+
+        if 'GAIN1' in header and 'GAIN2' in header:
+            ccdgain = (header['GAIN1'] + header['GAIN2'])/2.0
+        elif 'GAIN' in header:
+            ccdgain = header['GAIN']
+        else:
+            ccdgain = None
+
+    if not ccdexptime:
+        ccdexptime = header['EXPTIME'] if 'EXPTIME' in header else None
+
+    if not (ccdgain or ccdexptime):
+        print('%sZ: no GAIN or EXPTIME defined for %s' %
+              (datetime.utcnow().isoformat(),
+               photref_frame))
+        return None
+
+    # figure out the fitsbase from the fits sourcelist
+    fitsbase = os.path.basename(photref_sourcelist).strip('.sourcelist')
+
+    # handle the zeropoints
+    if not zeropoint:
+
+        # if the zeropoint isn't provided and if this is a HAT frame, the ccd
+        # number will get us the zeropoint in the ZEROPOINTS dictionary
+        frameinfo = FRAMEREGEX.findall(photref_sourcelist)
+        if frameinfo:
+            zeropoint = ZEROPOINTS[int(frameinfo[0][-1])]
+        else:
+            print('%sZ: no zeropoint magnitude defined for %s' %
+                  (datetime.utcnow().isoformat(),
+                   photref_frame))
+            return None
+
+    # figure out the output path
+    if not outfile:
+        outfile = os.path.abspath(photref_frame.strip('.fits.fz') + '.cmrawphot')
+
+    # now assemble the command
+    cmdtorun = COMBINEDREFPHOTCMD.format(
+        photref=photref_frame,
+        srclist=photref_sourcelist,
+        srclist_idcol=srclist_idcol,
+        srclist_xycol=srclist_xycol,
+        ccdgain=ccdgain,
+        zeropoint=zeropoint,
+        exptime=ccdexptime,
+        aperturestring=apertures,
+        photrefbase=fitsbase,
+        outfile=outfile
+    )
+
+    if DEBUG:
+        print(cmdtorun)
+
+    returncode = os.system(cmdtorun)
+
+    if returncode == 0:
+        print('%sZ: photometry on photref %s OK -> %s' %
+              (datetime.utcnow().isoformat(), photref_frame, outfile))
+        return framelist, outfile
+    else:
+        print('ERR! %sZ: photometry on photref %s failed!' %
+              (datetime.utcnow().isoformat(), photref_frame))
+        if os.path.exists(outfile):
+            os.remove(outfile)
+        return framelist, None
 
 
 

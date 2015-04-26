@@ -815,9 +815,8 @@ def make_frameprojected_catalog(fits,
             if not ccdextent:
                 ccdextent = CCDEXTENT
 
-            # get indices for the lines to be kept
-            # optionally, remove all sources within pixborders pixels of the edges
-            # of the image.
+            # get indices for the lines to be kept optionally, remove all
+            # sources within pixborders pixels of the edges of the image.
             keep_ind = np.where(
                 (sourcelist_x > (ccdextent['x'][0] + pixborders)) &
                 (sourcelist_x < (ccdextent['x'][1] - pixborders)) &
