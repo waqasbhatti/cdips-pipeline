@@ -889,7 +889,7 @@ def select_photref_frames(fitsdir,
 
     # this is the final operating set of frames that will be sorted for the
     # following tests
-    selectind = haind & moonind & zenithdist
+    selectind = haind & moonind & zenithind
 
     selected_frames = infodict['frames'][selectind]
 
