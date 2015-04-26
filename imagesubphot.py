@@ -580,7 +580,7 @@ def transform_frames_to_astromref(fitsdir,
 
 def generate_astromref_registration_info(astromrefsrclist,
                                          outfile,
-                                         xycols=(2,3)):
+                                         xycols=(1,2)):
     '''This generates a registration information file using the astrometry
     reference frame. This file is then used by the convolution step somehow to
     figure out the convolution kernel? In any case, it's needed for:
