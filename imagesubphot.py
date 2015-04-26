@@ -1,9 +1,103 @@
 #!/usr/bin/env python
 
-'''
-imagesubphot.py - Waqas Bhatti (wbhatti@astro.princeton.edu) - March 2015
+'''imagesubphot.py - Waqas Bhatti (wbhatti@astro.princeton.edu) - March 2015
 
 This contains functions to do image subtraction photometry.
+
+GENERAL ORDER OF THINGS
+
+0. you need reduced frames with accompanying fiphot (photometry) files, and
+   fistar (source detection) files. see aperturephot.py's docstring (steps 1
+   through 5) for how to get to this state. also see framecalib.py for how to
+   get from raw frames to calibrated reduced frames.
+
+   (see /nfs/phs3/ar1/S/HP0/PHOT_WB/ccd5-work on phs3 for an example of a
+    directory that has most of the needed stuff in it)
+
+1. the first order of business is to select an astrometric reference frame
+   (astromref) using select_astromref_frame. this should be a frame that has the
+   sharpest and roundest stars. see select_astromref_frame below to see other
+   useful selectors that are applied.
+
+2. next, use get_smoothed_xysdk_coeffs to generate files that contain the
+   smoothed S, D, K coefficients for each source detection list. this is needed
+   later when we do photometry on the subtracted frames.
+
+3. use get_astromref_shifts to calculate the X and Y coordinate shifts between
+   the selected astromref and all other frames we're working on. these will be
+   used to shift these other frames to the coordinate system of the astromref,
+   which is required to subtract these frames cleanly.
+
+4. use transform_frames_to_astromref to do the actual shifting of all frames to
+   the coordinate system of the astromref. this produces new FITS files with the
+   '-xtrns.fits' postfix in their filenames. these are the files we'll use from
+   now on.
+
+5. use generate_astromref_registration_info to generate a file that grids up the
+   astromref source detections into a 30 x 30 grid based on their x and y
+   coordinates. not sure what this does exactly, but the file it generates is
+   required by the actual convolution steps later.
+
+6. the next thing to do is to select a bunch of frames that can serve as
+   photometric reference frames (photrefs). use select_photref_frames for
+   this. see the docstring there for the list of selectors used. we'll then
+   stack these photrefs into a combined photref later.
+
+7. now that we have photrefs, we have to convolve their PSFs to the best
+   available PSF we have (from the astromref). in this way, we match both the
+   PSF of the image and the coordinates; these are needed to combine the frames
+   correctly. use covolve_photref_frames for this task. this function produces
+   FITS with PHOTREF- prefixes to indicate that these are the convolved photref
+   frames.
+
+8. use combine_frames to combine all PHOTREF-*-xtrns.fits frames. this creates a
+   single high quality photometric reference frame that we'll subtract from all
+   other frames to produce difference images.
+
+9. get raw photometry on this combined photref by using
+   photometry_on_combined_photref. this produces the base photometry values that
+   we'll be diffing from those found in the difference images to get difference
+   magnitudes.
+
+10. use convolve_and_subtract_frames to convolve all other frames to the
+    combined photref, and generate difference images. the produced images will
+    have a subtracted- prefix in their filenames.
+
+11. finally, use photometry_on_subtracted_frames to do photometry on the
+    subtracted frames to produce difference magnitudes for each image. these
+    calculated mags are put into .iphot files.
+
+12. use parallel_collect_lightcurves to collect the .iphot files into .ilc
+    lightcurve files containing image subtraction photometric timeseries for
+    each star.
+
+the next few steps are common between imagesubphot.py and aperturephot.py, so
+you can use the functions there for them (but that might have issues with
+differing column numbers, so I'll probably end up remaking them for
+imagesubphot.py):
+
+13. run serial_run_epd or parallel_run_epd to do EPD on all LCs.
+
+14. run parallel_lc_statistics to collect stats on .epdlc files.
+
+15. run choose_tfa_template to choose TFA template stars using the .epdlc stats.
+
+16. run parallel_run_tfa for TFA to get .tfalc.TF{1,2,3} files (FIXME: still
+    need to collect into single .tfalc files for all apertures)
+
+17. run parallel_lc_statistics to collect stats on .tfalc files.
+
+18. run parallel_bin_lightcurves to bin LCs to desired time-bins.
+
+19. run parallel_binnedlc_statistics to collect stats for the binned LCs.
+
+20. run plot_stats_file to make RMS vs. mag plots for all unbinned and binned
+    LCs.
+
+21. run plot_magrms_comparison to compare the mag-RMS relation for various CCDs.
+
+22. run plot_ismphot_comparison to compare against ISM photometry statistics for
+    the same field (requires common stars).
 
 '''
 
@@ -1127,9 +1221,9 @@ def combine_frames(framelist,
 
 
 def photometry_on_combined_photref(
-    stackedphotref,
-    apertures='2.95:7.0:6.0,3.35:7.0:6.0,3.95:7.0:6.0'
-    ):
+        combinedphotref,
+        apertures='2.95:7.0:6.0,3.35:7.0:6.0,3.95:7.0:6.0'
+):
     '''This runs fiphot in the special iphot mode on the combined photometric
     reference frame. See cmrawphot.sh for the correct commandline to use.
 
@@ -1248,5 +1342,13 @@ def photometry_on_subtracted_frames(subtractedframelist,
     magnitudes.
 
     See run_iphot.py and IMG-3-PHOT_st5.sh for what this is supposed to do.
+
+    '''
+
+
+
+def parallel_collect_lightcurves(photdir):
+    '''
+    This collects all .iphot objects into lightcurves.
 
     '''
