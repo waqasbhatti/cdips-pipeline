@@ -717,7 +717,7 @@ def select_photref_frames(fitsdir,
 
         # 1. get the data from FITS header
         headerdata = imageutils.get_header_keyword_list(
-            fits,
+            frame,
             ['Z','MOONDIST','MOONELEV','MOONPH','HA']
             )
 
