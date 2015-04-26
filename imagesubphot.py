@@ -1203,9 +1203,9 @@ convolve_and_subtract_frames below.
 
 
 def convolve_and_subtract_frames(fitsdir,
-                                 fitsglob='*-xtrns.fits',
                                  combinedphotref,
                                  photrefregfile,
+                                 fitsglob='*-xtrns.fits',
                                  kernelspec='b/4;i/4;d=4/4',
                                  nworkers=16,
                                  maxworkertasks=1000,
