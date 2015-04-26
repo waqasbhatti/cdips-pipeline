@@ -1251,14 +1251,6 @@ def photometry_on_combined_photref(
     '''This runs fiphot in the special iphot mode on the combined photometric
     reference frame. See cmrawphot.sh for the correct commandline to use.
 
-    fiphot --input $Refframe --input-list $Inlist --col-id 1 --col-xy 5,6
-           --gain 2.725 --mag-flux $zp,30
-           --apertures '2.5:7.0:6.0,2.95:7.0:6.0,3.35:7.0:6.0,3.95:7.0:6.0'
-           --sky-fit 'mode,sigma=3,iterations=2' --disjoint-radius 2
-           --serial $seriel --format 'IXY-----,sMm' --nan-string 'NaN'
-           --aperture-mask-ignore 'saturated' --comment '--comment'
-           --single-background 3 -op $output -k
-
     '''
 
     # get the required header keywords from the FITS file
