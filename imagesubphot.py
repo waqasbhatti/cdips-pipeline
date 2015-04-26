@@ -1120,12 +1120,11 @@ def combine_frames(framelist,
 
 
 
-def photometry_on_stacked_photref(
+def photometry_on_combined_photref(
     stackedphotref,
     apertures='2.95:7.0:6.0,3.35:7.0:6.0,3.95:7.0:6.0'
     ):
-    '''
-    This runs fiphot in the special iphot mode on the stacked photometric
+    '''This runs fiphot in the special iphot mode on the combined photometric
     reference frame. See cmrawphot.sh for the correct commandline to use.
 
     fiphot --input $Refframe --input-list $Inlist --col-id 1 --col-xy 5,6
