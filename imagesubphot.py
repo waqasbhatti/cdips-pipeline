@@ -103,6 +103,11 @@ FRAMETRANSFORMCMD = ('fitrans {frametoshift} -k '
                      '--input-transformation {itransfile} '
                      '--reverse -o {outtransframe}')
 
+PHOTREFCONVOLVECMD = ('ficonv -i {targetframe} '
+                      '-r {frametoconvolve} '
+                      '-it {convregfile} '
+                      '-k "{kernelspec}" '
+                      '-oc {outputfile}')
 
 
 ##################################
@@ -984,13 +989,81 @@ def select_photref_frames(fitsdir,
 
 
 
-def convolve_photref_frames(photreflist,
-                            targetframe,
-                            outdir=None):
-    '''This convolves all photref frames to the targetframe. See getref() in
-    run_ficonv.py.
+def photref_convolution_worker(task):
+    '''This is a parallel worker to convolve the photref frames to the astromref
+    frame. Used by convolve_photref_frames below.
+
+    task[0] -> the frame to convolve
+    task[1] -> the frame to use as the convolution target
+    task[2] -> the convolution target's registration info file
+    task[3] -> the kernel specification for the convolution
+    task[4] -> the output directory where to place the results
 
     '''
+
+    frametoconvolve, targetframe, convregfile, kernelspec, outdir = task
+
+    if not outdir:
+        outfile = os.path.join(os.path.dirname(frametoconvolve),
+                               'PHOTREF-%s' % os.path.basename(frametoconvolve))
+
+    else:
+        outfile = os.path.join(outdir,
+                               'PHOTREF-%s' % os.path.basename(frametoconvolve))
+
+    cmdtorun = PHOTREFCONVOLVECMD.format(
+        targetframe=targetframe,
+        frametoconvolve=frametoconvolve,
+        convregfile=convregfile,
+        kernelspec=kernelspec,
+        outputfile=outfile
+    )
+
+    returncode = os.system(cmdtorun)
+
+    if returncode == 0:
+        print('%sZ: photref convolution OK: %s -> %s' %
+              (datetime.utcnow().isoformat(), frametoconvolve, outfile))
+        return frametoconvolve, outfile
+    else:
+        print('ERR! %sZ: photref convolution failed for %s' %
+              (datetime.utcnow().isoformat(), frametoconvolve,))
+        if os.path.exists(outfile):
+            os.remove(outfile)
+        return frametoconvolve, None
+
+
+def convolve_photref_frames(photreflist,
+                            targetframe,
+                            convregfile,
+                            kernelspec='b/4;i/4;d=4/4',
+                            nworkers=16,
+                            maxworkertasks=1000,
+                            outdir=None):
+
+    '''This convolves all photref frames in photreflist to the targetframe. See
+    getref() in run_ficonv.py.
+
+    '''
+
+    # make a list of tasks
+
+    tasks = [(x, targetframe, convregfile, kernelspec, outdir)
+             for x in photreflist]
+
+    print('%sZ: %s photref files to convolve to %s' %
+          (datetime.utcnow().isoformat(), len(photreflist), targetframe))
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+    # fire up the pool of workers
+    results = pool.map(photref_convolution_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    return {x:y for (x,y) in results}
 
 
 
