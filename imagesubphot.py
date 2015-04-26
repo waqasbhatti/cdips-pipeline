@@ -747,7 +747,7 @@ def select_photref_frames(fitsdir,
 
             elif '--binary-output' in header and not HAVEBINPHOT:
 
-                print('%sZ: %s is a binary phot file, '
+                print('WRN! %sZ: %s is a binary phot file, '
                       'but no binary phot reader is present, skipping...' %
                       (datetime.utcnow().isoformat(), phot))
                 continue
@@ -860,6 +860,10 @@ def select_photref_frames(fitsdir,
 
     # if the imagesub photref info file exists already, load it up
     else:
+
+        print('%sZ: wrote the photref select info to %s' %
+              (datetime.utcnow().isoformat(),
+               os.path.join(fitsdir, 'TM-imagesub-photref.pkl')))
 
         inpf = open(os.path.join(fitsdir, 'TM-imagesub-photref.pkl'), 'rb')
         infodict = pickle.load(inpf)
