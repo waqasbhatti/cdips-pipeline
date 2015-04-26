@@ -693,7 +693,7 @@ def select_photref_frames(fitsdir,
     # we only work on goodframes now
     print('%sZ: %s good frames found in %s, '
           'now selecting photometric reference frames...' %
-          (datetime.utcnow().isoformat(), len(goodframes)))
+          (datetime.utcnow().isoformat(), len(goodframes), fitsdir))
 
     # things we need to worry about
     # best median scatter of photometry
