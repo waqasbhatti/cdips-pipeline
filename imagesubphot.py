@@ -980,7 +980,7 @@ def select_photref_frames(fitsdir,
 
     # finally return the best frames for use with the photref convolution and
     # the infodict
-    return final_frames, infodict
+    return final_frames.tolist(), infodict
 
 
 
