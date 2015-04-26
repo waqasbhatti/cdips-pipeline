@@ -109,6 +109,8 @@ PHOTREFCONVOLVECMD = ('ficonv -i {targetframe} '
                       '-k "{kernelspec}" '
                       '-oc {outputfile}')
 
+FRAMECOMBINECMD = ('ficombine {framelist} -m {combinemethod} -o {outfile}')
+
 
 ##################################
 ## ASTROMETRIC REFERENCE FRAMES ##
@@ -1070,19 +1072,52 @@ def convolve_photref_frames(photreflist,
 
 
 
-def stack_photref_frames(framelist):
+def combine_frames(framelist,
+                   outfile,
+                   combinemethod='median'):
+    '''This combines all of the frames in framelist (a list of filenames) using
+    ficombine and the specified combinemethod. combinemethod is one of the
+    following strings (taken from ficombine's help):
+
+     average, mean      The mean value of the pixels.
+     median             The median value of the pixels.
+     rejmed, rejection  Median value after rejecting outliers.
+     rejavg             Mean value after rejecting outliers.
+     sum                Sum of the pixel values.
+     squaresum          Sum for the squarers of the pixel values.
+     scatter, stddev    Pixel scatter (standard deviation).
+     or                 Use logical OR combination between masks.
+     and                Use logical AND combination between masks.
+     ignorenegative     Ignore (i.e. mask) pixels with negative values.
+     ignorezero         Ignore (i.e. mask) pixels with a zero value.
+     ignorenegative     Ignore (i.e. mask) pixels with positive values.
+
     '''
-    This stacks the photometric reference frames in median mode.
 
-    - first, transform all of them to the astrometric reference frame
+    combineflist = ' '.join(framelist)
 
-    - then use ficombine in median mode to stack them
+    cmdtorun = FRAMECOMBINECMD.format(
+        framelist=combineflist,
+        combinemethod=combinemethod,
+        outfile=outfile
+    )
 
-    - (or actually, use scipy to do this instead, making sure to copy over the
-      first frame's header + adding a new keyword listing all the component
-      frames)
+    if DEBUG:
+        print(cmdtorun)
 
-    '''
+    returncode = os.system(cmdtorun)
+
+    if returncode == 0:
+        print('%sZ: framelist combine OK: %s images in framelist -> %s' %
+              (datetime.utcnow().isoformat(), len(framelist), outfile))
+        return framelist, outfile
+    else:
+        print('ERR! %sZ: framelist combine failed!' %
+              (datetime.utcnow().isoformat(), frametoconvolve,))
+        if os.path.exists(outfile):
+            os.remove(outfile)
+        return framelist, None
+
 
 
 def photometry_on_stacked_photref(
