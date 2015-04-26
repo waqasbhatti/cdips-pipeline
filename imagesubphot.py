@@ -1019,6 +1019,9 @@ def photref_convolution_worker(task):
         outputfile=outfile
     )
 
+    if DEBUG:
+        print(cmdtorun)
+
     returncode = os.system(cmdtorun)
 
     if returncode == 0:
