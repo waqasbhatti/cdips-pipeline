@@ -234,7 +234,9 @@ def select_astromref_frame(fitsdir,
         median_dval.append(np.nanmedian(srcdata['dvalue']))
         median_sval.append(np.nanmedian(srcdata['svalue']))
 
+    #
     # now find the best astrometric reference frame
+    #
 
     # to np.arrays first
     median_sval = np.array(median_sval)
@@ -611,8 +613,11 @@ def generate_astromref_registration_info(astromrefsrclist,
 ##################################
 
 def select_photref_frames(fitsdir,
-                          photdir,
-                          fistardir,
+                          fitsglob='*-xtrns.fits',
+                          photdir=None,
+                          photext='.fiphot',
+                          srclistdir=None,
+                          srclistext='.fistar',
                           minframes=80):
     '''This selects a group of photometric reference frames that will later be
     stacked and medianed to form the single photometric reference frame.
@@ -627,33 +632,236 @@ def select_photref_frames(fitsdir,
     - lowest median error in photometry
     - lowest median background measurement
     - low zenith distance
-    - high moon and sun distance
-    - large number of stars detected
-    - fewest number of failed source photometry extractions
+    - high moon distance and lowest moon elevation
+    - hour angle with +/- 3 hours
+    - large number of stars detected with good flags
 
     for all selected frames, we will get the median of the background values
     near the center 512x512 pixels. then, we'll enforce that the median of
     background values of each frames be within some delta of the overall
     median. this is basically a slacker way to get rid of cloudy nights.
 
-    2. the best frame out of all these selectors is the one every other frame of
-    these photref frames will be convolved to.
-
-    FIXME! check if it's actually the astrometric we convolve all these
-    photometric references to
+    2. we convolve all of these to the astrometric reference frame's PSF
+    (they're already in the same coordinates as the astromref).
 
     3. now that all the frames are in the same coordinate system, and have been
-    convolved to the same PSF, we can median-stack them (using scipy or ficombine)
-
-    so we return:
-
-    - a list of selected frames suitable for use as photometric references the
-    - best frame among these to use as the convolution target
-
-    - (or nothing, if we're convolving to the best astrometric reference instead
-      -- which would make more sense)
+    convolved to the same PSF, we can median-stack them (using scipy or
+    ficombine)
 
     '''
+    # first, get the frames
+    fitslist = glob.glob(os.path.join(fitsdir, fitsglob))
+
+    if not srclistdir:
+        srclistdir = fitsdir
+    if not photdir:
+        photdir = fitsdir
+
+    print('%sZ: %s FITS files found in %s matching glob %s, '
+          'finding photometry and source lists...' %
+          (datetime.utcnow().isoformat(),
+           len(fitslist), fitsdir, fitsglob))
+
+    goodframes = []
+    goodphots = []
+    goodsrclists = []
+
+    # associate the frames with their fiphot files
+    for fits in fitslist:
+
+        fitsbase = os.path.splitext(os.path.basename(fits))[0]
+
+        # if the xtrns files are passed in, make sure we look at the
+        # right fistar and fiphot files
+        if '-xtrns' in fitsbase:
+            fitsbase = fitsbase.rstrip('-xtrns')
+
+        photpath = os.path.join(
+            photdir,
+            fitsbase + photext
+            )
+        srclistpath = os.path.join(
+            srclistdir,
+            fitsbase + srclistext
+            )
+
+        if os.path.exists(photpath) and os.path.exists(srclistpath):
+            goodframes.append(fits)
+            goodphots.append(photpath)
+            goodsrclists.append(srclistpath)
+
+    # we only work on goodframes now
+    print('%sZ: %s good frames found in %s, '
+          'now selecting photometric reference frames...' %
+          (datetime.utcnow().isoformat(), len(goodframes)))
+
+    # things we need to worry about
+    # best median scatter of photometry
+    # lowest median error in photometry
+    # lowest median background measurement
+    # low zenith distance
+    # high moon and sun distance
+    # large number of stars detected
+
+    # from the FITS
+    zenithdist, moondist, moonelev, moonphase, hourangle = [], [], [], [], []
+
+    # from the fiphot files
+    ngoodobjects, medmagerr, magerrmad, medsrcbg = [], [], [], []
+
+
+    for frame, phot, srclist in zip(goodframes, goodphots, goodsrclists):
+
+        if DEBUG:
+            print('working on frame %s' % frame)
+
+        # 1. get the data from FITS header
+        headerdata = imageutils.get_header_keyword_list(
+            fits,
+            ['Z','MOONDIST','MOONELEV','MOONPH','HA']
+            )
+
+        # 2. get the data from the fiphot file
+
+        # decide if the phot file is binary or not. read the first 600
+        # bytes and look for the '--binary-output' text
+        with open(phot,'rb') as photf:
+            header = photf.read(600)
+
+        if '--binary-output' in header and HAVEBINPHOT:
+
+            photdata_f = read_fiphot(phot)
+            photdata = {
+                'mag':np.array(photdata_f['per aperture'][2]['mag']),
+                'err':np.array(photdata_f['per aperture'][2]['mag err']),
+                'flag':np.array(
+                    photdata_f['per aperture'][2]['status flag']
+                    )
+                }
+            del photdata_f
+
+        elif '--binary-output' in header and not HAVEBINPHOT:
+
+            print('%sZ: %s is a binary phot file, '
+                  'but no binary phot reader is present, skipping...' %
+                  (datetime.utcnow().isoformat(), phot))
+            continue
+
+        else:
+
+            # read in the phot file
+            photdata = np.genfromtxt(
+                phot,
+                usecols=(12,13,14),
+                dtype='f8,f8,S5',
+                names=['mag','err','flag']
+                )
+
+        # 3. get the data fro mthe fistar file
+        srcdata = np.genfromtxt(srclist,
+                                usecols=(3,5,6),
+                                dtype='f8,f8,f8',
+                                names=['background',
+                                       'svalue',
+                                       'dvalue'])
+
+        # now we have headerdata, photdata, and srcdata, fill in the lists
+
+        # header data
+        if 'Z' in headerdata:
+            zenithdist.append(headerdata['Z'])
+        else:
+            zenithdist.append(np.nan)
+
+        if 'MOONDIST' in headerdata:
+            moondist.append(headerdata['MOONDIST'])
+        else:
+            moondist.append(np.nan)
+
+        if 'MOONELEV' in headerdata:
+            moonelev.append(headerdata['MOONELEV'])
+        else:
+            moonelev.append(np.nan)
+
+        if 'MOONPH' in headerdata:
+            moonphase.append(headerdata['MOONPH'])
+        else:
+            moonphase.append(np.nan)
+
+        if 'HA' in headerdata:
+            hourangle.append(headerdata['HA'])
+        else:
+            hourangle.append(np.nan)
+
+        # fiphot data
+        if '--binary-output' in header:
+            goodind = np.where(photdata['flag'] == 0)
+        else:
+            goodind = np.where(photdata['flag'] == 'G')
+
+        median_mag = np.median(photdata['mag'][goodind])
+
+        # these are the quantities we're interested in
+        ngood = len(goodind[0])
+        median_magerr = np.nanmedian(photdata['err'][goodind])
+        medabsdev_mag = np.nanmedian(
+            np.abs(photdata['mag'][goodind] - median_mag)
+            )
+
+        # put these in the lists
+        ngoodobjects.append(ngood)
+        medmagerr.append(median_magerr)
+        magerrmad.append(medabsdev_mag)
+
+        # fistar data
+        medsrcbg.append(np.nanmedian(srcdata['background']))
+
+    #
+    # done with collecting data, choose the best photometric reference frames
+    #
+
+    # convert all lists to np.arrays first
+    zenithdist = np.array(zenithdist)
+    moondist = np.array(moondist)
+    moonelev = np.array(moonelev)
+    moonphase = np.array(moonphase)
+    hourangle = np.array(hourangle)
+
+    ngoodobjects = np.array(ngoodobjects)
+    medmagerr = np.array(medmagerr)
+    magerrmad = np.array(magerrmad)
+
+    medsrcbg = np.array(medsrcbg)
+
+    goodframes = np.array(goodframes)
+
+    outdict = {
+        'frames':goodframes,
+        'zenithdist':zenithdist,
+        'moondist':moondist,
+        'moonelev':moonelev,
+        'moonphase':moonphase,
+        'hourangle':hourangle,
+        'ngoodobjs':ngoodobjects,
+        'medmagerr':medmagerr,
+        'magerrmad':magerrmad,
+        'medsrcbkg':medsrcbg
+    }
+
+    # filter on hour angle
+    haind = np.where(np.fabs(hourangle) < 3.0)
+    haind = haind[0]
+
+    # get dark nights
+    moonind = np.where((np.fabs(moonphase) < 50.0) |
+                       (moonelev < -30.0))
+    moonind = moonind[0]
+
+
+    return outdict
+
+
+
 
 
 def convolve_photref_frames(photreflist,
