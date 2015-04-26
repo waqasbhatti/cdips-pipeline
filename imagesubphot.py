@@ -111,6 +111,12 @@ PHOTREFCONVOLVECMD = ('ficonv -i {targetframe} '
 
 FRAMECOMBINECMD = ('ficombine {framelist} -m {combinemethod} -o {outfile}')
 
+CONVOLVESUBFRAMESCMD = ('ficonv -r {frametoconvolve} '
+                        ' -i {targetframe} '
+                        '-it {convregfile} '
+                        '-k "{kernelspec}" '
+                        '-ok {outputkernel} '
+                        '-os {outputfile}')
 
 ##################################
 ## ASTROMETRIC REFERENCE FRAMES ##
@@ -1143,16 +1149,97 @@ def photometry_on_combined_photref(
 ## CONVOLUTION AND SUBTRACTION ##
 #################################
 
-def convolve_and_subtract_frames(transformedframelist,
-                                 stackedphotref,
-                                 stackedphotrefregistration,
-                                 kernelspec='b/4;i/4;d=4/4'):
+def subframe_convolution_worker(task):
+    '''This is a parallel worker to convolve the combined photref frame to each
+input frame, subtract them, and then return the subtracted frame. Used by
+convolve_and_subtract_frames below.
+
+    task[0] -> the frame to convolve
+    task[1] -> the frame to use as the convolution target
+    task[2] -> the convolution target's registration info file
+    task[3] -> the kernel specification for the convolution
+    task[4] -> the output directory where to place the results
+
+    '''
+
+    frametoconvolve, targetframe, convregfile, kernelspec, outdir = task
+
+    if not outdir:
+        outfile = os.path.join(os.path.dirname(frametoconvolve),
+                               'subtracted-%s' % os.path.basename(frametoconvolve))
+        outkernel = os.path.join(os.path.dirname(frametoconvolve),
+                                 '%s-kernel' % os.path.basename(frametoconvolve))
+
+    else:
+        outfile = os.path.join(outdir,
+                               'subtracted-%s' % os.path.basename(frametoconvolve))
+        outkernel = os.path.join(outdir,
+                                 '%s-kernel' % os.path.basename(frametoconvolve))
+
+    cmdtorun = CONVOLVESUBFRAMESCMD.format(
+        targetframe=targetframe,
+        frametoconvolve=frametoconvolve,
+        convregfile=convregfile,
+        kernelspec=kernelspec,
+        outputkernel=outkernel,
+        outputfile=outfile
+    )
+
+    if DEBUG:
+        print(cmdtorun)
+
+    returncode = os.system(cmdtorun)
+
+    if returncode == 0:
+        print('%sZ: convolution and subtraction OK: %s -> %s' %
+              (datetime.utcnow().isoformat(), frametoconvolve, outfile))
+        return frametoconvolve, outfile
+    else:
+        print('ERR! %sZ: convolution and subtraction failed for %s' %
+              (datetime.utcnow().isoformat(), frametoconvolve,))
+        if os.path.exists(outfile):
+            os.remove(outfile)
+        return frametoconvolve, None
+
+
+def convolve_and_subtract_frames(fitsdir,
+                                 fitsglob='*-xtrns.fits',
+                                 combinedphotref,
+                                 photrefregfile,
+                                 kernelspec='b/4;i/4;d=4/4',
+                                 nworkers=16,
+                                 maxworkertasks=1000,
+                                 outdir=None):
     '''
     This convolves the photometric reference to each frame, using the specified
     kernel, then subtracts the frame from the photometric reference to produce
     the subtracted frames.
 
     '''
+
+    # find all the files to process
+    transframelist = glob.glob(os.path.join(os.path.abspath(fitsdir),
+                                            fitsglob))
+
+    # make a list of tasks
+    tasks = [(x, combinedphotref, photrefregfile, kernelspec, outdir)
+             for x in transframelist]
+
+    print('%sZ: %s frames to convolve to %s and subtract' %
+          (datetime.utcnow().isoformat(), len(transframelist), combinedphotref))
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+    # fire up the pool of workers
+    results = pool.map(subframe_convolution_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    return {x:y for (x,y) in results}
+
+
 
 def photometry_on_subtracted_frames(subtractedframelist,
                                     photrefrawphot):
