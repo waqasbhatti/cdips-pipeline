@@ -225,7 +225,7 @@ COMBINEDREFPHOTCMD = (
     "--format 'IXY-----,sMm' --nan-string 'NaN' "
     "--aperture-mask-ignore 'saturated' "
     "--comment '--comment' --single-background 3 "
-    "--op {outfile} -k"
+    "-op {outfile} -k"
 )
 
 
