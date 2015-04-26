@@ -1322,13 +1322,13 @@ def photometry_on_combined_photref(
     if returncode == 0:
         print('%sZ: photometry on photref %s OK -> %s' %
               (datetime.utcnow().isoformat(), photref_frame, outfile))
-        return framelist, outfile
+        return photref_frame, outfile
     else:
         print('ERR! %sZ: photometry on photref %s failed!' %
               (datetime.utcnow().isoformat(), photref_frame))
         if os.path.exists(outfile):
             os.remove(outfile)
-        return framelist, None
+        return photref_frame, None
 
 
 
