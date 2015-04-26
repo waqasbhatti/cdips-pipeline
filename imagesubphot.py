@@ -893,7 +893,7 @@ def select_photref_frames(fitsdir,
 
     selected_frames = infodict['frames'][selectind]
 
-    selected_ngoodobj = infodict['ngoodobj'][selectind]
+    selected_ngoodobj = infodict['ngoodobjs'][selectind]
     selected_medmagerr = infodict['medmagerr'][selectind]
     selected_magerrmad = infodict['magerrmad'][selectind]
     selected_medsrcbkg = infodict['medsrcbkg'][selectind]
