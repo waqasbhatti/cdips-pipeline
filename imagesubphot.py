@@ -451,7 +451,7 @@ def astromref_shift_worker(task):
 
 
 def get_astromref_shifts(fistardir,
-                         astromrefframe,
+                         astromrefsrclist,
                          fistarglob='*.fistar',
                          outdir=None,
                          nworkers=16,
@@ -469,7 +469,7 @@ def get_astromref_shifts(fistardir,
 
     pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
-    tasks = [(x, astromrefframe, outdir) for x in fistarlist]
+    tasks = [(x, astromrefsrclist, outdir) for x in fistarlist]
 
     # fire up the pool of workers
     results = pool.map(astromref_shift_worker, tasks)
