@@ -1475,18 +1475,14 @@ def subframe_photometry_worker(task):
                                                  'GAIN2',
                                                  'EXPTIME'])
 
-    # handle the gain and exptime parameters
-    if not ccdgain:
+    if 'GAIN1' in header and 'GAIN2' in header:
+        ccdgain = (header['GAIN1'] + header['GAIN2'])/2.0
+    elif 'GAIN' in header:
+        ccdgain = header['GAIN']
+    else:
+        ccdgain = None
 
-        if 'GAIN1' in header and 'GAIN2' in header:
-            ccdgain = (header['GAIN1'] + header['GAIN2'])/2.0
-        elif 'GAIN' in header:
-            ccdgain = header['GAIN']
-        else:
-            ccdgain = None
-
-    if not ccdexptime:
-        ccdexptime = header['EXPTIME'] if 'EXPTIME' in header else None
+    ccdexptime = header['EXPTIME'] if 'EXPTIME' in header else None
 
     if not (ccdgain or ccdexptime):
         print('%sZ: no GAIN or EXPTIME defined for %s' %
