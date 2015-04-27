@@ -1553,6 +1553,8 @@ def photometry_on_subtracted_frames(subframedir,
                                     subframeitransdir=None,
                                     subframexysdkdir=None,
                                     photdisjointradius=2,
+                                    nworkers=16,
+                                    maxworkertasks=1000,
                                     outdir=None):
 
     '''
