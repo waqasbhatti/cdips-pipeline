@@ -1732,7 +1732,7 @@ def make_photometry_index(framedir,
 
             # go through each hatid the sourcelisthatids and phothatids lists
             # and add their line numbes to the index
-            for ind, hatid in sourcehatids:
+            for ind, hatid in enumerate(sourcehatids):
 
                 if hatid not in outdict['hatids']:
                     outdict['hatids'][hatid] = {'sourcelists':[sourcelist],
@@ -1745,7 +1745,7 @@ def make_photometry_index(framedir,
                     outdict['hatids'][hatid]['sourcelists'].append(sourcelist)
                     outdict['hatids'][hatid]['sourcelines'].append(ind)
 
-            for ind, hatid in phothatids:
+            for ind, hatid in enumerate(phothatids):
 
                 if hatid not in outdict['hatids']:
                     outdict['hatids'][hatid] = {'sourcelists':[],
