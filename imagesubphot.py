@@ -240,7 +240,7 @@ SUBFRAMEPHOTCMD = (
     "--magfit orders=4:2,niter=3,sigma=3 "
     "--input-kernel {subtractedkernel} "
     "--nan-string 'NaN' "
-    "--comment '--comment' --output - | "
+    "--comment --output - | "
     "grtrans --col-xy 2,3 "
     "--input-transformation {subtracteditrans} "
     "--col-out 4,5 "
@@ -1553,9 +1553,6 @@ def photometry_on_subtracted_frames(subframedir,
                                     subframeitransdir=None,
                                     subframexysdkdir=None,
                                     photdisjointradius=2,
-                                    zeropoint=None,
-                                    exptime=None,
-                                    ccdgain=None,
                                     outdir=None):
 
     '''
@@ -1569,9 +1566,6 @@ def photometry_on_subtracted_frames(subframedir,
     # find all the subtracted frames
     subframelist = glob.glob(os.path.join(os.path.abspath(subframedir),
                                           subframeglob))
-
-
-    # figure out the CCD parameters
 
 
     # we need to find the accompanying kernel, itrans, and xysdk files for each
@@ -1617,7 +1611,7 @@ def photometry_on_subtracted_frames(subframedir,
                           outdir))
 
     # now start up the parallel photometry
-    print('%sZ: %s good frames to run photometry on in %s' %
+    print('%sZ: %s good frames to run photometry on in %s, starting...' %
           (datetime.utcnow().isoformat(), len(tasks), subframedir))
 
     pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
