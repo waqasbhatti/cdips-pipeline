@@ -1463,6 +1463,54 @@ def subframe_photometry_worker(task):
 
     '''
 
+    # get the info out of the task
+    (subframe, photrefrawphot, ccdinfo, disjointraid,
+     subframekernel, subframeitrans, subframexysdk,
+     outdir) = task
+    zeropoint, exptime, ccdgain = ccdinfo
+
+    frameinfo = re.findall(os.path.basename(subframe))
+    frameiphot = '%s-%s_%s.iphot' % (frameinfo[0][0],
+                                     frameinfo[0][1],
+                                     frameinfo[0][2])
+
+    if outdir:
+        outfile = os.path.join(os.path.abspath(outdir),
+                               frameiphot)
+    else:
+        outfile = os.path.join(os.path.abspath(os.path.dirname(subframe)),
+                               frameiphot)
+
+
+    cmdtorun = SUBFRAMEPHOTCMD.format(
+        subtractedframe=subframe,
+        photrefrawphot=photrefrawphot,
+        zeropoint=zeropoint,
+        exptime=exptime,
+        ccdgain=ccdgain,
+        disjointradius=disjointrad,
+        subtractedkernel=subframekernel,
+        subtracteditrans=subframeitrans,
+        subtractedxysdk=subframexysdk,
+        outiphot=outfile
+        )
+
+    if DEBUG:
+        print(cmdtorun)
+
+    returncode = os.system(cmdtorun)
+
+    if returncode == 0:
+        print('%sZ: subtracted frame photometry OK for %s -> %s' %
+              (datetime.utcnow().isoformat(), subframe, outfile))
+        return subframe, outfile
+    else:
+        print('ERR! %sZ: subtracted frame photometry failed for %s' %
+              (datetime.utcnow().isoformat(), subframe,))
+        if os.path.exists(outfile):
+            os.remove(outfile)
+        return subframe, None
+
 
 
 def photometry_on_subtracted_frames(subframedir,
@@ -1485,9 +1533,20 @@ def photometry_on_subtracted_frames(subframedir,
 
     '''
 
+    # find all the subtracted frames
+    subframelist = glob.glob(os.path.join(os.path.abspath(subframedir),
+                                          subframeglob))
 
 
 
+
+
+
+
+
+###########################
+## LIGHTCURVE COLLECTION ##
+###########################
 
 def parallel_collect_lightcurves(photdir):
     '''
