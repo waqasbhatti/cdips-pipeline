@@ -6,8 +6,9 @@ This contains functions to do image subtraction photometry.
 
 GENERAL ORDER OF THINGS
 
-0. you need reduced frames with accompanying fiphot (photometry) files, and
-   fistar (source detection) files. see aperturephot.py's docstring (steps 1
+0. you need reduced frames with accompanying .fiphot (photometry) files, and
+   .fistar (source detection) files, as well as frame-projected source detection
+   lists for each frame (.sourcelist). see aperturephot.py's docstring (steps 1
    through 5) for how to get to this state. also see framecalib.py for how to
    get from raw frames to calibrated reduced frames.
 
@@ -1467,9 +1468,8 @@ def subframe_photometry_worker(task):
      subframekernel, subframeitrans, subframexysdk,
      outdir) = task
 
-
     # get the CCD info out of the subframe
-    header = imageutils.get_header_keyword_list(photref_frame,
+    header = imageutils.get_header_keyword_list(subframe,
                                                 ['GAIN',
                                                  'GAIN1',
                                                  'GAIN2',
@@ -1491,14 +1491,21 @@ def subframe_photometry_worker(task):
     if not (ccdgain or ccdexptime):
         print('%sZ: no GAIN or EXPTIME defined for %s' %
               (datetime.utcnow().isoformat(),
-               photref_frame))
-        return None
+               subframe))
+        return subframe, None
 
+    # get the zeropoint. if this is a HAT frame, the ccd number will get us the
+    # zeropoint in the ZEROPOINTS dictionary
+    frameinfo = FRAMEREGEX.findall(os.path.basename(subframe))
 
+    if frameinfo:
+        zeropoint = ZEROPOINTS[int(frameinfo[0][-1])]
+    else:
+        print('%sZ: no zeropoint magnitude defined for %s' %
+              (datetime.utcnow().isoformat(),
+               subframe))
+        return subframe, None
 
-    zeropoint, exptime, ccdgain = ccdinfo
-
-    frameinfo = re.findall(os.path.basename(subframe))
     frameiphot = '%s-%s_%s.iphot' % (frameinfo[0][0],
                                      frameinfo[0][1],
                                      frameinfo[0][2])
@@ -1588,21 +1595,45 @@ def photometry_on_subtracted_frames(subframedir,
         kernel = '%s-%s_%s-xtrns.fits-kernel' % (frameinfo[0][0],
                                                  frameinfo[0][1],
                                                  frameinfo[0][2])
+        kernel = os.path.join(os.path.abspath(subframekerneldir,kernel))
+
         itrans = '%s-%s_%s.itrans' % (frameinfo[0][0],
                                       frameinfo[0][1],
                                       frameinfo[0][2])
+        itrans = os.path.join(os.path.abspath(subframeitransdir,itrans))
 
         xysdk = '%s-%s_%s.xysdk' % (frameinfo[0][0],
                                     frameinfo[0][1],
                                     frameinfo[0][2])
+        xysdk = os.path.join(os.path.abspath(subframexysdkdir,xysdk))
 
-        if (os.path.exists(os.path.join(subframekerneldir, kernel)) and
-            os.path.exists(os.path.join(subframekerneldir, itrans)) and
-            os.path.exists(os.path.join(subframekerneldir, xysdk))):
+        if (os.path.exists(kernel) and
+            os.path.exists(itrans) and
+            os.path.exists(xysdk)):
 
             tasks.append((os.path.abspath(subframe),
                           os.path.abspath(photrefrawphot),
-                          (
+                          photdisjointradius,
+                          kernel,
+                          itrans,
+                          xysdk,
+                          outdir))
+
+    # now start up the parallel photometry
+    print('%sZ: %s good frames to run photometry on in %s' %
+          (datetime.utcnow().isoformat(), len(tasks), subframedir))
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+    # fire up the pool of workers
+    results = pool.map(subframe_photometry_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    return {x:y for (x,y) in results}
+
 
 
 ###########################
