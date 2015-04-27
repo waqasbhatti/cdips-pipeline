@@ -1448,16 +1448,34 @@ def convolve_and_subtract_frames(fitsdir,
 
 
 
-def subframe_photometry_worker(tasks):
+def subframe_photometry_worker(task):
     '''This runs the special version of fiphot in subtracted image mode to
     calculate the ISM magnitudes.
+
+    task[0] -> subtracted frame FITS
+    task[1] -> photometric reference frame .cmrawphot file
+    task[2] -> (zeropoint, exptime, ccdgain)
+    task[3] -> disjoint radius
+    task[4] -> subtracted frame kernel file
+    task[5] -> subtracted frame itrans file
+    task[6] -> subtracted frame xysdk file
+    task[7] -> output directory
 
     '''
 
 
 
-def photometry_on_subtracted_frames(subtractedframelist,
-                                    photrefrawphot):
+def photometry_on_subtracted_frames(subframedir,
+                                    photrefrawphot,
+                                    subframeglob='subtracted-*.fits',
+                                    subframekerneldir=None,
+                                    subframeitransdir=None,
+                                    subframexysdkdir=None,
+                                    photdisjointradius=2,
+                                    zeropoint=None,
+                                    exptime=None,
+                                    ccdgain=None,
+                                    outdir=None):
 
     '''
     This runs photometry on the subtracted frames and finally produces the ISM
@@ -1466,6 +1484,8 @@ def photometry_on_subtracted_frames(subtractedframelist,
     See run_iphot.py and IMG-3-PHOT_st5.sh for what this is supposed to do.
 
     '''
+
+
 
 
 
