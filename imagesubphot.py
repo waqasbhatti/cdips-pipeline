@@ -1518,7 +1518,7 @@ def subframe_photometry_worker(task):
         subtractedframe=subframe,
         photrefrawphot=photrefrawphot,
         zeropoint=zeropoint,
-        exptime=exptime,
+        exptime=ccdexptime,
         ccdgain=ccdgain,
         disjointradius=disjointrad,
         subtractedkernel=subframekernel,
