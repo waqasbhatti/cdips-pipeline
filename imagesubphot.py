@@ -239,6 +239,7 @@ SUBFRAMEPHOTCMD = (
     "--disjoint-radius {disjointradius} "
     "--magfit orders=4:2,niter=3,sigma=3 "
     "--input-kernel {subtractedkernel} "
+    "--nan-string 'NaN' "
     "--comment --output - | "
     "grtrans --col-xy 2,3 "
     "--input-transformation {subtracteditrans} "
