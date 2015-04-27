@@ -240,7 +240,7 @@ SUBFRAMEPHOTCMD = (
     "--magfit orders=4:2,niter=3,sigma=3 "
     "--input-kernel {subtractedkernel} "
     "--nan-string 'NaN' "
-    "--comment --output - | "
+    "--comment '--comment' --output - | "
     "grtrans --col-xy 2,3 "
     "--input-transformation {subtracteditrans} "
     "--col-out 4,5 "
