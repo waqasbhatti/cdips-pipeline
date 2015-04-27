@@ -1689,7 +1689,7 @@ def make_photometry_index(framedir,
 
     # go through all the frames
 
-    for frame in framelist:
+    for frame in framelist[:10]:
 
         print('%sZ: working on frame %s' %
               (datetime.utcnow().isoformat(), frame))
