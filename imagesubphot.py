@@ -1697,6 +1697,8 @@ def make_photometry_index(framedir,
         # generate the names of the associated phot and sourcelist files
         frameinfo = FRAMEREGEX.findall(os.path.basename(frame))
 
+        print(frameinfo)
+
         sourcelist = '%s-%s_%s.%s' % (frameinfo[0][0],
                                       frameinfo[0][1],
                                       frameinfo[1][2],
