@@ -1454,19 +1454,48 @@ def subframe_photometry_worker(task):
 
     task[0] -> subtracted frame FITS
     task[1] -> photometric reference frame .cmrawphot file
-    task[2] -> (zeropoint, exptime, ccdgain)
-    task[3] -> disjoint radius
-    task[4] -> subtracted frame kernel file
-    task[5] -> subtracted frame itrans file
-    task[6] -> subtracted frame xysdk file
-    task[7] -> output directory
+    task[2] -> disjoint radius
+    task[3] -> subtracted frame kernel file
+    task[4] -> subtracted frame itrans file
+    task[5] -> subtracted frame xysdk file
+    task[6] -> output directory
 
     '''
 
     # get the info out of the task
-    (subframe, photrefrawphot, ccdinfo, disjointraid,
+    (subframe, photrefrawphot, disjointraid,
      subframekernel, subframeitrans, subframexysdk,
      outdir) = task
+
+
+    # get the CCD info out of the subframe
+    header = imageutils.get_header_keyword_list(photref_frame,
+                                                ['GAIN',
+                                                 'GAIN1',
+                                                 'GAIN2',
+                                                 'EXPTIME'])
+
+    # handle the gain and exptime parameters
+    if not ccdgain:
+
+        if 'GAIN1' in header and 'GAIN2' in header:
+            ccdgain = (header['GAIN1'] + header['GAIN2'])/2.0
+        elif 'GAIN' in header:
+            ccdgain = header['GAIN']
+        else:
+            ccdgain = None
+
+    if not ccdexptime:
+        ccdexptime = header['EXPTIME'] if 'EXPTIME' in header else None
+
+    if not (ccdgain or ccdexptime):
+        print('%sZ: no GAIN or EXPTIME defined for %s' %
+              (datetime.utcnow().isoformat(),
+               photref_frame))
+        return None
+
+
+
     zeropoint, exptime, ccdgain = ccdinfo
 
     frameinfo = re.findall(os.path.basename(subframe))
@@ -1538,10 +1567,42 @@ def photometry_on_subtracted_frames(subframedir,
                                           subframeglob))
 
 
+    # figure out the CCD parameters
 
 
+    # we need to find the accompanying kernel, itrans, and xysdk files for each
+    # subtracted frame for the tasks list
+    tasks = []
 
+    if not subframekerneldir:
+        subframekerneldir = subframedir
+    if not subframeitransdir:
+        subframeitransdir = subframedir
+    if not subframexysdkdir:
+        subframeitransdir = subframedir
 
+    # find matching kernel, itrans, and xysdk files for each subtracted frame
+    for subframe in subframelist:
+
+        frameinfo = re.findall(os.path.basename(subframe))
+        kernel = '%s-%s_%s-xtrns.fits-kernel' % (frameinfo[0][0],
+                                                 frameinfo[0][1],
+                                                 frameinfo[0][2])
+        itrans = '%s-%s_%s.itrans' % (frameinfo[0][0],
+                                      frameinfo[0][1],
+                                      frameinfo[0][2])
+
+        xysdk = '%s-%s_%s.xysdk' % (frameinfo[0][0],
+                                    frameinfo[0][1],
+                                    frameinfo[0][2])
+
+        if (os.path.exists(os.path.join(subframekerneldir, kernel)) and
+            os.path.exists(os.path.join(subframekerneldir, itrans)) and
+            os.path.exists(os.path.join(subframekerneldir, xysdk))):
+
+            tasks.append((os.path.abspath(subframe),
+                          os.path.abspath(photrefrawphot),
+                          (
 
 
 ###########################
