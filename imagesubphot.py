@@ -1588,17 +1588,17 @@ def photometry_on_subtracted_frames(subframedir,
         kernel = '%s-%s_%s-xtrns.fits-kernel' % (frameinfo[0][0],
                                                  frameinfo[0][1],
                                                  frameinfo[0][2])
-        kernel = os.path.join(os.path.abspath(subframekerneldir,kernel))
+        kernel = os.path.abspath(os.path.join(subframekerneldir,kernel))
 
         itrans = '%s-%s_%s.itrans' % (frameinfo[0][0],
                                       frameinfo[0][1],
                                       frameinfo[0][2])
-        itrans = os.path.join(os.path.abspath(subframeitransdir,itrans))
+        itrans = os.path.abspath(os.path.join(subframeitransdir,itrans))
 
         xysdk = '%s-%s_%s.xysdk' % (frameinfo[0][0],
                                     frameinfo[0][1],
                                     frameinfo[0][2])
-        xysdk = os.path.join(os.path.abspath(subframexysdkdir,xysdk))
+        xysdk = os.path.abspath(os.path.join(subframexysdkdir,xysdk))
 
         if (os.path.exists(kernel) and
             os.path.exists(itrans) and
