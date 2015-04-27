@@ -1584,7 +1584,7 @@ def photometry_on_subtracted_frames(subframedir,
     # find matching kernel, itrans, and xysdk files for each subtracted frame
     for subframe in subframelist:
 
-        frameinfo = re.findall(os.path.basename(subframe))
+        frameinfo = FRAMEREGEX.findall(os.path.basename(subframe))
         kernel = '%s-%s_%s-xtrns.fits-kernel' % (frameinfo[0][0],
                                                  frameinfo[0][1],
                                                  frameinfo[0][2])
