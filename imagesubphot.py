@@ -228,6 +228,26 @@ COMBINEDREFPHOTCMD = (
     "-op {outfile} -k"
 )
 
+SUBFRAMEPHOTCMD = (
+    "fiphot --input-subtracted {subtractedframe} "
+    "--input-raw-photometry {photrefrawphot} "
+    "--sky-fit mode,iterations=2,sigma=3 "
+    "--format IXY-----,sMm "
+    "--mag-flux {zeropoint},{exptime} "
+    "--gain {ccdgain} "
+    "--disjoint-radius {disjointradius} "
+    "--magfit orders=4:2,niter=3,sigma=3 "
+    "--input-kernel {subtractedkernel} "
+    "--comment --output - | "
+    "grtrans --col-xy 2,3 "
+    "--input-transformation {subtracteditrans} "
+    "--col-out 4,5 "
+    "--output - | "
+    "grtrans --col-xy 4,5 "
+    "--input-transformation {subtractedxysdk} "
+    "--col-out 6,7,8 "
+    "--output {outiphot}"
+)
 
 ##################################
 ## ASTROMETRIC REFERENCE FRAMES ##
@@ -1428,8 +1448,17 @@ def convolve_and_subtract_frames(fitsdir,
 
 
 
+def subframe_photometry_worker(tasks):
+    '''This runs the special version of fiphot in subtracted image mode to
+    calculate the ISM magnitudes.
+
+    '''
+
+
+
 def photometry_on_subtracted_frames(subtractedframelist,
                                     photrefrawphot):
+
     '''
     This runs photometry on the subtracted frames and finally produces the ISM
     magnitudes.
