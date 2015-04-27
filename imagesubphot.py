@@ -1750,12 +1750,12 @@ def make_photometry_index(framedir,
                 if hatid not in outdict['hatids']:
                     outdict['hatids'][hatid] = {'sourcelists':[],
                                                 'sourcelines':[],
-                                                'phots':[photlist],
+                                                'phots':[phot],
                                                 'photlines':[ind]}
 
                 else:
 
-                    outdict['hatids'][hatid]['phots'].append(photlist)
+                    outdict['hatids'][hatid]['phots'].append(phot)
                     outdict['hatids'][hatid]['photlines'].append(ind)
 
         # if some associated files don't exist for this frame, ignore it
