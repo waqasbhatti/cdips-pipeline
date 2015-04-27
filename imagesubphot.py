@@ -1579,7 +1579,7 @@ def photometry_on_subtracted_frames(subframedir,
     if not subframeitransdir:
         subframeitransdir = subframedir
     if not subframexysdkdir:
-        subframeitransdir = subframedir
+        subframexysdkdir = subframedir
 
     # find matching kernel, itrans, and xysdk files for each subtracted frame
     for subframe in subframelist:
