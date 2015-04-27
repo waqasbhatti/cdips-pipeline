@@ -119,6 +119,9 @@ import shutil
 import random
 import cPickle as pickle
 
+# used for fast random access to lines in text files
+from linecache import getline
+
 import numpy as np
 
 from scipy.spatial import cKDTree as kdtree
@@ -1633,8 +1636,206 @@ def photometry_on_subtracted_frames(subframedir,
 ## LIGHTCURVE COLLECTION ##
 ###########################
 
+def make_photometry_index(framedir,
+                          outfile,
+                          frameglob='subtracted-*-xtrns.fits',
+                          photdir=None,
+                          photext='iphot',
+                          sourcelistdir=None,
+                          sourcelistext='sourcelist'):
+    '''
+    This makes a master index file containing the following information for each
+    FITS frame:
+
+    frames: framekey: RJD
+
+    for each hatid: a tuple containing the .iphot, .sourcelist filenames and
+                    respective linenumbers where this hatid was found
+
+    '''
+
+    # each elem in frames below has a key that is the frame filename and a value
+    # that is a dict with keys:
+    # {'jd':JD, 'phot':PHOTPATH, 'sourcelist':SOURCELISTPATH}
+
+    # each elem in hatids below has a key that is the HATID and a value that is
+    # a dict with keys:
+
+    # {'frames':[list of frames with this hatid]
+    #  'phots': [list of photometry files with this hatid]
+    #  'photlines': [for each phot file, lineno/byteoffset
+    #                where this hatid appears]
+    #  'sourcelists': [list of sourcelist files with this hatid]
+    #  'srclines': [for each sourcelist file, lineno.byteoffset
+    #               where this hatid appears]}
+
+    outdict = {
+        'frames': {},
+        'hatids': {}
+        }
+
+    # first, figure out the directories
+    if not photdir:
+        photdir = framedir
+    if not sourcelistdir:
+        sourcelistdir = framedir
+
+    # for each frame in frame directory, get associated phot and sourcelist
+
+    # first, find all the frames
+    framelist = glob.glob(os.path.join(os.path.abspath(framedir),
+                                       frameglob))
+
+
+    # go through all the frames
+
+    for frame in framelist:
+
+        print('%sZ: working on frame %s' %
+              (datetime.utcnow().isoformat(), frame))
+
+        # generate the names of the associated phot and sourcelist files
+        frameinfo = FRAMEREGEX.findall(os.path.basename(frame))
+
+        sourcelist = '%s-%s_%s.%s' % (frameinfo[0][0],
+                                      frameinfo[0][1],
+                                      frameinfo[1][2],
+                                      sourcelistext)
+        phot = '%s-%s_%s.%s' % (frameinfo[0][0],
+                                frameinfo[0][1],
+                                frameinfo[1][2],
+                                photext)
+
+        sourcelist = os.path.join(os.path.abspath(sourcelistdir), sourcelist)
+        phot = os.path.join(os.path.abspath(photdir), phot)
+
+        # check these files exist, and populate the dict if they do
+        if os.path.exists(sourcelist) and os.path.exists(phot):
+
+            # get the JD from the FITS file
+            framerjd = get_header_keyword(frame, 'JD')
+
+            # update the frame part of the index dict
+            outdict['frames'][frame] = {'rjd':framerjd,
+                                        'phot':phot,
+                                        'sourcelist':sourcelist}
+
+            # now open the phot and sourcelist files, and a list of all HATIDs
+            # in there.
+            sourcelistf = open(sourcelist,'rb')
+            sourcehatids = [x.split()[0] for x in sourcelistf]
+            sourcelistf.close()
+
+            photf = open(phot, 'rb')
+            phothatids = [x.split()[0] for x in photf]
+            photf.close()
+
+            # go through each hatid the sourcelisthatids and phothatids lists
+            # and add their line numbes to the index
+            for ind, hatid in sourcehatids:
+
+                if hatid not in outdict['hatids']:
+                    outdict['hatids'][hatid] = {'sourcelists':[sourcelist],
+                                                'sourcelines':[ind],
+                                                'phots':[],
+                                                'photlines':[]}
+
+                else:
+
+                    outdict['hatids'][hatid]['sourcelists'].append(sourcelist)
+                    outdict['hatids'][hatid]['sourcelines'].append(ind)
+
+            for ind, hatid in phothatids:
+
+                if hatid not in outdict['hatids']:
+                    outdict['hatids'][hatid] = {'sourcelists':[],
+                                                'sourcelines':[],
+                                                'phots':[photlist],
+                                                'photlines':[ind]}
+
+                else:
+
+                    outdict['hatids'][hatid]['phots'].append(photlist)
+                    outdict['hatids'][hatid]['photlines'].append(ind)
+
+        # if some associated files don't exist for this frame, ignore it
+        else:
+
+            print('WRN! %sZ: ignoring frame %s, '
+                  'either a phot or sourcelist is not available!' %
+                  (datetime.utcnow().isoformat(), frame))
+
+
+    # now that we're all done, write this index dict to a pickle file
+    outpicklef = open(outfile,'wb')
+    pickle.dump(outdict, outpicklef, pickle.HIGHEST_PROTOCOL)
+    outpicklef.close()
+
+    return outfile
+
+
+
+
+def collect_imagesubphot_lightcurve(hatid,
+                                    photindexfile,
+                                    outdir,
+                                    ignorecollected=True):
+    '''
+    This collects the imagesubphot lightcurve of a single object into a .ilc
+    file.
+
+    hatid -> the hatid of the object to collect the light-curve for
+
+    photindexfile -> the file containing the master index of which .iphot,
+                      .sourcelist, and .fits contain all the information
+
+    outdir -> the directory where to the place the collected lightcurve
+
+    ignorecollected -> if True, looks for an existing LC for this hatid in
+                       outdir. if found, returns the path to that LC instead of
+                       actually processing. if this is False, redoes the
+                       processing for this LC anyway.
+
+    The collected LC is similar to the aperturephot LC, but some extra columns
+    added by fiphot running on the subtracted frames. columns are:
+
+    rjd    Reduced Julian Date (RJD = JD - 2400000.0)
+    rstfc  Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
+    xcc    original X coordinate on CCD before shifting to astromref
+    ycc    original y coordinate on CCD before shifting to astromref
+    xic    shifted X coordinate on CCD after shifting to astromref
+    yic    shifted Y coordinate on CCD after shifting to astromref
+    bgv    Background value
+    bge    Background measurement error
+    fsv    Measured S value
+    fdv    Measured D value
+    fkv    Measured K value
+    irm1   Instrumental magnitude in aperture 1
+    ire1   Instrumental magnitude error for aperture 1
+    irq1   Instrumental magnitude quality flag for aperture 1 (0 or G OK, X bad)
+    irm2   Instrumental magnitude in aperture 2
+    ire2   Instrumental magnitude error for aperture 2
+    irq2   Instrumental magnitude quality flag for aperture 2 (0 or G OK, X bad)
+    irm3   Instrumental magnitude in aperture 3
+    ire3   Instrumental magnitude error for aperture 3
+    irq3   Instrumental magnitude quality flag for aperture 3 (0 or G OK, X bad)
+
+    '''
+
+
+def imagesublc_collection_worker(task):
+    '''
+    This wraps collect_imagesuphot_lightcurve for parallel_collect_lightcurves
+    below.
+
+    '''
+
+
+
 def parallel_collect_lightcurves(photdir):
     '''
     This collects all .iphot objects into lightcurves.
 
+
     '''
+

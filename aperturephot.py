@@ -1982,9 +1982,27 @@ def collect_lightcurve(hatid,
     This collects all photometric info into an LC for a given HATID. Returns
     path of collected LC.
 
-    jd rstfc x y bgv bge s d k
-    im1 ie1 iq1 im2 ie2 iq2 im3 ie3 iq3
-    rm1 rm2 rm3 ep1 ep2 ep3 tf1 tf2 tf3
+    rjd    Reduced Julian Date (RJD = JD - 2400000.0)
+    rstfc  Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
+    xcc    X coordinate on CCD
+    ycc    Y coordinate on CCD
+    bgv    Background value
+    bge    Background measurement error
+    fsv    Measured S value
+    fdv    Measured D value
+    fkv    Measured K value
+    im1    Instrumental magnitude in aperture 1
+    ie1    Instrumental magnitude error for aperture 1
+    iq1    Instrumental magnitude quality flag for aperture 1 (0 or G OK, X bad)
+    im2    Instrumental magnitude in aperture 2
+    ie2    Instrumental magnitude error for aperture 2
+    iq2    Instrumental magnitude quality flag for aperture 2 (0 or G OK, X bad)
+    im3    Instrumental magnitude in aperture 3
+    ie3    Instrumental magnitude error for aperture 3
+    iq3    Instrumental magnitude quality flag for aperture 3 (0 or G OK, X bad)
+    rm1    Reduced fit magnitude in aperture 1 after magnitude fitting
+    rm2    Reduced fit magnitude in aperture 2 after magnitude fitting
+    rm3    Reduced fit magnitude in aperture 3 after magnitude fitting
 
     '''
 
