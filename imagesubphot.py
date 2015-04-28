@@ -1764,7 +1764,7 @@ def get_iphot_line(iphot, linenum, iphotlinechars=260):
     return iphotline
 
 
-def get_iphot_line_linecache(iphot, linenum, iphotlinecars=260):
+def get_iphot_line_linecache(iphot, linenum, iphotlinechars=260):
     '''
     This uses linecache's getline function to get the line out of the file
     iphot.
@@ -1780,7 +1780,8 @@ def collect_imagesubphot_lightcurve(hatid,
                                     outdir,
                                     photindex_is_dict=True,
                                     ignorecollected=True,
-                                    iphot_linefunc=get_iphot_line):
+                                    iphot_linefunc=get_iphot_line,
+                                    iphotlinechars=260):
     '''
     This collects the imagesubphot lightcurve of a single object into a .ilc
     file.
@@ -1874,7 +1875,11 @@ def collect_imagesubphot_lightcurve(hatid,
 
                 # next, get the lines from phot file using linecache's getline
                 # function
-                phot_elem = getline(phot, photline).split()
+                phot_elem = iphot_linefunc(
+                    phot,
+                    photline,
+                    iphotlinechars=iphotlinechars
+                    ).split()
 
                 # parse these lines and prepare the output
                 rstfc_elems = FRAMEREGEX.findall(os.path.basename(phot))
