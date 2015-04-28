@@ -1840,6 +1840,7 @@ def collect_imagesubphot_lightcurve(hatid,
                 rstfc_elems = FRAMEREGEX.findall(os.path.basename(phot))
                 rstfc = '%s-%s_%s' % (rstfc_elems[0])
                 out_line = '%s %s %s' % (framerjd, rstfc, ' '.join(phot_elem[1:]))
+                print(out_line)
                 outf.write(out_line)
 
             # if this frame isn't available, ignore it
