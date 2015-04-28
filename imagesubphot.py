@@ -1818,6 +1818,8 @@ def collect_imagesubphot_lightcurve(hatid,
             photindex['hatids'][hatid]['photlines']
             )
 
+        print(hatid_photfiles, hatid_photlines)
+
         # prepare the output file
 
         outfile = os.path.join(os.path.abspath(outdir), '%s.ilc' % hatid)
@@ -1845,6 +1847,7 @@ def collect_imagesubphot_lightcurve(hatid,
 
             # if this frame isn't available, ignore it
             except KeyError as e:
+
                 print('WRN! %sZ: phot %s isn\'t available, skipping...' %
                       (datetime.utcnow().isoformat(), phot))
                 continue
