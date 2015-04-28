@@ -1647,10 +1647,12 @@ def make_photometry_index(framedir,
     This makes a master index file containing the following information for each
     FITS frame:
 
-    frames: framekey: RJD
+    (see the comments directly below)
 
-    for each hatid: a tuple containing the .iphot, .sourcelist filenames and
-                    respective linenumbers where this hatid was found
+
+    TODO: make this parallel using mp.Process and mp.Queue. we'll have upto
+    nworkers processes working on frames in parallel, with a collector process
+    pulling the info into a dict, which it'll eventually write to disk
 
     '''
 
@@ -1787,7 +1789,9 @@ def collect_imagesubphot_lightcurve(hatid,
     hatid -> the hatid of the object to collect the light-curve for
 
     photindexfile -> the file containing the master index of which .iphot,
-                      .sourcelist, and .fits contain all the information
+                      .sourcelist, and .fits contain the lines corresponding to
+                      this HATID. this way, we can look these lines up
+                      super-fast using the linecache module.
 
     outdir -> the directory where to the place the collected lightcurve
 
@@ -1821,6 +1825,9 @@ def collect_imagesubphot_lightcurve(hatid,
     irq3   Instrumental magnitude quality flag for aperture 3 (0 or G OK, X bad)
 
     '''
+
+
+
 
 
 def imagesublc_collection_worker(task):
