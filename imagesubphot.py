@@ -267,7 +267,7 @@ SUBFRAMEPHOTCMD = (
 ## SQLITE SCHEMAS ##
 ####################
 
-PHOTS_TABLE = 'create table phots (phot text, rjd double precision, frame text)'
+PHOTS_TABLE = 'create table phots (phot text, rjd double, frame text)'
 HATIDS_TABLE = 'create table hatids (hatid text, phot text, photline integer)'
 META_TABLE = 'create table metainfo (photdir text, framedir text)'
 PRAGMA_CMDS = 'pragma journal_mode = WAL'
