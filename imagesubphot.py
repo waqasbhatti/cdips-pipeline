@@ -1740,12 +1740,12 @@ def make_photometry_indexdb(framedir,
             # get the JD from the FITS file
             framerjd = get_header_keyword(frame, 'JD')
 
-            print(framerjd)
+            print(framerjd, type(framerjd))
 
             # update the DB with this info
             cur.execute(PHOTS_INSERT_CMD,
                         (os.path.basename(phot),
-                         framerjd,
+                         float(framerjd),
                          os.path.basename(frame)))
 
             # get the phot file
