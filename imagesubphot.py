@@ -1731,14 +1731,19 @@ def make_photometry_indexdb(framedir,
                                 frameinfo[0][1],
                                 frameinfo[0][2],
                                 photext)
+        originalframe = '%s-%s_%s.fits' % (frameinfo[0][0],
+                                frameinfo[0][1],
+                                frameinfo[0][2])
 
         phot = os.path.join(os.path.abspath(photdir), phot)
+        originalframe = os.path.join(os.path.abspath(framedir),
+                                     originalframe)
 
         # check these files exist, and populate the dict if they do
         if os.path.exists(phot):
 
             # get the JD from the FITS file
-            framerjd = get_header_keyword(frame, 'JD')
+            framerjd = get_header_keyword(originalframe, 'JD')
 
             print(framerjd, type(framerjd))
 
@@ -1746,7 +1751,7 @@ def make_photometry_indexdb(framedir,
             cur.execute(PHOTS_INSERT_CMD,
                         (os.path.basename(phot),
                          float(framerjd),
-                         os.path.basename(frame)))
+                         os.path.basename(originalframe)))
 
             # get the phot file
             photf = open(phot, 'rb')
