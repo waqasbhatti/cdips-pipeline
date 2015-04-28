@@ -1832,7 +1832,7 @@ def collect_imagesubphot_lightcurve(hatid,
             try:
 
                 # first, get the JD corresponding to this phot
-                framerjd = photindex[phot]['jd']
+                framerjd = photindex['phots'][phot]['jd']
 
                 # next, get the lines from phot file using linecache's getline
                 # function
