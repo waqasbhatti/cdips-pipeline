@@ -267,7 +267,7 @@ SUBFRAMEPHOTCMD = (
 ## SQLITE SCHEMAS ##
 ####################
 
-PHOTS_TABLE = 'create table phots (phot text, rjd double, frame text)'
+PHOTS_TABLE = 'create table phots (phot text, rjd double precision, frame text)'
 HATIDS_TABLE = 'create table hatids (hatid text, phot text, photline integer)'
 META_TABLE = 'create table metainfo (photdir text, framedir text)'
 PRAGMA_CMDS = 'pragma journal_mode = WAL'
@@ -283,6 +283,7 @@ META_INSERT_CMD = 'insert into metainfo values (?,?)'
 PHOT_SELECT_CMD = ('select a.rjd, a.phot, b.photline from '
                    'phots a join hatids b on (a.phot = b.phot) '
                    'where b.hatid = ?')
+META_SELECT_CMD = ('select * from metainfo')
 
 
 ##################################
@@ -1794,123 +1795,6 @@ def make_photometry_indexdb(framedir,
 
 
 
-def make_photometry_index(framedir,
-                          outfile,
-                          frameglob='subtracted-*-xtrns.fits',
-                          photdir=None,
-                          photext='iphot',
-                          maxframes=None):
-    '''
-    This makes a master index file containing the following information for each
-    FITS frame:
-
-    (see the comments directly below)
-
-
-    TODO: make this parallel using mp.Process and mp.Queue. we'll have upto
-    nworkers processes working on frames in parallel, with a collector process
-    pulling the info into a dict, which it'll eventually write to disk
-
-    '''
-
-    # each elem in frames below has a key that is the phot filename and a value
-    # that is a dict with keys:
-    # {'rjd':JD, 'frame':FRAMEPATH, 'sourcelist':SOURCELISTPATH}
-
-    # each elem in hatids below has a key that is the HATID and a value that is
-    # a dict with keys:
-
-    # {'phots': [list of photometry files with this hatid]
-    #  'photlines': [for each phot file, lineno/byteoffset
-    #                where this hatid appears]}
-
-    outdict = {
-        'phots': {},
-        'hatids': {},
-        'photdir':'',
-        'framedir':os.path.abspath(framedir),
-        }
-
-    # first, figure out the directories
-    if not photdir:
-        photdir = framedir
-
-    outdict['photdir'] = photdir
-
-    # for each frame in frame directory, get associated phot and sourcelist
-
-    # first, find all the frames
-    framelist = glob.glob(os.path.join(os.path.abspath(framedir),
-                                       frameglob))
-
-    # restrict to maxframes max frames
-    if maxframes:
-        framelist = framelist[:maxframes]
-
-    # go through all the frames
-    for frame in framelist: # FIXME: temp go through 100 for testing
-
-        print('%sZ: working on frame %s' %
-              (datetime.utcnow().isoformat(), frame))
-
-        # generate the names of the associated phot and sourcelist files
-        frameinfo = FRAMEREGEX.findall(os.path.basename(frame))
-
-        phot = '%s-%s_%s.%s' % (frameinfo[0][0],
-                                frameinfo[0][1],
-                                frameinfo[0][2],
-                                photext)
-
-        phot = os.path.join(os.path.abspath(photdir), phot)
-
-        # check these files exist, and populate the dict if they do
-        if os.path.exists(phot):
-
-            # get the JD from the FITS file
-            framerjd = get_header_keyword(frame, 'JD')
-
-            # update the frame part of the index dict
-            outdict['phots'][os.path.basename(phot)] = {
-                'rjd':framerjd,
-                'frame':os.path.basename(frame)
-                }
-
-            photf = open(phot, 'rb')
-            phothatids = [x.split()[0] for x in photf]
-            photf.close()
-
-            for ind, hatid in enumerate(phothatids):
-
-                if hatid not in outdict['hatids']:
-                    outdict['hatids'][hatid] = {
-                        'phots':[os.path.basename(phot)],
-                        'photlines':[ind]
-                        }
-
-                else:
-
-                    outdict['hatids'][hatid]['phots'].append(
-                        os.path.basename(phot)
-                        )
-                    outdict['hatids'][hatid]['photlines'].append(ind)
-
-        # if some associated files don't exist for this frame, ignore it
-        else:
-
-            print('WRN! %sZ: ignoring frame %s, '
-                  'photometry for this frame is not available!' %
-                  (datetime.utcnow().isoformat(), frame))
-
-
-    # now that we're all done, write this index dict to a pickle file
-    outpicklef = open(outfile,'wb')
-    pickle.dump(outdict, outpicklef, pickle.HIGHEST_PROTOCOL)
-    outpicklef.close()
-
-    return outfile
-
-
-
 def get_iphot_line(iphot, linenum, iphotlinechars=260):
     '''
     This gets a random iphot line out of the file iphot.
@@ -1940,7 +1824,6 @@ def get_iphot_line_linecache(iphot, linenum, iphotlinechars=260):
 def collect_imagesubphot_lightcurve(hatid,
                                     photindex,
                                     outdir,
-                                    photindex_is_dict=True,
                                     ignorecollected=True,
                                     iphot_linefunc=get_iphot_line,
                                     iphotlinechars=260):
@@ -1991,30 +1874,23 @@ def collect_imagesubphot_lightcurve(hatid,
 
     '''
 
-    # load the photindex from the file if the provided second arg is a filename
-    # instead of a dict
-    if not photindex_is_dict:
+    # connect to the photindex sqlite3 database
+    indexdb = sqlite3.connect(photindex)
+    cur = indexdb.cursor()
 
-        # load the photindex file
-        indexf = open(photindex,'rb')
-        photindexdict = pickle.load(indexf)
-        indexf.close()
-        photindex = photindexdict
+    # first, look up the metainfo
+    cur.execute(META_SELECT_CMD)
+    metarow = cur.fetchone()
+    photdir, framedir = metarow
 
+    # look up the hatid and its info in the photindex db
+    cur.execute(PHOT_SELECT_CMD, (hatid,))
+    rows = cur.fetchall()
 
-    # look up the hatid in the photindex dict
-    if hatid in photindex['hatids']:
-
-        hatid_photfiles, hatid_photlines = (
-            photindex['hatids'][hatid]['phots'],
-            photindex['hatids'][hatid]['photlines']
-            )
-
-        photdir = photindex['photdir']
+    if rows and len(rows) > 0:
 
         # prepare the output file
         outfile = os.path.join(os.path.abspath(outdir), '%s.ilc' % hatid)
-
 
         # if the file already exists and ignorecollected is True, then return
         # that file instead of processing any further
@@ -2030,15 +1906,14 @@ def collect_imagesubphot_lightcurve(hatid,
 
         # go through the phots and sourcelists, picking out the timeseries
         # information for this hatid
-        for phot, photline in zip(hatid_photfiles, hatid_photlines):
+        for row in rows:
+
+            # unpack the row to get our values
+            framerjd, phot, photline = row
 
             try:
 
-                # first, get the JD corresponding to this phot
-                framerjd = photindex['phots'][phot]['rjd']
-
-                # next, get the lines from phot file using linecache's getline
-                # function
+                # next, get the requested line from phot file
                 phot_elem = iphot_linefunc(
                     os.path.join(photdir, phot),
                     photline,
@@ -2053,10 +1928,11 @@ def collect_imagesubphot_lightcurve(hatid,
                 outf.write(out_line)
 
             # if this frame isn't available, ignore it
-            except KeyError as e:
+            except Exception as e:
 
-                print('WRN! %sZ: phot %s isn\'t available, skipping...' %
-                      (datetime.utcnow().isoformat(), phot))
+                print('WRN! %sZ: phot %s isn\'t available (error: %s)'
+                      ', skipping...' %
+                      (datetime.utcnow().isoformat(), phot, e))
                 continue
 
         # close the output LC once we're done with it
@@ -2065,7 +1941,7 @@ def collect_imagesubphot_lightcurve(hatid,
         print('%sZ: object %s -> %s' %
               (datetime.utcnow().isoformat(), hatid, outfile))
 
-        return outfile
+        returnf = outfile
 
     # if the hatid isn't found in the photometry index, then we can't do
     # anything
@@ -2075,7 +1951,11 @@ def collect_imagesubphot_lightcurve(hatid,
               'photometry index, ignoring...' %
               (datetime.utcnow().isoformat(), hatid))
 
-        return None
+        returnf = None
+
+    # at the end, close the DB and return
+    indexdb.close()
+    return returnf
 
 
 
