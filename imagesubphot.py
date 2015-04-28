@@ -1818,8 +1818,6 @@ def collect_imagesubphot_lightcurve(hatid,
             photindex['hatids'][hatid]['photlines']
             )
 
-        print(hatid_photfiles, hatid_photlines)
-
         # prepare the output file
 
         outfile = os.path.join(os.path.abspath(outdir), '%s.ilc' % hatid)
@@ -1841,8 +1839,8 @@ def collect_imagesubphot_lightcurve(hatid,
                 # parse these lines and prepare the output
                 rstfc_elems = FRAMEREGEX.findall(os.path.basename(phot))
                 rstfc = '%s-%s_%s' % (rstfc_elems[0])
-                out_line = '%s %s %s' % (framerjd, rstfc, ' '.join(phot_elem[1:]))
-                print(out_line)
+                out_line = '%s %s %s\n' % (framerjd, rstfc,
+                                           ' '.join(phot_elem[1:]))
                 outf.write(out_line)
 
             # if this frame isn't available, ignore it
@@ -1860,7 +1858,8 @@ def collect_imagesubphot_lightcurve(hatid,
     # anything
     else:
 
-        print('ERR! %sZ: object %s is not in the photometry index, ignoring...' %
+        print('ERR! %sZ: object %s is not in the '
+              'photometry index, ignoring...' %
               (datetime.utcnow().isoformat(), hatid))
 
         return None
