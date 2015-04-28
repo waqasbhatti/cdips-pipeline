@@ -236,13 +236,13 @@ SUBFRAMEPHOTCMD = (
     "fiphot --input-subtracted {subtractedframe} "
     "--input-raw-photometry {photrefrawphot} "
     "--sky-fit mode,iterations=2,sigma=3 "
-    "--format IXY-----,sMm "
+    "--format IXY-----,BbMms "
     "--mag-flux {zeropoint},{exptime} "
     "--gain {ccdgain} "
     "--disjoint-radius {disjointradius} "
     "--magfit orders=4:2,niter=3,sigma=3 "
     "--input-kernel {subtractedkernel} "
-    "--nan-string 'NaN' "
+    "--nan-string 'NaN' --single-background 3 "
     "--comment --output - | "
     "grtrans --col-xy 2,3 "
     "--input-transformation {subtracteditrans} "
@@ -1656,15 +1656,14 @@ def make_photometry_index(framedir,
 
     '''
 
-    # each elem in frames below has a key that is the frame filename and a value
+    # each elem in frames below has a key that is the phot filename and a value
     # that is a dict with keys:
-    # {'jd':JD, 'phot':PHOTPATH, 'sourcelist':SOURCELISTPATH}
+    # {'jd':JD, 'frame':FRAMEPATH, 'sourcelist':SOURCELISTPATH}
 
     # each elem in hatids below has a key that is the HATID and a value that is
     # a dict with keys:
 
-    # {'frames':[list of frames with this hatid]
-    #  'phots': [list of photometry files with this hatid]
+    # {'phots': [list of photometry files with this hatid]
     #  'photlines': [for each phot file, lineno/byteoffset
     #                where this hatid appears]
     #  'sourcelists': [list of sourcelist files with this hatid]
@@ -1688,10 +1687,8 @@ def make_photometry_index(framedir,
     framelist = glob.glob(os.path.join(os.path.abspath(framedir),
                                        frameglob))
 
-
     # go through all the frames
-
-    for frame in framelist[:10]:
+    for frame in framelist[:100]: # FIXME: temp go through 100 for testing
 
         print('%sZ: working on frame %s' %
               (datetime.utcnow().isoformat(), frame))
@@ -1718,9 +1715,9 @@ def make_photometry_index(framedir,
             framerjd = get_header_keyword(frame, 'JD')
 
             # update the frame part of the index dict
-            outdict['frames'][frame] = {'rjd':framerjd,
-                                        'phot':phot,
-                                        'sourcelist':sourcelist}
+            outdict['phot'][phot] = {'rjd':framerjd,
+                                     'sourcelist':sourcelist,
+                                     'frame':frame}
 
             # now open the phot and sourcelist files, and a list of all HATIDs
             # in there.
@@ -1779,8 +1776,9 @@ def make_photometry_index(framedir,
 
 
 def collect_imagesubphot_lightcurve(hatid,
-                                    photindexfile,
+                                    photindex,
                                     outdir,
+                                    photindex_is_dict=True,
                                     ignorecollected=True):
     '''
     This collects the imagesubphot lightcurve of a single object into a .ilc
@@ -1826,7 +1824,65 @@ def collect_imagesubphot_lightcurve(hatid,
 
     '''
 
+    # load the photindex from the file if the provided second arg is a filename
+    # instead of a dict
+    if not photindex_is_dict:
 
+        # load the photindex file
+        indexf = open(photindex,'rb')
+        photindexdict = pickle.load(indexf)
+        indexf.close()
+        photindex = photindexdict
+
+
+    # look up the hatid in the photindex dict
+    if hatid in photindex['hatids']:
+
+        hatid_photfiles, hatid_photlines = (
+            photindex['hatids'][hatid]['phots'],
+            photindex['hatids'][hatid]['photlines']
+            )
+
+        hatid_sourcelists, hatid_sourcelines = (
+            sourceindex['hatids'][hatid]['sourcelists'],
+            sourceindex['hatids'][hatid]['sourcelines']
+            )
+
+        # prepare the output file
+
+        outfile = os.path.join(os.path.abspath(outdir), '%s.ilc' % hatid)
+        outf = open(outfile, 'wb')
+
+        # go through the phots and sourcelists, picking out the timeseries
+        # information for this hatid
+        for phot, photline, sourcelist, sourceline in zip(hatid_photfiles,
+                                                          hatid_photlines,
+                                                          hatid_sourcelists,
+                                                          hatid_sourcelines):
+
+            # first, get the JD corresponding to this phot
+            framerjd = photindex[phot]['jd']
+
+            # next, get the lines from phot and sourcelist files
+            phot_elem = getline(phot, photline).split()
+            source_elem = getline(sourcelist, sourceline).split()
+
+            # parse these lines and prepare the output
+            rstfc_elems = FRAMEREGEX.findall(os.path.basename(phot))
+            rstfc = '%s-%s_%s' % (rstfc_elems[0])
+
+            xcc, ycc, xic, yic = phot_elem[1:5]
+            bgv, bge = source_elem
+
+
+    # if the hatid isn't found in the photometry index, then we can't do
+    # anything
+    else:
+
+        print('ERR! %sZ: HATID %s is not in the photometry index, ignoring...' %
+              (datetime.utcnow().isoformat(), hatid))
+
+        return None
 
 
 
