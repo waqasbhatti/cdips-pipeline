@@ -1842,7 +1842,7 @@ def collect_imagesubphot_lightcurve(hatid,
     # anything
     else:
 
-        print('ERR! %sZ: HATID %s is not in the photometry index, ignoring...' %
+        print('ERR! %sZ: object %s is not in the photometry index, ignoring...' %
               (datetime.utcnow().isoformat(), hatid))
 
         return None
