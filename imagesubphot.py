@@ -1685,7 +1685,7 @@ def make_photometry_indexdb(framedir,
     if os.path.exists(outfile) and not overwrite:
 
         print('WRN! %sZ: a photometry index DB by this name already exists!' %
-              (datetime.utcnow().isoformat(), frame))
+              (datetime.utcnow().isoformat(),))
         return outfile
 
     db = sqlite3.connect(outfile)
