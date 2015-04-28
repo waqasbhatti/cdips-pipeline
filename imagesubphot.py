@@ -1844,8 +1844,9 @@ def collect_imagesubphot_lightcurve(hatid,
 
             # if this frame isn't available, ignore it
             except KeyError as e:
-
-                pass
+                print('WRN! %sZ: phot %s isn\'t available, skipping...' %
+                      (datetime.utcnow().isoformat(), phot))
+                continue
 
         # close the output LC once we're done with it
         outf.close()
