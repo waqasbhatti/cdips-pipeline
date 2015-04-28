@@ -1674,12 +1674,16 @@ def make_photometry_index(framedir,
 
     outdict = {
         'phots': {},
-        'hatids': {}
+        'hatids': {},
+        'photdir':'',
+        'framedir':os.path.abspath(framedir),
         }
 
     # first, figure out the directories
     if not photdir:
         photdir = framedir
+
+    outdict['photdir'] = photdir
 
     # for each frame in frame directory, get associated phot and sourcelist
 
@@ -1714,8 +1718,10 @@ def make_photometry_index(framedir,
             framerjd = get_header_keyword(frame, 'JD')
 
             # update the frame part of the index dict
-            outdict['phots'][phot] = {'rjd':framerjd,
-                                      'frame':frame}
+            outdict['phots'][os.path.basename(phot)] = {
+                'rjd':framerjd,
+                'frame':os.path.basename(frame)
+                }
 
             photf = open(phot, 'rb')
             phothatids = [x.split()[0] for x in photf]
@@ -1724,12 +1730,16 @@ def make_photometry_index(framedir,
             for ind, hatid in enumerate(phothatids):
 
                 if hatid not in outdict['hatids']:
-                    outdict['hatids'][hatid] = {'phots':[phot],
-                                                'photlines':[ind]}
+                    outdict['hatids'][hatid] = {
+                        'phots':[os.path.basename(phot)],
+                        'photlines':[ind]
+                        }
 
                 else:
 
-                    outdict['hatids'][hatid]['phots'].append(phot)
+                    outdict['hatids'][hatid]['phots'].append(
+                        os.path.basename(phot)
+                        )
                     outdict['hatids'][hatid]['photlines'].append(ind)
 
         # if some associated files don't exist for this frame, ignore it
@@ -1848,6 +1858,8 @@ def collect_imagesubphot_lightcurve(hatid,
             photindex['hatids'][hatid]['photlines']
             )
 
+        photdir = photindex['photdir']
+
         # prepare the output file
         outfile = os.path.join(os.path.abspath(outdir), '%s.ilc' % hatid)
 
@@ -1876,7 +1888,7 @@ def collect_imagesubphot_lightcurve(hatid,
                 # next, get the lines from phot file using linecache's getline
                 # function
                 phot_elem = iphot_linefunc(
-                    phot,
+                    os.path.join(photdir, phot),
                     photline,
                     iphotlinechars=iphotlinechars
                     ).split()
