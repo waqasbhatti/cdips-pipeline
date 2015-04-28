@@ -1856,7 +1856,7 @@ def collect_imagesubphot_lightcurve(hatid,
         # that file instead of processing any further
         if os.path.exists(outfile) and ignorecollected:
 
-            print('ERR! %sZ: object %s LC already exists, not overwriting: %s' %
+            print('WRN! %sZ: object %s LC already exists, not overwriting: %s' %
                   (datetime.utcnow().isoformat(), hatid, outfile))
 
             return outfile
@@ -1898,7 +1898,7 @@ def collect_imagesubphot_lightcurve(hatid,
         # close the output LC once we're done with it
         outf.close()
 
-        print('ERR! %sZ: object %s -> %s' %
+        print('%sZ: object %s -> %s' %
               (datetime.utcnow().isoformat(), hatid, outfile))
 
         return outfile
