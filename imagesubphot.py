@@ -1646,7 +1646,8 @@ def make_photometry_index(framedir,
                           outfile,
                           frameglob='subtracted-*-xtrns.fits',
                           photdir=None,
-                          photext='iphot'):
+                          photext='iphot',
+                          maxframes=None):
     '''
     This makes a master index file containing the following information for each
     FITS frame:
@@ -1686,8 +1687,12 @@ def make_photometry_index(framedir,
     framelist = glob.glob(os.path.join(os.path.abspath(framedir),
                                        frameglob))
 
+    # restrict to maxframes max frames
+    if maxframes:
+        framelist = framelist[:maxframes]
+
     # go through all the frames
-    for frame in framelist[:100]: # FIXME: temp go through 100 for testing
+    for frame in framelist: # FIXME: temp go through 100 for testing
 
         print('%sZ: working on frame %s' %
               (datetime.utcnow().isoformat(), frame))
@@ -1822,18 +1827,25 @@ def collect_imagesubphot_lightcurve(hatid,
         # information for this hatid
         for phot, photline in zip(hatid_photfiles, hatid_photlines):
 
-            # first, get the JD corresponding to this phot
-            framerjd = photindex[phot]['jd']
+            try:
 
-            # next, get the lines from phot file using linecache's getline
-            # function
-            phot_elem = getline(phot, photline).split()
+                # first, get the JD corresponding to this phot
+                framerjd = photindex[phot]['jd']
 
-            # parse these lines and prepare the output
-            rstfc_elems = FRAMEREGEX.findall(os.path.basename(phot))
-            rstfc = '%s-%s_%s' % (rstfc_elems[0])
-            out_line = '%s %s %s' % (framerjd, rstfc, ' '.join(phot_elem[1:]))
-            outf.write(out_line)
+                # next, get the lines from phot file using linecache's getline
+                # function
+                phot_elem = getline(phot, photline).split()
+
+                # parse these lines and prepare the output
+                rstfc_elems = FRAMEREGEX.findall(os.path.basename(phot))
+                rstfc = '%s-%s_%s' % (rstfc_elems[0])
+                out_line = '%s %s %s' % (framerjd, rstfc, ' '.join(phot_elem[1:]))
+                outf.write(out_line)
+
+            # if this frame isn't available, ignore it
+            except KeyError as e:
+
+                pass
 
         # close the output LC once we're done with it
         outf.close()
