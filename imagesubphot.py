@@ -1749,12 +1749,38 @@ def make_photometry_index(framedir,
 
 
 
+def get_iphot_line(iphot, linenum, iphotlinechars=260):
+    '''
+    This gets a random iphot line out of the file iphot.
+
+    '''
+
+    iphotf = open(iphot, 'rb')
+    filelinenum = iphotlinechars*linenum
+    iphotf.seek(filelinenum)
+    iphotline = iphotf.read(iphotlinechars)
+    iphotf.close()
+
+    return iphotline
+
+
+def get_iphot_line_linecache(iphot, linenum, iphotlinecars=260):
+    '''
+    This uses linecache's getline function to get the line out of the file
+    iphot.
+
+    '''
+
+    return getline(iphot, linenum)
+
+
 
 def collect_imagesubphot_lightcurve(hatid,
                                     photindex,
                                     outdir,
                                     photindex_is_dict=True,
-                                    ignorecollected=True):
+                                    ignorecollected=True,
+                                    iphot_linefunc=get_iphot_line):
     '''
     This collects the imagesubphot lightcurve of a single object into a .ilc
     file.
@@ -1772,6 +1798,9 @@ def collect_imagesubphot_lightcurve(hatid,
                        outdir. if found, returns the path to that LC instead of
                        actually processing. if this is False, redoes the
                        processing for this LC anyway.
+
+    iphotlinefunc -> this is the function to use for getting a specific line out
+                     of the specified iphot file.
 
     The collected LC is similar to the aperturephot LC, but some extra columns
     added by fiphot running on the subtracted frames. columns are:
@@ -1819,8 +1848,19 @@ def collect_imagesubphot_lightcurve(hatid,
             )
 
         # prepare the output file
-
         outfile = os.path.join(os.path.abspath(outdir), '%s.ilc' % hatid)
+
+
+        # if the file already exists and ignorecollected is True, then return
+        # that file instead of processing any further
+        if os.path.exists(outfile) and ignorecollected:
+
+            print('ERR! %sZ: object %s LC already exists, not overwriting: %s' %
+                  (datetime.utcnow().isoformat(), hatid, outfile))
+
+            return outfile
+
+        # otherwise, open the file and prepare to write to it
         outf = open(outfile, 'wb')
 
         # go through the phots and sourcelists, picking out the timeseries
@@ -1852,6 +1892,10 @@ def collect_imagesubphot_lightcurve(hatid,
 
         # close the output LC once we're done with it
         outf.close()
+
+        print('ERR! %sZ: object %s -> %s' %
+              (datetime.utcnow().isoformat(), hatid, outfile))
+
         return outfile
 
     # if the hatid isn't found in the photometry index, then we can't do
