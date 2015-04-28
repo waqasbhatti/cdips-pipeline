@@ -1852,6 +1852,7 @@ def collect_imagesubphot_lightcurve(hatid,
     added by fiphot running on the subtracted frames. columns are:
 
     rjd    Reduced Julian Date (RJD = JD - 2400000.0)
+    hat    HAT ID of the object
     rstfc  Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
     xcc    original X coordinate on CCD before shifting to astromref
     ycc    original y coordinate on CCD before shifting to astromref
@@ -1924,7 +1925,7 @@ def collect_imagesubphot_lightcurve(hatid,
                 rstfc_elems = FRAMEREGEX.findall(os.path.basename(phot))
                 rstfc = '%s-%s_%s' % (rstfc_elems[0])
                 out_line = '%s %s %s\n' % (framerjd, rstfc,
-                                           ' '.join(phot_elem[1:]))
+                                           ' '.join(phot_elem))
                 outf.write(out_line)
 
             # if this frame isn't available, ignore it
