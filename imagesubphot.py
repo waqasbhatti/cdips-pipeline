@@ -1852,8 +1852,8 @@ def collect_imagesubphot_lightcurve(hatid,
     added by fiphot running on the subtracted frames. columns are:
 
     rjd    Reduced Julian Date (RJD = JD - 2400000.0)
-    hat    HAT ID of the object
     rstfc  Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
+    hat    HAT ID of the object
     xcc    original X coordinate on CCD before shifting to astromref
     ycc    original y coordinate on CCD before shifting to astromref
     xic    shifted X coordinate on CCD after shifting to astromref
