@@ -270,13 +270,19 @@ SUBFRAMEPHOTCMD = (
 PHOTS_TABLE = 'create table phots (phot text, rjd double precision, frame text)'
 HATIDS_TABLE = 'create table hatids (hatid text, phot text, photline integer)'
 META_TABLE = 'create table metainfo (photdir text, framedir text)'
+PRAGMA_CMDS = 'pragma journal_mode = WAL'
 
-PHOTS_INDEX_CMD = 'create index hatid_index on phots (phot)'
+PHOTS_INDEX_CMD = 'create index phots_index on phots (phot)'
 HATIDS_INDEX_CMD = 'create index hatid_index on hatids (hatid)'
+HATIDS_PHOT_INDEX_CMD = 'create index hatid_phot_index on hatids (phot)'
 
 PHOTS_INSERT_CMD = 'insert into phots values (?,?,?)'
 HATIDS_INSERT_CMD = 'insert into hatids values (?,?,?)'
 META_INSERT_CMD = 'insert into metainfo values (?,?)'
+
+PHOT_SELECT_CMD = ('select a.rjd, a.phot, b.photline from '
+                   'phots a join hatids b on (a.phot = b.phot) '
+                   'where b.hatid = ?')
 
 
 ##################################
@@ -1686,6 +1692,7 @@ def make_photometry_indexdb(framedir,
     cur = db.cursor()
 
     # make the database tables
+    cur.execute(PRAGMA_CMDS)
     cur.execute(PHOTS_TABLE)
     cur.execute(HATIDS_TABLE)
     cur.execute(META_TABLE)
@@ -1762,6 +1769,7 @@ def make_photometry_indexdb(framedir,
           (datetime.utcnow().isoformat(),))
     cur.execute(PHOTS_INDEX_CMD)
     cur.execute(HATIDS_INDEX_CMD)
+    cur.execute(HATIDS_PHOT_INDEX_CMD)
 
     # commit the DB at the end of writing
     db.commit()
