@@ -282,7 +282,7 @@ META_INSERT_CMD = 'insert into metainfo values (?,?)'
 
 PHOT_SELECT_CMD = ('select a.rjd, a.phot, b.photline from '
                    'phots a join hatids b on (a.phot = b.phot) '
-                   'where b.hatid = ?')
+                   'where b.hatid = ? order by a.rjd')
 META_SELECT_CMD = ('select * from metainfo')
 
 
