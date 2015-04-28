@@ -232,6 +232,12 @@ COMBINEDREFPHOTCMD = (
     "-op {outfile} -k"
 )
 
+
+# FIXME: why do we not get the background values by default? EPD needs these
+# ANSWER: we're ignoring the background for the subtracted frame photometry, and
+#         EPD on imagesub photometry doesn't use the background values
+#         extract them anyway, since it might be useful
+
 SUBFRAMEPHOTCMD = (
     "fiphot --input-subtracted {subtractedframe} "
     "--input-raw-photometry {photrefrawphot} "
