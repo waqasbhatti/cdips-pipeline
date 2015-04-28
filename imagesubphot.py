@@ -284,6 +284,7 @@ PHOT_SELECT_CMD = ('select a.rjd, a.phot, b.photline from '
                    'phots a join hatids b on (a.phot = b.phot) '
                    'where b.hatid = ? order by a.rjd')
 META_SELECT_CMD = ('select * from metainfo')
+DISTINCT_HATIDS_CMD = ('select distinct hatid from hatids')
 
 
 ##################################
@@ -1824,8 +1825,8 @@ def get_iphot_line_linecache(iphot, linenum, iphotlinechars=260):
 def collect_imagesubphot_lightcurve(hatid,
                                     photindex,
                                     outdir,
-                                    ignorecollected=True,
-                                    iphot_linefunc=get_iphot_line,
+                                    skipcollected=True,
+                                    iphotlinefunc=get_iphot_line,
                                     iphotlinechars=260):
     '''
     This collects the imagesubphot lightcurve of a single object into a .ilc
@@ -1840,7 +1841,7 @@ def collect_imagesubphot_lightcurve(hatid,
 
     outdir -> the directory where to the place the collected lightcurve
 
-    ignorecollected -> if True, looks for an existing LC for this hatid in
+    skipcollected -> if True, looks for an existing LC for this hatid in
                        outdir. if found, returns the path to that LC instead of
                        actually processing. if this is False, redoes the
                        processing for this LC anyway.
@@ -1893,9 +1894,9 @@ def collect_imagesubphot_lightcurve(hatid,
         # prepare the output file
         outfile = os.path.join(os.path.abspath(outdir), '%s.ilc' % hatid)
 
-        # if the file already exists and ignorecollected is True, then return
+        # if the file already exists and skipcollected is True, then return
         # that file instead of processing any further
-        if os.path.exists(outfile) and ignorecollected:
+        if os.path.exists(outfile) and skipcollected:
 
             print('WRN! %sZ: object %s LC already exists, not overwriting: %s' %
                   (datetime.utcnow().isoformat(), hatid, outfile))
@@ -1915,7 +1916,7 @@ def collect_imagesubphot_lightcurve(hatid,
             try:
 
                 # next, get the requested line from phot file
-                phot_elem = iphot_linefunc(
+                phot_elem = iphotlinefunc(
                     os.path.join(photdir, phot),
                     photline,
                     iphotlinechars=iphotlinechars
@@ -1965,14 +1966,102 @@ def imagesublc_collection_worker(task):
     This wraps collect_imagesuphot_lightcurve for parallel_collect_lightcurves
     below.
 
+    task[0] -> hatid
+    task[1] -> photindex DB name
+    task[2] -> outdir
+    task[3] -> {skipcollected, iphotlinefunc, iphotlinechars}
+
     '''
 
+    try:
+
+        return task[0], collect_imagesubphot_lightcurve(task[0],
+                                                        task[1],
+                                                        task[2],
+                                                        **task[3])
+
+    except Exception as e:
+
+        print('ERR! %sZ: failed to get LC for %s, error: %s' %
+              (datetime.utcnow().isoformat(), task[0], e ))
+        return task[0], None
 
 
-def parallel_collect_imagesublcs(photdir):
+
+def parallel_collect_imagesublcs(framedir,
+                                 outdir,
+                                 frameglob='subtracted-*-xtrns.fits',
+                                 photindexdb=None,
+                                 photdir=None,
+                                 photext='iphot',
+                                 maxframes=None,
+                                 overwritephotindex=False,
+                                 skipcollectedlcs=True,
+                                 iphotlinefunc=get_iphot_line,
+                                 iphotlinechars=260
+                                 ):
     '''
     This collects all .iphot files into lightcurves.
 
-
     '''
+
+    # first, check if the output directory exists
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+
+    # next, check if we have to make a photometry index DB, and launch the
+    if not photindexdb:
+
+        photdbf = os.path.join(framedir,'TM-imagesubphot-index.sqlite')
+
+        photindexdb = make_photometry_indexdb(framedir,
+                                         photdbf,
+                                         frameglob=frameglob,
+                                         photdir=photdir,
+                                         photext=photext,
+                                         maxframes=maxframes,
+                                         overwrite=overwritephotindex)
+
+    # only proceed if the photometry index DB exists
+    if os.path.exists(photindexdb):
+
+        # get the list of distinct HATIDs from the photindexdb
+        db = sqlite3.connect(photindexdb)
+        cur = db.cursor()
+        cur.execute(DISTINCT_HATIDS_CMD)
+        rows = cur.fetchall()
+        hatids = [rows[0] for x in rows]
+        db.close()
+
+        # generate the task list
+        tasks = [(hatid,
+                  photindexdb,
+                  outdir,
+                  {'skipcollected':skipcollectedlcs,
+                   'iphotlinefunc':iphotlinefunc,
+                   'iphotlinechars':iphotlinechars}) for hatid in hatids]
+
+        # now start up the parallel collection
+        print('%sZ: %s HATIDs to get LCs for, starting...' %
+              (datetime.utcnow().isoformat(), len(hatids), ))
+        pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+        # fire up the pool of workers
+        results = pool.map(imgsublc_collection_worker, tasks)
+
+        # wait for the processes to complete work
+        pool.close()
+        pool.join()
+
+        return {x:y for (x,y) in results}
+
+    # if the photometry index DB doesn't exist, nothing we can do
+    else:
+
+        print('ERR! %sZ: %s specified photometry index DB does not exist!' %
+              (datetime.utcnow().isoformat(), ))
+
+
+
+
 
