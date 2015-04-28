@@ -122,6 +122,8 @@ import cPickle as pickle
 # used for fast random access to lines in text files
 from linecache import getline
 
+import sqlite3
+
 import numpy as np
 
 from scipy.spatial import cKDTree as kdtree
@@ -259,6 +261,23 @@ SUBFRAMEPHOTCMD = (
     "--col-out 6,7,8 "
     "--output {outiphot}"
 )
+
+
+####################
+## SQLITE SCHEMAS ##
+####################
+
+PHOTS_TABLE = 'create table phots (phot text, rjd double precision, frame text)'
+HATIDS_TABLE = 'create table hatids (hatid text, phot text, photline integer)'
+META_TABLE = 'create table metainfo (photdir text, framedir text)'
+
+PHOTS_INDEX_CMD = 'create index hatid_index on phots (phot)'
+HATIDS_INDEX_CMD = 'create index hatid_index on hatids (hatid)'
+
+PHOTS_INSERT_CMD = 'insert into phots values (?,?,?)'
+HATIDS_INSERT_CMD = 'insert into hatids values (?,?,?)'
+META_INSERT_CMD = 'insert into metainfo values (?,?)'
+
 
 ##################################
 ## ASTROMETRIC REFERENCE FRAMES ##
@@ -1642,6 +1661,118 @@ def photometry_on_subtracted_frames(subframedir,
 ## LIGHTCURVE COLLECTION ##
 ###########################
 
+
+def make_photometry_indexdb(framedir,
+                            outfile,
+                            frameglob='subtracted-*-xtrns.fits',
+                            photdir=None,
+                            photext='iphot',
+                            maxframes=None,
+                            overwrite=False):
+    '''
+    This is like make_photometry_index below, but uses an sqlite3 database
+    instead of an in-memory disk.
+
+    '''
+
+    # make sure we don't overwrite anything unless we're supposed to
+    if os.path.exists(outfile) and not overwrite:
+
+        print('WRN! %sZ: a photometry index DB by this name already exists!' %
+              (datetime.utcnow().isoformat(), frame))
+        return outfile
+
+    db = sqlite3.connect(outfile)
+    cur = db.cursor()
+
+    # make the database tables
+    cur.execute(PHOTS_TABLE)
+    cur.execute(HATIDS_TABLE)
+    cur.execute(META_TABLE)
+    db.commit()
+
+    # first, figure out the directories
+    if not photdir:
+        photdir = framedir
+
+    # send these to the database
+    cur.execute(META_INSERT_CMD, (photdir, framedir))
+    db.commit()
+
+
+    # first, find all the frames
+    framelist = glob.glob(os.path.join(os.path.abspath(framedir),
+                                       frameglob))
+
+    # restrict to maxframes max frames
+    if maxframes:
+        framelist = framelist[:maxframes]
+
+    # go through all the frames
+    for frame in framelist:
+
+        print('%sZ: working on frame %s' %
+              (datetime.utcnow().isoformat(), frame))
+
+        # generate the names of the associated phot and sourcelist files
+        frameinfo = FRAMEREGEX.findall(os.path.basename(frame))
+
+        phot = '%s-%s_%s.%s' % (frameinfo[0][0],
+                                frameinfo[0][1],
+                                frameinfo[0][2],
+                                photext)
+
+        phot = os.path.join(os.path.abspath(photdir), phot)
+
+        # check these files exist, and populate the dict if they do
+        if os.path.exists(phot):
+
+            # get the JD from the FITS file
+            framerjd = get_header_keyword(frame, 'JD')
+
+            # update the DB with this info
+            cur.execute(PHOTS_INSERT_CMD,
+                        (os.path.basename(phot),
+                         framerjd,
+                         os.path.basename(frame)))
+
+            # get the phot file
+            photf = open(phot, 'rb')
+            phothatids = [x.split()[0] for x in photf]
+            photf.close()
+
+            for ind, hatid in enumerate(phothatids):
+
+                # update the DB with phot info
+                cur.execute(HATIDS_INSERT_CMD,
+                            (hatid,
+                             os.path.basename(phot),
+                             ind))
+
+        # if some associated files don't exist for this frame, ignore it
+        else:
+
+            print('WRN! %sZ: ignoring frame %s, '
+                  'photometry for this frame is not available!' %
+                  (datetime.utcnow().isoformat(), frame))
+
+
+    # make the indices for fast lookup
+    print('%sZ: making photometry index DB indices...' %
+          (datetime.utcnow().isoformat(),))
+    cur.execute(PHOTS_INDEX_CMD)
+    cur.execute(HATIDS_INDEX_CMD)
+
+    # commit the DB at the end of writing
+    db.commit()
+
+    print('%sZ: done. photometry index DB written to %s' %
+          (datetime.utcnow().isoformat(), outfile))
+
+    return outfile
+
+
+
 def make_photometry_index(framedir,
                           outfile,
                           frameglob='subtracted-*-xtrns.fits',
@@ -1663,7 +1794,7 @@ def make_photometry_index(framedir,
 
     # each elem in frames below has a key that is the phot filename and a value
     # that is a dict with keys:
-    # {'jd':JD, 'frame':FRAMEPATH, 'sourcelist':SOURCELISTPATH}
+    # {'rjd':JD, 'frame':FRAMEPATH, 'sourcelist':SOURCELISTPATH}
 
     # each elem in hatids below has a key that is the HATID and a value that is
     # a dict with keys:
