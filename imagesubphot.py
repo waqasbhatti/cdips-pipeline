@@ -2022,7 +2022,9 @@ def parallel_collect_imagesublcs(framedir,
                                  overwritephotindex=False,
                                  skipcollectedlcs=True,
                                  iphotlinefunc=get_iphot_line,
-                                 iphotlinechars=260
+                                 iphotlinechars=260,
+                                 nworkers=16,
+                                 maxworkertasks=1000
                                  ):
     '''
     This collects all .iphot files into lightcurves.
