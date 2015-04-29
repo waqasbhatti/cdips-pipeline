@@ -2041,12 +2041,12 @@ def parallel_collect_imagesublcs(framedir,
         photdbf = os.path.join(framedir,'TM-imagesubphot-index.sqlite')
 
         photindexdb = make_photometry_indexdb(framedir,
-                                         photdbf,
-                                         frameglob=frameglob,
-                                         photdir=photdir,
-                                         photext=photext,
-                                         maxframes=maxframes,
-                                         overwrite=overwritephotindex)
+                                              photdbf,
+                                              frameglob=frameglob,
+                                              photdir=photdir,
+                                              photext=photext,
+                                              maxframes=maxframes,
+                                              overwrite=overwritephotindex)
 
     # only proceed if the photometry index DB exists
     if os.path.exists(photindexdb):
