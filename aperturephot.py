@@ -1836,7 +1836,7 @@ def run_magfit(sphotref_frame,
                hatnetwork='HATSouth',
                magfitexec='MagnitudeFitting.py'):
     '''
-    This runs magfit in single photometric reference mode.
+    This runs magfit in single/master photometric reference mode.
 
     lcohpsrv1 invocation:
 
@@ -1954,15 +1954,6 @@ def get_master_photref(sphotref_frame,
 
         return False
 
-
-
-def run_psf_trans():
-    '''
-    This runs the psf trans action. This probably gets the S, D, K values for
-    the future EPD process. Not needed now since we get this from fistar in the
-    current implementation.
-
-    '''
 
 #####################################
 ## LIGHTCURVE GENERATION FUNCTIONS ##
