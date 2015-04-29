@@ -1714,7 +1714,7 @@ def make_photometry_indexdb(framedir,
               (datetime.utcnow().isoformat(),))
         return outfile
 
-    if overwrite:
+    if overwrite and os.path.exists(outfile):
         os.remove(outfile)
 
     db = sqlite3.connect(outfile)
