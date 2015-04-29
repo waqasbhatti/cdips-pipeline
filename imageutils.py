@@ -708,7 +708,8 @@ def fits_to_stamps_jpeg(fits_image,
 def fits_to_full_jpeg(fits_image,
                       out_fname=None,
                       ext=None,
-                      resize=True,
+                      resize=False,
+                      flip=True,
                       outsizex=770,
                       outsizey=770,
                       scale_func=clipped_linscale_img,
@@ -741,27 +742,26 @@ def fits_to_full_jpeg(fits_image,
     else:
         resized_img = scaled_img
 
-    out_fname = '%s-%s-%s-%s-%s.jpg' % (
-        fits_image.rstrip('.fits.fz'),
-        hdr['IMAGETYP'].lower() if 'IMAGETYP' in hdr else 'typeunknown',
-        hdr['EXPTIME'] if 'EXPTIME' in hdr else 'expunknown',
-        hdr['FILTERS'].replace('+','') if 'FILTERS' in hdr else 'filtunknown',
-        hdr['PROJID'] if 'PROJID' in hdr else 'projunknown'
-        )
+    if not out_fname:
 
-    print(
-        'fits: %s, xsize = %s, ysize = %s, x/y = %s, out = %s' % (fits_image,
-                                                                  img.shape[1],
-                                                                  img.shape[0],
-                                                                  jpegaspect,
-                                                                  out_fname)
-        )
+        out_fname = '%s-%s-%s-%s-%s.jpg' % (
+            fits_image.rstrip('.fits.fz'),
+            hdr['IMAGETYP'].lower() if 'IMAGETYP' in hdr else 'typeunknown',
+            hdr['EXPTIME'] if 'EXPTIME' in hdr else 'expunknown',
+            hdr['FILTERS'].replace('+','') if 'FILTERS' in hdr else 'filtunknown',
+            hdr['PROJID'] if 'PROJID' in hdr else 'projunknown'
+            )
+
     scipy.misc.imsave(out_fname,resized_img)
 
     # flip the saved image
-    outimg = Image.open(out_fname)
-    outimg = outimg.transpose(Image.FLIP_TOP_BOTTOM)
-    outimg.save(out_fname)
+    if flip:
+        outimg = Image.open(out_fname)
+        outimg = outimg.transpose(Image.FLIP_TOP_BOTTOM)
+        outimg.save(out_fname)
+
+    return out_fname
+
 
 
 def nparr_to_full_jpeg(nparr,
