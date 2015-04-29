@@ -708,6 +708,7 @@ def fits_to_stamps_jpeg(fits_image,
 def fits_to_full_jpeg(fits_image,
                       out_fname=None,
                       ext=None,
+                      resize=True,
                       outsizex=770,
                       outsizey=770,
                       scale_func=clipped_linscale_img,
@@ -732,21 +733,31 @@ def fits_to_full_jpeg(fits_image,
     trimmed_img = img
     jpegaspect = float(img.shape[1])/float(img.shape[0])
     scaled_img = scale_func(trimmed_img,**scale_func_params)
-    
-    resized_img = scipy.misc.imresize(scaled_img,
-                                      (int(img.shape[1]/2.2),int(img.shape[0]/2.2)))
-    out_fname = '%s-%s-%s-%s-%s.jpg' % (fits_image.rstrip('.fits.fz'),
-                                        hdr['IMAGETYP'].lower() if 'IMAGETYP' in hdr else 'typeunknown',
-                                        hdr['EXPTIME'] if 'EXPTIME' in hdr else 'expunknown',
-                                        hdr['FILTERS'].replace('+','') if 'FILTERS' in hdr else 'filtunknown',
-                                        hdr['PROJID'] if 'PROJID' in hdr else 'projunknown')
-    
-    print('fits: %s, xsize = %s, ysize = %s, x/y = %s, out = %s' % (fits_image, 
-                                                                    img.shape[1], 
-                                                                    img.shape[0], 
-                                                                    jpegaspect,
-                                                                    out_fname))
+
+    if resize:
+        resized_img = scipy.misc.imresize(scaled_img,
+                                          (int(img.shape[1]/2.2),
+                                           int(img.shape[0]/2.2)))
+    else:
+        resized_img = scaled_img
+
+    out_fname = '%s-%s-%s-%s-%s.jpg' % (
+        fits_image.rstrip('.fits.fz'),
+        hdr['IMAGETYP'].lower() if 'IMAGETYP' in hdr else 'typeunknown',
+        hdr['EXPTIME'] if 'EXPTIME' in hdr else 'expunknown',
+        hdr['FILTERS'].replace('+','') if 'FILTERS' in hdr else 'filtunknown',
+        hdr['PROJID'] if 'PROJID' in hdr else 'projunknown'
+        )
+
+    print(
+        'fits: %s, xsize = %s, ysize = %s, x/y = %s, out = %s' % (fits_image,
+                                                                  img.shape[1],
+                                                                  img.shape[0],
+                                                                  jpegaspect,
+                                                                  out_fname)
+        )
     scipy.misc.imsave(out_fname,resized_img)
+
     # flip the saved image
     outimg = Image.open(out_fname)
     outimg = outimg.transpose(Image.FLIP_TOP_BOTTOM)

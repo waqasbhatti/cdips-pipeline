@@ -1838,13 +1838,10 @@ def run_magfit(sphotref_frame,
     '''
     This runs magfit in single photometric reference mode.
 
-    command to use is:
+    lcohpsrv1 invocation:
 
-    first create the directories stats and MPHOTREF in the work directory
+    python /home/hatuser/wbhatti/src/MagnitudeFittingOrig.py HATSouth single /nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/ccd5-fits/1-404411d_5.fits /nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/ccd5-fits/1-404411d_5.fits -p 8 --log-config=/home/hatuser/wbhatti/src/logging.conf --config-file=/nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/photometry-ap/ccd5-magfit.cfg --manual-frame-list=/nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/photometry-ap/ccd5-magfit-frames.list --stat
 
-    python /home/wbhatti/scripts/photometry/MagnitudeFittingOrig.py HATSouth single /nfs/phs3/ar1/S/HP0/PHOT_WB/allphot/CCD5-test/1-377729c_5.fits /nfs/phs3/ar1/S/HP0/PHOT_WB/allphot/CCD5-test/1-377729c_5.fiphot -p 8 --config-file=/nfs/phs3/ar1/S/HP0/PHOT_WB/allphot/CCD5-test/CCD5-test-magfit.cfg --manual-frame-list=/nfs/phs3/ar1/S/HP0/PHOT_WB/allphot/CCD5-test/test-CCD5-frame-fiphot.list --stat
-
-    python MagnitudeFitting.py HATSouth single /nfs/phs3/ar1/S/HP0/PHOT_WB/1-20141120-work-CCD5/1-377740d_5.fits /nfs/phs3/ar1/S/HP0/PHOT_WB/1-20141120-work-CCD5/1-377740d_5.fiphot -p 8 --config-file=/home/wbhatti/scripts/magfit_rG548.cfg --manual-frame-list=/nfs/phs3/ar1/S/HP0/PHOT_WB/1-20141120-work-CCD5/ccd5-20141120.framelist --stat
 
     '''
 
