@@ -2472,6 +2472,7 @@ def epd_lightcurve(rlcfile,
                    backgnd=[4,5],
                    smooth=21,
                    sigmaclip=3.0,
+                   rlcext='rlc',
                    outfile=None):
     '''
     Runs the EPD process on rlcfile, using columns specified to get the required
@@ -2525,7 +2526,7 @@ def epd_lightcurve(rlcfile,
 
     # now write the EPD LCs out to the outfile
     if not outfile:
-        outfile = '%s.epdlc' % rlcfile.strip('.rlc')
+        outfile = '%s.epdlc' % rlcfile.strip('.%s' % rlcext)
 
     inf = open(rlcfile,'rb')
     inflines = inf.readlines()
@@ -2570,7 +2571,8 @@ def serial_run_epd(rlcdir,
             outfilename = epd_lightcurve(rlc,
                                          outfile=outepd,
                                          smooth=smooth,
-                                         sigmaclip=sigmaclip)
+                                         sigmaclip=sigmaclip,
+                                         rlcext=os.path.splitext(rlcglob)[-1])
         except Exception as e:
             print('EPD failed for %s, error was: %s' % (rlc, e))
 

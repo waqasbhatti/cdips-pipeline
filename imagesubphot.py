@@ -68,9 +68,33 @@ GENERAL ORDER OF THINGS
     subtracted frames to produce difference magnitudes for each image. these
     calculated mags are put into .iphot files.
 
-12. use parallel_collect_lightcurves to collect the .iphot files into .ilc
+12. use parallel_collect_imagesublcs to collect the .iphot files into .ilc
     lightcurve files containing image subtraction photometric timeseries for
     each star.
+
+the columns in these .ilc files are:
+
+    rjd    Reduced Julian Date (RJD = JD - 2400000.0)
+    rstfc  Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
+    hat    HAT ID of the object
+    xcc    original X coordinate on CCD before shifting to astromref
+    ycc    original y coordinate on CCD before shifting to astromref
+    xic    shifted X coordinate on CCD after shifting to astromref
+    yic    shifted Y coordinate on CCD after shifting to astromref
+    bgv    Background value
+    bge    Background measurement error
+    fsv    Measured S value
+    fdv    Measured D value
+    fkv    Measured K value
+    irm1   Instrumental magnitude in aperture 1
+    ire1   Instrumental magnitude error for aperture 1
+    irq1   Instrumental magnitude quality flag for aperture 1 (0 or G OK, X bad)
+    irm2   Instrumental magnitude in aperture 2
+    ire2   Instrumental magnitude error for aperture 2
+    irq2   Instrumental magnitude quality flag for aperture 2 (0 or G OK, X bad)
+    irm3   Instrumental magnitude in aperture 3
+    ire3   Instrumental magnitude error for aperture 3
+    irq3   Instrumental magnitude quality flag for aperture 3 (0 or G OK, X bad)
 
 the next few steps are common between imagesubphot.py and aperturephot.py, so
 you can use the functions there for them (but that might have issues with
