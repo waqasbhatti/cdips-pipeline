@@ -166,7 +166,7 @@ import matplotlib.pyplot as plt
 import pyfits
 
 import imageutils
-from imageutils import get_header_keyword
+from imageutils import get_header_keyword, fits_to_full_jpeg
 
 # get fiphot binary reader
 try:
@@ -320,7 +320,8 @@ def select_astromref_frame(fitsdir,
                            srclistdir=None,
                            srclistext='.fistar',
                            photdir=None,
-                           photext='.fiphot'):
+                           photext='.fiphot',
+                           jpeg=True):
     '''
     This picks an astrometric reference frame.
 
@@ -500,6 +501,16 @@ def select_astromref_frame(fitsdir,
         print('%sZ: selected best astrometric reference frame is %s' %
               (datetime.utcnow().isoformat(), selectedreference))
 
+        if jpeg:
+            framejpg = fits_to_full_jpeg(
+                selectedreference,
+                out_fname=os.path.join(
+                    os.path.dirname(selectedreference),
+                    ('JPEG-ASTROMREF-%s.jpg' %
+                     os.path.basename(selectedreference).strip('.fits.fz'))
+                    )
+                )
+
         return selectedreference
 
     # otherwise, fall back to to the frames with the best values of S, D and
@@ -511,6 +522,16 @@ def select_astromref_frame(fitsdir,
         print('WRN! %sZ: selected best astrometric reference frame '
               '(using S, D, and ndet only) is %s' %
               (datetime.utcnow().isoformat(), selectedreference))
+
+        if jpeg:
+            framejpg = fits_to_full_jpeg(
+                selectedreference,
+                out_fname=os.path.join(
+                    os.path.dirname(selectedreference),
+                    ('JPEG-ASTROMREF-%s.jpg' %
+                     os.path.basename(selectedreference).strip('.fits.fz'))
+                    )
+                )
 
         return selectedreference
 
@@ -534,6 +555,16 @@ def select_astromref_frame(fitsdir,
         print('WRN! %sZ: selected best astrometric reference frame '
               '(using S only) is %s' %
               (datetime.utcnow().isoformat(), selectedreference))
+
+        if jpeg:
+            framejpg = fits_to_full_jpeg(
+                selectedreference,
+                out_fname=os.path.join(
+                    os.path.dirname(selectedreference),
+                    ('JPEG-ASTROMREF-%s.jpg' %
+                     os.path.basename(selectedreference).strip('.fits.fz'))
+                    )
+                )
 
         return selectedreference
 
@@ -731,6 +762,17 @@ def frame_to_astromref_worker(task):
     if returncode == 0:
         print('%sZ: transform to astromref OK: %s -> %s' %
               (datetime.utcnow().isoformat(), frametoshift, outtransframe))
+
+
+        framejpg = fits_to_full_jpeg(
+            outtransframe,
+            out_fname=os.path.join(
+                os.path.dirname(outtransframe),
+                ('JPEG-XTRNS-%s.jpg' %
+                 os.path.basename(outtransframe).strip('.fits.fz'))
+                )
+            )
+
         return frametoshift, outtransframe
     else:
         print('ERR! %sZ: transform to astromref failed for %s' %
@@ -1186,6 +1228,18 @@ def select_photref_frames(fitsdir,
 
     # finally return the best frames for use with the photref convolution and
     # the infodict
+
+    for final_frame in final_frames:
+
+        framejpg = fits_to_full_jpeg(
+            final_frame,
+            out_fname=os.path.join(
+                os.path.dirname(final_frame),
+                ('JPEG-PHOTREF-%s.jpg' %
+                 os.path.basename(final_frame).strip('.fits.fz'))
+                )
+            )
+
     return final_frames.tolist(), infodict
 
 
@@ -1228,6 +1282,16 @@ def photref_convolution_worker(task):
     if returncode == 0:
         print('%sZ: photref convolution OK: %s -> %s' %
               (datetime.utcnow().isoformat(), frametoconvolve, outfile))
+
+        framejpg = fits_to_full_jpeg(
+            outfile,
+            out_fname=os.path.join(
+                os.path.dirname(outfile),
+                ('JPEG-CONVPHOTREF-%s.jpg' %
+                 os.path.basename(outfile).strip('.fits.fz'))
+                )
+            )
+
         return frametoconvolve, outfile
     else:
         print('ERR! %sZ: photref convolution failed for %s' %
@@ -1309,6 +1373,16 @@ def combine_frames(framelist,
     if returncode == 0:
         print('%sZ: framelist combine OK: %s images in framelist -> %s' %
               (datetime.utcnow().isoformat(), len(framelist), outfile))
+
+        framejpg = fits_to_full_jpeg(
+            outfile,
+            out_fname=os.path.join(
+                os.path.dirname(outfile),
+                ('JPEG-COMBINED-%s.jpg' %
+                 os.path.basename(outfile).strip('.fits.fz'))
+                )
+            )
+
         return framelist, outfile
     else:
         print('ERR! %sZ: framelist combine failed!' %
@@ -1462,6 +1536,16 @@ convolve_and_subtract_frames below.
     if returncode == 0:
         print('%sZ: convolution and subtraction OK: %s -> %s' %
               (datetime.utcnow().isoformat(), frametoconvolve, outfile))
+
+        framejpg = fits_to_full_jpeg(
+            outfile,
+            out_fname=os.path.join(
+                os.path.dirname(outfile),
+                ('JPEG-SUBTRACTEDCONV-%s.jpg' %
+                 os.path.basename(outfile).strip('.fits.fz'))
+                )
+            )
+
         return frametoconvolve, outfile
     else:
         print('ERR! %sZ: convolution and subtraction failed for %s' %
