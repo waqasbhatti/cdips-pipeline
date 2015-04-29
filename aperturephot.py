@@ -3110,7 +3110,7 @@ def get_lc_statistics(lcfile,
                       sigclip=4.0):
     '''
     This calculates the following statistics for the magnitude columns in the
-    given lcfile:
+    given lcfile.
 
     mean
     median
@@ -3119,6 +3119,9 @@ def get_lc_statistics(lcfile,
 
     # TODO
     iterative stdev after sigma-clipping (RMS)
+
+    IMPORTANT: the lcfile is always the .epdlc file (which contains the rlc, and
+    is used to derive the filenames of the tfalcs)
 
 
     '''
