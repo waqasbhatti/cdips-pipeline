@@ -463,10 +463,10 @@ def select_astromref_frame(fitsdir,
     good_detections_ind = np.argsort(good_detections)[::-1]
 
     # get the top 200 of each index
-    median_sval_ind = median_sval_ind[:200]
-    median_dval_ind = median_dval_ind[:200]
-    median_background_ind = median_background_ind[:200]
-    good_detections_ind = good_detections_ind[:200]
+    median_sval_ind = median_sval_ind[:500]
+    median_dval_ind = median_dval_ind[:500]
+    median_background_ind = median_background_ind[:500]
+    good_detections_ind = good_detections_ind[:500]
 
     # now intersect all of these arrays to find the best candidates for the
     # astrometric reference frame

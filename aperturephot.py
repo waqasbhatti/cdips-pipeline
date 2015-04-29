@@ -1534,16 +1534,17 @@ def get_magfit_frames(fitsdir,
 
         # get the first 200 of these or all 200 if n < 200
         if len(goodframes) > 200:
-            zenithdist_ind = zenithdist_ind[:200]
-            moondist_ind = moondist_ind[:200]
-            moonelev_ind = moonelev_ind[:200]
+            zenithdist_ind = zenithdist_ind[:500]
+            moondist_ind = moondist_ind[:500]
+            moonelev_ind = moonelev_ind[:500]
 
-            ngood_ind = ngood_ind[:200]
-            mederr_ind = mederr_ind[:200]
-            magmad_ind = magmad_ind[:200]
+            ngood_ind = ngood_ind[:500]
+            mederr_ind = mederr_ind[:500]
+            magmad_ind = magmad_ind[:500]
 
         # intersect all arrays to find a set of common indices that belong to
         # the likely reference frames
+
         photgood_ind = np.intersect1d(np.intersect1d(ngood_ind,
                                                      magmad_ind,
                                                      assume_unique=True),
@@ -1600,7 +1601,7 @@ def get_magfit_frames(fitsdir,
                                         'zenithdist':zenithdist,
                                         'moondist':moondist,
                                         'moonelev':moonelev,
-                                        'ngood':ngood,
+                                        'ngood':ngoodobjects,
                                         'magmad':magerrmad,
                                         'mederr':medmagerr}
         # done with reference frame selection #
