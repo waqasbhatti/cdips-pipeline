@@ -1721,7 +1721,7 @@ def make_photometry_indexdb(framedir,
     cur = db.cursor()
 
     # make the database tables
-    cur.execute(PRAGMA_CMDS)
+    # cur.execute(PRAGMA_CMDS)   # not sure if we want WAL mode or not
     cur.execute(PHOTS_TABLE)
     cur.execute(HATIDS_TABLE)
     cur.execute(META_TABLE)
