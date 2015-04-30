@@ -1994,7 +1994,7 @@ def collect_imagesubphot_lightcurve(hatid,
     photdir, framedir = metarow
 
     # look up the hatid and its info in the photindex db
-    cur.execute(PHOT_SELECT_CMD, (hatid,))
+    cur.execute(PHOT_SELECT_CMD, (str(hatid),))
     rows = cur.fetchall()
 
     if rows and len(rows) > 0:
