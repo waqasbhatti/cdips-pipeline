@@ -2774,6 +2774,8 @@ def choose_tfa_template(statsfile,
 
                 if os.path.exists(lcfile_searchpath):
 
+                    print('getting LC for %s' % tfaobj)
+
                     tfa_stars_lcfile.append(
                         os.path.abspath(lcfile_searchpath)
                     )
@@ -2795,6 +2797,9 @@ def choose_tfa_template(statsfile,
 
                 # if it doesn't, then add nans to the file
                 else:
+
+                    print('ERR! couldn\'t find an LC for %s' % tfaobj)
+
                     tfa_stars_lcfile.append(None)
                     tfa_stars_catmag.append(np.nan)
                     tfa_stars_statrms.append(np.nan)
