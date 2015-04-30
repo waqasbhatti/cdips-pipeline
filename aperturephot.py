@@ -3137,6 +3137,8 @@ def get_lc_statistics(lcfile,
 
         try:
 
+            print(rmcols, epcols)
+
             (rm1, rm2, rm3,
              ep1, ep2, ep3) = np.loadtxt(lcfile,
                                          usecols=tuple(rmcols + epcols),
@@ -3150,7 +3152,7 @@ def get_lc_statistics(lcfile,
                   (datetime.utcnow().isoformat(), lcfile))
 
             rm1, rm2, rm3 = np.loadtxt(lcfile,
-                                       usecols=tuple(rmcols + epcols),
+                                       usecols=tuple(rmcols),
                                        unpack=True)
 
             ep1, ep2, ep3, tf1, tf2, tf3 = [], [], [], [], [], []
