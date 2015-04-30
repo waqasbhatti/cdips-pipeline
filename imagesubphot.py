@@ -2140,10 +2140,8 @@ def parallel_collect_imagesublcs(framedir,
         cur = db.cursor()
         cur.execute(DISTINCT_HATIDS_CMD)
         rows = cur.fetchall()
-        hatids = [rows[0] for x in rows]
+        hatids = [x[0] for x in rows]
         db.close()
-
-        print(hatids[:10])
 
         # generate the task list
         tasks = [(hatid,
