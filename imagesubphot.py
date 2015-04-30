@@ -2172,7 +2172,6 @@ def parallel_collect_imagesublcs(framedir,
               (datetime.utcnow().isoformat(), ))
 
 
-
 ############################################
 ## SPECIAL EPD FUNCTIONS FOR IMAGESUB LCS ##
 ############################################
@@ -2275,94 +2274,133 @@ def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
     # if the solution fails, return nothing
     except Exception as e:
 
-        print('%sZ: EPD solution did not converge! Error was: %s' %
+        print('ERR! %sZ: EPD solution did not converge! Error was: %s' %
               (datetime.utcnow().isoformat(), e))
         return None
 
 
 
-def epd_lightcurve_imagesub(rlcfile,
+def epd_lightcurve_imagesub(ilcfile,
                             mags=[12,15,18],
                             sdk=[9,10,11],
                             xy=[5,6],
                             smooth=21,
                             sigmaclip=3.0,
-                            rlcext='rlc',
+                            ilcext='ilc',
                             outfile=None):
     '''
-    Runs the EPD process on rlcfile, using columns specified to get the required
+    Runs the EPD process on ilcfile, using columns specified to get the required
     parameters. If outfile is None, the .epdlc will be placeed in the same
-    directory as rlcfile.
+    directory as ilcfile.
 
     '''
 
     # read the lightcurve in
-    rlc = np.genfromtxt(rlcfile,
+    ilc = np.genfromtxt(ilcfile,
                         usecols=tuple(xy + sdk + mags),
                         dtype='f8,f8,f8,f8,f8,f8,f8,f8',
                         names=['xcc','ycc',
                                'fsv','fdv','fkv',
                                'rm1','rm2','rm3'])
 
+    # get the indices where all columns are non-nan
+    combinedok = (np.isfinite(ilc['xcc']) &
+                  np.isfinite(ilc['ycc']) &
+                  np.isfinite(ilc['fsv']) &
+                  np.isfinite(ilc['fdv']) &
+                  np.isfinite(ilc['fkv']) &
+                  np.isfinite(ilc['rm1']) &
+                  np.isfinite(ilc['rm2']) &
+                  np.isfinite(ilc['rm3']))
+
+
+
     # calculate the EPD differential mags
-    epddiffmag1 = epd_magseries_imagesub(rlc['rm1']
-                                         ,rlc['fsv'],rlc['fdv'],rlc['fkv'],
-                                         rlc['xcc'],rlc['ycc'],
-                                         smooth=smooth, sigmaclip=sigmaclip)
-    epddiffmag2 = epd_magseries_imagesub(rlc['rm2']
-                                         ,rlc['fsv'],rlc['fdv'],rlc['fkv'],
-                                         rlc['xcc'],rlc['ycc'],
-                                         smooth=smooth, sigmaclip=sigmaclip)
-    epddiffmag3 = epd_magseries_imagesub(rlc['rm3']
-                                         ,rlc['fsv'],rlc['fdv'],rlc['fkv'],
-                                         rlc['xcc'],rlc['ycc'],
-                                         smooth=smooth, sigmaclip=sigmaclip)
+    epddiffmag1 = epd_magseries_imagesub(
+        ilc['rm1'][combinedok],
+        ilc['fsv'][combinedok],
+        ilc['fdv'][combinedok],
+        ilc['fkv'][combinedok],
+        ilc['xcc'][combinedok],
+        ilc['ycc'][combinedok],
+        smooth=smooth, sigmaclip=sigmaclip
+        )
+
+    epddiffmag2 = epd_magseries_imagesub(
+        ilc['rm2'][combinedok],
+        ilc['fsv'][combinedok],
+        ilc['fdv'][combinedok],
+        ilc['fkv'][combinedok],
+        ilc['xcc'][combinedok],
+        ilc['ycc'][combinedok],
+        smooth=smooth, sigmaclip=sigmaclip
+        )
+
+    epddiffmag3 = epd_magseries_imagesub(
+        ilc['rm3'][combinedok],
+        ilc['fsv'][combinedok],
+        ilc['fdv'][combinedok],
+        ilc['fkv'][combinedok],
+        ilc['xcc'][combinedok],
+        ilc['ycc'][combinedok],
+        smooth=smooth, sigmaclip=sigmaclip
+        )
 
     # add the EPD diff mags back to the median mag to get the EPD mags
     if epddiffmag1 is not None:
-        mag_median = np.median(rlc['rm1'][np.isfinite(rlc['rm1'])])
+        mag_median = np.nanmedian(ilc['rm1'])
         epdmag1 = epddiffmag1 + mag_median
     else:
-        epdmag1 = np.array([np.nan for x in rlc['rm1']])
-        print('%sZ: no EP1 mags available for %s!' %
-              (datetime.utcnow().isoformat(), rlcfile))
+        epdmag1 = np.array([np.nan for x in ilc['rm1'][combinedok]])
+        print('WRN! %sZ: no EP1 mags available for %s!' %
+              (datetime.utcnow().isoformat(), ilcfile))
 
     if epddiffmag2 is not None:
-        mag_median = np.median(rlc['rm2'][np.isfinite(rlc['rm2'])])
+        mag_median = np.nanmedian(ilc['rm2'])
         epdmag2 = epddiffmag2 + mag_median
     else:
-        epdmag2 = np.array([np.nan for x in rlc['rm2']])
-        print('%sZ: no EP2 mags available for %s!' %
-              (datetime.utcnow().isoformat(), rlcfile))
+        epdmag2 = np.array([np.nan for x in ilc['rm2'][combinedok]])
+        print('WRN! %sZ: no EP2 mags available for %s!' %
+              (datetime.utcnow().isoformat(), ilcfile))
 
     if epddiffmag3 is not None:
-        mag_median = np.median(rlc['rm3'][np.isfinite(rlc['rm3'])])
+        mag_median = np.nanmedian(ilc['rm3'])
         epdmag3 = epddiffmag3 + mag_median
     else:
-        epdmag3 = np.array([np.nan for x in rlc['rm3']])
-        print('%sZ: no EP3 mags available for %s!' %
-              (datetime.utcnow().isoformat(), rlcfile))
+        epdmag3 = np.array([np.nan for x in ilc['rm3'][combinedok]])
+        print('WRN! %sZ: no EP3 mags available for %s!' %
+              (datetime.utcnow().isoformat(), ilcfile))
 
     # now write the EPD LCs out to the outfile
     if not outfile:
-        outfile = '%s.epdlc' % rlcfile.strip('.%s' % rlcext)
+        outfile = '%s.epdlc' % ilcfile.strip('.%s' % ilcext)
 
-    inf = open(rlcfile,'rb')
+    inf = open(ilcfile,'rb')
     inflines = inf.readlines()
     inf.close()
+
+    # get only the lines that have no nans in the epd input columns
+    inflines = (np.array(inflines))[combinedok]
+
     outf = open(outfile,'wb')
 
+    # only these lines can be attached to the output epd mags
     for line, epd1, epd2, epd3 in zip(inflines, epdmag1, epdmag2, epdmag3):
         outline = '%s %.6f %.6f %.6f\n' % (line.rstrip('\n'), epd1, epd2, epd3)
         outf.write(outline)
 
     outf.close()
+
+    print('%sZ: ilc %s with %s dets -> epdlc %s with %s dets' %
+          (datetime.utcnow().isoformat(),
+           ilcfile, len(ilc['xcc']), outfile, len(inflines)))
+
     return outfile
 
 
 
-def serial_run_epd_imagesub(rlcdir,
-                            rlcglob='*.ilc',
+def serial_run_epd_imagesub(ilcdir,
+                            ilcglob='*.ilc',
                             outdir=None,
                             smooth=21,
                             sigmaclip=3.0):
@@ -2372,29 +2410,29 @@ def serial_run_epd_imagesub(rlcdir,
     '''
 
     if not outdir:
-        outdir = rlcdir
+        outdir = ilcdir
 
     if not os.path.exists(outdir):
         os.mkdir(outdir)
 
-    rlcfiles = glob.glob(os.path.join(rlcdir, rlcglob))
+    ilcfiles = glob.glob(os.path.join(ilcdir, ilcglob))
 
-    for rlc in rlcfiles:
+    for ilc in ilcfiles:
 
         outepd = os.path.join(outdir,
-                              os.path.basename(rlc).replace('.rlc','.epdlc'))
+                              os.path.basename(ilc).replace('.ilc','.epdlc'))
 
         print('%sZ: doing EPD for %s...' %
-              (datetime.utcnow().isoformat(), rlc))
+              (datetime.utcnow().isoformat(), ilc))
 
         try:
             outfilename = epd_lightcurve_imagesub(
-                rlc,
+                ilc,
                 outfile=outepd,
                 smooth=smooth,
                 sigmaclip=sigmaclip,
-                rlcext=os.path.splitext(rlcglob)[-1]
+                ilcext=os.path.splitext(ilcglob)[-1]
                 )
         except Exception as e:
-            print('EPD failed for %s, error was: %s' % (rlc, e))
+            print('EPD failed for %s, error was: %s' % (ilc, e))
 
