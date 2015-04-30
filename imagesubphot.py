@@ -2157,7 +2157,7 @@ def parallel_collect_imagesublcs(framedir,
         pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
         # fire up the pool of workers
-        results = pool.map(imgsublc_collection_worker, tasks)
+        results = pool.map(imagesublc_collection_worker, tasks)
 
         # wait for the processes to complete work
         pool.close()
@@ -2170,8 +2170,3 @@ def parallel_collect_imagesublcs(framedir,
 
         print('ERR! %sZ: %s specified photometry index DB does not exist!' %
               (datetime.utcnow().isoformat(), ))
-
-
-
-
-
