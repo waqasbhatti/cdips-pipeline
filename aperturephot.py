@@ -3118,16 +3118,16 @@ def get_lc_statistics(lcfile,
 
         # get the reduced magnitude columns
         (rm1, rm2, rm3,
-         ep1, ep2, ep3) = np.loadtxt(lcfile,
-                                     usecols=tuple(rmcols + epcols),
-                                     unpack=True)
+         ep1, ep2, ep3) = np.genfromtxt(lcfile,
+                                        usecols=tuple(rmcols + epcols),
+                                        unpack=True)
 
-        tf1 = np.loadtxt(lcfile.replace('.epdlc','.tfalc.TF1'),
-                         usecols=(24,), unpack=True)
-        tf2 = np.loadtxt(lcfile.replace('.epdlc','.tfalc.TF2'),
-                         usecols=(24,), unpack=True)
-        tf3 = np.loadtxt(lcfile.replace('.epdlc','.tfalc.TF3'),
-                         usecols=(24,), unpack=True)
+        tf1 = np.genfromtxt(lcfile.replace('.epdlc','.tfalc.TF1'),
+                            usecols=(24,), unpack=True)
+        tf2 = np.genfromtxt(lcfile.replace('.epdlc','.tfalc.TF2'),
+                            usecols=(24,), unpack=True)
+        tf3 = np.genfromtxt(lcfile.replace('.epdlc','.tfalc.TF3'),
+                            usecols=(24,), unpack=True)
 
     # if we don't have TF columns, cut down to RM and EP only
     except Exception as e:
@@ -3137,12 +3137,10 @@ def get_lc_statistics(lcfile,
 
         try:
 
-            print(rmcols, epcols)
-
             (rm1, rm2, rm3,
-             ep1, ep2, ep3) = np.loadtxt(lcfile,
-                                         usecols=tuple(rmcols + epcols),
-                                         unpack=True)
+             ep1, ep2, ep3) = np.genfromtxt(lcfile,
+                                            usecols=tuple(rmcols + epcols),
+                                            unpack=True)
 
             tf1, tf2, tf3 = [], [], []
 
@@ -3151,9 +3149,9 @@ def get_lc_statistics(lcfile,
             print('%sZ: no EPD mags available for %s!' %
                   (datetime.utcnow().isoformat(), lcfile))
 
-            rm1, rm2, rm3 = np.loadtxt(lcfile,
-                                       usecols=tuple(rmcols),
-                                       unpack=True)
+            rm1, rm2, rm3 = np.genfromtxt(lcfile,
+                                          usecols=tuple(rmcols),
+                                          unpack=True)
 
             ep1, ep2, ep3, tf1, tf2, tf3 = [], [], [], [], [], []
 
