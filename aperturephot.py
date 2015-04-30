@@ -2987,8 +2987,8 @@ def run_tfa_singlelc(epdlc,
 
     # run tfa for each aperture
     for templatef, magcol, magind in zip(templatefiles,
-                                 epdlc_magcol,
-                                 range(len(epdlc_magcol))):
+                                         epdlc_magcol,
+                                         range(len(epdlc_magcol))):
 
         in_jdcol = epdlc_jdcol + 1
         in_magcol = magcol + 1
