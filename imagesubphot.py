@@ -1960,27 +1960,27 @@ def collect_imagesubphot_lightcurve(hatid,
     The collected LC is similar to the aperturephot LC, but some extra columns
     added by fiphot running on the subtracted frames. columns are:
 
-    rjd    Reduced Julian Date (RJD = JD - 2400000.0)
-    rstfc  Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
-    hat    HAT ID of the object
-    xcc    original X coordinate on CCD before shifting to astromref
-    ycc    original y coordinate on CCD before shifting to astromref
-    xic    shifted X coordinate on CCD after shifting to astromref
-    yic    shifted Y coordinate on CCD after shifting to astromref
-    bgv    Background value
-    bge    Background measurement error
-    fsv    Measured S value
-    fdv    Measured D value
-    fkv    Measured K value
-    irm1   Instrumental magnitude in aperture 1
-    ire1   Instrumental magnitude error for aperture 1
-    irq1   Instrumental magnitude quality flag for aperture 1 (0 or G OK, X bad)
-    irm2   Instrumental magnitude in aperture 2
-    ire2   Instrumental magnitude error for aperture 2
-    irq2   Instrumental magnitude quality flag for aperture 2 (0 or G OK, X bad)
-    irm3   Instrumental magnitude in aperture 3
-    ire3   Instrumental magnitude error for aperture 3
-    irq3   Instrumental magnitude quality flag for aperture 3 (0 or G OK, X bad)
+    00 rjd    Reduced Julian Date (RJD = JD - 2400000.0)
+    01 rstfc  Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
+    02 hat    HAT ID of the object
+    03 xcc    original X coordinate on CCD before shifting to astromref
+    04 ycc    original y coordinate on CCD before shifting to astromref
+    05 xic    shifted X coordinate on CCD after shifting to astromref
+    06 yic    shifted Y coordinate on CCD after shifting to astromref
+    07 bgv    Background value
+    08 bge    Background measurement error
+    09 fsv    Measured S value
+    10 fdv    Measured D value
+    11 fkv    Measured K value
+    12 irm1   Instrumental magnitude in aperture 1
+    13 ire1   Instrumental magnitude error for aperture 1
+    14 irq1   Instrumental magnitude quality flag for aperture 1 (0/G OK, X bad)
+    15 irm2   Instrumental magnitude in aperture 2
+    16 ire2   Instrumental magnitude error for aperture 2
+    17 irq2   Instrumental magnitude quality flag for aperture 2 (0/G OK, X bad)
+    18 irm3   Instrumental magnitude in aperture 3
+    19 ire3   Instrumental magnitude error for aperture 3
+    20 irq3   Instrumental magnitude quality flag for aperture 3 (0/G OK, X bad)
 
     '''
 
@@ -2170,3 +2170,231 @@ def parallel_collect_imagesublcs(framedir,
 
         print('ERR! %sZ: %s specified photometry index DB does not exist!' %
               (datetime.utcnow().isoformat(), ))
+
+
+
+############################################
+## SPECIAL EPD FUNCTIONS FOR IMAGESUB LCS ##
+############################################
+
+def epd_diffmags_imagesub(coeff, fsv, fdv, fkv, xcc, ycc, mag):
+    '''
+    This calculates the difference in mags after EPD coefficients are calculated
+    for imagesub lightcurves. The only difference is that we don't use the
+    background or background error to figure out the fit.
+
+    final EPD mags = median(magseries) + epd_diffmags()
+
+    '''
+
+    return -(coeff[0]*fsv**2. +
+             coeff[1]*fsv +
+             coeff[2]*fdv**2. +
+             coeff[3]*fdv +
+             coeff[4]*fkv**2. +
+             coeff[5]*fkv +
+             coeff[6] +
+             coeff[7]*fsv*fdv +
+             coeff[8]*fsv*fkv +
+             coeff[9]*fdv*fkv +
+             coeff[10]*np.sin(2*np.pi*xcc) +
+             coeff[11]*np.cos(2*np.pi*xcc) +
+             coeff[12]*np.sin(2*np.pi*ycc) +
+             coeff[13]*np.cos(2*np.pi*ycc) +
+             coeff[14]*np.sin(4*np.pi*xcc) +
+             coeff[15]*np.cos(4*np.pi*xcc) +
+             coeff[16]*np.sin(4*np.pi*ycc) +
+             coeff[17]*np.cos(4*np.pi*ycc) -
+             mag)
+
+
+
+def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
+                           smooth=21, sigmaclip=3.0):
+    '''
+    Detrends a magnitude series given in mag using accompanying values of S in
+    fsv, D in fdv, K in fkv, x coords in xcc, y coords in ycc. smooth is used to
+    set a smoothing parameter for the fit function. Does EPD voodoo.
+
+    '''
+
+    # find all the finite values of the magnitude
+    finiteind = np.isfinite(mag)
+
+    # calculate median and stdev
+    mag_median = np.median(mag[finiteind])
+    mag_stdev = np.nanstd(mag)
+
+    # if we're supposed to sigma clip, do so
+    if sigmaclip:
+        excludeind = abs(mag - mag_median) < sigmaclip*mag_stdev
+        finalind = finiteind & excludeind
+    else:
+        finalind = finiteind
+
+    final_mag = mag[finalind]
+    final_len = len(final_mag)
+
+    if DEBUG:
+        print('final epd fit mag len = %s' % final_len)
+
+    # smooth the signal
+    smoothedmag = medfilt(final_mag, smooth)
+
+    # make the linear equation matrix
+    epdmatrix = np.c_[fsv[finalind]**2.0,
+                      fsv[finalind],
+                      fdv[finalind]**2.0,
+                      fdv[finalind],
+                      fkv[finalind]**2.0,
+                      fkv[finalind],
+                      np.ones(final_len),
+                      fsv[finalind]*fdv[finalind],
+                      fsv[finalind]*fkv[finalind],
+                      fdv[finalind]*fkv[finalind],
+                      np.sin(2*np.pi*xcc[finalind]),
+                      np.cos(2*np.pi*xcc[finalind]),
+                      np.sin(2*np.pi*ycc[finalind]),
+                      np.cos(2*np.pi*ycc[finalind]),
+                      np.sin(4*np.pi*xcc[finalind]),
+                      np.cos(4*np.pi*xcc[finalind]),
+                      np.sin(4*np.pi*ycc[finalind]),
+                      np.cos(4*np.pi*ycc[finalind])]
+
+    # solve the equation epdmatrix * x = smoothedmag
+    # return the EPD differential mags if the solution succeeds
+    try:
+
+        coeffs, residuals, rank, singulars = lstsq(epdmatrix, smoothedmag)
+
+        if DEBUG:
+            print('coeffs = %s, residuals = %s' % (coeffs, residuals))
+
+        return epd_diffmags_imagesub(coeffs, fsv, fdv, fkv, xcc, ycc, mag)
+
+    # if the solution fails, return nothing
+    except Exception as e:
+
+        print('%sZ: EPD solution did not converge! Error was: %s' %
+              (datetime.utcnow().isoformat(), e))
+        return None
+
+
+
+def epd_lightcurve_imagesub(rlcfile,
+                            mags=[12,15,18],
+                            sdk=[9,10,11],
+                            xy=[5,6],
+                            smooth=21,
+                            sigmaclip=3.0,
+                            rlcext='rlc',
+                            outfile=None):
+    '''
+    Runs the EPD process on rlcfile, using columns specified to get the required
+    parameters. If outfile is None, the .epdlc will be placeed in the same
+    directory as rlcfile.
+
+    '''
+
+    # read the lightcurve in
+    rlc = np.genfromtxt(rlcfile,
+                        usecols=tuple(xy + sdk + mags),
+                        dtype='f8,f8,f8,f8,f8,f8,f8,f8',
+                        names=['xcc','ycc',
+                               'fsv','fdv','fkv',
+                               'rm1','rm2','rm3'])
+
+    # calculate the EPD differential mags
+    epddiffmag1 = epd_magseries_imagesub(rlc['rm1']
+                                         ,rlc['fsv'],rlc['fdv'],rlc['fkv'],
+                                         rlc['xcc'],rlc['ycc'],
+                                         smooth=smooth, sigmaclip=sigmaclip)
+    epddiffmag2 = epd_magseries_imagesub(rlc['rm2']
+                                         ,rlc['fsv'],rlc['fdv'],rlc['fkv'],
+                                         rlc['xcc'],rlc['ycc'],
+                                         smooth=smooth, sigmaclip=sigmaclip)
+    epddiffmag3 = epd_magseries_imagesub(rlc['rm3']
+                                         ,rlc['fsv'],rlc['fdv'],rlc['fkv'],
+                                         rlc['xcc'],rlc['ycc'],
+                                         smooth=smooth, sigmaclip=sigmaclip)
+
+    # add the EPD diff mags back to the median mag to get the EPD mags
+    if epddiffmag1 is not None:
+        mag_median = np.median(rlc['rm1'][np.isfinite(rlc['rm1'])])
+        epdmag1 = epddiffmag1 + mag_median
+    else:
+        epdmag1 = np.array([np.nan for x in rlc['rm1']])
+        print('%sZ: no EP1 mags available for %s!' %
+              (datetime.utcnow().isoformat(), rlcfile))
+
+    if epddiffmag2 is not None:
+        mag_median = np.median(rlc['rm2'][np.isfinite(rlc['rm2'])])
+        epdmag2 = epddiffmag2 + mag_median
+    else:
+        epdmag2 = np.array([np.nan for x in rlc['rm2']])
+        print('%sZ: no EP2 mags available for %s!' %
+              (datetime.utcnow().isoformat(), rlcfile))
+
+    if epddiffmag3 is not None:
+        mag_median = np.median(rlc['rm3'][np.isfinite(rlc['rm3'])])
+        epdmag3 = epddiffmag3 + mag_median
+    else:
+        epdmag3 = np.array([np.nan for x in rlc['rm3']])
+        print('%sZ: no EP3 mags available for %s!' %
+              (datetime.utcnow().isoformat(), rlcfile))
+
+    # now write the EPD LCs out to the outfile
+    if not outfile:
+        outfile = '%s.epdlc' % rlcfile.strip('.%s' % rlcext)
+
+    inf = open(rlcfile,'rb')
+    inflines = inf.readlines()
+    inf.close()
+    outf = open(outfile,'wb')
+
+    for line, epd1, epd2, epd3 in zip(inflines, epdmag1, epdmag2, epdmag3):
+        outline = '%s %.6f %.6f %.6f\n' % (line.rstrip('\n'), epd1, epd2, epd3)
+        outf.write(outline)
+
+    outf.close()
+    return outfile
+
+
+
+def serial_run_epd_imagesub(rlcdir,
+                            rlcglob='*.ilc',
+                            outdir=None,
+                            smooth=21,
+                            sigmaclip=3.0):
+    '''
+    This runs EPD on the lightcurves from the pipeline.
+
+    '''
+
+    if not outdir:
+        outdir = rlcdir
+
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+
+    rlcfiles = glob.glob(os.path.join(rlcdir, rlcglob))
+
+    for rlc in rlcfiles:
+
+        outepd = os.path.join(outdir,
+                              os.path.basename(rlc).replace('.rlc','.epdlc'))
+
+        print('%sZ: doing EPD for %s...' %
+              (datetime.utcnow().isoformat(), rlc))
+
+        try:
+            outfilename = epd_lightcurve_imagesub(
+                rlc,
+                outfile=outepd,
+                smooth=smooth,
+                sigmaclip=sigmaclip,
+                rlcext=os.path.splitext(rlcglob)[-1]
+                )
+        except Exception as e:
+            print('EPD failed for %s, error was: %s' % (rlc, e))
+

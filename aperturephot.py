@@ -2453,7 +2453,6 @@ def epd_magseries(mag, fsv, fdv, fkv, xcc, ycc, bgv, bge,
         return None
 
 
-
 def epd_lightcurve(rlcfile,
                    mags=[18,19,20],
                    sdk=[6,7,8],
