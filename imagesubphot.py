@@ -2143,8 +2143,10 @@ def parallel_collect_imagesublcs(framedir,
         hatids = [rows[0] for x in rows]
         db.close()
 
+        print(hatid[:10])
+
         # generate the task list
-        tasks = [(hatid[0],
+        tasks = [(hatid,
                   photindexdb,
                   outdir,
                   {'skipcollected':skipcollectedlcs,
