@@ -96,12 +96,13 @@ the columns in these .ilc files are:
     ire3   Instrumental magnitude error for aperture 3
     irq3   Instrumental magnitude quality flag for aperture 3 (0 or G OK, X bad)
 
-the next few steps are common between imagesubphot.py and aperturephot.py, so
-you can use the functions there for them (but that might have issues with
-differing column numbers, so I'll probably end up remaking them for
-imagesubphot.py):
+13. run serial_run_epd_imagesub or parallel_run_epd_imagesub to do EPD on all
+LCs.
 
-13. run serial_run_epd or parallel_run_epd to do EPD on all LCs.
+the next few steps are common between imagesubphot.py and aperturephot.py, so
+you can use the functions there for them. make sure to use columns 12, 15, 18
+for the reduced magnitudes (rmcols) instead of the default, since these are
+different from the aperture photometry lightcurves.
 
 14. run parallel_lc_statistics to collect stats on .epdlc files.
 
@@ -119,10 +120,15 @@ imagesubphot.py):
 20. run plot_stats_file to make RMS vs. mag plots for all unbinned and binned
     LCs.
 
-21. run plot_magrms_comparison to compare the mag-RMS relation for various CCDs.
+21. run plot_magrms_comparison to compare the mag-RMS relation for various
+    CCDs. note: you can also use this to compare the aperture photometry LCs
+    produced by aperturephot.py to image subtraction photometry LCs produced by
+    this module.
 
 22. run plot_ismphot_comparison to compare against ISM photometry statistics for
-    the same field (requires common stars).
+    the same field (requires common stars). this step is pretty much obsolete
+    since we're now using the same functions to produce ISM and AP lightcurve
+    stats.
 
 '''
 

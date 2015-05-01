@@ -1905,7 +1905,9 @@ def get_master_photref(sphotref_frame,
     '''
     Generates the master photometric reference from single ref photometry.
 
-    python do_masterphotref.py HATSouth /nfs/phs3/ar1/S/HP0/PHOT_WB/1-20141120-work-CCD5/1-377740d_5.fits --manual-frame-list=/nfs/phs3/ar1/S/HP0/PHOT_WB/1-20141120-work-CCD5/1-20141120-CCD5-binphot.list --config-file=/home/wbhatti/scripts/magfit_rG548.cfg --nostat
+    lcohpsrv1 invocation:
+
+    nohup python /home/hatuser/wbhatti/src/do_masterphotref.py HATSouth /nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/ccd5-fits/1-404411d_5.fits --manual-frame-list=/nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/photometry-ap/ccd5-fiphot.list --config-file=/nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/photometry-ap/ccd5-magfit.cfg --log-config=/home/hatuser/wbhatti/src/logging.conf --nostat > ccd5-masterphotref.log &
 
     '''
 
