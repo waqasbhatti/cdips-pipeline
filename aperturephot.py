@@ -1957,9 +1957,10 @@ def get_master_photref(sphotref_frame,
         return False
 
 
-#####################################
-## LIGHTCURVE GENERATION FUNCTIONS ##
-#####################################
+
+###########################
+## FIPHOT DUMP FUNCTIONS ##
+###########################
 
 def dump_binary_fiphot(fiphot, outfile):
     '''
@@ -1985,6 +1986,10 @@ def parallel_dump_binary_fiphots(fiphotdir, outdir):
 
     '''
 
+
+#####################################
+## LIGHTCURVE GENERATION FUNCTIONS ##
+#####################################
 
 def collect_lightcurve(hatid,
                        framefiles,
