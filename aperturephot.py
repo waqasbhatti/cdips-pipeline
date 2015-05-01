@@ -3948,7 +3948,7 @@ def time_bin_lightcurve(lcprefix,
                                usecols=tuple([jdcol] + magcolspec),
                                names=['rjd'] + lcmagcols)
 
-        if lcdata['rjd'].shape and len(lcdata['rjd']) > 10:
+        if lcdata['rjd'].shape and len(lcdata['rjd']) >= 100:
 
             # convert binsize in seconds to JD units
             binsizejd = binsize/(86400.0)
