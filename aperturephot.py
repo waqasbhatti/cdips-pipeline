@@ -1961,6 +1961,30 @@ def get_master_photref(sphotref_frame,
 ## LIGHTCURVE GENERATION FUNCTIONS ##
 #####################################
 
+def dump_binary_fiphot(fiphot, outfile):
+    '''
+    This dumps all columns from a fiphot binary format file to a text fiphot
+    file.
+
+    '''
+
+
+def dump_binary_worker(task):
+    '''
+    This is a worker for parallelization of binary fiphot dumping.
+
+    '''
+
+
+def parallel_dump_binary_fiphots(fiphotdir, outdir):
+    '''
+    This dumps all binary fiphots found in fiphotdir (we check if the file is
+    binary or not) to text fiphots with all the same row lengths in outdir. This
+    is needed if we want to use the fast LC collection method implemented in
+    imagesubphot.py.
+
+    '''
+
 
 def collect_lightcurve(hatid,
                        framefiles,
