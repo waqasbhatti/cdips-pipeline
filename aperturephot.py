@@ -2010,13 +2010,13 @@ def dump_binary_fiphot(fiphot, outfile):
     ie1 = binphot['per aperture'][0]['mag err']
     iq1 = binphot['per aperture'][0]['flag']
 
-    im2 = binphot['per aperture'][0]['mag']
-    ie2 = binphot['per aperture'][0]['mag err']
-    iq2 = binphot['per aperture'][0]['flag']
+    im2 = binphot['per aperture'][1]['mag']
+    ie2 = binphot['per aperture'][1]['mag err']
+    iq2 = binphot['per aperture'][1]['flag']
 
-    im3 = binphot['per aperture'][0]['mag']
-    ie3 = binphot['per aperture'][0]['mag err']
-    iq3 = binphot['per aperture'][0]['flag']
+    im3 = binphot['per aperture'][2]['mag']
+    ie3 = binphot['per aperture'][2]['mag err']
+    iq3 = binphot['per aperture'][2]['flag']
 
     rm1 = binphot['mprmag[0]'] if 'mprmag[0]' in binphot else [np.nan for x in srcx]
     rm2 = binphot['mprmag[1]'] if 'mprmag[1]' in binphot else [np.nan for x in srcx]
