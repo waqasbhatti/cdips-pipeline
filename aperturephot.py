@@ -1969,22 +1969,21 @@ def dump_binary_fiphot(fiphot, outfile):
 
     keys to dump and in which order:
 
+    HAT-field-sourceid
     serial
-    field
-    source
     x
     y
     bg
     bg err
     per aperture[0] mag
     per aperture[0] mag err
-    per aperture[0] flag
+    per aperture[0] status flag
     per aperture[1] mag
     per aperture[1] mag err
-    per aperture[1] flag
+    per aperture[1] status flag
     per aperture[2] mag
     per aperture[2] mag err
-    per aperture[2] flag
+    per aperture[2] status flag
     mprmag[0]
     mprmag[1]
     mprmag[2]
