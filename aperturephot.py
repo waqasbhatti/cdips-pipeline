@@ -1989,7 +1989,7 @@ def dump_binary_fiphot(fiphot, outfile):
     mprmag[1]
     mprmag[2]
 
-    NOTE: each line has a length of 208 characters (this will be useful as input
+    NOTE: each line has a length of 209 characters (this will be useful as input
     to the fast parallel LC collection function in imagesubphot.py).
 
     '''
