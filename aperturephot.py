@@ -1967,7 +1967,89 @@ def dump_binary_fiphot(fiphot, outfile):
     This dumps all columns from a fiphot binary format file to a text fiphot
     file.
 
+    keys to dump and in which order:
+
+    serial
+    field
+    source
+    x
+    y
+    bg
+    bg err
+    per aperture[0] mag
+    per aperture[0] mag err
+    per aperture[0] flag
+    per aperture[1] mag
+    per aperture[1] mag err
+    per aperture[1] flag
+    per aperture[2] mag
+    per aperture[2] mag err
+    per aperture[2] flag
+    mprmag[0]
+    mprmag[1]
+    mprmag[2]
+
     '''
+
+    # first, read the fiphot in
+    binphot = read_fiphot(fiphot)
+
+    # get all the columns
+
+    source = binphot['source']
+    serial = binphot['serial']
+    field = binphot['field']
+
+    srcx = binphot['x']
+    srcy = binphot['y']
+
+    bkg = binphot['bg']
+    bkgerr = binphot['bg err']
+
+    im1 = binphot['per aperture'][0]['mag']
+    ie1 = binphot['per aperture'][0]['mag err']
+    iq1 = binphot['per aperture'][0]['flag']
+
+    im2 = binphot['per aperture'][0]['mag']
+    ie2 = binphot['per aperture'][0]['mag err']
+    iq2 = binphot['per aperture'][0]['flag']
+
+    im3 = binphot['per aperture'][0]['mag']
+    ie3 = binphot['per aperture'][0]['mag err']
+    iq3 = binphot['per aperture'][0]['flag']
+
+    rm1 = binphot['mprmag[0]'] if 'mprmag[0]' in binphot else [np.nan for x in srcx]
+    rm2 = binphot['mprmag[1]'] if 'mprmag[1]' in binphot else [np.nan for x in srcx]
+    rm3 = binphot['mprmag[2]'] if 'mprmag[2]' in binphot else [np.nan for x in srcx]
+
+    # format the output line
+    lineform = (
+        '%8i %12s %8i '           # source, serial, field
+        '%12.5f %12.5f '          # srcx, srcy
+        '%12.5f %12.5f '          # bkg, bkgerr
+        '%12.5f %12.5f %3if '     # im1, ie1, iq1
+        '%12.5f %12.5f %3i '      # im2, ie2, iq2
+        '%12.5f %12.5f %3i '      # im3, ie3, iq3
+        '%12.5f %12.5f %12.5f\n'  # rm1, rm2, rm3
+        )
+
+    # open the outfile
+    outf = open(outfile, 'wb')
+
+    for ind in xrange(len(srcx)):
+
+        outf.write(lineform % (source[ind], serial, field[ind],
+                               srcx[ind], srcy[ind],
+                               bkg[ind], bkgerr[ind],
+                               im1[ind], ie1[ind], iq1[ind],
+                               im2[ind], ie2[ind], iq2[ind],
+                               im3[ind], ie3[ind], iq3[ind],
+                               rm1[ind], rm2[ind], rm3[ind]))
+
+    outf.close()
+
+    return outfile
+
 
 
 def dump_binary_worker(task):
