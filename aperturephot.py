@@ -1989,6 +1989,9 @@ def dump_binary_fiphot(fiphot, outfile):
     mprmag[1]
     mprmag[2]
 
+    NOTE: each line has a length of 208 characters (this will be useful as input
+    to the fast parallel LC collection function in imagesubphot.py).
+
     '''
 
     # first, read the fiphot in
@@ -2056,10 +2059,36 @@ def dump_binary_worker(task):
     '''
     This is a worker for parallelization of binary fiphot dumping.
 
+    task[0] -> path to input binary fiphot
+    task[1] -> output directory
+    task[2] -> output fiphot extension to use
+
     '''
 
+    try:
 
-def parallel_dump_binary_fiphots(fiphotdir, outdir):
+        outbasename = task[0].replace('fiphot',task[2])
+        outfile = os.path.join(os.path.abspath(task[1]), outbasename)
+
+        print('%sZ: binary fiphot %s -> text fiphot %s OK' %
+              (datetime.utcnow().isoformat(), task[0], outfile))
+
+        return task[0], dump_binary_fiphot(task[0], outfile)
+
+    except Exception as e:
+
+        print('ERR! %sZ: could not dump '
+              'binary fiphot %s to text fiphot, error was: %s' %
+              (datetime.utcnow().isoformat(), task[0], e))
+
+        return task[0], None
+
+
+
+def parallel_dump_binary_fiphots(fiphotdir,
+                                 fiphotglob='*.fiphot',
+                                 outdir=None,
+                                 textfiphotext='fiphottxt'):
     '''
     This dumps all binary fiphots found in fiphotdir (we check if the file is
     binary or not) to text fiphots with all the same row lengths in outdir. This
@@ -2067,6 +2096,29 @@ def parallel_dump_binary_fiphots(fiphotdir, outdir):
     imagesubphot.py.
 
     '''
+
+    fiphotlist = glob.glob(os.path.join(os.path.abspath(fiphotdir), fiphotglob))
+
+    print('%sZ: %s files to process in %s' %
+          (datetime.utcnow().isoformat(), len(fiphotlist), fiphotdir))
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+    if not outdir:
+        outdir = fiphotdir
+
+    tasks = [(x, outdir, textfiphotext) for x in fiphotlist]
+
+    # fire up the pool of workers
+    results = pool.map(dump_binary_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    return {x:y for (x,y) in results}
+
+
 
 
 #####################################
