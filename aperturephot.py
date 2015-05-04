@@ -2088,7 +2088,9 @@ def dump_binary_worker(task):
 def parallel_dump_binary_fiphots(fiphotdir,
                                  fiphotglob='*.fiphot',
                                  outdir=None,
-                                 textfiphotext='fiphottxt'):
+                                 textfiphotext='fiphottxt',
+                                 nworkers=16,
+                                 maxworkertasks=1000):
     '''
     This dumps all binary fiphots found in fiphotdir (we check if the file is
     binary or not) to text fiphots with all the same row lengths in outdir. This
