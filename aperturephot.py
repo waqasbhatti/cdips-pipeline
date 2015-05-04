@@ -2024,10 +2024,10 @@ def dump_binary_fiphot(fiphot, outfile):
 
     # format the output line
     lineform = (
-        '%8i %12s %8i '           # source, serial, field
+        '%7i %12s %6i '           # source, serial, field
         '%12.5f %12.5f '          # srcx, srcy
         '%12.5f %12.5f '          # bkg, bkgerr
-        '%12.5f %12.5f %3if '     # im1, ie1, iq1
+        '%12.5f %12.5f %3i '     # im1, ie1, iq1
         '%12.5f %12.5f %3i '      # im2, ie2, iq2
         '%12.5f %12.5f %3i '      # im3, ie3, iq3
         '%12.5f %12.5f %12.5f\n'  # rm1, rm2, rm3
