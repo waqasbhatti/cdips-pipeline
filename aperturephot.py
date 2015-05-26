@@ -2128,7 +2128,7 @@ def dump_binary_worker(task):
 def parallel_dump_binary_fiphots(fiphotdir,
                                  fiphotglob='*.fiphot',
                                  sourcelistdir=None,
-                                 sourcelistext='sourcelist',
+                                 sourcelistext='.sourcelist',
                                  outdir=None,
                                  textfiphotext='text-fiphot',
                                  nworkers=16,
@@ -2300,7 +2300,7 @@ def make_photometry_indexdb(framedir,
 
 
 
-def get_fiphot_line(fiphot, linenum, fiphotlinechars=210):
+def get_fiphot_line(fiphot, linenum, fiphotlinechars=249):
     '''
     This gets a random fiphot line out of the file fiphot.
 
@@ -2315,7 +2315,7 @@ def get_fiphot_line(fiphot, linenum, fiphotlinechars=210):
     return fiphotline
 
 
-def get_fiphot_line_linecache(fiphot, linenum, fiphotlinechars=210):
+def get_fiphot_line_linecache(fiphot, linenum, fiphotlinechars=249):
     '''
     This uses linecache's getline function to get the line out of the file
     fiphot.
@@ -2331,7 +2331,7 @@ def collect_aperturephot_lightcurve(hatid,
                                     outdir,
                                     skipcollected=True,
                                     fiphotlinefunc=get_fiphot_line,
-                                    fiphotlinechars=210):
+                                    fiphotlinechars=249):
     '''
     This collects the imagesubphot lightcurve of a single object into a .ilc
     file.
@@ -2501,7 +2501,7 @@ def parallel_collect_aperturephotlcs(framedir,
                                      overwritephotindex=False,
                                      skipcollectedlcs=True,
                                      fiphotlinefunc=get_fiphot_line,
-                                     fiphotlinechars=210,
+                                     fiphotlinechars=249,
                                      nworkers=16,
                                      maxworkertasks=1000):
     '''
