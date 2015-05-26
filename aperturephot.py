@@ -2372,7 +2372,7 @@ def collect_aperturephot_lightcurve(hatid,
     if rows and len(rows) > 0:
 
         # prepare the output file
-        outfile = os.path.join(os.path.abspath(outdir), '%s.ilc' % hatid)
+        outfile = os.path.join(os.path.abspath(outdir), '%s.rlc' % hatid)
 
         # if the file already exists and skipcollected is True, then return
         # that file instead of processing any further
