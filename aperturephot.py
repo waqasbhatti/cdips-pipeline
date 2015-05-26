@@ -1988,10 +1988,15 @@ def get_master_photref(sphotref_frame,
 ## FIPHOT DUMP FUNCTIONS ##
 ###########################
 
-def dump_binary_fiphot(fiphot, outfile):
+def dump_binary_fiphot(fiphot,
+                       sourcelist,
+                       outfile):
     '''
     This dumps all columns from a fiphot binary format file to a text fiphot
-    file.
+    file. This also needs the sourcelist file for the same frame to get the S,
+    D, K values correctly for each detection. This assumes that the sourcelist
+    source detections are ordered in the same way as the source detections in
+    the fiphot file (this appears to be valid, but need a workaround).
 
     keys to dump and in which order:
 
@@ -2014,13 +2019,18 @@ def dump_binary_fiphot(fiphot, outfile):
     mprmag[1]
     mprmag[2]
 
-    NOTE: each line has a length of 209 characters (this will be useful as input
+    NOTE: each line has a length of 210 characters (this will be useful as input
     to the fast parallel LC collection function in imagesubphot.py).
 
     '''
 
     # first, read the fiphot in
     binphot = read_fiphot(fiphot)
+
+    srclist = np.genfromtxt(sourcelist,
+                            usecols=(8,9,10),
+                            dtype='f8,f8,f8',
+                            names=['fsv','fdv','fkv'])
 
     # get all the columns
 
@@ -2052,9 +2062,10 @@ def dump_binary_fiphot(fiphot, outfile):
 
     # format the output line
     lineform = (
-        'HAT-%3i-%07i %12s '      # source, serial, field
+        'HAT-%3i-%07i %12s '      # hatid, rstfc
         '%12.5f %12.5f '          # srcx, srcy
         '%12.5f %12.5f '          # bkg, bkgerr
+        '%12.5f %12.5f %12.5f '   # fsv, fdv, fkv
         '%12.5f %12.5f %3i '      # im1, ie1, iq1
         '%12.5f %12.5f %3i '      # im2, ie2, iq2
         '%12.5f %12.5f %3i '      # im3, ie3, iq3
@@ -2069,6 +2080,9 @@ def dump_binary_fiphot(fiphot, outfile):
         outf.write(lineform % (field[ind], source[ind], serial,
                                srcx[ind], srcy[ind],
                                bkg[ind], bkgerr[ind],
+                               srclist['fsv'][ind],
+                               srclist['fdv'][ind],
+                               srclist['fkv'][ind],
                                im1[ind], ie1[ind], iq1[ind],
                                im2[ind], ie2[ind], iq2[ind],
                                im3[ind], ie3[ind], iq3[ind],
@@ -2085,20 +2099,21 @@ def dump_binary_worker(task):
     This is a worker for parallelization of binary fiphot dumping.
 
     task[0] -> path to input binary fiphot
-    task[1] -> output directory
-    task[2] -> output fiphot extension to use
+    task[1] -> path to accompanying sourcelist file
+    task[2] -> output directory
+    task[3] -> output fiphot extension to use
 
     '''
 
     try:
 
-        outbasename = task[0].replace('fiphot',task[2])
-        outfile = os.path.join(os.path.abspath(task[1]), outbasename)
+        outbasename = task[0].replace('fiphot',task[3])
+        outfile = os.path.join(os.path.abspath(task[2]), outbasename)
 
         print('%sZ: binary fiphot %s -> text fiphot %s OK' %
               (datetime.utcnow().isoformat(), task[0], outfile))
 
-        return task[0], dump_binary_fiphot(task[0], outfile)
+        return task[0], dump_binary_fiphot(task[0], task[1], outfile)
 
     except Exception as e:
 
@@ -2112,8 +2127,10 @@ def dump_binary_worker(task):
 
 def parallel_dump_binary_fiphots(fiphotdir,
                                  fiphotglob='*.fiphot',
+                                 sourcelistdir=None,
+                                 sourcelistext='sourcelist',
                                  outdir=None,
-                                 textfiphotext='fiphottxt',
+                                 textfiphotext='text-fiphot',
                                  nworkers=16,
                                  maxworkertasks=1000):
     '''
@@ -2124,7 +2141,13 @@ def parallel_dump_binary_fiphots(fiphotdir,
 
     '''
 
+    if not sourcelistdir:
+        sourcelistdir = fiphotdir
+
     fiphotlist = glob.glob(os.path.join(os.path.abspath(fiphotdir), fiphotglob))
+    fiphotext = os.path.splitext(fiphotglob)[-1]
+
+    sourcelistlist = [x.replace(fiphotext, sourcelistext) for x in fiphotlist]
 
     print('%sZ: %s files to process in %s' %
           (datetime.utcnow().isoformat(), len(fiphotlist), fiphotdir))
@@ -2134,7 +2157,8 @@ def parallel_dump_binary_fiphots(fiphotdir,
     if not outdir:
         outdir = fiphotdir
 
-    tasks = [(x, outdir, textfiphotext) for x in fiphotlist]
+    tasks = [(x, y, outdir, textfiphotext)
+             for (x,y) in zip(fiphotlist, sourcelistlist)]
 
     # fire up the pool of workers
     results = pool.map(dump_binary_worker, tasks)
@@ -2154,7 +2178,7 @@ def make_photometry_indexdb(framedir,
                             outfile,
                             frameglob='*.fits',
                             photdir=None,
-                            photext='fiphottxt',
+                            photext='text-fiphot',
                             maxframes=None,
                             overwrite=False):
     '''
@@ -2507,10 +2531,14 @@ def parallel_collect_aperturephotlcs(framedir,
 
         # get the list of distinct HATIDs from the photindexdb
         db = sqlite3.connect(photindexdb)
+
         cur = db.cursor()
         cur.execute(DISTINCT_HATIDS_CMD)
         rows = cur.fetchall()
-        hatids = [x[0] for x in rows]
+        # make sure these are unique
+        hatids = [x[0].strip() for x in rows]
+        hatids = list(set(hatids))
+
         db.close()
 
         # generate the task list
