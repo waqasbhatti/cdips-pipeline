@@ -76,6 +76,7 @@ import json
 import shutil
 import random
 import cPickle as pickle
+import sqlite3
 
 import numpy as np
 
@@ -232,6 +233,31 @@ MAGFITCMD = ("python {magfitexec} {network} {fit_type} "
 MPHOTREFCMD = ("python {mphotrefexec} {network} {sphotref_frame} "
                "--manual-frame-list={fiphot_list} "
                "--config-file={magfit_config_file} --nostat")
+
+
+
+####################
+## SQLITE SCHEMAS ##
+####################
+
+PHOTS_TABLE = 'create table phots (phot text, rjd double precision, frame text)'
+HATIDS_TABLE = 'create table hatids (hatid text, phot text, photline integer)'
+META_TABLE = 'create table metainfo (photdir text, framedir text)'
+PRAGMA_CMDS = 'pragma journal_mode = WAL'
+
+PHOTS_INDEX_CMD = 'create index phots_index on phots (phot)'
+HATIDS_INDEX_CMD = 'create index hatid_index on hatids (hatid)'
+HATIDS_PHOT_INDEX_CMD = 'create index hatid_phot_index on hatids (phot)'
+
+PHOTS_INSERT_CMD = 'insert into phots values (?,?,?)'
+HATIDS_INSERT_CMD = 'insert into hatids values (?,?,?)'
+META_INSERT_CMD = 'insert into metainfo values (?,?)'
+
+PHOT_SELECT_CMD = ('select a.rjd, a.phot, b.photline from '
+                   'phots a join hatids b on (a.phot = b.phot) '
+                   'where b.hatid = ? order by a.rjd')
+META_SELECT_CMD = ('select * from metainfo')
+DISTINCT_HATIDS_CMD = ('select distinct hatid from hatids')
 
 
 ###############################
