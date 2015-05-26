@@ -2120,6 +2120,403 @@ def parallel_dump_binary_fiphots(fiphotdir,
     return {x:y for (x,y) in results}
 
 
+#############################
+## NEW STYLE LC COLLECTION ##
+#############################
+
+def make_photometry_indexdb(framedir,
+                            outfile,
+                            frameglob='*.fits',
+                            photdir=None,
+                            photext='fiphottxt',
+                            maxframes=None,
+                            overwrite=False):
+    '''
+    This is like make_photometry_index below, but uses an sqlite3 database
+    instead of an in-memory disk.
+
+    '''
+
+    # make sure we don't overwrite anything unless we're supposed to
+    if os.path.exists(outfile) and not overwrite:
+
+        print('WRN! %sZ: a photometry index DB by this name already exists!' %
+              (datetime.utcnow().isoformat(),))
+        return outfile
+
+    if overwrite and os.path.exists(outfile):
+        os.remove(outfile)
+
+    db = sqlite3.connect(outfile)
+    cur = db.cursor()
+
+    # make the database tables
+    # cur.execute(PRAGMA_CMDS)   # not sure if we want WAL mode or not
+    cur.execute(PHOTS_TABLE)
+    cur.execute(HATIDS_TABLE)
+    cur.execute(META_TABLE)
+    db.commit()
+
+    # first, figure out the directories
+    if not photdir:
+        photdir = framedir
+
+    # send these to the database
+    cur.execute(META_INSERT_CMD, (photdir, framedir))
+    db.commit()
+
+
+    # first, find all the frames
+    framelist = glob.glob(os.path.join(os.path.abspath(framedir),
+                                       frameglob))
+
+    # restrict to maxframes max frames
+    if maxframes:
+        framelist = framelist[:maxframes]
+
+    # go through all the frames
+    for frame in framelist:
+
+        print('%sZ: working on frame %s' %
+              (datetime.utcnow().isoformat(), frame))
+
+        # generate the names of the associated phot and sourcelist files
+        frameinfo = FRAMEREGEX.findall(os.path.basename(frame))
+
+        phot = '%s-%s_%s.%s' % (frameinfo[0][0],
+                                frameinfo[0][1],
+                                frameinfo[0][2],
+                                photext)
+        originalframe = '%s-%s_%s.fits' % (frameinfo[0][0],
+                                frameinfo[0][1],
+                                frameinfo[0][2])
+
+        phot = os.path.join(os.path.abspath(photdir), phot)
+        originalframe = os.path.join(os.path.abspath(framedir),
+                                     originalframe)
+
+        # check these files exist, and populate the dict if they do
+        if os.path.exists(phot) and os.path.exists(originalframe):
+
+
+            # get the JD from the FITS file.
+
+            # NOTE: this is the ORIGINAL FITS frame, since the subtracted one
+            # contains some weird JD header (probably inherited from the photref
+            # frame)
+            framerjd = get_header_keyword(originalframe, 'JD')
+
+            # update the DB with this info
+            cur.execute(PHOTS_INSERT_CMD,
+                        (os.path.basename(phot),
+                         framerjd,
+                         os.path.basename(originalframe)))
+
+            # get the phot file
+            photf = open(phot, 'rb')
+            phothatids = [x.split()[0] for x in photf]
+            photf.close()
+
+            for ind, hatid in enumerate(phothatids):
+
+                # update the DB with phot info
+                cur.execute(HATIDS_INSERT_CMD,
+                            (hatid,
+                             os.path.basename(phot),
+                             ind))
+
+        # if some associated files don't exist for this frame, ignore it
+        else:
+
+            print('WRN! %sZ: ignoring frame %s, '
+                  'photometry for this frame is not available!' %
+                  (datetime.utcnow().isoformat(), frame))
+
+
+    # make the indices for fast lookup
+    print('%sZ: making photometry index DB indices...' %
+          (datetime.utcnow().isoformat(),))
+    cur.execute(PHOTS_INDEX_CMD)
+    cur.execute(HATIDS_INDEX_CMD)
+    cur.execute(HATIDS_PHOT_INDEX_CMD)
+
+    # commit the DB at the end of writing
+    db.commit()
+
+    print('%sZ: done. photometry index DB written to %s' %
+          (datetime.utcnow().isoformat(), outfile))
+
+    return outfile
+
+
+
+def get_fiphot_line(fiphot, linenum, fiphotlinechars=210):
+    '''
+    This gets a random fiphot line out of the file fiphot.
+
+    '''
+
+    fiphotf = open(ffiphot, 'rb')
+    filelinenum = fiphotlinechars*linenum
+    fiphotf.seek(filelinenum)
+    fiphotline = fiphotf.read(fiphotlinechars)
+    fiphotf.close()
+
+    return fiphotline
+
+
+def get_fiphot_line_linecache(fiphot, linenum, fiphotlinechars=210):
+    '''
+    This uses linecache's getline function to get the line out of the file
+    fiphot.
+
+    '''
+
+    return getline(fiphot, linenum)
+
+
+
+def collect_imagesubphot_lightcurve(hatid,
+                                    photindex,
+                                    outdir,
+                                    skipcollected=True,
+                                    fiphotlinefunc=get_fiphot_line,
+                                    fiphotlinechars=260):
+    '''
+    This collects the imagesubphot lightcurve of a single object into a .ilc
+    file.
+
+    hatid -> the hatid of the object to collect the light-curve for
+
+    photindexfile -> the file containing the master index of which .fiphot,
+                      .sourcelist, and .fits contain the lines corresponding to
+                      this HATID. this way, we can look these lines up
+                      super-fast using the linecache module.
+
+    outdir -> the directory where to the place the collected lightcurve
+
+    skipcollected -> if True, looks for an existing LC for this hatid in
+                       outdir. if found, returns the path to that LC instead of
+                       actually processing. if this is False, redoes the
+                       processing for this LC anyway.
+
+    fiphotlinefunc -> this is the function to use for getting a specific line out
+                     of the specified fiphot file.
+
+    The collected LC is similar to the aperturephot LC, but some extra columns
+    added by ffiphot running on the subtracted frames. columns are:
+
+    00 rjd    Reduced Julian Date (RJD = JD - 2400000.0)
+    01 rstfc  Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
+    02 hat    HAT ID of the object
+    03 xcc    original X coordinate on CCD before shifting to astromref
+    04 ycc    original y coordinate on CCD before shifting to astromref
+    05 xic    shifted X coordinate on CCD after shifting to astromref
+    06 yic    shifted Y coordinate on CCD after shifting to astromref
+    07 bgv    Background value
+    08 bge    Background measurement error
+    09 fsv    Measured S value
+    10 fdv    Measured D value
+    11 fkv    Measured K value
+    12 irm1   Instrumental magnitude in aperture 1
+    13 ire1   Instrumental magnitude error for aperture 1
+    14 irq1   Instrumental magnitude quality flag for aperture 1 (0/G OK, X bad)
+    15 irm2   Instrumental magnitude in aperture 2
+    16 ire2   Instrumental magnitude error for aperture 2
+    17 irq2   Instrumental magnitude quality flag for aperture 2 (0/G OK, X bad)
+    18 irm3   Instrumental magnitude in aperture 3
+    19 ire3   Instrumental magnitude error for aperture 3
+    20 irq3   Instrumental magnitude quality flag for aperture 3 (0/G OK, X bad)
+
+    '''
+
+    # connect to the photindex sqlite3 database
+    indexdb = sqlite3.connect(photindex)
+    cur = indexdb.cursor()
+
+    # first, look up the metainfo
+    cur.execute(META_SELECT_CMD)
+    metarow = cur.fetchone()
+    photdir, framedir = metarow
+
+    # look up the hatid and its info in the photindex db
+    cur.execute(PHOT_SELECT_CMD, (str(hatid),))
+    rows = cur.fetchall()
+
+    if rows and len(rows) > 0:
+
+        # prepare the output file
+        outfile = os.path.join(os.path.abspath(outdir), '%s.ilc' % hatid)
+
+        # if the file already exists and skipcollected is True, then return
+        # that file instead of processing any further
+        if os.path.exists(outfile) and skipcollected:
+
+            print('WRN! %sZ: object %s LC already exists, not overwriting: %s' %
+                  (datetime.utcnow().isoformat(), hatid, outfile))
+
+            return outfile
+
+        # otherwise, open the file and prepare to write to it
+        outf = open(outfile, 'wb')
+
+        # go through the phots and sourcelists, picking out the timeseries
+        # information for this hatid
+        for row in rows:
+
+            # unpack the row to get our values
+            framerjd, phot, photline = row
+
+            try:
+
+                # next, get the requested line from phot file
+                phot_elem = fiphotlinefunc(
+                    os.path.join(photdir, phot),
+                    photline,
+                    fiphotlinechars=fiphotlinechars
+                    ).split()
+
+                # parse these lines and prepare the output
+                rstfc_elems = FRAMEREGEX.findall(os.path.basename(phot))
+                rstfc = '%s-%s_%s' % (rstfc_elems[0])
+                out_line = '%s %s %s\n' % (framerjd, rstfc,
+                                           ' '.join(phot_elem))
+                outf.write(out_line)
+
+            # if this frame isn't available, ignore it
+            except Exception as e:
+
+                print('WRN! %sZ: phot %s isn\'t available (error: %s)'
+                      ', skipping...' %
+                      (datetime.utcnow().isoformat(), phot, e))
+                continue
+
+        # close the output LC once we're done with it
+        outf.close()
+
+        print('%sZ: object %s -> %s' %
+              (datetime.utcnow().isoformat(), hatid, outfile))
+
+        returnf = outfile
+
+    # if the hatid isn't found in the photometry index, then we can't do
+    # anything
+    else:
+
+        print('ERR! %sZ: object %s is not in the '
+              'photometry index, ignoring...' %
+              (datetime.utcnow().isoformat(), hatid))
+
+        returnf = None
+
+    # at the end, close the DB and return
+    indexdb.close()
+    return returnf
+
+
+
+def imagesublc_collection_worker(task):
+    '''
+    This wraps collect_imagesuphot_lightcurve for parallel_collect_lightcurves
+    below.
+
+    task[0] -> hatid
+    task[1] -> photindex DB name
+    task[2] -> outdir
+    task[3] -> {skipcollected, fiphotlinefunc, fiphotlinechars}
+
+    '''
+
+    try:
+
+        return task[0], collect_imagesubphot_lightcurve(task[0],
+                                                        task[1],
+                                                        task[2],
+                                                        **task[3])
+
+    except Exception as e:
+
+        print('ERR! %sZ: failed to get LC for %s, error: %s' %
+              (datetime.utcnow().isoformat(), task[0], e ))
+        return task[0], None
+
+
+
+def parallel_collect_imagesublcs(framedir,
+                                 outdir,
+                                 frameglob='subtracted-*-xtrns.fits',
+                                 photindexdb=None,
+                                 photdir=None,
+                                 photext='fiphot',
+                                 maxframes=None,
+                                 overwritephotindex=False,
+                                 skipcollectedlcs=True,
+                                 fiphotlinefunc=get_fiphot_line,
+                                 fiphotlinechars=260,
+                                 nworkers=16,
+                                 maxworkertasks=1000
+                                 ):
+    '''
+    This collects all .fiphot files into lightcurves.
+
+    '''
+
+    # first, check if the output directory exists
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+
+    # next, check if we have to make a photometry index DB, and launch the
+    if not photindexdb:
+
+        photdbf = os.path.join(framedir,'TM-imagesubphot-index.sqlite')
+
+        photindexdb = make_photometry_indexdb(framedir,
+                                              photdbf,
+                                              frameglob=frameglob,
+                                              photdir=photdir,
+                                              photext=photext,
+                                              maxframes=maxframes,
+                                              overwrite=overwritephotindex)
+
+    # only proceed if the photometry index DB exists
+    if os.path.exists(photindexdb):
+
+        # get the list of distinct HATIDs from the photindexdb
+        db = sqlite3.connect(photindexdb)
+        cur = db.cursor()
+        cur.execute(DISTINCT_HATIDS_CMD)
+        rows = cur.fetchall()
+        hatids = [x[0] for x in rows]
+        db.close()
+
+        # generate the task list
+        tasks = [(hatid,
+                  photindexdb,
+                  outdir,
+                  {'skipcollected':skipcollectedlcs,
+                   'fiphotlinefunc':fiphotlinefunc,
+                   'fiphotlinechars':fiphotlinechars}) for hatid in hatids]
+
+        # now start up the parallel collection
+        print('%sZ: %s HATIDs to get LCs for, starting...' %
+              (datetime.utcnow().isoformat(), len(hatids), ))
+        pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+        # fire up the pool of workers
+        results = pool.map(imagesublc_collection_worker, tasks)
+
+        # wait for the processes to complete work
+        pool.close()
+        pool.join()
+
+        return {x:y for (x,y) in results}
+
+    # if the photometry index DB doesn't exist, nothing we can do
+    else:
+
+        print('ERR! %sZ: %s specified photometry index DB does not exist!' %
+              (datetime.utcnow().isoformat(), ))
+
 
 
 #####################################
