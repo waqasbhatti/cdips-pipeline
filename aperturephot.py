@@ -2282,7 +2282,7 @@ def get_fiphot_line(fiphot, linenum, fiphotlinechars=210):
 
     '''
 
-    fiphotf = open(ffiphot, 'rb')
+    fiphotf = open(fiphot, 'rb')
     filelinenum = fiphotlinechars*linenum
     fiphotf.seek(filelinenum)
     fiphotline = fiphotf.read(fiphotlinechars)
@@ -2302,12 +2302,12 @@ def get_fiphot_line_linecache(fiphot, linenum, fiphotlinechars=210):
 
 
 
-def collect_imagesubphot_lightcurve(hatid,
+def collect_aperturephot_lightcurve(hatid,
                                     photindex,
                                     outdir,
                                     skipcollected=True,
                                     fiphotlinefunc=get_fiphot_line,
-                                    fiphotlinechars=260):
+                                    fiphotlinechars=210):
     '''
     This collects the imagesubphot lightcurve of a single object into a .ilc
     file.
@@ -2326,11 +2326,11 @@ def collect_imagesubphot_lightcurve(hatid,
                        actually processing. if this is False, redoes the
                        processing for this LC anyway.
 
-    fiphotlinefunc -> this is the function to use for getting a specific line out
-                     of the specified fiphot file.
+    fiphotlinefunc -> this is the function to use for getting a specific line
+                     out of the specified fiphot file.
 
     The collected LC is similar to the aperturephot LC, but some extra columns
-    added by ffiphot running on the subtracted frames. columns are:
+    added by fiphot running on the subtracted frames. columns are:
 
     00 rjd    Reduced Julian Date (RJD = JD - 2400000.0)
     01 rstfc  Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
