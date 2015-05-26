@@ -2403,10 +2403,9 @@ def collect_aperturephot_lightcurve(hatid,
                     ).split()
 
                 # parse these lines and prepare the output
-                rstfc_elems = FRAMEREGEX.findall(os.path.basename(phot))
-                rstfc = '%s-%s_%s' % (rstfc_elems[0])
-                out_line = '%s %s %s\n' % (framerjd, rstfc,
-                                           ' '.join(phot_elem))
+                # rstfc_elems = FRAMEREGEX.findall(os.path.basename(phot))
+                # rstfc = '%s-%s_%s' % (rstfc_elems[0])
+                out_line = '%s %s\n' % (framerjd, ' '.join(phot_elem))
                 outf.write(out_line)
 
             # if this frame isn't available, ignore it
@@ -2441,9 +2440,9 @@ def collect_aperturephot_lightcurve(hatid,
 
 
 
-def imagesublc_collection_worker(task):
+def aperturephotlc_collection_worker(task):
     '''
-    This wraps collect_imagesuphot_lightcurve for parallel_collect_lightcurves
+    This wraps collect_aperurephot_lightcurve for parallel_collect_lightcurves
     below.
 
     task[0] -> hatid
@@ -2455,7 +2454,7 @@ def imagesublc_collection_worker(task):
 
     try:
 
-        return task[0], collect_imagesubphot_lightcurve(task[0],
+        return task[0], collect_aperturephot_lightcurve(task[0],
                                                         task[1],
                                                         task[2],
                                                         **task[3])
@@ -2468,9 +2467,9 @@ def imagesublc_collection_worker(task):
 
 
 
-def parallel_collect_imagesublcs(framedir,
+def parallel_collect_aperturephotlcs(framedir,
                                  outdir,
-                                 frameglob='subtracted-*-xtrns.fits',
+                                 frameglob='*.fits',
                                  photindexdb=None,
                                  photdir=None,
                                  photext='fiphot',
@@ -2478,7 +2477,7 @@ def parallel_collect_imagesublcs(framedir,
                                  overwritephotindex=False,
                                  skipcollectedlcs=True,
                                  fiphotlinefunc=get_fiphot_line,
-                                 fiphotlinechars=260,
+                                 fiphotlinechars=210,
                                  nworkers=16,
                                  maxworkertasks=1000
                                  ):
@@ -2494,7 +2493,7 @@ def parallel_collect_imagesublcs(framedir,
     # next, check if we have to make a photometry index DB, and launch the
     if not photindexdb:
 
-        photdbf = os.path.join(framedir,'TM-imagesubphot-index.sqlite')
+        photdbf = os.path.join(framedir,'TM-aperturephot-index.sqlite')
 
         photindexdb = make_photometry_indexdb(framedir,
                                               photdbf,
@@ -2529,7 +2528,7 @@ def parallel_collect_imagesublcs(framedir,
         pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
         # fire up the pool of workers
-        results = pool.map(imagesublc_collection_worker, tasks)
+        results = pool.map(aperturephotlc_collection_worker, tasks)
 
         # wait for the processes to complete work
         pool.close()
