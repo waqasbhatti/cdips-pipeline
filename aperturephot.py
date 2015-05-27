@@ -2176,7 +2176,7 @@ def parallel_dump_binary_fiphots(fiphotdir,
 
 def make_photometry_indexdb(framedir,
                             outfile,
-                            frameglob='*.fits',
+                            frameglob='*_5.fits',  # avoid ISM FITS products
                             photdir=None,
                             photext='text-fiphot',
                             maxframes=None,
