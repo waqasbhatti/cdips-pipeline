@@ -2357,26 +2357,28 @@ def collect_aperturephot_lightcurve(hatid,
     added by fiphot running on the subtracted frames. columns are:
 
     00 rjd    Reduced Julian Date (RJD = JD - 2400000.0)
-    01 rstfc  Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
-    02 hat    HAT ID of the object
-    03 xcc    original X coordinate on CCD before shifting to astromref
-    04 ycc    original y coordinate on CCD before shifting to astromref
-    05 xic    shifted X coordinate on CCD after shifting to astromref
-    06 yic    shifted Y coordinate on CCD after shifting to astromref
-    07 bgv    Background value
-    08 bge    Background measurement error
-    09 fsv    Measured S value
-    10 fdv    Measured D value
-    11 fkv    Measured K value
-    12 irm1   Instrumental magnitude in aperture 1
-    13 ire1   Instrumental magnitude error for aperture 1
-    14 irq1   Instrumental magnitude quality flag for aperture 1 (0/G OK, X bad)
-    15 irm2   Instrumental magnitude in aperture 2
-    16 ire2   Instrumental magnitude error for aperture 2
-    17 irq2   Instrumental magnitude quality flag for aperture 2 (0/G OK, X bad)
-    18 irm3   Instrumental magnitude in aperture 3
-    19 ire3   Instrumental magnitude error for aperture 3
-    20 irq3   Instrumental magnitude quality flag for aperture 3 (0/G OK, X bad)
+    01 hat    HAT ID of the object
+    02 rstfc  Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
+    03 xcc    original X coordinate on CCD
+    04 ycc    original y coordinate on CCD
+    05 bgv    Background value
+    06 bge    Background measurement error
+    07 fsv    Measured S value
+    08 fdv    Measured D value
+    09 fkv    Measured K value
+    10 im1   Instrumental magnitude in aperture 1
+    11 ie1   Instrumental magnitude error for aperture 1
+    12 iq1   Instrumental magnitude quality flag for aperture 1 (0/G OK, X bad)
+    13 im2   Instrumental magnitude in aperture 2
+    14 ie2   Instrumental magnitude error for aperture 2
+    15 iq2   Instrumental magnitude quality flag for aperture 2 (0/G OK, X bad)
+    16 im3   Instrumental magnitude in aperture 3
+    17 ie3   Instrumental magnitude error for aperture 3
+    18 iq3   Instrumental magnitude quality flag for aperture 3 (0/G OK, X bad)
+    19 rm1    Reduced Mags from magfit in aperture 1
+    20 rm2    Reduced Mags from magfit in aperture 1
+    21 rm3    Reduced Mags from magfit in aperture 1
+
 
     '''
 
@@ -2493,7 +2495,7 @@ def aperturephotlc_collection_worker(task):
 
 def parallel_collect_aperturephot_lightcurves(framedir,
                                               outdir,
-                                              frameglob='*.fits',
+                                              frameglob='*_5.fits',
                                               photindexdb=None,
                                               photdir=None,
                                               photext='fiphot',
@@ -3069,10 +3071,10 @@ def epd_magseries(mag, fsv, fdv, fkv, xcc, ycc, bgv, bge,
 
 
 def epd_lightcurve(rlcfile,
-                   mags=[18,19,20],
-                   sdk=[6,7,8],
-                   xy=[2,3],
-                   backgnd=[4,5],
+                   mags=[19,20,21],
+                   sdk=[7,8,9],
+                   xy=[3,4],
+                   backgnd=[5,6],
                    smooth=21,
                    sigmaclip=3.0,
                    rlcext='rlc',
