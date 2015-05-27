@@ -3331,7 +3331,7 @@ def parallel_run_tfa(lcdir,
                      template_sigclip=5.0,
                      epdlc_sigclip=5.0,
                      nworkers=16,
-                     workerntasks=500):
+                     workerntasks=1000):
     '''
     This runs TFA on the EPD lightcurves.
 
