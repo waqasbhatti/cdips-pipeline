@@ -2573,393 +2573,6 @@ def parallel_collect_aperturephot_lightcurves(framedir,
 
 
 
-#####################################
-## LIGHTCURVE GENERATION FUNCTIONS ##
-#####################################
-
-def collect_lightcurve(hatid,
-                       framefiles,
-                       srcfiles,
-                       photfiles,
-                       jdlist,
-                       outdir,
-                       ignorecollected=True):
-    '''
-    This collects all photometric info into an LC for a given HATID. Returns
-    path of collected LC.
-
-    rjd    Reduced Julian Date (RJD = JD - 2400000.0)
-    rstfc  Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
-    xcc    X coordinate on CCD
-    ycc    Y coordinate on CCD
-    bgv    Background value
-    bge    Background measurement error
-    fsv    Measured S value
-    fdv    Measured D value
-    fkv    Measured K value
-    im1    Instrumental magnitude in aperture 1
-    ie1    Instrumental magnitude error for aperture 1
-    iq1    Instrumental magnitude quality flag for aperture 1 (0 or G OK, X bad)
-    im2    Instrumental magnitude in aperture 2
-    ie2    Instrumental magnitude error for aperture 2
-    iq2    Instrumental magnitude quality flag for aperture 2 (0 or G OK, X bad)
-    im3    Instrumental magnitude in aperture 3
-    ie3    Instrumental magnitude error for aperture 3
-    iq3    Instrumental magnitude quality flag for aperture 3 (0 or G OK, X bad)
-    rm1    Reduced fit magnitude in aperture 1 after magnitude fitting
-    rm2    Reduced fit magnitude in aperture 2 after magnitude fitting
-    rm3    Reduced fit magnitude in aperture 3 after magnitude fitting
-
-    '''
-
-    outfile = os.path.join(outdir, '%s.rlc' % hatid)
-
-    # if this LC is already collected and ignorecollected is True, then don't
-    # process it
-    if ignorecollected and os.path.exists(outfile):
-        outlines = open(outfile,'rb').readlines()
-        if len(outlines) > 0:
-            print('%sZ: LC for %s already collected with '
-                  'ndet = %s, ignoring...' %
-                  (datetime.utcnow().isoformat(), hatid, len(outlines)))
-            return outfile
-
-    outf = open(outfile, 'wb')
-
-    outlineformat = ('%.8f %s %.3f %.3f %.3f %.3f %s %s %s '
-                     '%.5f %.5f %s %.5f %.5f %s %.5f %.5f %s '
-                     '%.5f %.5f %.5f\n')
-
-    print('%sZ: collecting LC for %s...' %
-          (datetime.utcnow().isoformat(), hatid))
-
-    for frame, srcfile, photfile in zip(framefiles, srcfiles, photfiles):
-
-        # get the JD and RSTFC key for this frame
-        jd = jdlist[frame]
-        rstfc = os.path.basename(frame).rstrip('.fits.fz')
-
-        # get the sourcelist line for the hatid
-        matchedsrcline = [x.split() for x in file(srcfile) if hatid in x]
-
-        # if the hatid is found in the sourcelist, then try to find it in the
-        # fiphot file
-        if len(matchedsrcline) == 1:
-
-            matchedsrcline = matchedsrcline[0]
-
-            phot = read_fiphot(photfile)
-            phot_hatids = ['HAT-%03i-%07i' % (x,y)
-                           for x,y in zip(phot['field'],
-                                          phot['source'])]
-
-            # get the index of the HATID line in the fiphot file and get all the
-            # photometric info
-            try:
-
-                phot_index = phot_hatids.index(hatid)
-
-                objx, objy = phot['x'][phot_index], phot['y'][phot_index]
-                objbgv, objbge = (phot['bg'][phot_index],
-                                  phot['bg err'][phot_index])
-                objs, objd, objk = (matchedsrcline[-3],
-                                    matchedsrcline[-2],
-                                    matchedsrcline[-1])
-
-                objim1, objie1, objiq1 = (
-                    phot['per aperture'][0]['mag'][phot_index],
-                    phot['per aperture'][0]['mag err'][phot_index],
-                    phot['per aperture'][0]['status flag'][phot_index]
-                    )
-                objim2, objie2, objiq2 = (
-                    phot['per aperture'][1]['mag'][phot_index],
-                    phot['per aperture'][1]['mag err'][phot_index],
-                    phot['per aperture'][1]['status flag'][phot_index]
-                    )
-                objim3, objie3, objiq3 = (
-                    phot['per aperture'][2]['mag'][phot_index],
-                    phot['per aperture'][2]['mag err'][phot_index],
-                    phot['per aperture'][2]['status flag'][phot_index]
-                    )
-
-                objrm1, objrm2, objrm3 = (phot['mprmag[0]'][phot_index],
-                                          phot['mprmag[1]'][phot_index],
-                                          phot['mprmag[2]'][phot_index])
-
-                # format the line string and write it to the outfile
-                outline = outlineformat % (
-                    jd, rstfc, objx, objy, objbgv, objbge, objs, objd, objk,
-                    objim1, objie1, objiq1,
-                    objim2, objie2, objiq2,
-                    objim3, objie3, objiq3,
-                    objrm1, objrm2, objrm3
-                    )
-                outf.write(outline)
-
-            # if the hatid isn't in the fiphot file, we can't do anything. skip
-            # to the next hatid
-            except ValueError as e:
-                continue
-
-    # at the end of collection
-    print('%sZ: collected LC for %s' % (datetime.utcnow().isoformat(), hatid))
-
-    outf.close()
-    return outfile
-
-
-def serial_collect_lightcurves(finalsourcesfile,
-                               fitsdir,
-                               fitsglob,
-                               fiphotdir,
-                               sourcelistdir,
-                               outdir):
-    '''
-    This generates the raw lightcurves.
-
-    finalsourcesfile = the file from which to take the list of final sources to
-                       extract from the fiphot files. the sphotref/mphotref stat
-                       files appear to be the right ones to use
-
-    fitsdir = directory to search for FITS files
-
-    fitsglob = glob to apply in search for FITS files
-
-    fiphotdir = directory to search for .fiphot files matching FITS files. the
-                xy coordinates, background measurements, instrumental magnitudes
-                for each aperture, and the reduced mags for each aperture will
-                be taken from here.
-
-    sourcelistdir = directory to search for .sourcelist files matching FITS
-                    files. the S, D, K values will be taken from here
-
-
-    outdir = directory where the output .rlc LC files will go, one per HAT
-             object.
-
-    Basically:
-
-    0. dump the binary fiphot files to text fiphot files
-    1. we need to get JDs for each frame
-    2. get a master list of objects and the fiphot files they're in
-    3. for each object, using linecache, get the lines for each measurement
-       and concatenate into a output file along with JDs
-
-    lc_gen.sh
-
-    The output LC format is:
-
-    jd rstfc x y bgv bge s d k
-    im1 ie1 iq1 im2 ie2 iq2 im3 ie3 iq3
-    rm1 rm2 rm3 ep1 ep2 ep3 tf1 tf2 tf3
-
-
-    '''
-
-    # get all the FITS files
-    fitsfiles = glob.glob(os.path.join(fitsdir, fitsglob))
-
-    print('%sZ: found %s FITS files matching %s, getting JDs from headers...' %
-          (datetime.utcnow().isoformat(), len(fitsfiles), fitsglob))
-
-    jds = {x:get_header_keyword(x,'JD') for x in fitsfiles}
-
-    # list the .fiphot files
-    fiphotfiles = [
-        os.path.join(fiphotdir,
-                     '%s.fiphot' % os.path.basename(x).strip('.fits.fz'))
-        for x in fitsfiles
-        ]
-
-    # list the .sourcelist files
-    sourcelistfiles = [
-        os.path.join(sourcelistdir,
-                     '%s.sourcelist' % os.path.basename(x).strip('.fits.fz'))
-        for x in fitsfiles
-        ]
-
-    # filter all the FITs, .sourcelist and fiphot files to make sure all three
-    # files exist for a frame
-    final_fits_files, final_fiphot_files, final_sourcelist_files = [], [], []
-
-    for fits, fiphot, sourcelist in zip(fitsfiles, fiphotfiles, sourcelistfiles):
-
-        if (os.path.exists(fits) and
-            os.path.exists(fiphot) and
-            os.path.exists(sourcelist)):
-
-            final_fits_files.append(fits)
-            final_fiphot_files.append(fiphot)
-            final_sourcelist_files.append(sourcelist)
-
-        else:
-
-            print('%sZ: sourcelist/fiphot missing for %s, ignoring...' %
-                  (datetime.utcnow().isoformat(), fits))
-
-
-    # read the finalsourcesfile and get the HAT IDs to use
-    hatid_list = np.loadtxt(finalsourcesfile,usecols=(0,),dtype='S17')
-
-    print('%sZ: %s objects to process, starting collection...' %
-          (datetime.utcnow().isoformat(), len(hatid_list)))
-
-    # create a task list for the parallel collection processes
-    collect_tasks = [(str(x), final_fits_files, final_sourcelist_files,
-                      final_fiphot_files, jds, outdir)
-                     for x in hatid_list]
-
-    # make the output directory if not ready
-    if not os.path.exists(outdir):
-        os.mkdir(outdir)
-
-    # launch the collection
-    for task in collect_tasks:
-        result = collect_lightcurve(*task)
-
-    print('%sZ: done. %s objects collected into lightcurves.' %
-          (datetime.utcnow().isoformat(), len(hatid_list)))
-
-
-
-def lightcurve_collection_worker(task):
-    '''
-    Wrapper around collect_lightcurve for use in parallel_collect_lightcurves
-    below.
-
-    '''
-    try:
-
-        result =  collect_lightcurve(*task)
-
-    except Exception as e:
-
-        print('%sZ: failed to collect LC for %s, error was %s' %
-              (datetime.utcnow().isoformat(), task[0], e))
-        result = None
-
-    return result
-
-
-def parallel_collect_lightcurves(finalsourcesfile,
-                                 fitsdir,
-                                 fitsglob,
-                                 fiphotdir,
-                                 sourcelistdir,
-                                 outdir,
-                                 nworkers=16,
-                                 workerntasks=500):
-    '''
-    This generates the raw lightcurves.
-
-    finalsourcesfile = the file from which to take the list of final sources to
-                       extract from the fiphot files. the sphotref/mphotref stat
-                       files appear to be the right ones to use
-
-    fitsdir = directory to search for FITS files
-
-    fitsglob = glob to apply in search for FITS files
-
-    fiphotdir = directory to search for .fiphot files matching FITS files. the
-                xy coordinates, background measurements, instrumental magnitudes
-                for each aperture, and the reduced mags for each aperture will
-                be taken from here.
-
-    sourcelistdir = directory to search for .sourcelist files matching FITS
-                    files. the S, D, K values will be taken from here
-
-
-    outdir = directory where the output .rlc LC files will go, one per HAT
-             object.
-
-    Basically:
-
-    0. dump the binary fiphot files to text fiphot files
-    1. we need to get JDs for each frame
-    2. get a master list of objects and the fiphot files they're in
-    3. for each object, using linecache, get the lines for each measurement
-       and concatenate into a output file along with JDs
-
-    lc_gen.sh
-
-    The output LC format is:
-
-    jd rstfc x y bgv bge s d k
-    im1 ie1 iq1 im2 ie2 iq2 im3 ie3 iq3
-    rm1 rm2 rm3 ep1 ep2 ep3 tf1 tf2 tf3
-
-    '''
-
-    # get all the FITS files
-    fitsfiles = glob.glob(os.path.join(fitsdir, fitsglob))
-
-    print('%sZ: found %s FITS files matching %s, getting JDs from headers...' %
-          (datetime.utcnow().isoformat(), len(fitsfiles), fitsglob))
-
-    jds = {x:get_header_keyword(x,'JD') for x in fitsfiles}
-
-    # list the .fiphot files
-    fiphotfiles = [
-        os.path.join(fiphotdir,
-                     '%s.fiphot' % os.path.basename(x).strip('.fits.fz'))
-        for x in fitsfiles
-        ]
-
-    # list the .sourcelist files
-    sourcelistfiles = [
-        os.path.join(sourcelistdir,
-                     '%s.sourcelist' % os.path.basename(x).strip('.fits.fz'))
-        for x in fitsfiles
-        ]
-
-    # filter all the FITs, .sourcelist and fiphot files to make sure all three
-    # files exist for a frame
-    final_fits_files, final_fiphot_files, final_sourcelist_files = [], [], []
-
-    for fits, fiphot, sourcelist in zip(fitsfiles, fiphotfiles, sourcelistfiles):
-
-        if (os.path.exists(fits) and
-            os.path.exists(fiphot) and
-            os.path.exists(sourcelist)):
-
-            final_fits_files.append(fits)
-            final_fiphot_files.append(fiphot)
-            final_sourcelist_files.append(sourcelist)
-
-        else:
-
-            print('%sZ: sourcelist/fiphot missing for %s, ignoring...' %
-                  (datetime.utcnow().isoformat(), fits))
-
-    # read the finalsourcesfile and get the HAT IDs to use
-    hatid_list = np.loadtxt(finalsourcesfile,usecols=(0,),dtype='S17')
-
-    print('%sZ: %s objects to process, starting collection...' %
-          (datetime.utcnow().isoformat(), len(hatid_list)))
-
-    # create a task list for the parallel collection processes
-    collect_tasks = [(str(x), final_fits_files, final_sourcelist_files,
-                      final_fiphot_files, jds, outdir)
-                     for x in hatid_list]
-
-    # make the output directory if not ready
-    if not os.path.exists(outdir):
-        os.mkdir(outdir)
-    # make the output directory if not ready
-    if not os.path.exists(outdir):
-        os.mkdir(outdir)
-
-    pool = mp.Pool(nworkers,maxtasksperchild=workerntasks)
-    results = pool.map(lightcurve_collection_worker, collect_tasks)
-    pool.close()
-    pool.join()
-
-    print('%sZ: done. %s objects collected into lightcurves.' %
-          (datetime.utcnow().isoformat(), len(hatid_list)))
-
-    return {x:y for x,y in zip(hatid_list, results)}
-
-
 ###################
 ## EPD FUNCTIONS ##
 ###################
@@ -3183,17 +2796,60 @@ def serial_run_epd(rlcdir,
 
 
 
-def parallel_epd_worker():
+def parallel_epd_worker(task):
     '''
     Function to wrap the epd_lightcurve function for use with mp.Pool.
 
-    '''
-
-def parallel_run_epd():
-    '''
-    This runs EPD in parallel on the lightcurves from the pipeline.
+    task[0] = rlcfile
+    task[1] = {'mags', 'sdk', 'xy', 'backgnd', 'smooth', 'sigmaclip', 'rlcext'}
 
     '''
+
+    try:
+        return task[0], epd_lightcurve(task[0], **task[1])
+    except Exception as e:
+        print('EPD failed for %s, error was: %s' % (task[0], e))
+        return task[0], None
+
+
+def parallel_run_epd(rlcdir,
+                     mags=[19,20,21],
+                     sdk=[7,8,9],
+                     xy=[3,4],
+                     backgnd=[5,6],
+                     smooth=21,
+                     sigmaclip=3.0,
+                     rlcext='rlc',
+                     rlcglobprefix='*',
+                     outfile=None,
+                     nworkers=16,
+                     maxworkertasks=1000):
+    '''
+    This runs EPD in parallel on the lightcurves in rlcdir.
+
+    '''
+
+    # find all the rlc files in the rlcdir
+    rlclist = glob.glob(os.path.join(os.path.abspath(rlcdir), '%s.%s' %
+                                     (rlcglobprefix, rlcext)))
+
+    tasks = [(x, {'mags':mags, 'sdk':sdk, 'xy':xy, 'backgnd':backgnd,
+                  'smooth':smooth, 'sigmaclip':sigmaclip, 'rlcext':rlcext})
+             for x in rlclist]
+
+    # now start up the parallel EPD processes
+    print('%sZ: %s HATIDs for EPD, starting...' %
+          (datetime.utcnow().isoformat(), len(hatids), ))
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+    # fire up the pool of workers
+    results = pool.map(parallel_epd_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    return {x:y for (x,y) in results}
 
 
 ###################
