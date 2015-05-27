@@ -3903,9 +3903,9 @@ def parallel_lc_statistics(lcdir,
                            outfile=None,
                            nworkers=16,
                            workerntasks=500,
-                           rmcols=[18,19,20],
-                           epcols=[21,22,23],
-                           tfcols=[24,25,26],
+                           rmcols=[19,20,21],
+                           epcols=[22,23,24],
+                           tfcols=[25,26,27],
                            sigclip=4.0):
     '''
     This calculates statistics on all lc files in lcdir using lcglob to find the
