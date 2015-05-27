@@ -3370,9 +3370,9 @@ def parallel_run_tfa(lcdir,
 # 4. binned LC versions of these plots, using 10, 30, and 60 minute binning
 
 def get_lc_statistics(lcfile,
-                      rmcols=[18,19,20],
-                      epcols=[21,22,23],
-                      tfcols=[24,25,26],
+                      rmcols=[19,20,21],
+                      epcols=[22,23,24],
+                      tfcols=[25,26,27],
                       sigclip=4.0):
     '''
     This calculates the following statistics for the magnitude columns in the
