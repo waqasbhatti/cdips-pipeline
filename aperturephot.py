@@ -2839,7 +2839,7 @@ def parallel_run_epd(rlcdir,
 
     # now start up the parallel EPD processes
     print('%sZ: %s HATIDs for EPD, starting...' %
-          (datetime.utcnow().isoformat(), len(hatids), ))
+          (datetime.utcnow().isoformat(), len(rlclist), ))
     pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
     # fire up the pool of workers
