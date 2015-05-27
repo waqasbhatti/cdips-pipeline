@@ -2491,19 +2491,19 @@ def aperturephotlc_collection_worker(task):
 
 
 
-def parallel_collect_aperturephotlcs(framedir,
-                                     outdir,
-                                     frameglob='*.fits',
-                                     photindexdb=None,
-                                     photdir=None,
-                                     photext='fiphot',
-                                     maxframes=None,
-                                     overwritephotindex=False,
-                                     skipcollectedlcs=True,
-                                     fiphotlinefunc=get_fiphot_line,
-                                     fiphotlinechars=249,
-                                     nworkers=16,
-                                     maxworkertasks=1000):
+def parallel_collect_aperturephot_lightcurves(framedir,
+                                              outdir,
+                                              frameglob='*.fits',
+                                              photindexdb=None,
+                                              photdir=None,
+                                              photext='fiphot',
+                                              maxframes=None,
+                                              overwritephotindex=False,
+                                              skipcollectedlcs=True,
+                                              fiphotlinefunc=get_fiphot_line,
+                                              fiphotlinechars=249,
+                                              nworkers=16,
+                                              maxworkertasks=1000):
     '''
     This collects all .fiphot files into lightcurves.
 
