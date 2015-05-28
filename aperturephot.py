@@ -5186,7 +5186,7 @@ def plot_stats_file(statsfile, outdir, outprefix,
 
         else:
             # make the horizontal lines for 10, 5, 1 mmag
-            plt.ylim((0.001,1.0))
+            plt.ylim((0.0001,1.0))
             plt.hlines([0.001, 0.002, 0.003, 0.004, 0.005, 0.01],
                        xmin=5.0,xmax=15.0,colors='b')
 
