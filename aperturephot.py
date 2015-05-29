@@ -4343,9 +4343,9 @@ def parallel_bin_lightcurves(lcdir,
                              lcexts=('epdlc',
                                      'tfalc.TF1','tfalc.TF2','tfalc.TF3'),
                              jdcol=0,
-                             lcmagcols=([21,22,23],[24,],[24,],[24,]),
+                             lcmagcols=([22,23,24],[25,],[25,],[25,]),
                              nworkers=16,
-                             workerntasks=500):
+                             workerntasks=1000):
 
 
     epdlcfiles = glob.glob(os.path.join(lcdir, epdlc_glob))
