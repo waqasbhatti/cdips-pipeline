@@ -2692,7 +2692,7 @@ def epd_lightcurve(rlcfile,
                    sigmaclip=3.0,
                    rlcext='rlc',
                    outfile=None,
-                   minndet=500):
+                   minndet=200):
     '''
     Runs the EPD process on rlcfile, using columns specified to get the required
     parameters. If outfile is None, the .epdlc will be placeed in the same
@@ -2767,49 +2767,14 @@ def epd_lightcurve(rlcfile,
         return None
 
 
-def serial_run_epd(rlcdir,
-                   rlcglob='*.rlc',
-                   outdir=None,
-                   smooth=21,
-                   sigmaclip=3.0):
-    '''
-    This runs EPD on the lightcurves from the pipeline.
-
-    '''
-
-    if not outdir:
-        outdir = rlcdir
-
-    if not os.path.exists(outdir):
-        os.mkdir(outdir)
-
-    rlcfiles = glob.glob(os.path.join(rlcdir, rlcglob))
-
-    for rlc in rlcfiles:
-
-        outepd = os.path.join(outdir,
-                              os.path.basename(rlc).replace('.rlc','.epdlc'))
-
-        print('%sZ: doing EPD for %s...' %
-              (datetime.utcnow().isoformat(), rlc))
-
-        try:
-            outfilename = epd_lightcurve(rlc,
-                                         outfile=outepd,
-                                         smooth=smooth,
-                                         sigmaclip=sigmaclip,
-                                         rlcext=os.path.splitext(rlcglob)[-1])
-        except Exception as e:
-            print('EPD failed for %s, error was: %s' % (rlc, e))
-
-
-
 def parallel_epd_worker(task):
     '''
     Function to wrap the epd_lightcurve function for use with mp.Pool.
 
     task[0] = rlcfile
-    task[1] = {'mags', 'sdk', 'xy', 'backgnd', 'smooth', 'sigmaclip', 'rlcext'}
+    task[1] = {'mags', 'sdk', 'xy', 'backgnd',
+               'smooth', 'sigmaclip', 'rlcext',
+               'minndet'}
 
     '''
 
@@ -2831,7 +2796,8 @@ def parallel_run_epd(rlcdir,
                      rlcglobprefix='*',
                      outfile=None,
                      nworkers=16,
-                     maxworkertasks=1000):
+                     maxworkertasks=1000,
+                     minndet=200):
     '''
     This runs EPD in parallel on the lightcurves in rlcdir.
 
@@ -2842,7 +2808,8 @@ def parallel_run_epd(rlcdir,
                                      (rlcglobprefix, rlcext)))
 
     tasks = [(x, {'mags':mags, 'sdk':sdk, 'xy':xy, 'backgnd':backgnd,
-                  'smooth':smooth, 'sigmaclip':sigmaclip, 'rlcext':rlcext})
+                  'smooth':smooth, 'sigmaclip':sigmaclip, 'rlcext':rlcext,
+                  'minndet':minndet})
              for x in rlclist]
 
     # now start up the parallel EPD processes
