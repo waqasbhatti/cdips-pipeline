@@ -2376,8 +2376,8 @@ def collect_aperturephot_lightcurve(hatid,
     17 ie3   Instrumental magnitude error for aperture 3
     18 iq3   Instrumental magnitude quality flag for aperture 3 (0/G OK, X bad)
     19 rm1    Reduced Mags from magfit in aperture 1
-    20 rm2    Reduced Mags from magfit in aperture 1
-    21 rm3    Reduced Mags from magfit in aperture 1
+    20 rm2    Reduced Mags from magfit in aperture 2
+    21 rm3    Reduced Mags from magfit in aperture 3
 
 
     '''
