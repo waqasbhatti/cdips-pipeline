@@ -2498,7 +2498,7 @@ def parallel_collect_aperturephot_lightcurves(framedir,
                                               frameglob='*_5.fits',
                                               photindexdb=None,
                                               photdir=None,
-                                              photext='fiphot',
+                                              photext='text-fiphot',
                                               maxframes=None,
                                               overwritephotindex=False,
                                               skipcollectedlcs=True,
@@ -2691,7 +2691,8 @@ def epd_lightcurve(rlcfile,
                    smooth=21,
                    sigmaclip=3.0,
                    rlcext='rlc',
-                   outfile=None):
+                   outfile=None,
+                   minndet=500):
     '''
     Runs the EPD process on rlcfile, using columns specified to get the required
     parameters. If outfile is None, the .epdlc will be placeed in the same
@@ -2706,57 +2707,64 @@ def epd_lightcurve(rlcfile,
                         names=['xcc','ycc','bgv','bge','fsv','fdv','fkv',
                                'rm1','rm2','rm3'])
 
-    # calculate the EPD differential mags
-    epddiffmag1 = epd_magseries(rlc['rm1'],rlc['fsv'],rlc['fdv'],rlc['fkv'],
-                                rlc['xcc'],rlc['ycc'],rlc['bgv'],rlc['bge'],
-                                smooth=smooth, sigmaclip=sigmaclip)
-    epddiffmag2 = epd_magseries(rlc['rm2'],rlc['fsv'],rlc['fdv'],rlc['fkv'],
-                                rlc['xcc'],rlc['ycc'],rlc['bgv'],rlc['bge'],
-                                smooth=smooth, sigmaclip=sigmaclip)
-    epddiffmag3 = epd_magseries(rlc['rm3'],rlc['fsv'],rlc['fdv'],rlc['fkv'],
-                                rlc['xcc'],rlc['ycc'],rlc['bgv'],rlc['bge'],
-                                smooth=smooth, sigmaclip=sigmaclip)
+    if len(rlc['xcc']) >= minndet:
 
-    # add the EPD diff mags back to the median mag to get the EPD mags
-    if epddiffmag1 is not None:
-        mag_median = np.median(rlc['rm1'][np.isfinite(rlc['rm1'])])
-        epdmag1 = epddiffmag1 + mag_median
+        # calculate the EPD differential mags
+        epddiffmag1 = epd_magseries(rlc['rm1'],rlc['fsv'],rlc['fdv'],rlc['fkv'],
+                                    rlc['xcc'],rlc['ycc'],rlc['bgv'],rlc['bge'],
+                                    smooth=smooth, sigmaclip=sigmaclip)
+        epddiffmag2 = epd_magseries(rlc['rm2'],rlc['fsv'],rlc['fdv'],rlc['fkv'],
+                                    rlc['xcc'],rlc['ycc'],rlc['bgv'],rlc['bge'],
+                                    smooth=smooth, sigmaclip=sigmaclip)
+        epddiffmag3 = epd_magseries(rlc['rm3'],rlc['fsv'],rlc['fdv'],rlc['fkv'],
+                                    rlc['xcc'],rlc['ycc'],rlc['bgv'],rlc['bge'],
+                                    smooth=smooth, sigmaclip=sigmaclip)
+
+        # add the EPD diff mags back to the median mag to get the EPD mags
+        if epddiffmag1 is not None:
+            mag_median = np.median(rlc['rm1'][np.isfinite(rlc['rm1'])])
+            epdmag1 = epddiffmag1 + mag_median
+        else:
+            epdmag1 = np.array([np.nan for x in rlc['rm1']])
+            print('%sZ: no EP1 mags available for %s!' %
+                  (datetime.utcnow().isoformat(), rlcfile))
+
+        if epddiffmag2 is not None:
+            mag_median = np.median(rlc['rm2'][np.isfinite(rlc['rm2'])])
+            epdmag2 = epddiffmag2 + mag_median
+        else:
+            epdmag2 = np.array([np.nan for x in rlc['rm2']])
+            print('%sZ: no EP2 mags available for %s!' %
+                  (datetime.utcnow().isoformat(), rlcfile))
+
+        if epddiffmag3 is not None:
+            mag_median = np.median(rlc['rm3'][np.isfinite(rlc['rm3'])])
+            epdmag3 = epddiffmag3 + mag_median
+        else:
+            epdmag3 = np.array([np.nan for x in rlc['rm3']])
+            print('%sZ: no EP3 mags available for %s!' %
+                  (datetime.utcnow().isoformat(), rlcfile))
+
+        # now write the EPD LCs out to the outfile
+        if not outfile:
+            outfile = '%s.epdlc' % rlcfile.strip('.%s' % rlcext)
+
+        inf = open(rlcfile,'rb')
+        inflines = inf.readlines()
+        inf.close()
+        outf = open(outfile,'wb')
+
+        for line, epd1, epd2, epd3 in zip(inflines, epdmag1, epdmag2, epdmag3):
+            outline = '%s %.6f %.6f %.6f\n' % (line.rstrip('\n'), epd1, epd2, epd3)
+            outf.write(outline)
+
+        outf.close()
+        return outfile
+
     else:
-        epdmag1 = np.array([np.nan for x in rlc['rm1']])
-        print('%sZ: no EP1 mags available for %s!' %
-              (datetime.utcnow().isoformat(), rlcfile))
-
-    if epddiffmag2 is not None:
-        mag_median = np.median(rlc['rm2'][np.isfinite(rlc['rm2'])])
-        epdmag2 = epddiffmag2 + mag_median
-    else:
-        epdmag2 = np.array([np.nan for x in rlc['rm2']])
-        print('%sZ: no EP2 mags available for %s!' %
-              (datetime.utcnow().isoformat(), rlcfile))
-
-    if epddiffmag3 is not None:
-        mag_median = np.median(rlc['rm3'][np.isfinite(rlc['rm3'])])
-        epdmag3 = epddiffmag3 + mag_median
-    else:
-        epdmag3 = np.array([np.nan for x in rlc['rm3']])
-        print('%sZ: no EP3 mags available for %s!' %
-              (datetime.utcnow().isoformat(), rlcfile))
-
-    # now write the EPD LCs out to the outfile
-    if not outfile:
-        outfile = '%s.epdlc' % rlcfile.strip('.%s' % rlcext)
-
-    inf = open(rlcfile,'rb')
-    inflines = inf.readlines()
-    inf.close()
-    outf = open(outfile,'wb')
-
-    for line, epd1, epd2, epd3 in zip(inflines, epdmag1, epdmag2, epdmag3):
-        outline = '%s %.6f %.6f %.6f\n' % (line.rstrip('\n'), epd1, epd2, epd3)
-        outf.write(outline)
-
-    outf.close()
-    return outfile
+        print('not running EPD for %s, ndet = %s < min ndet = %s' %
+              (rlcfile, len(rlc['xcc']), minndet))
+        return None
 
 
 def serial_run_epd(rlcdir,
