@@ -744,12 +744,13 @@ def fits_to_full_jpeg(fits_image,
 
     if not out_fname:
 
-        out_fname = '%s-%s-%s-%s-%s.jpg' % (
+        out_fname = '%s-%s-%s-%s-proj%s-%s.jpg' % (
             fits_image.rstrip('.fits.fz'),
             hdr['IMAGETYP'].lower() if 'IMAGETYP' in hdr else 'typeunknown',
             hdr['EXPTIME'] if 'EXPTIME' in hdr else 'expunknown',
             hdr['FILTERS'].replace('+','') if 'FILTERS' in hdr else 'filtunknown',
-            hdr['PROJID'] if 'PROJID' in hdr else 'projunknown'
+            hdr['PROJID'] if 'PROJID' in hdr else 'unknown',
+            hdr['OBJECT'] if 'OBJECT' in hdr else 'objectunknown'
             )
 
     scipy.misc.imsave(out_fname,resized_img)
