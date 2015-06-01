@@ -1300,8 +1300,7 @@ def collect_image_info(fits, fistar,
 
     # the overall image background
     framebgv = float(extract_img_background(frame,
-                                            median_diffbelow=300.0,
-                                            image_min=0.0)[0])
+                                            median_diffbelow=300.0)[0])
 
     # get the fistar file columns we need
     framecols = np.genfromtxt(fistar,
@@ -1316,7 +1315,7 @@ def collect_image_info(fits, fistar,
 
     frameok = ((mediansrcbgv > minsrcbgv) and
                (madsrcbgv < maxmadbgv) and
-               (framebgv < maxframebgv) and
+               (0.0 < framebgv < maxframebgv) and
                (nstars >= minnstars))
 
     frameinfo = {'fits':fits,
