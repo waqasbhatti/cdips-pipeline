@@ -1456,7 +1456,7 @@ def parallel_frame_filter(fitsdir,
         pickle.dump(outdict, resultsfile)
         resultsfile.close()
 
-        return returndict
+        return outdict
 
 
 
