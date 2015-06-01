@@ -1418,39 +1418,41 @@ def parallel_frame_filter(fitsdir,
                                          'maxframebgv':maxframebgv,
                                          'minnstars':minnstars}))
 
-    print('checking FITS files...')
+    if len(tasks) > 0:
 
-    # now start up the workers
-    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
-    results = pool.map(frame_filter_worker, tasks)
+        print('checking FITS files...')
 
-    # wait for the processes to complete work
-    pool.close()
-    pool.join()
+        # now start up the workers
+        pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+        results = pool.map(frame_filter_worker, tasks)
 
-    # now remove the fiphots if we're asked to do so
-    for x, result in zip(tasks, results):
+        # wait for the processes to complete work
+        pool.close()
+        pool.join()
 
-        fits = x[0]
+        # now remove the fiphots if we're asked to do so
+        for x, result in zip(tasks, results):
 
-        if result is False or result is None and removebadframes:
-            os.remove(fits.replace('fits',fiphotext))
-            print('removed fiphot for bad frame %s' % fits)
+            fits = x[0]
 
-        if result is False or result is None and not removebadframes:
-            print('bad frame %s, not removing' % fits)
+            if result is False or result is None and removebadframes:
+                os.remove(fits.replace('fits',fiphotext))
+                print('removed fiphot for bad frame %s' % fits)
 
-        else:
-            print('frame %s is OK' % fits)
+            if result is False or result is None and not removebadframes:
+                print('bad frame %s, not removing' % fits)
 
-    # this is the return dictionary
-    returndict = {x:y for (x,y) in results}
+            else:
+                print('frame %s is OK' % fits)
 
-    if saveresults:
-        resultsfile = open(os.path.join(fitsdir,'TM-framerejection.pkl'),'wb')
+        # this is the return dictionary
+        returndict = {x:y for (x,y) in results}
+
+        resultsfile = open(os.path.join(fitsdir,
+                                        'TM-framerejection.pkl'),'wb')
         pickle.dump(returndict, resultsfile)
         resultsfile.close()
-    else:
+
         return returndict
 
 
