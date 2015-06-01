@@ -1386,7 +1386,7 @@ def parallel_frame_filter(fitsdir,
                           fitsglob='?-*_?.fits',
                           fistarext='.fistar',
                           fiphotext='.fiphot',
-                          removebadframes=True,
+                          removebadframes=False,
                           minsrcbgv=100.0,
                           maxmadbgv=80.0,
                           maxframebgv=1500.0,
@@ -1449,7 +1449,7 @@ def parallel_frame_filter(fitsdir,
             else:
                 print('frame %s is OK' % fits)
 
-            outdict[fits] = result
+            outdict[fits] = (result, fits.replace('.fits',fiphotext))
 
         resultsfile = open(os.path.join(fitsdir,
                                         'TM-framerejection.pkl'),'wb')
