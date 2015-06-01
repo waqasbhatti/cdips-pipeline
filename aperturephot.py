@@ -96,7 +96,7 @@ import matplotlib.pyplot as plt
 import pyfits
 
 import imageutils
-from imageutils import get_header_keyword
+from imageutils import get_header_keyword, read_fits, extract_img_background
 
 # get fiphot binary reader
 try:
@@ -1033,7 +1033,11 @@ def do_photometry(fits,
                   pixborders=0.0,
                   aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
                   removesourcelist=False,
-                  binaryoutput=True):
+                  binaryoutput=True,
+                  minsrcbgv=100.0,
+                  maxmadbgv=20.0,
+                  maxframebgv=500.0,
+                  minnstars=500):
     '''This rolls up the sourcelist and fiphot functions above.
 
     Runs both stages on fits, and puts the output in outdir if it exists. If it
@@ -1111,7 +1115,7 @@ def do_photometry(fits,
 
                 print('%sZ: extracting sources failed for %s!' %
                       (datetime.utcnow().isoformat(), fits))
-                return None
+                return None, None
 
         else:
 
@@ -1129,7 +1133,14 @@ def do_photometry(fits,
 
         if fiphotfile:
 
-            return fiphotfile
+            # check if this frame is worth our time later
+            framedata = collect_image_info(fits, fistar,
+                                           minsrcbgv=minsrcbgv,
+                                           maxmadbgv=maxmadbgv,
+                                           maxframebgv=maxframebgv,
+                                           minnstars=minnstars)
+
+            return fiphotfile, framedata
 
         else:
 
@@ -1140,52 +1151,7 @@ def do_photometry(fits,
 
         print('%sZ: creating a projected source catalog failed for %s!' %
               (datetime.utcnow().isoformat(), fits))
-        return None
-
-
-def fitsdir_photometry(fitsdir,
-                       outdir,
-                       fovcatalog,
-                       ccdextent=None,
-                       pixborders=0.0,
-                       aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
-                       removesourcetemp=True,
-                       removesourcelist=False,
-                       binaryoutput=True):
-    '''This does photometry for all FITS file in a directory.
-
-    Puts the results in outdir. Returns a dictionary with photometry output for
-    each file.
-
-    '''
-
-    # get a list of all fits files in the directory
-    fitslist = glob.glob(os.path.join(fitsdir,'*.fits'))
-    resultdict = {}
-
-    print('%sZ: found %s FITS files in %s, starting photometry...' %
-          (datetime.utcnow().isoformat(),
-           len(fitslist), fitsdir))
-
-    for i, fits in enumerate(fitslist):
-
-        print('%sZ: working on %s (%s/%s)' %
-              (datetime.utcnow().isoformat(),
-               fits, i+1, len(fitslist)))
-
-        fiphotresult = do_photometry(fits,
-                                     fovcatalog,
-                                     outdir=outdir,
-                                     ccdextent=ccdextent,
-                                     pixborders=pixborders,
-                                     aperturelist=aperturelist,
-                                     removesourcetemp=removesourcetemp,
-                                     removesourcelist=removesourcelist,
-                                     binaryoutput=binaryoutput)
-        resultdict[i] = [fits, fiphotresult]
-
-    return resultdict
-
+        return None, None
 
 
 def parallel_photometry_worker(task):
@@ -1201,12 +1167,27 @@ def parallel_photometry_worker(task):
 
     try:
 
-        # task[0] is args and first arg is the path to the fits file
-        result = (task[0][0], do_photometry(*task[0], **task[1]))
+        # first, do the photometry
+        framephot, frameinfo = do_photometry(*task[0], **task[1]))
+
+        # make sure all is OK with this frame
+        if framephot and frameinfo and frameinfo['frameok']:
+            result = (framephot, frameinfo)
+
+        # if the frame photometry is bad or the frame isn't OK, delete its
+        # fiphot so we don't have to deal with it later
+        else:
+            if os.path.exists(framephot):
+                os.remove(framephot)
+            print('frame %s rejected and fiphot removed. %s' %
+                  (task[0][0],
+                   frameinfo if frameinfo else 'photometry failed!'))
+            result = (framephot, frameinfo)
 
     except Exception as e:
+
         print('photometry failed! reason: %s' % e)
-        result = None
+        result = (None, None)
 
     return result
 
@@ -1223,7 +1204,12 @@ def parallel_fitsdir_photometry(
         binaryoutput=True,
         nworkers=16,
         maxtasksperworker=1000,
-        resultstojson=None
+        saveresults=True,
+        rejectbadframes=True,
+        minsrcbgv=100.0,
+        maxmadbgv=20.0,
+        maxframebgv=500.0,
+        minnstars=500
         ):
     '''
     This does photometry for all FITS files in a directory using nworkers
@@ -1232,7 +1218,7 @@ def parallel_fitsdir_photometry(
     '''
 
     # get a list of all fits files in the directory
-    fitslist = glob.glob(os.path.join(fitsdir,'*_?.fits'))
+    fitslist = glob.glob(os.path.join(fitsdir,'?-*_?.fits'))
 
     print('%sZ: found %s FITS files in %s, starting photometry...' %
           (datetime.utcnow().isoformat(),
@@ -1254,7 +1240,11 @@ def parallel_fitsdir_photometry(
                'aperturelist':aperturelist,
                'removesourcetemp':removesourcetemp,
                'removesourcelist':removesourcelist,
-               'binaryoutput':binaryoutput}] for x in fitslist]
+               'binaryoutput':binaryoutput,
+               'minsrcbgv':minsrcbgv,
+               'maxmadbgv':maxmadbgv,
+               'maxframebgv':maxframebgv,
+               'minnstars':minnstars}] for x in fitslist]
 
     # fire up the pool of workers
     results = pool.map(parallel_photometry_worker, tasks)
@@ -1266,26 +1256,77 @@ def parallel_fitsdir_photometry(
     # this is the return dictionary
     returndict = {x:y for (x,y) in results}
 
-    if resultstojson:
-        resultsfile = open(os.path.join(outdir,
-                                        '%s-photometry-results.json' %
-                                        os.path.basename(outdir)),'wb')
-        resultsfile.write(json.dumps(returndict,ensure_ascii=True))
+    if saveresults:
+        resultsfile = open(os.path.join(outdir,'TM-photometry.pkl'),'wb')
+        pickle.dump(returndict, resultsfile)
         resultsfile.close()
     else:
         return returndict
 
 
+################
+## FRAME INFO ##
+################
 
-# remaining steps:
-# 0) find a frame to use as the single photometric reference
-# 1) run MagnitudeFitting.py with the single reference mode
-# 2) using do_masterphotref.py to generate the master frames
-# 3) run MagnitudeFitting.py with the master reference mode
-# 4) run run_fitpsf.py to generate .psftrans files
-# 5) using lc_gen.sh to generate the .rlc files
-# 6) using the do_epd.py to generate .epd files
-# 7) run tfa on those. this can be done by calling tfa from command line.
+def collect_image_info(fits, fistar,
+                       minsrcbgv=100.0,
+                       maxframebgv=500.0,
+                       maxmadbgv=20.0,
+                       minnstars=500):
+    '''
+    This collects the following info about a frame.
+
+    - nstars detected
+    - median background for all source detections
+    - MAD of the background for all source detections
+    - the overall image background
+
+    bad frames are usually those with:
+
+    - large MAD for the background
+    - median source background < 0
+    - nstars < 500
+
+    furthermore, a running average over, say, 10 frames will reject large
+    deviations in:
+
+    - nstars
+    - median source background
+    - overall image background
+
+    '''
+
+    frame, hdr = read_fits(fits)
+
+    # the overall image background
+    framebgv = extract_img_background(frame, median_diffbelow=300.0)
+
+    # get the fistar file columns we need
+    framecols = np.genfromtxt(fistar,
+                              usecols=(3,),
+                              names=['bgv'],
+                              dtype='f8')
+
+    finitesrcbgvs = framecols['bgv'][np.isfinite(framecols['bgv'])]
+    nstars = len(finitesrcbgvs)
+    mediansrcbgv = np.median(finitesrcbgvs)
+    madsrcbgv = np.median(np.abs(finitesrcbgvs - mediansrcbgv))
+
+    frameok = ((mediansrcbgv > minsrcbgv) and
+               (madsrcbgv < maxmadbgv) and
+               (framebgv < maxframebgv) and
+               (nstars >= minnstars))
+
+    frameinfo = {'fits':fits,
+                 'fistar':fistar,
+                 'nstars':nstars,
+                 'medsrcbgv':mediansrcbgv,
+                 'madsrcbgv':madsrcbgv,
+                 'framebgv':framebgv
+                 'frameok':frameok}
+
+    return frameinfo
+
 
 
 #################################

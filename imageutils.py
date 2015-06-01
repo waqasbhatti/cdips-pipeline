@@ -476,7 +476,7 @@ def extract_img_background(img_array,
     if not custom_limits:
 
         backmax = np.median(img_array)-median_diffbelow
-        backmin = image_min if image_min is not None else np.min(img_array)
+        backmin = image_min if image_min is not None else np.nanmin(img_array)
 
     else:
 
