@@ -1418,6 +1418,8 @@ def parallel_frame_filter(fitsdir,
                                          'maxframebgv':maxframebgv,
                                          'minnstars':minnstars}))
 
+    print('%s FITS to work on.' % len(tasks))
+
     if len(tasks) > 0:
 
         print('checking FITS files...')
