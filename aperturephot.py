@@ -1422,7 +1422,7 @@ def parallel_frame_filter(fitsdir,
 
     # now start up the workers
     pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
-    results = pool.map(frame_filter_worker_worker, tasks)
+    results = pool.map(frame_filter_worker, tasks)
 
     # wait for the processes to complete work
     pool.close()
