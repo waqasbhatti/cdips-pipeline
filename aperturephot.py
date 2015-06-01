@@ -1437,18 +1437,18 @@ def parallel_frame_filter(fitsdir,
 
             fits = x[0]
 
-            if result is False or result is None and removebadframes:
+            if (result is False or result is None) and removebadframes:
                 os.remove(fits.replace('.fits',fiphotext))
                 print('removed fiphot for bad frame %s' % fits)
 
-            if result is False or result is None and not removebadframes:
+            if (result is False or result is None) and not removebadframes:
                 print('bad frame %s, not removing' % fits)
 
             else:
                 print('frame %s is OK' % fits)
 
         # this is the return dictionary
-        returndict = {x:y for (x,y) in results}
+        returndict = {x:y for (x,y) in zip(tasks, results)}
 
         resultsfile = open(os.path.join(fitsdir,
                                         'TM-framerejection.pkl'),'wb')
