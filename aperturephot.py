@@ -1322,7 +1322,7 @@ def collect_image_info(fits, fistar,
                  'nstars':nstars,
                  'medsrcbgv':mediansrcbgv,
                  'madsrcbgv':madsrcbgv,
-                 'framebgv':framebgv
+                 'framebgv':framebgv,
                  'frameok':frameok}
 
     return frameinfo
