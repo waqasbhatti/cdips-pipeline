@@ -1384,8 +1384,8 @@ def frame_filter_worker(task):
 
 def parallel_frame_filter(fitsdir,
                           fitsglob='?-*_?.fits',
-                          fistarext='fistar',
-                          fiphotext='fiphot',
+                          fistarext='.fistar',
+                          fiphotext='.fiphot',
                           removebadframes=True,
                           minsrcbgv=100.0,
                           maxmadbgv=50.0,
@@ -1409,8 +1409,8 @@ def parallel_frame_filter(fitsdir,
 
     for fits in fitslist:
 
-        fistar = fits.replace('fits',fistarext)
-        fiphot = fits.replace('fits',fiphotext)
+        fistar = fits.replace('.fits',fistarext)
+        fiphot = fits.replace('.fits',fiphotext)
 
         if os.path.exists(fistar) and os.path.exists(fiphot):
             tasks.append((fits, fistar, {'minsrcbgv':minsrcbgv,
@@ -1438,7 +1438,7 @@ def parallel_frame_filter(fitsdir,
             fits = x[0]
 
             if result is False or result is None and removebadframes:
-                os.remove(fits.replace('fits',fiphotext))
+                os.remove(fits.replace('.fits',fiphotext))
                 print('removed fiphot for bad frame %s' % fits)
 
             if result is False or result is None and not removebadframes:
