@@ -1168,7 +1168,7 @@ def parallel_photometry_worker(task):
     try:
 
         # first, do the photometry
-        framephot, frameinfo = do_photometry(*task[0], **task[1]))
+        framephot, frameinfo = do_photometry(*task[0], **task[1])
 
         # make sure all is OK with this frame
         if framephot and frameinfo and frameinfo['frameok']:
