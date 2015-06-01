@@ -1159,7 +1159,8 @@ def parallel_photometry_worker(task):
     This is the parallel photometry worker function for use with
     parallel_fitsdir_photometry below. Just calls do_photometry with expanded
     args and kwargs from the two element task list. task[0] is a tuple of args,
-    and task[1] is a dictionary of kwargs.
+    and task[1] is a dictionary of kwargs. task[2] is a boolean indicating if we
+    should kill bad frames.
 
     Returns a tuple of form: (fits, fiphot)
 
@@ -1177,16 +1178,21 @@ def parallel_photometry_worker(task):
         # if the frame photometry is bad or the frame isn't OK, delete its
         # fiphot so we don't have to deal with it later
         else:
-            if os.path.exists(framephot):
+            # if the fiphot exists and we're allowed to kill it, do so
+            if os.path.exists(framephot) and task[2]:
                 os.remove(framephot)
-            print('frame %s rejected and fiphot removed. %s' %
+
+            # tell the user what happened
+            print('WRN! frame %s rejected, %s. %s' %
                   (task[0][0],
+                   'fiphot removed' if task[2] else 'fiphot %s' % framephot,
                    frameinfo if frameinfo else 'photometry failed!'))
+
             result = (framephot, frameinfo)
 
     except Exception as e:
 
-        print('photometry failed! reason: %s' % e)
+        print('ERR! photometry failed! reason: %s' % e)
         result = (None, None)
 
     return result
@@ -1244,7 +1250,7 @@ def parallel_fitsdir_photometry(
                'minsrcbgv':minsrcbgv,
                'maxmadbgv':maxmadbgv,
                'maxframebgv':maxframebgv,
-               'minnstars':minnstars}] for x in fitslist]
+               'minnstars':minnstars}, rejectbadframes] for x in fitslist]
 
     # fire up the pool of workers
     results = pool.map(parallel_photometry_worker, tasks)
@@ -1264,9 +1270,9 @@ def parallel_fitsdir_photometry(
         return returndict
 
 
-################
-## FRAME INFO ##
-################
+##############################
+## FRAME INFO AND FILTERING ##
+##############################
 
 def collect_image_info(fits, fistar,
                        minsrcbgv=100.0,
@@ -1327,6 +1333,125 @@ def collect_image_info(fits, fistar,
                  'frameok':frameok}
 
     return frameinfo
+
+
+
+def frame_filter_worker(task):
+    '''
+    This wraps collect_image_info above and removes the fiphot for image if it's
+    rejected.
+
+    task[0] = fits
+    task[1] = fistar
+    task[2] = {'minsrcbgv', 'maxframebgv', 'maxmaxbgv', 'minnstars'}
+
+    this returns:
+
+    True: if the frame was not filtered out
+    False: if the frame was filtered out
+    None: if the frame filtering failed
+
+    '''
+
+    try:
+
+        # first, make sure that fits and fistar both exist
+        if (task[0] and task[1] and
+            os.path.exists(task[0]) and os.path.exists(task[1])):
+
+            frameinfo = collect_image_info(task[0],
+                                           task[1],
+                                           **task[2])
+
+            # get rid of the frame if we're allowed to do so
+            if not frameinfo['frameok']:
+                returnval = False
+
+            else:
+                returnval = True
+
+            return returnval
+
+        else:
+            print("ERR! fits/fiphot don't exist for this frame: %s" % task[0])
+            return None
+
+    except Exception as e:
+        print("ERR! frame stats collection failed for %s, reason: %s" %
+              (task[0], e))
+        return None
+
+
+def parallel_frame_filter(fitsdir,
+                          fitsglob='?-*_?.fits',
+                          fistarext='fistar',
+                          fiphotext='fiphot',
+                          removebadframes=True,
+                          minsrcbgv=100.0,
+                          maxmadbgv=50.0,
+                          maxframebgv=1000.0,
+                          minnstars=500,
+                          nworkers=16,
+                          maxworkertasks=1000):
+    '''
+    This goes through a fitsdir and removes bad frames.
+
+    '''
+
+    # find all the fits files
+    fitslist = glob.glob(os.path.join(os.path.abspath(fitsdir),
+                                      fitsglob))
+
+    # make sure all of these have accompanying fistar and fiphot files
+    tasks = []
+
+    print('finding FITS files...')
+
+    for fits in fitslist:
+
+        fistar = fits.replace('fits',fistarext)
+        fiphot = fits.replace('fits',fiphotext)
+
+        if os.path.exists(fistar) and os.path.exists(fiphot):
+            tasks.append((fits, fistar, {'minsrcbgv':minsrcbgv,
+                                         'maxmadbgv':maxmadbgv,
+                                         'maxframebgv':maxframebgv,
+                                         'minnstars':minnstars}))
+
+    print('checking FITS files...')
+
+    # now start up the workers
+    pool = mp.Pool(nworkers,maxtasksperchild=maxtasksperworker)
+    results = pool.map(frame_filter_worker_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    # now remove the fiphots if we're asked to do so
+    for x, result in zip(tasks, results):
+
+        fits = x[0]
+
+        if result is False or result is None and removebadframes:
+            os.remove(fits.replace('fits',fiphotext))
+            print('removed fiphot for bad frame %s' % fits)
+
+        if result is False or result is None and not removebadframes:
+            print('bad frame %s, not removing' % fits)
+
+        else:
+            print('frame %s is OK' % fits)
+
+    # this is the return dictionary
+    returndict = {x:y for (x,y) in results}
+
+    if saveresults:
+        resultsfile = open(os.path.join(fitsdir,'TM-framerejection.pkl'),'wb')
+        pickle.dump(returndict, resultsfile)
+        resultsfile.close()
+    else:
+        return returndict
 
 
 
