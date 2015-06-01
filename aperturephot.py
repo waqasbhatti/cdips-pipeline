@@ -1405,7 +1405,7 @@ def parallel_frame_filter(fitsdir,
     # make sure all of these have accompanying fistar and fiphot files
     tasks = []
 
-    print('finding FITS files...')
+    print('%s total FITS, finding good FITS files...' % len(fitslist))
 
     for fits in fitslist:
 
