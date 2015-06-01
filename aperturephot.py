@@ -1270,7 +1270,7 @@ def parallel_fitsdir_photometry(
 
 def collect_image_info(fits, fistar,
                        minsrcbgv=100.0,
-                       maxframebgv=500.0,
+                       maxframebgv=1000.0,
                        maxmadbgv=20.0,
                        minnstars=500):
     '''
@@ -1315,7 +1315,7 @@ def collect_image_info(fits, fistar,
 
     frameok = ((mediansrcbgv > minsrcbgv) and
                (madsrcbgv < maxmadbgv) and
-               (0.0 < framebgv < maxframebgv) and
+               (-minsrcbgv < framebgv < maxframebgv) and
                (nstars >= minnstars))
 
     frameinfo = {'fits':fits,
