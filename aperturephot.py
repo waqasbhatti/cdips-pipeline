@@ -1213,8 +1213,8 @@ def parallel_fitsdir_photometry(
         saveresults=True,
         rejectbadframes=True,
         minsrcbgv=100.0,
-        maxmadbgv=50.0,
-        maxframebgv=1000.0,
+        maxmadbgv=80.0,
+        maxframebgv=1500.0,
         minnstars=500
         ):
     '''
@@ -1388,8 +1388,8 @@ def parallel_frame_filter(fitsdir,
                           fiphotext='.fiphot',
                           removebadframes=True,
                           minsrcbgv=100.0,
-                          maxmadbgv=50.0,
-                          maxframebgv=1000.0,
+                          maxmadbgv=80.0,
+                          maxframebgv=1500.0,
                           minnstars=500,
                           nworkers=16,
                           maxworkertasks=1000):
@@ -1432,6 +1432,8 @@ def parallel_frame_filter(fitsdir,
         pool.close()
         pool.join()
 
+        outdict = {}
+
         # now remove the fiphots if we're asked to do so
         for x, result in zip(tasks, results):
 
@@ -1447,12 +1449,11 @@ def parallel_frame_filter(fitsdir,
             else:
                 print('frame %s is OK' % fits)
 
-        # this is the return dictionary
-        returndict = {x:y for (x,y) in zip(tasks, results)}
+            outdict[fits] = result
 
         resultsfile = open(os.path.join(fitsdir,
                                         'TM-framerejection.pkl'),'wb')
-        pickle.dump(returndict, resultsfile)
+        pickle.dump(outdict, resultsfile)
         resultsfile.close()
 
         return returndict
