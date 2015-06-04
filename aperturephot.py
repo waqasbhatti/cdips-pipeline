@@ -1276,7 +1276,7 @@ def parallel_fitsdir_photometry(
 
 def collect_image_info(fits, fistar,
                        minsrcbgv=100.0,
-                       maxframebgv=1500.0,
+                       maxframebgv=2000.0,
                        maxmadbgv=150.0,
                        minnstars=500):
     '''
@@ -1398,7 +1398,7 @@ def parallel_frame_filter(fitsdir,
                           removebadframes=False,
                           minsrcbgv=100.0,
                           maxmadbgv=150.0,
-                          maxframebgv=1500.0,
+                          maxframebgv=2000.0,
                           minnstars=500,
                           nworkers=16,
                           maxworkertasks=1000):
