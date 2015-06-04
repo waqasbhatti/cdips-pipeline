@@ -1319,10 +1319,19 @@ def collect_image_info(fits, fistar,
     mediansrcbgv = np.median(finitesrcbgvs)
     madsrcbgv = np.median(np.abs(finitesrcbgvs - mediansrcbgv))
 
+    # check if the frame was aborted in the middle of the exposure
+    if 'ABORTED' in hdr and hdr['ABORTED'] and hdr['ABORTED'] == 1:
+        frameaborted = True
+    elif 'ABORTED' in hdr and hdr['ABORTED'] and hdr['ABORTED'] == 0:
+        frameaborted = False
+    else:
+        frameaborted = None
+
     frameok = ((mediansrcbgv > minsrcbgv) and
                (madsrcbgv < maxmadbgv) and
-               (-minsrcbgv < framebgv < maxframebgv) and
-               (nstars >= minnstars))
+               (-2*minsrcbgv < framebgv < maxframebgv) and
+               (nstars >= minnstars) and
+               (frameborted is not True))
 
     frameinfo = {'fits':fits,
                  'fistar':fistar,
