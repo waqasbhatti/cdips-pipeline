@@ -1331,7 +1331,7 @@ def collect_image_info(fits, fistar,
                (madsrcbgv < maxmadbgv) and
                (-2*minsrcbgv < framebgv < maxframebgv) and
                (nstars >= minnstars) and
-               (frameborted is not True))
+               (frameaborted is not True))
 
     frameinfo = {'fits':fits,
                  'fistar':fistar,
