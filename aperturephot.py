@@ -1276,8 +1276,8 @@ def parallel_fitsdir_photometry(
 
 def collect_image_info(fits, fistar,
                        minsrcbgv=100.0,
-                       maxframebgv=1000.0,
-                       maxmadbgv=50.0,
+                       maxframebgv=1500.0,
+                       maxmadbgv=150.0,
                        minnstars=500):
     '''
     This collects the following info about a frame.
@@ -1388,7 +1388,7 @@ def parallel_frame_filter(fitsdir,
                           fiphotext='.fiphot',
                           removebadframes=False,
                           minsrcbgv=100.0,
-                          maxmadbgv=80.0,
+                          maxmadbgv=150.0,
                           maxframebgv=1500.0,
                           minnstars=500,
                           nworkers=16,
