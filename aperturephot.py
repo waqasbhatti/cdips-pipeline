@@ -1459,7 +1459,7 @@ def parallel_frame_filter(fitsdir,
                     shutil.move(deadfile, badframesdir)
                 print('moved all files for %s to %s' % (fits, badframesdir))
 
-            if (result is False or result is None) and not removebadframes:
+            elif (result is False or result is None) and not removebadframes:
                 print('bad frame %s, not moving' % fits)
 
             else:
