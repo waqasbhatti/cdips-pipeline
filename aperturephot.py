@@ -1396,6 +1396,7 @@ def parallel_frame_filter(fitsdir,
                           fistarext='.fistar',
                           fiphotext='.fiphot',
                           removebadframes=False,
+                          badframesdir=None,
                           minsrcbgv=100.0,
                           maxmadbgv=150.0,
                           maxframebgv=2000.0,
@@ -1419,9 +1420,8 @@ def parallel_frame_filter(fitsdir,
     for fits in fitslist:
 
         fistar = fits.replace('.fits',fistarext)
-        fiphot = fits.replace('.fits',fiphotext)
 
-        if os.path.exists(fistar) and os.path.exists(fiphot):
+        if os.path.exists(fistar):
             tasks.append((fits, fistar, {'minsrcbgv':minsrcbgv,
                                          'maxmadbgv':maxmadbgv,
                                          'maxframebgv':maxframebgv,
@@ -1430,6 +1430,11 @@ def parallel_frame_filter(fitsdir,
     print('%s FITS to work on.' % len(tasks))
 
     if len(tasks) > 0:
+
+        if not badframesdir:
+            badframesdir = os.path.join(fitsdir, 'badframes')
+            if not os.path.exists(badframesdir):
+                os.mkdir(badframesdir)
 
         print('checking FITS files...')
 
@@ -1449,11 +1454,13 @@ def parallel_frame_filter(fitsdir,
             fits = x[0]
 
             if (result is False or result is None) and removebadframes:
-                os.remove(fits.replace('.fits',fiphotext))
-                print('removed fiphot for bad frame %s' % fits)
+                filestomove = glob.glob(fits.replace('.fits','.*'))
+                for deadfile in filestomove:
+                    shutil.move(deadfile, badframesdir)
+                print('moved all files for %s to %s' % (fits, badframesdir))
 
             if (result is False or result is None) and not removebadframes:
-                print('bad frame %s, not removing' % fits)
+                print('bad frame %s, not moving' % fits)
 
             else:
                 print('frame %s is OK' % fits)
