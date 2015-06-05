@@ -266,9 +266,9 @@ DISTINCT_HATIDS_CMD = ('select distinct hatid from hatids')
 
 
 def reform_fistars(fistardir,
-                   fistarglob='1-*.fistar',
+                   fistarglob='1-*_?.fistar',
                    linestokeep=2500,
-                   outprefix='astrometry'):
+                   outpostfix='astrometry'):
     '''
     This truncates all fistars in the directory fistardir to linestokeep
     lines. This is useful for astrometry since the fistar files we produce are
@@ -286,8 +286,9 @@ def reform_fistars(fistardir,
 
         inf = open(fistar,'rb')
         outfname = os.path.join(os.path.dirname(fistar),
-                                '%s-%s' % (outprefix,
-                                           os.path.basename(fistar)))
+                                '%s-%s' % (os.path.basename(fistar),
+                                           outpostfix))
+
         outf = open(outfname, 'wb')
 
         for ind, line in enumerate(inf):
@@ -406,7 +407,7 @@ def parallel_anet_worker(task):
 def parallel_anet(srclistdir,
                   outdir,
                   ra, dec,
-                  fistarglob='astrometry-*_?.fistar',
+                  fistarglob='?-*_?.fistar-astrometry',
                   nworkers=16,
                   maxtasksperworker=1000,
                   width=13,
@@ -435,12 +436,18 @@ def parallel_anet(srclistdir,
 
     pool = mp.Pool(nworkers, maxtasksperchild=maxtasksperworker)
 
+    inpostfix = os.path.splitext(fistarglob)[-1]
+
     tasks = [
-        [x, os.path.join(outdir, os.path.basename(x.replace('.fistar','.wcs'))),
-                         ra, dec, {'width':width,
-                                   'tweak':tweak,
-                                   'radius':radius,
-                                   'cols':cols}]
+        [x, os.path.join(
+                outdir, os.path.basename(
+                    x.replace(inpostfix, '.wcs')
+                    )
+                ),
+         ra, dec, {'width':width,
+                   'tweak':tweak,
+                   'radius':radius,
+                   'cols':cols}]
         for x in fistarlist
         ]
 
