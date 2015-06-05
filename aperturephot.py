@@ -264,6 +264,44 @@ DISTINCT_HATIDS_CMD = ('select distinct hatid from hatids')
 ## ANET ASTROMETRY FUNCTIONS ##
 ###############################
 
+
+def reform_fistars(fistardir,
+                   fistarglob='*.fistar',
+                   linestokeep=2500,
+                   outprefix='astrometry'):
+    '''
+    This truncates all fistars in the directory fistardir to linestokeep
+    lines. This is useful for astrometry since the fistar files we produce are
+    sorted by decreasing flux, and we only only need a couple of thousand bright
+    sources to do astrometry with anet.
+
+    Mostly so we don't need to do source extraction over again
+
+    '''
+
+    fistars = glob.glob(os.path.join(os.path.abspath(fistardir),
+                                     fistarglob))
+
+    for fistar in fistars:
+
+        inf = open(fistar,'rb')
+        outfname = os.path.join(os.path.dirname(fistar),
+                                '%s-%s' % (outprefix,
+                                           os.path.basename(fistar)))
+        outf = open(outfname, 'wb')
+
+        for ind, line in enumerate(inf):
+
+            if ind < linestokeep:
+                outf.write(line)
+
+        print('%s -> %s' % (fistar, outfname))
+
+        outf.close()
+        inf.close()
+
+
+
 def anet_solve_frame(srclist,
                      wcsout,
                      ra,
