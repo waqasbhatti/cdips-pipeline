@@ -266,7 +266,7 @@ DISTINCT_HATIDS_CMD = ('select distinct hatid from hatids')
 
 
 def reform_fistars(fistardir,
-                   fistarglob='*.fistar',
+                   fistarglob='1-*.fistar',
                    linestokeep=2500,
                    outprefix='astrometry'):
     '''
