@@ -406,7 +406,7 @@ def parallel_anet_worker(task):
 def parallel_anet(srclistdir,
                   outdir,
                   ra, dec,
-                  fistarglob='*_?.fistar',
+                  fistarglob='astrometry-*_?.fistar',
                   nworkers=16,
                   maxtasksperworker=1000,
                   width=13,
