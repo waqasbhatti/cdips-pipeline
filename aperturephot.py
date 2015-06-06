@@ -1080,8 +1080,8 @@ def do_photometry(fits,
                   removesourcelist=False,
                   binaryoutput=True,
                   minsrcbgv=100.0,
-                  maxmadbgv=50.0,
-                  maxframebgv=1000.0,
+                  maxmadbgv=20.0,
+                  maxframebgv=2000.0,
                   minnstars=500):
     '''This rolls up the sourcelist and fiphot functions above.
 
