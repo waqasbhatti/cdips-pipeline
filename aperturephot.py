@@ -1257,9 +1257,9 @@ def parallel_fitsdir_photometry(
         maxtasksperworker=1000,
         saveresults=True,
         rejectbadframes=True,
-        minsrcbgv=100.0,
-        maxmadbgv=80.0,
-        maxframebgv=1500.0,
+        minsrcbgv=200.0,
+        maxmadbgv=150.0,
+        maxframebgv=2000.0,
         minnstars=500
         ):
     '''
