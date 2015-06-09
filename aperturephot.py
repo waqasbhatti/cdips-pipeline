@@ -1216,6 +1216,8 @@ def parallel_photometry_worker(task):
         # first, do the photometry
         framephot, frameinfo = do_photometry(*task[0], **task[1])
 
+        badframesdir = os.path.join(task[1]['outdir'],'badframes')
+
         # make sure all is OK with this frame
         if framephot and frameinfo and frameinfo['frameok']:
             result = (framephot, frameinfo)
@@ -1225,12 +1227,18 @@ def parallel_photometry_worker(task):
         else:
             # if the fiphot exists and we're allowed to kill it, do so
             if os.path.exists(framephot) and task[2]:
-                os.remove(framephot)
+                filestomove = glob.glob(
+                    os.path.dirname(framephot),
+                    os.path.basename(framephot).replace(.'fiphot','.*')
+                    )
+
+                for files in filestomove:
+                    shutil.move(framephot, badframesdir)
 
             # tell the user what happened
             print('WRN! frame %s rejected, %s. %s' %
                   (task[0][0],
-                   'fiphot removed' if task[2] else 'fiphot %s' % framephot,
+                   'files moved' if task[2] else 'fiphot %s' % framephot,
                    frameinfo if frameinfo else 'photometry failed!'))
 
             result = (framephot, frameinfo)
@@ -1296,6 +1304,12 @@ def parallel_fitsdir_photometry(
                'maxmadbgv':maxmadbgv,
                'maxframebgv':maxframebgv,
                'minnstars':minnstars}, rejectbadframes] for x in fitslist]
+
+    # if the badframes directory doesn't exist, make it
+    badframesdir = os.path.join(outdir, 'badframes')
+
+    if not os.path.exists(badframesdir):
+        os.mkdir(badframes)
 
     # fire up the pool of workers
     results = pool.map(parallel_photometry_worker, tasks)
