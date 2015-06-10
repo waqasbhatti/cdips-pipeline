@@ -1229,7 +1229,7 @@ def parallel_photometry_worker(task):
             if os.path.exists(framephot) and task[2]:
                 filestomove = glob.glob(
                     os.path.dirname(framephot),
-                    os.path.basename(framephot).replace(.'fiphot','.*')
+                    os.path.basename(framephot).replace('.fiphot','.*')
                     )
 
                 for files in filestomove:
