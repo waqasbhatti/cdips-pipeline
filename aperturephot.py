@@ -1227,13 +1227,16 @@ def parallel_photometry_worker(task):
         else:
             # if the fiphot exists and we're allowed to kill it, do so
             if os.path.exists(framephot) and task[2]:
-                filestomove = glob.glob(
-                    os.path.dirname(framephot),
-                    os.path.basename(framephot).replace('.fiphot','.*')
-                    )
 
-                for files in filestomove:
-                    shutil.move(framephot, badframesdir)
+                filestomove = glob.glob(
+                    os.path.join(
+                        os.path.dirname(framephot),
+                        os.path.basename(framephot).replace('.fiphot','.*')
+                    )
+                )
+
+                for filetomove in filestomove:
+                    shutil.move(filetomove, badframesdir)
 
             # tell the user what happened
             print('WRN! frame %s rejected, %s. %s' %
