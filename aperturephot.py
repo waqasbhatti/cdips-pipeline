@@ -1309,7 +1309,7 @@ def parallel_fitsdir_photometry(
     badframesdir = os.path.join(outdir, 'badframes')
 
     if not os.path.exists(badframesdir):
-        os.mkdir(badframes)
+        os.mkdir(badframesdir)
 
     # fire up the pool of workers
     results = pool.map(parallel_photometry_worker, tasks)
