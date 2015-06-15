@@ -560,6 +560,16 @@ def select_astromref_frame(fitsdir,
               '(using S and D only) is %s' %
               (datetime.utcnow().isoformat(), selectedreference))
 
+        if jpeg:
+            framejpg = fits_to_full_jpeg(
+                selectedreference,
+                out_fname=os.path.join(
+                    os.path.dirname(selectedreference),
+                    ('JPEG-ASTROMREF-%s.jpg' %
+                     os.path.basename(selectedreference).strip('.fits.fz'))
+                    )
+                )
+
         return selectedreference
 
     # if that fails, fail back to the best S value frame
