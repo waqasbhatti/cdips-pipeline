@@ -2312,7 +2312,8 @@ def epd_lightcurve_imagesub(ilcfile,
                             smooth=21,
                             sigmaclip=3.0,
                             ilcext='ilc',
-                            outfile=None):
+                            outfile=None,
+                            minndet=200):
     '''
     Runs the EPD process on ilcfile, using columns specified to get the required
     parameters. If outfile is None, the .epdlc will be placeed in the same
@@ -2328,99 +2329,106 @@ def epd_lightcurve_imagesub(ilcfile,
                                'fsv','fdv','fkv',
                                'rm1','rm2','rm3'])
 
-    # get the indices where all columns are non-nan
-    combinedok = (np.isfinite(ilc['xcc']) &
-                  np.isfinite(ilc['ycc']) &
-                  np.isfinite(ilc['fsv']) &
-                  np.isfinite(ilc['fdv']) &
-                  np.isfinite(ilc['fkv']) &
-                  np.isfinite(ilc['rm1']) &
-                  np.isfinite(ilc['rm2']) &
-                  np.isfinite(ilc['rm3']))
+    if len(ilc['xcc']) >= minndet:
+
+        # get the indices where all columns are non-nan
+        combinedok = (np.isfinite(ilc['xcc']) &
+                      np.isfinite(ilc['ycc']) &
+                      np.isfinite(ilc['fsv']) &
+                      np.isfinite(ilc['fdv']) &
+                      np.isfinite(ilc['fkv']) &
+                      np.isfinite(ilc['rm1']) &
+                      np.isfinite(ilc['rm2']) &
+                      np.isfinite(ilc['rm3']))
 
 
 
-    # calculate the EPD differential mags
-    epddiffmag1 = epd_magseries_imagesub(
-        ilc['rm1'][combinedok],
-        ilc['fsv'][combinedok],
-        ilc['fdv'][combinedok],
-        ilc['fkv'][combinedok],
-        ilc['xcc'][combinedok],
-        ilc['ycc'][combinedok],
-        smooth=smooth, sigmaclip=sigmaclip
-        )
+        # calculate the EPD differential mags
+        epddiffmag1 = epd_magseries_imagesub(
+            ilc['rm1'][combinedok],
+            ilc['fsv'][combinedok],
+            ilc['fdv'][combinedok],
+            ilc['fkv'][combinedok],
+            ilc['xcc'][combinedok],
+            ilc['ycc'][combinedok],
+            smooth=smooth, sigmaclip=sigmaclip
+            )
 
-    epddiffmag2 = epd_magseries_imagesub(
-        ilc['rm2'][combinedok],
-        ilc['fsv'][combinedok],
-        ilc['fdv'][combinedok],
-        ilc['fkv'][combinedok],
-        ilc['xcc'][combinedok],
-        ilc['ycc'][combinedok],
-        smooth=smooth, sigmaclip=sigmaclip
-        )
+        epddiffmag2 = epd_magseries_imagesub(
+            ilc['rm2'][combinedok],
+            ilc['fsv'][combinedok],
+            ilc['fdv'][combinedok],
+            ilc['fkv'][combinedok],
+            ilc['xcc'][combinedok],
+            ilc['ycc'][combinedok],
+            smooth=smooth, sigmaclip=sigmaclip
+            )
 
-    epddiffmag3 = epd_magseries_imagesub(
-        ilc['rm3'][combinedok],
-        ilc['fsv'][combinedok],
-        ilc['fdv'][combinedok],
-        ilc['fkv'][combinedok],
-        ilc['xcc'][combinedok],
-        ilc['ycc'][combinedok],
-        smooth=smooth, sigmaclip=sigmaclip
-        )
+        epddiffmag3 = epd_magseries_imagesub(
+            ilc['rm3'][combinedok],
+            ilc['fsv'][combinedok],
+            ilc['fdv'][combinedok],
+            ilc['fkv'][combinedok],
+            ilc['xcc'][combinedok],
+            ilc['ycc'][combinedok],
+            smooth=smooth, sigmaclip=sigmaclip
+            )
 
-    # add the EPD diff mags back to the median mag to get the EPD mags
-    if epddiffmag1 is not None:
-        mag_median = np.nanmedian(ilc['rm1'])
-        epdmag1 = epddiffmag1 + mag_median
+        # add the EPD diff mags back to the median mag to get the EPD mags
+        if epddiffmag1 is not None:
+            mag_median = np.nanmedian(ilc['rm1'])
+            epdmag1 = epddiffmag1 + mag_median
+        else:
+            epdmag1 = np.array([np.nan for x in ilc['rm1'][combinedok]])
+            print('WRN! %sZ: no EP1 mags available for %s!' %
+                  (datetime.utcnow().isoformat(), ilcfile))
+
+        if epddiffmag2 is not None:
+            mag_median = np.nanmedian(ilc['rm2'])
+            epdmag2 = epddiffmag2 + mag_median
+        else:
+            epdmag2 = np.array([np.nan for x in ilc['rm2'][combinedok]])
+            print('WRN! %sZ: no EP2 mags available for %s!' %
+                  (datetime.utcnow().isoformat(), ilcfile))
+
+        if epddiffmag3 is not None:
+            mag_median = np.nanmedian(ilc['rm3'])
+            epdmag3 = epddiffmag3 + mag_median
+        else:
+            epdmag3 = np.array([np.nan for x in ilc['rm3'][combinedok]])
+            print('WRN! %sZ: no EP3 mags available for %s!' %
+                  (datetime.utcnow().isoformat(), ilcfile))
+
+        # now write the EPD LCs out to the outfile
+        if not outfile:
+            outfile = '%s.epdlc' % ilcfile.strip('.%s' % ilcext)
+
+        inf = open(ilcfile,'rb')
+        inflines = inf.readlines()
+        inf.close()
+
+        # get only the lines that have no nans in the epd input columns
+        inflines = (np.array(inflines))[combinedok]
+
+        outf = open(outfile,'wb')
+
+        # only these lines can be attached to the output epd mags
+        for line, epd1, epd2, epd3 in zip(inflines, epdmag1, epdmag2, epdmag3):
+            outline = '%s %.6f %.6f %.6f\n' % (line.rstrip('\n'), epd1, epd2, epd3)
+            outf.write(outline)
+
+        outf.close()
+
+        print('%sZ: ilc %s with %s dets -> epdlc %s with %s dets' %
+              (datetime.utcnow().isoformat(),
+               ilcfile, len(ilc['xcc']), outfile, len(inflines)))
+
+        return outfile
+
     else:
-        epdmag1 = np.array([np.nan for x in ilc['rm1'][combinedok]])
-        print('WRN! %sZ: no EP1 mags available for %s!' %
-              (datetime.utcnow().isoformat(), ilcfile))
-
-    if epddiffmag2 is not None:
-        mag_median = np.nanmedian(ilc['rm2'])
-        epdmag2 = epddiffmag2 + mag_median
-    else:
-        epdmag2 = np.array([np.nan for x in ilc['rm2'][combinedok]])
-        print('WRN! %sZ: no EP2 mags available for %s!' %
-              (datetime.utcnow().isoformat(), ilcfile))
-
-    if epddiffmag3 is not None:
-        mag_median = np.nanmedian(ilc['rm3'])
-        epdmag3 = epddiffmag3 + mag_median
-    else:
-        epdmag3 = np.array([np.nan for x in ilc['rm3'][combinedok]])
-        print('WRN! %sZ: no EP3 mags available for %s!' %
-              (datetime.utcnow().isoformat(), ilcfile))
-
-    # now write the EPD LCs out to the outfile
-    if not outfile:
-        outfile = '%s.epdlc' % ilcfile.strip('.%s' % ilcext)
-
-    inf = open(ilcfile,'rb')
-    inflines = inf.readlines()
-    inf.close()
-
-    # get only the lines that have no nans in the epd input columns
-    inflines = (np.array(inflines))[combinedok]
-
-    outf = open(outfile,'wb')
-
-    # only these lines can be attached to the output epd mags
-    for line, epd1, epd2, epd3 in zip(inflines, epdmag1, epdmag2, epdmag3):
-        outline = '%s %.6f %.6f %.6f\n' % (line.rstrip('\n'), epd1, epd2, epd3)
-        outf.write(outline)
-
-    outf.close()
-
-    print('%sZ: ilc %s with %s dets -> epdlc %s with %s dets' %
-          (datetime.utcnow().isoformat(),
-           ilcfile, len(ilc['xcc']), outfile, len(inflines)))
-
-    return outfile
+        print('not running EPD for %s, ndet = %s < min ndet = %s' %
+              (ilcfile, len(ilc['xcc']), minndet))
+        return None
 
 
 
@@ -2431,6 +2439,32 @@ def serial_run_epd_imagesub(ilcdir,
                             sigmaclip=3.0):
     '''
     This runs EPD on the lightcurves from the pipeline.
+
+    00 rjd    Reduced Julian Date (RJD = JD - 2400000.0)
+    01 rstfc  Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
+    02 hat    HAT ID of the object
+    03 xcc    original X coordinate on CCD before shifting to astromref
+    04 ycc    original y coordinate on CCD before shifting to astromref
+    05 xic    shifted X coordinate on CCD after shifting to astromref
+    06 yic    shifted Y coordinate on CCD after shifting to astromref
+    07 bgv    Background value
+    08 bge    Background measurement error
+    09 fsv    Measured S value
+    10 fdv    Measured D value
+    11 fkv    Measured K value
+    12 irm1   Instrumental magnitude in aperture 1
+    13 ire1   Instrumental magnitude error for aperture 1
+    14 irq1   Instrumental magnitude quality flag for aperture 1 (0/G OK, X bad)
+    15 irm2   Instrumental magnitude in aperture 2
+    16 ire2   Instrumental magnitude error for aperture 2
+    17 irq2   Instrumental magnitude quality flag for aperture 2 (0/G OK, X bad)
+    18 irm3   Instrumental magnitude in aperture 3
+    19 ire3   Instrumental magnitude error for aperture 3
+    20 irq3   Instrumental magnitude quality flag for aperture 3 (0/G OK, X bad)
+    21 ep1    EPD magnitude for aperture 1
+    22 ep2    EPD magnitude for aperture 1
+    23 ep3    EPD magnitude for aperture 1
+
 
     '''
 
