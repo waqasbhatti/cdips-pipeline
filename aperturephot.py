@@ -3498,7 +3498,7 @@ def run_tfa_singlelc(epdlc,
         with open(tfatempf,'rb') as tfatemplist:
             templistlines = tfatemplist.readlines()
             tfatemplen = len(templistlines)
-            if tfatemplen <= 2*epdlen:
+            if epdlen >= 2*tfatemplen:
                 tfarunnable = True
 
     if tfarunnable:
