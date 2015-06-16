@@ -3272,8 +3272,6 @@ def choose_tfa_template(statsfile,
 
                 if os.path.exists(lcfile_searchpath):
 
-                    print('getting LC for %s' % tfaobj)
-
                     tfa_stars_lcfile.append(
                         os.path.abspath(lcfile_searchpath)
                     )
@@ -3626,11 +3624,11 @@ def get_lc_statistics(lcfile,
                                         unpack=True)
 
         tf1 = np.genfromtxt(lcfile.replace('.epdlc','.tfalc.TF1'),
-                            usecols=(24,), unpack=True)
+                            usecols=(tfcols[0],), unpack=True)
         tf2 = np.genfromtxt(lcfile.replace('.epdlc','.tfalc.TF2'),
-                            usecols=(24,), unpack=True)
+                            usecols=(tfcols[0],), unpack=True)
         tf3 = np.genfromtxt(lcfile.replace('.epdlc','.tfalc.TF3'),
-                            usecols=(24,), unpack=True)
+                            usecols=(tfcols[0],), unpack=True)
 
     # if we don't have TF columns, cut down to RM and EP only
     except Exception as e:
