@@ -1991,11 +1991,11 @@ def collect_imagesubphot_lightcurve(hatid,
     04 ycc    original y coordinate on CCD before shifting to astromref
     05 xic    shifted X coordinate on CCD after shifting to astromref
     06 yic    shifted Y coordinate on CCD after shifting to astromref
-    07 bgv    Background value
-    08 bge    Background measurement error
-    09 fsv    Measured S value
-    10 fdv    Measured D value
-    11 fkv    Measured K value
+    07 fsv    Measured S value
+    08 fdv    Measured D value
+    09 fkv    Measured K value
+    10 bgv    Background value
+    11 bge    Background measurement error
     12 irm1   Instrumental magnitude in aperture 1
     13 ire1   Instrumental magnitude error for aperture 1
     14 irq1   Instrumental magnitude quality flag for aperture 1 (0/G OK, X bad)
@@ -2307,7 +2307,7 @@ def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
 
 def epd_lightcurve_imagesub(ilcfile,
                             mags=[12,15,18],
-                            sdk=[9,10,11],
+                            sdk=[7,8,9],
                             xy=[5,6],
                             smooth=21,
                             sigmaclip=3.0,
@@ -2318,6 +2318,31 @@ def epd_lightcurve_imagesub(ilcfile,
     Runs the EPD process on ilcfile, using columns specified to get the required
     parameters. If outfile is None, the .epdlc will be placeed in the same
     directory as ilcfile.
+
+    00 rjd    Reduced Julian Date (RJD = JD - 2400000.0)
+    01 rstfc  Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
+    02 hat    HAT ID of the object
+    03 xcc    original X coordinate on CCD before shifting to astromref
+    04 ycc    original y coordinate on CCD before shifting to astromref
+    05 xic    shifted X coordinate on CCD after shifting to astromref
+    06 yic    shifted Y coordinate on CCD after shifting to astromref
+    07 fsv    Measured S value
+    08 fdv    Measured D value
+    09 fkv    Measured K value
+    10 bgv    Background value
+    11 bge    Background measurement error
+    12 irm1   Instrumental magnitude in aperture 1
+    13 ire1   Instrumental magnitude error for aperture 1
+    14 irq1   Instrumental magnitude quality flag for aperture 1 (0/G OK, X bad)
+    15 irm2   Instrumental magnitude in aperture 2
+    16 ire2   Instrumental magnitude error for aperture 2
+    17 irq2   Instrumental magnitude quality flag for aperture 2 (0/G OK, X bad)
+    18 irm3   Instrumental magnitude in aperture 3
+    19 ire3   Instrumental magnitude error for aperture 3
+    20 irq3   Instrumental magnitude quality flag for aperture 3 (0/G OK, X bad)
+    21 ep1    EPD magnitude for aperture 1
+    22 ep2    EPD magnitude for aperture 2
+    23 ep3    EPD magnitude for aperture 3
 
     '''
 
@@ -2447,11 +2472,11 @@ def serial_run_epd_imagesub(ilcdir,
     04 ycc    original y coordinate on CCD before shifting to astromref
     05 xic    shifted X coordinate on CCD after shifting to astromref
     06 yic    shifted Y coordinate on CCD after shifting to astromref
-    07 bgv    Background value
-    08 bge    Background measurement error
-    09 fsv    Measured S value
-    10 fdv    Measured D value
-    11 fkv    Measured K value
+    07 fsv    Measured S value
+    08 fdv    Measured D value
+    09 fkv    Measured K value
+    10 bgv    Background value
+    11 bge    Background measurement error
     12 irm1   Instrumental magnitude in aperture 1
     13 ire1   Instrumental magnitude error for aperture 1
     14 irq1   Instrumental magnitude quality flag for aperture 1 (0/G OK, X bad)
@@ -2462,8 +2487,8 @@ def serial_run_epd_imagesub(ilcdir,
     19 ire3   Instrumental magnitude error for aperture 3
     20 irq3   Instrumental magnitude quality flag for aperture 3 (0/G OK, X bad)
     21 ep1    EPD magnitude for aperture 1
-    22 ep2    EPD magnitude for aperture 1
-    23 ep3    EPD magnitude for aperture 1
+    22 ep2    EPD magnitude for aperture 2
+    23 ep3    EPD magnitude for aperture 3
 
 
     '''
