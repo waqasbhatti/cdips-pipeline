@@ -3481,50 +3481,79 @@ def run_tfa_singlelc(epdlc,
 
     tfalc_output = []
 
-    # run tfa for each aperture
-    for templatef, magcol, magind in zip(templatefiles,
-                                         epdlc_magcol,
-                                         range(len(epdlc_magcol))):
+    # figure out the number of templates for each aperture; only the stars with
+    # ndets > 2 x number of templates will have TFA light-curves generated
 
-        in_jdcol = epdlc_jdcol + 1
-        in_magcol = magcol + 1
-        out_magcol = in_magcol + 3
+    # get the ndets for this epdlc
+    with open(epdlc,'rb') as epdfile:
+        epdlines = epdfile.readlines()
+        epdlen = len(epdlines)
 
-        aperture_outfile = outfile + ('.TF%s' % (magind+1))
+    tfarunnable = False
 
-        tfacmd = tfacmdstr.format(epdlc=epdlc,
-                                  templatefile=templatef,
-                                  epdlc_jdcol=in_jdcol,
-                                  epdlc_magcol=in_magcol,
-                                  tfalc_magcol=out_magcol,
-                                  template_sigclip=template_sigclip,
-                                  epdlc_sigclip=epdlc_sigclip,
-                                  out_tfalc=aperture_outfile)
+    # check if the number of detections in this LC is more than 2 x ntemplates
+    # for each aperture
 
-        if DEBUG:
-            print(tfacmd)
+    for tfatempf in templatefiles:
+        with open(tfatempf,'rb') as tfatemplist:
+            templistlines = tfatempf.readlines()
+            tfatemplen = len(templistlines)
+            if tfatemplen <= 2*epdlen:
+                tfarunnable = True
 
-        # execute the tfa shell command
-        tfaproc = subprocess.Popen(shlex.split(tfacmd),
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
+    if tfarunnable:
 
-        # get results
-        tfa_stdout, tfa_stderr = tfaproc.communicate()
+        # run tfa for each aperture
+        for templatef, magcol, magind in zip(templatefiles,
+                                             epdlc_magcol,
+                                             range(len(epdlc_magcol))):
 
-        # get results if succeeded, log outcome, and return path of outfile
-        if tfaproc.returncode == 0:
+            in_jdcol = epdlc_jdcol + 1
+            in_magcol = magcol + 1
+            out_magcol = in_magcol + 3
 
-            tfalc_output.append(aperture_outfile)
+            aperture_outfile = outfile + ('.TF%s' % (magind+1))
 
-        else:
+            tfacmd = tfacmdstr.format(epdlc=epdlc,
+                                      templatefile=templatef,
+                                      epdlc_jdcol=in_jdcol,
+                                      epdlc_magcol=in_magcol,
+                                      tfalc_magcol=out_magcol,
+                                      template_sigclip=template_sigclip,
+                                      epdlc_sigclip=epdlc_sigclip,
+                                      out_tfalc=aperture_outfile)
 
-            print('%sZ: aperture %s TFA failed for %s! Error was: %s' %
-                  (datetime.utcnow().isoformat(), magind+1, epdlc), tfa_stderr)
+            if DEBUG:
+                print(tfacmd)
 
-            tfalc_output.append(None)
+            # execute the tfa shell command
+            tfaproc = subprocess.Popen(shlex.split(tfacmd),
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE)
 
-    return tfalc_output
+            # get results
+            tfa_stdout, tfa_stderr = tfaproc.communicate()
+
+            # get results if succeeded, log outcome, and return path of outfile
+            if tfaproc.returncode == 0:
+
+                tfalc_output.append(aperture_outfile)
+
+            else:
+
+                print('%sZ: aperture %s TFA failed for %s! Error was: %s' %
+                      (datetime.utcnow().isoformat(), magind+1, epdlc), tfa_stderr)
+
+                tfalc_output.append(None)
+
+        return tfalc_output
+
+    else:
+
+        print('ERR! %sZ: no TFA possible for %s! ndet < 2 x n(TFA templates)' %
+              (datetime.utcnow().isoformat(), epdlc))
+        return None
+
 
 
 def parallel_tfa_worker(task):
@@ -4412,7 +4441,7 @@ def time_bin_lightcurve(lcprefix,
                         lcexts=('epdlc',
                                 'tfalc.TF1','tfalc.TF2','tfalc.TF3'),
                         jdcol=0,
-                        lcmagcols=([21,22,23],[24,],[24,],[24,]),
+                        lcmagcols=([22,23,24],[25,],[25,],[25,]),
                         binsize=540,
                         minperbin=10,
                         outfile=None):
@@ -4520,7 +4549,7 @@ def serial_bin_lightcurves(lcdir,
                            lcexts=('epdlc',
                                    'tfalc.TF1','tfalc.TF2','tfalc.TF3'),
                            jdcol=0,
-                           lcmagcols=([21,22,23],[24,],[24,],[24,]),
+                           lcmagcols=([22,23,24],[25,],[25,],[25,]),
                            nworkers=16,
                            workerntasks=500):
 

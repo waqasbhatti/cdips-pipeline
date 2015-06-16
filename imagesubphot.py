@@ -2501,376 +2501,6 @@ def serial_run_epd_imagesub(ilcdir,
 ## TFA FUNCTIONS ##
 ###################
 
-def choose_tfa_template(statsfile,
-                        fovcatalog,
-                        epdlcdir,
-                        fovcat_idcol=0,
-                        fovcat_xicol=3,
-                        fovcat_etacol=4,
-                        fovcat_magcol=9,
-                        min_ndet=100,
-                        min_nstars=50,
-                        max_nstars=1000,
-                        brightest_mag=8.5,
-                        faintest_mag=12.0,
-                        max_rms=0.1,
-                        max_sigma_above_rmscurve=4.0,
-                        outprefix=None,
-                        tfastage1=True):
-    '''This chooses suitable stars for TFA template purposes.
-
-    statsfile = the file to use to get LC statistics from
-
-    fovcatalog = the fovcatalog file, this must have xi and eta coordinates,
-                 ras, decs, and magnitudes
-
-    Returns a dict with lists of stars chosen, their stats, and filenames of
-    where each star list was written.
-
-    '''
-
-    # read in the stats file
-    stats = read_stats_file(statsfile)
-
-    # read in the fovcatalog
-    fovcat = np.genfromtxt(fovcatalog,
-                           usecols=(fovcat_idcol,
-                                    fovcat_xicol,
-                                    fovcat_etacol,
-                                    fovcat_magcol),
-                           dtype='S17,f8,f8,f8',
-                           names=['objid','xi','eta','mag'])
-
-    # figure out the number of stars to use in the initial TFA template
-    # number of stars = TFA_TEMPLATE_FRACTION * median ndet
-    TFA_TEMPLATE_FRACTION = 0.1
-
-    # 1. ndet >= median_ndet
-    # 2. max rms <= 0.1
-    # 3. brightest_mag < median_mag < faintest_mag
-    # 4. fit rms-mag, then discard anything above max_sigma_above_rmscurve
-    # find the objects in the fovcat and stats file that match these
-    # conditions, then pick up to 1000 random stars
-
-    outdict = {'statsfile':os.path.abspath(statsfile),
-               'fovcat':os.path.abspath(fovcatalog),
-               'lcdir':os.path.abspath(epdlcdir)}
-
-    # do this per aperture
-    for aperture in [1,2,3]:
-
-        outdict[aperture] = {}
-
-        # first, pick the stars that meet our stats requirements
-
-        epdstr = 'ep%s' % aperture
-
-        objid_col = 'lcobj'
-        median_mag_col = 'med_sc_%s' % epdstr
-        mad_mag_col = 'mad_sc_%s' % epdstr
-        ndet_col = 'ndet_sc_%s' % epdstr
-
-        objectid = stats[objid_col]
-        mags_median = stats[median_mag_col]
-        mags_mad = stats[mad_mag_col]
-        obj_ndet = stats[ndet_col]
-
-        goodind = np.isfinite(mags_median) & np.isfinite(mags_mad)
-        objectid = objectid[goodind]
-        mags_median = mags_median[goodind]
-        mags_mad = mags_mad[goodind]
-        obj_ndet = obj_ndet[goodind]
-
-        print('\naperture %s: total good objects = %s' % (aperture,
-                                                        len(objectid)))
-
-        median_ndet = scipy.stats.nanmedian(obj_ndet)
-        print('aperture %s: median ndet = %s' % (aperture, median_ndet))
-        print('aperture %s: target TFA template size = %s' %
-              (aperture, int(median_ndet*TFA_TEMPLATE_FRACTION)))
-        outdict[aperture]['target_tfa_nstars'] = (
-            median_ndet*TFA_TEMPLATE_FRACTION
-        )
-
-        stars_ndet_condition = obj_ndet >= median_ndet
-        print('aperture %s: objects with ndet condition = %s' %
-              (aperture, len(objectid[stars_ndet_condition])))
-
-        stars_rms_condition = mags_mad < max_rms
-        print('aperture %s: objects with rms condition = %s' %
-              (aperture, len(objectid[stars_rms_condition])))
-
-        rmsfit_condition = stars_ndet_condition
-        print('aperture %s: objects with rmsfit condition = %s' %
-              (aperture, len(objectid[rmsfit_condition])))
-
-        # selection 1: fit a parabola to the median mag - mag MAD relation and
-        #              reject all stars with RMS > max_sigma_above_rmscurve
-        polyfit_coeffs = np.polyfit(mags_median[rmsfit_condition],
-                             mags_mad[rmsfit_condition],
-                             2)
-
-        print('aperture %s: rms fit params = %s' % (aperture,polyfit_coeffs))
-
-        # generate the model RMS curve with fit parameters
-        model_rms = (polyfit_coeffs[0]*mags_median*mags_median +
-                     polyfit_coeffs[1]*mags_median +
-                     polyfit_coeffs[2])
-
-        # find objects that lie below the requested rms threshold from this
-        # curve
-        threshold_condition = (mags_mad/model_rms) < max_sigma_above_rmscurve
-        print('aperture %s: objects with threshold condition = %s' %
-              (aperture, len(objectid[threshold_condition])))
-
-        final_statistics_ind = (threshold_condition &
-                                stars_rms_condition &
-                                stars_ndet_condition)
-
-        print('aperture %s: stars with good stats = %s' % (
-            aperture,
-            len(objectid[final_statistics_ind])
-        ))
-
-        good_stats_objects = objectid[final_statistics_ind]
-
-        # selection 2: get the stars with good magnitudes
-        mag_condition = ((fovcat['mag'] < faintest_mag) &
-                         (fovcat['mag'] > brightest_mag))
-        good_mag_objects = fovcat['objid'][mag_condition]
-        print('aperture %s: stars with good mags = %s' %
-              (aperture,len(good_mag_objects)))
-
-        # finally, intersect these two arrays to find a set of good TFA objects
-        good_tfa_objects = np.intersect1d(good_stats_objects,
-                                          good_mag_objects)
-        print('aperture %s: stars suitable for TFA = %s' %
-              (aperture,len(good_tfa_objects)))
-
-        # put this initial list into the outdict
-        outdict[aperture]['tfa_suitable_objects'] = good_tfa_objects
-
-        # selection 3: pick up to 1000 random objects for TFA. we need at least
-        # TFA_TEMPLATE_FRACTION * median ndet number of objects
-        if ((len(good_tfa_objects) > 1000) and
-            (len(good_tfa_objects) > TFA_TEMPLATE_FRACTION*median_ndet)):
-            tfa_stars = nprand.choice(good_tfa_objects,
-                                      replace=False,
-                                      size=500)
-        elif (TFA_TEMPLATE_FRACTION*median_ndet <= len(good_tfa_objects) <= 1000):
-            tfa_stars = good_tfa_objects
-        else:
-            print("aperture %s: not enough stars suitable for TFA!" %
-                  aperture)
-            tfa_stars = None
-
-        # now get these stars IDs, LC fnames, xis, etas, and other things needed
-        # for the first stage of TFA (this will choose exactly
-        # TFA_TEMPLATE_FRACTION*median_ndet stars to use as the template for the
-        # final stage of TFA)
-        if tfa_stars is not None:
-
-            print('aperture %s: %s objects chosen as TFA templates for stage 1' %
-                  (aperture,len(tfa_stars)))
-            outdict[aperture]['tfa_chosen_objects'] = tfa_stars
-
-            tfa_stars_catmag = []
-            tfa_stars_statrms = []
-            tfa_stars_statndet = []
-            tfa_stars_xi = []
-            tfa_stars_eta = []
-            tfa_stars_lcfile = []
-
-            print('aperture %s: getting object info...' %
-                  (aperture,))
-
-            # get the stats for these objects
-            for i, tfaobj in enumerate(tfa_stars):
-
-                # search for the LC file for this object and make sure it exists
-                lcfile_searchpath = os.path.join(epdlcdir, '%s.epdlc' % tfaobj)
-
-                if os.path.exists(lcfile_searchpath):
-
-                    tfa_stars_lcfile.append(
-                        os.path.abspath(lcfile_searchpath)
-                    )
-                    tfa_stars_catmag.append(
-                        fovcat['mag'][fovcat['objid'] == tfaobj]
-                    )
-                    tfa_stars_statrms.append(
-                        mags_mad[objectid == tfaobj]
-                    )
-                    tfa_stars_statndet.append(
-                        obj_ndet[objectid == tfaobj]
-                    )
-                    tfa_stars_xi.append(
-                        fovcat['xi'][fovcat['objid'] == tfaobj]
-                    )
-                    tfa_stars_eta.append(
-                        fovcat['eta'][fovcat['objid'] == tfaobj]
-                    )
-
-                # if it doesn't, then add nans to the file
-                else:
-
-                    print('ERR! couldn\'t find an LC for %s' % tfaobj)
-
-                    tfa_stars_lcfile.append(None)
-                    tfa_stars_catmag.append(np.nan)
-                    tfa_stars_statrms.append(np.nan)
-                    tfa_stars_statndet.append(np.nan)
-                    tfa_stars_xi.append(np.nan)
-                    tfa_stars_eta.append(np.nan)
-
-            outdict[aperture]['tfa_chosen_lcfile'] = tfa_stars_lcfile
-            outdict[aperture]['tfa_chosen_mag'] = np.ravel(tfa_stars_catmag)
-            outdict[aperture]['tfa_chosen_rms'] = np.ravel(tfa_stars_statrms)
-            outdict[aperture]['tfa_chosen_ndet'] = np.ravel(tfa_stars_statndet)
-            outdict[aperture]['tfa_chosen_xi'] = np.ravel(tfa_stars_xi)
-            outdict[aperture]['tfa_chosen_eta'] = np.ravel(tfa_stars_eta)
-
-        # if no TFA stars could be chosen, return Nones for this aperture
-        else:
-            outdict[aperture]['tfa_chosen_lcfile'] = None
-            outdict[aperture]['tfa_chosen_objects'] = None
-            outdict[aperture]['tfa_chosen_mag'] = None
-            outdict[aperture]['tfa_chosen_rms'] = None
-            outdict[aperture]['tfa_chosen_ndet'] = None
-
-
-        # make the input file for TFA stage 1 for this aperture
-        if not outprefix:
-            outfile = os.path.abspath(
-                os.path.join(os.getcwd(),
-                             'tfa-stage1-input-aperture-%s.txt' % aperture)
-            )
-        else:
-            outfile = os.path.abspath(
-                os.path.join(outprefix,
-                             'tfa-stage1-input-aperture-%s.txt' % aperture)
-            )
-
-
-        outf = open(outfile,'wb')
-
-        outline = '%s %s %.6f %.6f %i %.6f %.6f\n'
-
-        for objid, lcf, mag, rms, ndet, xi, eta in zip(
-                outdict[aperture]['tfa_chosen_objects'],
-                outdict[aperture]['tfa_chosen_lcfile'],
-                outdict[aperture]['tfa_chosen_mag'],
-                outdict[aperture]['tfa_chosen_rms'],
-                outdict[aperture]['tfa_chosen_ndet'],
-                outdict[aperture]['tfa_chosen_xi'],
-                outdict[aperture]['tfa_chosen_eta']
-        ):
-
-            outf.write(outline % (objid, lcf, mag, rms, ndet, xi, eta))
-        outf.close()
-        print('aperture %s: wrote object info to %s' %
-              (aperture, outfile))
-        outdict[aperture]['info_file'] = os.path.abspath(outfile)
-
-        # END OF PER APERTURE STUFF
-
-
-    # run TFAs stage 1 if we're supposed to do so
-    if tfastage1:
-
-        print('\nrunning TFA stage 1...')
-
-        # run TFA stage 1 to pick the good objects
-        tfa_stage1 = run_tfa_stage1(outdict)
-
-        for aperture in tfa_stage1:
-
-            outdict[aperture]['stage1_templatelist'] = tfa_stage1[aperture]
-
-            # make the TFA template list file for this aperture
-            if outdict[aperture]['stage1_templatelist']:
-                templatelistfname = os.path.join(
-                    outdict['lcdir'],
-                    'aperture-%s-tfa-template.list' % aperture
-                )
-                outf = open(templatelistfname,'wb')
-                for tfaobjid in outdict[aperture]['stage1_templatelist']:
-
-                    templatelc = os.path.join(
-                        outdict['lcdir'],
-                        tfaobjid + '.epdlc'
-                    )
-
-                    if os.path.exists(templatelc):
-                        outf.write('%s\n' % os.path.abspath(templatelc))
-
-                outf.close()
-                outdict[aperture]['stage1_tfa_templatefile'] = (
-                    templatelistfname
-                )
-                print('aperture %s: wrote TFA template list to %s' %
-                      (aperture, templatelistfname))
-
-
-    return outdict
-
-
-def run_tfa_stage1(tfainfo):
-    '''This just runs the TFA in fake mode to generate a list of template
-    stars. Uses the tfainfo dict created in choose_tfa_template above.
-
-    Communicates with the tfa program over pipe and then writes its output to a
-    tfa input file for the next stage.
-
-       tfa -r <REFFILE> --col-ref-id <REFFILE_IDCOLNUM>
-                        --col-ref-x <REFFILE_XCOLNUM>
-                        --col-ref-y <REFFILE_YCOLNUM>
-                        -n <NTEMPLATES_TO_USE>
-                        -T - (for stdout)
-                        -i /dev/null (no input file?)
-
-    '''
-
-    tfa_stage1_results = {}
-
-    for aperture in [1,2,3]:
-
-        tfacmdstr = ("tfa -r {inputfile} --col-ref-id 1 "
-                     "--col-ref-x 6 --col-ref-y 7 "
-                     "-n {ntemplates} -T - -i /dev/null")
-
-        tfacmd = tfacmdstr.format(
-            inputfile=tfainfo[aperture]['info_file'],
-            ntemplates=int(tfainfo[aperture]['target_tfa_nstars'])
-        )
-
-        print('aperture %s: starting TFA stage 1...' % aperture)
-
-        if DEBUG:
-            print(tfacmd)
-
-        tfaproc = subprocess.Popen(shlex.split(tfacmd),
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
-
-        tfa_stdout, tfa_stderr = tfaproc.communicate()
-
-        # get results if succeeded, log outcome, and return path of outfile
-        if tfaproc.returncode == 0 or tfa_stdout:
-            tfaobjects = tfa_stdout.split('\n')
-            tfaobjects = [x for x in tfaobjects if x.startswith('HAT-')]
-            print('aperture %s: TFA stage 1 completed, %s templates selected' %
-                  (aperture, len(tfaobjects)))
-            tfa_stage1_results[aperture] = tfaobjects
-        else:
-            print('aperture %s: TFA stage 1 failed, error was: %s' %
-                  (aperture, tfa_stderr))
-            tfa_stage1_results[aperture] = None
-
-    return tfa_stage1_results
-
-
-
 def run_tfa_singlelc(epdlc,
                      templatefiles,
                      outfile=None,
@@ -2901,50 +2531,79 @@ def run_tfa_singlelc(epdlc,
 
     tfalc_output = []
 
-    # run tfa for each aperture
-    for templatef, magcol, magind in zip(templatefiles,
-                                         epdlc_magcol,
-                                         range(len(epdlc_magcol))):
+    # figure out the number of templates for each aperture; only the stars with
+    # ndets > 2 x number of templates will have TFA light-curves generated
 
-        in_jdcol = epdlc_jdcol + 1
-        in_magcol = magcol + 1
-        out_magcol = in_magcol + 3
+    # get the ndets for this epdlc
+    with open(epdlc,'rb') as epdfile:
+        epdlines = epdfile.readlines()
+        epdlen = len(epdlines)
 
-        aperture_outfile = outfile + ('.TF%s' % (magind+1))
+    tfarunnable = False
 
-        tfacmd = tfacmdstr.format(epdlc=epdlc,
-                                  templatefile=templatef,
-                                  epdlc_jdcol=in_jdcol,
-                                  epdlc_magcol=in_magcol,
-                                  tfalc_magcol=out_magcol,
-                                  template_sigclip=template_sigclip,
-                                  epdlc_sigclip=epdlc_sigclip,
-                                  out_tfalc=aperture_outfile)
+    # check if the number of detections in this LC is more than 2 x ntemplates
+    # for each aperture
 
-        if DEBUG:
-            print(tfacmd)
+    for tfatempf in templatefiles:
+        with open(tfatempf,'rb') as tfatemplist:
+            templistlines = tfatempf.readlines()
+            tfatemplen = len(templistlines)
+            if tfatemplen <= 2*epdlen:
+                tfarunnable = True
 
-        # execute the tfa shell command
-        tfaproc = subprocess.Popen(shlex.split(tfacmd),
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
+    if tfarunnable:
 
-        # get results
-        tfa_stdout, tfa_stderr = tfaproc.communicate()
+        # run tfa for each aperture
+        for templatef, magcol, magind in zip(templatefiles,
+                                             epdlc_magcol,
+                                             range(len(epdlc_magcol))):
 
-        # get results if succeeded, log outcome, and return path of outfile
-        if tfaproc.returncode == 0:
+            in_jdcol = epdlc_jdcol + 1
+            in_magcol = magcol + 1
+            out_magcol = in_magcol + 3
 
-            tfalc_output.append(aperture_outfile)
+            aperture_outfile = outfile + ('.TF%s' % (magind+1))
 
-        else:
+            tfacmd = tfacmdstr.format(epdlc=epdlc,
+                                      templatefile=templatef,
+                                      epdlc_jdcol=in_jdcol,
+                                      epdlc_magcol=in_magcol,
+                                      tfalc_magcol=out_magcol,
+                                      template_sigclip=template_sigclip,
+                                      epdlc_sigclip=epdlc_sigclip,
+                                      out_tfalc=aperture_outfile)
 
-            print('%sZ: aperture %s TFA failed for %s! Error was: %s' %
-                  (datetime.utcnow().isoformat(), magind+1, epdlc), tfa_stderr)
+            if DEBUG:
+                print(tfacmd)
 
-            tfalc_output.append(None)
+            # execute the tfa shell command
+            tfaproc = subprocess.Popen(shlex.split(tfacmd),
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE)
 
-    return tfalc_output
+            # get results
+            tfa_stdout, tfa_stderr = tfaproc.communicate()
+
+            # get results if succeeded, log outcome, and return path of outfile
+            if tfaproc.returncode == 0:
+
+                tfalc_output.append(aperture_outfile)
+
+            else:
+
+                print('%sZ: aperture %s TFA failed for %s! Error was: %s' %
+                      (datetime.utcnow().isoformat(), magind+1, epdlc), tfa_stderr)
+
+                tfalc_output.append(None)
+
+        return tfalc_output
+
+    else:
+
+        print('ERR! %sZ: no TFA possible for %s! ndet < 2 x n(TFA templates)' %
+              (datetime.utcnow().isoformat(), epdlc))
+        return None
+
 
 
 def parallel_tfa_worker(task):
