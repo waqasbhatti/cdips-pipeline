@@ -3421,7 +3421,7 @@ def run_tfa_stage1(tfainfo):
 
         tfacmd = tfacmdstr.format(
             inputfile=tfainfo[aperture]['info_file'],
-            ntemplates=int(tfainfo[aperture]['target_tfa_nstars'])
+            ntemplates=int(tfainfo[aperture]['target_tfa_nstars'])+30
         )
 
         print('aperture %s: starting TFA stage 1...' % aperture)
