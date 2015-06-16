@@ -1165,7 +1165,6 @@ def select_photref_frames(fitsdir,
     selectind = haind & moonind & zenithind
 
     selected_frames = infodict['frames'][selectind]
-
     selected_ngoodobj = infodict['ngoodobjs'][selectind]
     selected_medmagerr = infodict['medmagerr'][selectind]
     selected_magerrmad = infodict['magerrmad'][selectind]
@@ -2121,20 +2120,21 @@ def imagesublc_collection_worker(task):
 
 
 
-def parallel_collect_imagesublcs(framedir,
-                                 outdir,
-                                 frameglob='subtracted-*-xtrns.fits',
-                                 photindexdb=None,
-                                 photdir=None,
-                                 photext='iphot',
-                                 maxframes=None,
-                                 overwritephotindex=False,
-                                 skipcollectedlcs=True,
-                                 iphotlinefunc=get_iphot_line,
-                                 iphotlinechars=260,
-                                 nworkers=16,
-                                 maxworkertasks=1000
-                                 ):
+def parallel_collect_imagesub_lightcurves(
+    framedir,
+    outdir,
+    frameglob='subtracted-*-xtrns.fits',
+    photindexdb=None,
+    photdir=None,
+    photext='iphot',
+    maxframes=None,
+    overwritephotindex=False,
+    skipcollectedlcs=True,
+    iphotlinefunc=get_iphot_line,
+    iphotlinechars=260,
+    nworkers=16,
+    maxworkertasks=1000
+    ):
     '''
     This collects all .iphot files into lightcurves.
 
