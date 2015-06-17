@@ -1900,6 +1900,8 @@ def make_photometry_indexdb(framedir,
 
             for ind, hatid in enumerate(phothatids):
 
+                print(hatid, ind, type(ind))
+
                 # update the DB with phot info
                 cur.execute(HATIDS_INSERT_CMD,
                             (hatid,
