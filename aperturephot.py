@@ -3419,6 +3419,8 @@ def run_tfa_stage1(tfainfo):
                      "--col-ref-x 6 --col-ref-y 7 "
                      "-n {ntemplates} -T - -i /dev/null")
 
+        # the +30 is to force selection of slightly more than the number
+        # of strictly required templates
         tfacmd = tfacmdstr.format(
             inputfile=tfainfo[aperture]['info_file'],
             ntemplates=int(tfainfo[aperture]['target_tfa_nstars'])+30

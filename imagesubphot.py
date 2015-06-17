@@ -1425,11 +1425,14 @@ def photometry_on_combined_photref(
         ccdgain=None,
         zeropoint=None,
         ccdexptime=None,
-        apertures='2.95:7.0:6.0,3.35:7.0:6.0,3.95:7.0:6.0',
+        apertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
         outfile=None
 ):
     '''This runs fiphot in the special iphot mode on the combined photometric
     reference frame. See cmrawphot.sh for the correct commandline to use.
+
+    Chelsea's apertures='2.95:7.0:6.0,3.35:7.0:6.0,3.95:7.0:6.0'
+
 
     '''
 
