@@ -44,12 +44,16 @@ GENERAL ORDER OF THINGS
    this. see the docstring there for the list of selectors used. we'll then
    stack these photrefs into a combined photref later.
 
-7. now that we have photrefs, we have to convolve their PSFs to the best
-   available PSF we have (from the astromref). in this way, we match both the
-   PSF of the image and the coordinates; these are needed to combine the frames
-   correctly. use covolve_photref_frames for this task. this function produces
-   FITS with PHOTREF- prefixes to indicate that these are the convolved photref
-   frames.
+7. now that we have photrefs, we have to convolve their PSFs. we convolve their
+   PSFs to one of the photrefs in this list. this frame should have round stars,
+   low background, but somewhere around the softest PSF FWHM in the list of
+   candidate photrefs (we don't want the sharpest of the images -> so choosing
+   the astromref as the photref is a bad idea).
+
+   in this way, we match both the PSF of the image and the coordinates; these
+   are needed to combine the frames correctly. use covolve_photref_frames for
+   this task. this function produces FITS with PHOTREF- prefixes to indicate
+   that these are the convolved photref frames.
 
 8. use combine_frames to combine all PHOTREF-*-xtrns.fits frames. this creates a
    single high quality photometric reference frame that we'll subtract from all
@@ -58,7 +62,10 @@ GENERAL ORDER OF THINGS
 9. get raw photometry on this combined photref by using
    photometry_on_combined_photref. this produces the base photometry values that
    we'll be diffing from those found in the difference images to get difference
-   magnitudes.
+   magnitudes. we need to redo source extraction and photometry on this frame
+   (possibly with anet to find actual sources). best not to use the existing
+   sourcelist for the normal frame counterpart to the combined photometric
+   reference frame.
 
 10. use convolve_and_subtract_frames to convolve all other frames to the
     combined photref, and generate difference images. the produced images will
