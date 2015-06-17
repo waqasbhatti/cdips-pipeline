@@ -2196,7 +2196,7 @@ def parallel_collect_imagesub_lightcurves(
     # if the photometry index DB doesn't exist, nothing we can do
     else:
 
-        print('ERR! %sZ: %s specified photometry index DB does not exist!' %
+        print('ERR! %sZ: specified photometry index DB does not exist!' %
               (datetime.utcnow().isoformat(), ))
 
 
