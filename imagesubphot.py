@@ -1252,6 +1252,11 @@ def select_photref_frames(fitsdir,
         frame_final_ind = select_background[:minframes]
 
     final_frames = selected_frames[frame_final_ind]
+    final_svalues = selected_medsvalue[frame_final_ind]
+
+    # the master photref is the frame we'll convolve all of the rest of the
+    # photrefs to
+    candidate_master_photref = final_frames[np.nanargmax(final_svalues)]
 
     # make JPEGs of the selected photref frames
     for final_frame in final_frames:
@@ -1265,7 +1270,7 @@ def select_photref_frames(fitsdir,
                 )
             )
 
-    return final_frames.tolist(), infodict
+    return candidate_master_photref, final_frames.tolist(), infodict
 
 
 
