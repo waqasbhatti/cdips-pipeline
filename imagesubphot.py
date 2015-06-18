@@ -1212,7 +1212,7 @@ def select_photref_frames(fitsdir,
     sorted_medsrcbkg_ind = (np.argsort(selected_medsrcbkg))[:2*minframes]
     sorted_stdsrcbkg_ind = (np.argsort(selected_stdsrcbkg))[:2*minframes]
 
-    sorted_medsvalue_ind = (np.argsort(selected_medsvalue))[::-1])[:2*minframes]
+    sorted_medsvalue_ind = (np.argsort(selected_medsvalue)[::-1])[:2*minframes]
     sorted_meddvalue_ind = (np.argsort(selected_meddvalue))[:2*minframes]
 
     # find intersects for background
