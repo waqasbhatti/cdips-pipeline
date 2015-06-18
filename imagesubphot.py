@@ -1204,52 +1204,20 @@ def select_photref_frames(fitsdir,
           (datetime.utcnow().isoformat(), len(selected_frames)))
 
     # sort the pre-selected frames
-    sorted_ngoodobj_ind = (np.argsort(selected_ngoodobj)[::-1])[:2*minframes]
+    sorted_medsrcbkg_ind = (np.argsort(selected_medsrcbkg))
+    sorted_stdsrcbkg_ind = (np.argsort(selected_stdsrcbkg))
 
-    sorted_medmagerr_ind = (np.argsort(selected_medmagerr))[:2*minframes]
-    sorted_magerrmad_ind = (np.argsort(selected_magerrmad))[:2*minframes]
+    sorted_medsvalue_ind = (np.argsort(selected_medsvalue)[::-1])
+    sorted_meddvalue_ind = (np.argsort(np.fabs(selected_meddvalue)))
 
-    sorted_medsrcbkg_ind = (np.argsort(selected_medsrcbkg))[:2*minframes]
-    sorted_stdsrcbkg_ind = (np.argsort(selected_stdsrcbkg))[:2*minframes]
-
-    sorted_medsvalue_ind = (np.argsort(selected_medsvalue)[::-1])[:2*minframes]
-    sorted_meddvalue_ind = (np.argsort(selected_meddvalue))[:2*minframes]
-
-    # find intersects for background
-    select_background = np.intersect1d(sorted_stdsrcbkg_ind,
-                                       sorted_medsrcbkg_ind,
-                                       assume_unique=True)
-
-    # find intersects for S and D
-    select_fwhm = np.intersect1d(sorted_medsvalue_ind,
-                                 sorted_meddvalue_ind,
-                                 assume_unique=True)
+    # we select in the following order
+    # 1. lowest background
+    # 2. lowest background stdev
+    # 3. D closest to 0
+    # 4. largest S
 
 
-    # find intersects for background and FWHM
-    select_final_ind = np.intersect1d(select_background,
-                                      select_fwhm,
-                                      assume_unique=True)
 
-    # finally return the best frames for use with the photref convolution and
-    # the infodict
-    if len(select_final_ind) > 0:
-
-        print('%sZ: selected %s frames with background + FWHM' %
-              (datetime.utcnow().isoformat(), len(select_final_ind)))
-        frame_final_ind = select_final_ind[:minframes]
-
-    elif len(select_fwhm) > 0:
-
-        print('%sZ: selected %s frames with FWHM only' %
-              (datetime.utcnow().isoformat(), len(select_fwhm)))
-        frame_final_ind = select_fwhm[:minframes]
-
-    elif len(select_background):
-
-        print('%sZ: selected %s frames with background only' %
-              (datetime.utcnow().isoformat(), len(select_background)))
-        frame_final_ind = select_background[:minframes]
 
     final_frames = selected_frames[frame_final_ind]
     final_svalues = selected_medsvalue[frame_final_ind]
