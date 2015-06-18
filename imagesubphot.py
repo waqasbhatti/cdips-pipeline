@@ -1236,19 +1236,19 @@ def select_photref_frames(fitsdir,
     if len(select_final_ind) > 0:
 
         print('%sZ: selected %s frames with background + FWHM' %
-              (datetime.utcnow().isoformat(), len(selected_final_ind)))
+              (datetime.utcnow().isoformat(), len(select_final_ind)))
         frame_final_ind = select_final_ind[:minframes]
 
     elif len(select_fwhm) > 0:
 
         print('%sZ: selected %s frames with FWHM only' %
-              (datetime.utcnow().isoformat(), len(selected_fwhm)))
+              (datetime.utcnow().isoformat(), len(select_fwhm)))
         frame_final_ind = select_fwhm[:minframes]
 
     elif len(select_background):
 
         print('%sZ: selected %s frames with background only' %
-              (datetime.utcnow().isoformat(), len(selected_fwhm)))
+              (datetime.utcnow().isoformat(), len(select_background)))
         frame_final_ind = select_background[:minframes]
 
     final_frames = selected_frames[frame_final_ind]
