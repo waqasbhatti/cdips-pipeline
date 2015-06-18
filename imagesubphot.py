@@ -916,6 +916,7 @@ def select_photref_frames(fitsdir,
     - best median scatter of photometry
     - lowest median error in photometry
     - lowest median background measurement
+    - lowest MAD in the background measurements
     - low zenith distance
     - high moon distance and lowest moon elevation
     - hour angle with +/- 3 hours
@@ -926,8 +927,9 @@ def select_photref_frames(fitsdir,
     background values of each frames be within some delta of the overall
     median. this is basically a slacker way to get rid of cloudy nights.
 
-    2. we convolve all of these to the astrometric reference frame's PSF
-    (they're already in the same coordinates as the astromref).
+    2. we convolve all of these to the the best photometric reference frame's
+    PSF (they're already in the same coordinate frame since everything was
+    translated to the astromref's coordinate frame).
 
     3. now that all the frames are in the same coordinate system, and have been
     convolved to the same PSF, we can median-stack them (using scipy or
@@ -993,11 +995,13 @@ def select_photref_frames(fitsdir,
         forcecollectinfo):
 
         # from the FITS
-        zenithdist, moondist, moonelev, moonphase, hourangle = [], [], [], [], []
+        (zenithdist, moondist, moonelev,
+         moonphase, hourangle) = [], [], [], [], []
 
-        # from the fiphot files
-        ngoodobjects, medmagerr, magerrmad, medsrcbg = [], [], [], []
-
+        # from the fiphot and fistar files
+        (ngoodobjects, medmagerr, magerrmad,
+         medsrcbg, stdsrcbg,
+         medsvalue, meddvalue) = [], [], [], [], [], [], []
 
         for frame, phot, srclist in zip(goodframes, goodphots, goodsrclists):
 
@@ -1046,7 +1050,7 @@ def select_photref_frames(fitsdir,
                     names=['mag','err','flag']
                     )
 
-            # 3. get the data fro mthe fistar file
+            # 3. get the data from the fistar file
             srcdata = np.genfromtxt(srclist,
                                     usecols=(3,5,6),
                                     dtype='f8,f8,f8',
@@ -1102,11 +1106,16 @@ def select_photref_frames(fitsdir,
             medmagerr.append(median_magerr)
             magerrmad.append(medabsdev_mag)
 
-            # fistar data
+            # fistar data -- background
             medsrcbg.append(np.nanmedian(srcdata['background']))
+            stdsrcbg.append(np.nanstd(srcdata['background']))
+
+            # fistar data -- PSF
+            medsvalue.append(np.nanmedian(srcdata['svalue']))
+            meddvalue.append(np.nanmedian(srcdata['dvalue']))
 
         #
-        # done with collecting data, choose the best photometric reference frames
+        # done with collecting data, get the best photometric reference frames
         #
 
         # convert all lists to np.arrays first
@@ -1121,6 +1130,10 @@ def select_photref_frames(fitsdir,
         magerrmad = np.array(magerrmad)
 
         medsrcbg = np.array(medsrcbg)
+        stdsrcbg = np.array(stdsrcbg)
+
+        medsvalue = np.array(medsvalue)
+        meddvalue = np.array(meddvalue)
 
         goodframes = np.array(goodframes)
 
@@ -1134,7 +1147,10 @@ def select_photref_frames(fitsdir,
             'ngoodobjs':ngoodobjects,
             'medmagerr':medmagerr,
             'magerrmad':magerrmad,
-            'medsrcbkg':medsrcbg
+            'medsrcbkg':medsrcbg,
+            'stdsrcbkg':stdsrcbg,
+            'medsvalue':medsvalue,
+            'meddvalue':meddvalue
         }
 
         # write this info dict to a file so we can quickly load it later
@@ -1173,93 +1189,71 @@ def select_photref_frames(fitsdir,
 
     selected_frames = infodict['frames'][selectind]
     selected_ngoodobj = infodict['ngoodobjs'][selectind]
+
     selected_medmagerr = infodict['medmagerr'][selectind]
     selected_magerrmad = infodict['magerrmad'][selectind]
+
     selected_medsrcbkg = infodict['medsrcbkg'][selectind]
+    selected_stdsrcbkg = infodict['stdsrcbkg'][selectind]
+
+    selected_medsvalue = infodict['medsvalue'][selectind]
+    selected_meddvalue = infodict['meddvalue'][selectind]
 
     print('%sZ: selected %s frames with acceptable '
           'HA, Z, moon phase, and elevation for further filtering...' %
           (datetime.utcnow().isoformat(), len(selected_frames)))
 
-    # do the more strict selection only if we have at least 2 x minframes
-    if len(selected_frames) >= 2*minframes:
+    # sort the pre-selected frames
+    sorted_ngoodobj_ind = (np.argsort(selected_ngoodobj)[::-1])
 
-        # now sort these by the required order
-        sorted_ngoodobj_ind = (np.argsort(selected_ngoodobj)[::-1])[:2*minframes]
-        sorted_medmagerr_ind = (np.argsort(selected_medmagerr))[:2*minframes]
-        sorted_magerrmad_ind = (np.argsort(selected_magerrmad))[:2*minframes]
-        sorted_medsrcbkg_ind = (np.argsort(selected_medsrcbkg))[:2*minframes]
+    sorted_medmagerr_ind = (np.argsort(selected_medmagerr))
+    sorted_magerrmad_ind = (np.argsort(selected_magerrmad))
 
-        select_ind1 = np.intersect1d(
-            sorted_medmagerr_ind,
-            sorted_magerrmad_ind,
-            assume_unique=True
-        )
-        select_ind2 = np.intersect1d(
-            sorted_ngoodobj_ind,
-            sorted_medsrcbkg_ind,
-            assume_unique=True
-        )
+    sorted_medsrcbkg_ind = (np.argsort(selected_medsrcbkg))
+    sorted_stdsrcbkg_ind = (np.argsort(selected_stdsrcbkg))
 
-        best_ind = np.intersect1d(
-            select_ind1,
-            select_ind2,
-            assume_unique=True
-        )
+    sorted_medsvalue_ind = (np.argsort(selected_medsvalue))[::-1]
+    sorted_meddvalue_ind = (np.argsort(selected_meddvalue))
 
-        if len(best_ind) >= minframes:
+    # find intersects for background
+    select_background = np.intersect1d(sorted_stdsrcbkg_ind,
+                                       sorted_medsrcbkg_ind,
+                                       assume_unique=True)
 
-            print('%sZ: selecting frames based on '
-                  'detections, med mag err, med mag MAD, background' %
-                  (datetime.utcnow().isoformat(), ))
+    # find intersects for S and D
+    select_fwhm = np.intersect1d(sorted_medsvalue_ind,
+                                 sorted_meddvalue_ind,
+                                 assume_unique=True)
 
-            final_ind = best_ind[:minframes]
 
-        elif len(select_ind2) >= minframes:
-
-            print('WRN! %sZ: selecting frames based on '
-                  'detections, background' %
-                  (datetime.utcnow().isoformat(), ))
-
-            final_ind = select_ind2[:minframes]
-
-        elif len(select_ind1) >= minframes:
-
-            print('WRN! %sZ: selecting frames based on '
-                  'med mag err, med mag MAD' %
-                  (datetime.utcnow().isoformat(), ))
-
-            final_ind = select_ind1[:minframes]
-
-        elif len(sorted_medsrcbkg_ind) >= minframes:
-
-            print('WRN! %sZ: selecting frames based on '
-                  'background only' %
-                  (datetime.utcnow().isoformat(), ))
-
-            final_ind = sorted_medsrcbkg_ind[:minframes]
-
-        else:
-
-            print('ERR! %sZ: not enough frames to select photref!.' %
-                  (datetime.utcnow().isoformat(), ))
-            return None, infodict
-
-        # the final set of frames
-        final_frames = selected_frames[final_ind]
-
-    else:
-
-        print('WRN! %sZ: not enough pre-selected frames to cut down '
-              'to a minimum set, selecting those with lowest background...' %
-              (datetime.utcnow().isoformat(), ))
-
-        final_ind = (np.argsort(selected_medsrcbkg))[:minframes]
-        final_frames = selected_frames[final_ind]
+    # find intersects for background and FWHM
+    select_final_ind = np.intersect1d(select_background,
+                                      select_fwhm,
+                                      assume_unique=True)
 
     # finally return the best frames for use with the photref convolution and
     # the infodict
+    if len(select_final_ind) > 0:
 
+        print('%sZ: selected %s frames with background + FWHM' %
+              (datetime.utcnow().isoformat(), len(selected_final_ind)))
+        frame_final_ind = select_final_ind[:minframes]
+
+    elif len(select_fwhm) > 0:
+
+        print('%sZ: selected %s frames with FWHM only' %
+              (datetime.utcnow().isoformat(), len(selected_fwhm)))
+        frame_final_ind = select_fwhm[:minframes]
+
+    elif len(select_background):
+
+        print('%sZ: selected %s frames with background only' %
+              (datetime.utcnow().isoformat(), len(selected_fwhm)))
+        frame_final_ind = select_background[:minframes]
+
+    final_frames = selected_frames[frame_final_ind]
+
+    # make JPEGs of the selected photref frames
     for final_frame in final_frames:
 
         framejpg = fits_to_full_jpeg(
@@ -1276,8 +1270,8 @@ def select_photref_frames(fitsdir,
 
 
 def photref_convolution_worker(task):
-    '''This is a parallel worker to convolve the photref frames to the astromref
-    frame. Used by convolve_photref_frames below.
+    '''This is a parallel worker to convolve the photref frames to the chosen
+    master photref frame. Used by convolve_photref_frames below.
 
     task[0] -> the frame to convolve
     task[1] -> the frame to use as the convolution target
