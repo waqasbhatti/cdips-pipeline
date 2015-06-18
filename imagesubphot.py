@@ -1255,8 +1255,8 @@ def select_photref_frames(fitsdir,
     final_svalues = selected_medsvalue[frame_final_ind]
 
     # the master photref is the frame we'll convolve all of the rest of the
-    # photrefs to
-    candidate_master_photref = final_frames[np.nanargmax(final_svalues)]
+    # photrefs to. it's the softest of these frames
+    candidate_master_photref = final_frames[np.nanargmin(final_svalues)]
 
     # make JPEGs of the selected photref frames
     for final_frame in final_frames:
