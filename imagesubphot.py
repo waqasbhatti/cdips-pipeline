@@ -1204,16 +1204,16 @@ def select_photref_frames(fitsdir,
           (datetime.utcnow().isoformat(), len(selected_frames)))
 
     # sort the pre-selected frames
-    sorted_ngoodobj_ind = (np.argsort(selected_ngoodobj)[::-1])
+    sorted_ngoodobj_ind = (np.argsort(selected_ngoodobj)[::-1])[:int(1.5*minframes)]
 
-    sorted_medmagerr_ind = (np.argsort(selected_medmagerr))
-    sorted_magerrmad_ind = (np.argsort(selected_magerrmad))
+    sorted_medmagerr_ind = (np.argsort(selected_medmagerr))[:int(1.5*minframes)]
+    sorted_magerrmad_ind = (np.argsort(selected_magerrmad))[:int(1.5*minframes)]
 
-    sorted_medsrcbkg_ind = (np.argsort(selected_medsrcbkg))
-    sorted_stdsrcbkg_ind = (np.argsort(selected_stdsrcbkg))
+    sorted_medsrcbkg_ind = (np.argsort(selected_medsrcbkg))[:int(1.5*minframes)]
+    sorted_stdsrcbkg_ind = (np.argsort(selected_stdsrcbkg))[:int(1.5*minframes)]
 
-    sorted_medsvalue_ind = (np.argsort(selected_medsvalue))[::-1]
-    sorted_meddvalue_ind = (np.argsort(selected_meddvalue))
+    sorted_medsvalue_ind = (np.argsort(selected_medsvalue))[::-1])[:int(1.5*minframes)]
+    sorted_meddvalue_ind = (np.argsort(selected_meddvalue))[:int(1.5*minframes)]
 
     # find intersects for background
     select_background = np.intersect1d(sorted_stdsrcbkg_ind,
