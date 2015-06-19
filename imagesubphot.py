@@ -899,7 +899,7 @@ def select_photref_frames(fitsdir,
                           srclistdir=None,
                           srclistext='.fistar',
                           minframes=80,
-                          maxhourangle=3.0,
+                          maxhourangle=2.0,
                           maxmoonphase=25.0,
                           maxmoonelev=-10.0,
                           maxzenithdist=30.0,
@@ -1203,24 +1203,53 @@ def select_photref_frames(fitsdir,
           'HA, Z, moon phase, and elevation for further filtering...' %
           (datetime.utcnow().isoformat(), len(selected_frames)))
 
-    # sort the pre-selected frames
-    sorted_medsrcbkg_ind = (np.argsort(selected_medsrcbkg))
-    sorted_stdsrcbkg_ind = (np.argsort(selected_stdsrcbkg))
-
-    sorted_medsvalue_ind = (np.argsort(selected_medsvalue)[::-1])
-    sorted_meddvalue_ind = (np.argsort(np.fabs(selected_meddvalue)))
-
     # we select in the following order
     # 1. lowest background
     # 2. lowest background stdev
     # 3. D closest to 0
     # 4. largest S
 
+    # sort using the lowest background
+    stage1_sort_ind = (np.argsort(selected_medsrcbkg))
 
+    stage1_frames = selected_frames[stage1_sort_ind]
+    stage1_median_bgv = selected_medsrcbkg[stage1_sort_ind]
+    stage1_stdev_bgv = selected_stdsrcbkg[stage1_sort_ind]
+    stage1_svalue = selected_medsvalue[stage1_sort_ind]
+    stage1_dvalue = selected_meddvalue[stage1_sort_ind]
 
+    # next, sort by lowest stdev of the background
+    stage2_sort_ind = (np.argsort(stage1_stdev_bgv))
 
-    final_frames = selected_frames[frame_final_ind]
-    final_svalues = selected_medsvalue[frame_final_ind]
+    stage2_frames = stage1_frames[stage2_sort_ind]
+    stage2_median_bgv = stage1_median_bgv[stage2_sort_ind]
+    stage2_stdev_bgv = stage1_stdev_bgv[stage2_sort_ind]
+    stage2_svalue = stage1_svalue[stage2_sort_ind]
+    stage2_dvalue = stage1_dvalue[stage2_sort_ind]
+
+    # next, sort by roundest stars
+    stage3_sort_ind = (np.argsort(np.fabs(stage2_dvalue)))
+
+    stage3_frames = stage2_frames[stage3_sort_ind]
+    stage3_median_bgv = stage2_median_bgv[stage3_sort_ind]
+    stage3_stdev_bgv = stage2_stdev_bgv[stage3_sort_ind]
+    stage3_svalue = stage2_svalue[stage3_sort_ind]
+    stage3_dvalue = stage2_svalue[stage3_sort_ind]
+
+    # next, sort by highest S value
+    stage4_sort_ind = (np.argsort(stage3_svalue))[::-1]
+
+    stage4_frames = stage3_frames[stage4_sort_ind[:minframes]]
+    stage4_median_bgv = stage3_median_bgv[stage4_sort_ind[:minframes]]
+    stage4_stdev_bgv = stage3_stdev_bgv[stage4_sort_ind[:minframes]]
+    stage4_svalue = stage3_svalue[stage4_sort_ind[:minframes]]
+    stage4_dvalue = stage3_svalue[stage4_sort_ind[:minframes]]
+
+    print('%sZ: selected %s final frames as photref' %
+          (datetime.utcnow().isoformat(), len(stage4_frames)))
+
+    final_frames = stage4_frames
+    final_svalues = stage4_svalue
 
     # the master photref is the frame we'll convolve all of the rest of the
     # photrefs to. it's the softest of these frames
