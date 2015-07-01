@@ -992,9 +992,13 @@ def select_photref_frames(fitsdir,
     # high moon and sun distance
     # large number of stars detected
 
-    if (not os.path.exists(os.path.join(fitsdir,
-                                         'TM-imagesub-photref.pkl')) or
-        forcecollectinfo):
+    outpostfix = (
+        fitsglob.replace('*','').replace('?','').replace('.fits','')
+        )
+    pklfile = os.path.join(os.path.abspath(fitsdir),
+                           'TM-imagesub-photref-%s.pkl' % outpostfix)
+
+    if (not os.path.exists(pklfile) or forcecollectinfo):
 
         # from the FITS
         (zenithdist, moondist, moonelev,
@@ -1156,14 +1160,7 @@ def select_photref_frames(fitsdir,
         }
 
         # write this info dict to a file so we can quickly load it later
-
-        outpostfix = (
-            fitsglob.replace('*','').replace('?','').replace('.fits','')
-            )
-
-        outpf = open(os.path.join(fitsdir,
-                                  'TM-imagesub-photref-%s.pkl' % outpostfix),
-                     'wb')
+        outpf = open(pklfile,'wb')
         pickle.dump(infodict, outpf, pickle.HIGHEST_PROTOCOL)
         outpf.close()
 
@@ -1173,12 +1170,10 @@ def select_photref_frames(fitsdir,
         outpostfix = (
             fitsglob.replace('*','').replace('?','').replace('.fits','')
             )
-        inpf = open(os.path.join(fitsdir,
-                                  'TM-imagesub-photref-%s.pkl' % outpostfix),
-                     'rb')
+        inpf = open(pklfile,'rb')
 
         print('%sZ: loading existing photref select info from %s' %
-              (datetime.utcnow().isoformat(), inpf))
+              (datetime.utcnow().isoformat(), pklfile))
 
         infodict = pickle.load(inpf)
         inpf.close()
