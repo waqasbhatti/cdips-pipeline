@@ -903,7 +903,7 @@ def select_photref_frames(fitsdir,
                           maxmoonphase=25.0,
                           maxmoonelev=-12.0,
                           maxzenithdist=30.0,
-                          maxbackgroundstdev=50.0,
+                          maxbackgroundstdev=20.0,
                           forcecollectinfo=False):
     '''This selects a group of photometric reference frames that will later be
     stacked and medianed to form the single photometric reference frame.
