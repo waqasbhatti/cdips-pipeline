@@ -1261,7 +1261,7 @@ def select_photref_frames(fitsdir,
     final_dvalues = stage2_dvalue[final_selector_ind][:minframes]
 
     print('%sZ: selected %s final frames as photref' %
-          (datetime.utcnow().isoformat(), len(stage4_frames)))
+          (datetime.utcnow().isoformat(), len(final_frames)))
 
     # the master photref is the frame we'll convolve all of the rest of the
     # photrefs to. it's the softest of these frames
