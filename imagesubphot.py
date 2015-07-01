@@ -1222,7 +1222,7 @@ def select_photref_frames(fitsdir,
     # 4. largest S
 
     # next, sort by lowest stdev of the background
-    stage1_sort_ind = (np.argsort(selected_stdsrcbgv))
+    stage1_sort_ind = (np.argsort(selected_stdsrcbkg))
 
     stage1_frames = selected_frames[stage1_sort_ind[:2*minframes]]
     stage1_median_bgv = selected_medsrcbkg[stage1_sort_ind[:2*minframes]]
