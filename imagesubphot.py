@@ -899,10 +899,10 @@ def select_photref_frames(fitsdir,
                           srclistdir=None,
                           srclistext='.fistar',
                           minframes=80,
-                          maxhourangle=2.0,
+                          maxhourangle=1.5,
                           maxmoonphase=25.0,
-                          maxmoonelev=-10.0,
-                          maxzenithdist=30.0,
+                          maxmoonelev=-12.0,
+                          maxzenithdist=20.0,
                           forcecollectinfo=False):
     '''This selects a group of photometric reference frames that will later be
     stacked and medianed to form the single photometric reference frame.
@@ -1168,11 +1168,17 @@ def select_photref_frames(fitsdir,
     # if the imagesub photref info file exists already, load it up
     else:
 
-        print('%sZ: loading existing photref select info from %s' %
-              (datetime.utcnow().isoformat(),
-               os.path.join(fitsdir, 'TM-imagesub-photref.pkl')))
+        outpostfix = (
+            fitsglob.replace('*','').replace('?','').replace('.fits','')
+            )
+        outpf = open(os.path.join(fitsdir,
+                                  'TM-imagesub-photref-%s.pkl' % outpostfix),
+                     'wb')
 
-        inpf = open(os.path.join(fitsdir, 'TM-imagesub-photref.pkl'), 'rb')
+        print('%sZ: loading existing photref select info from %s' %
+              (datetime.utcnow().isoformat(), outpf))
+
+        inpf = open(outpf, 'rb')
         infodict = pickle.load(inpf)
         inpf.close()
 
@@ -1216,23 +1222,23 @@ def select_photref_frames(fitsdir,
     # 3. D closest to 0
     # 4. largest S
 
-    # sort using the lowest background
-    stage1_sort_ind = (np.argsort(selected_medsrcbkg))
-
-    stage1_frames = selected_frames[stage1_sort_ind][:2*minframes]
-    stage1_median_bgv = selected_medsrcbkg[stage1_sort_ind][:2*minframes]
-    stage1_stdev_bgv = selected_stdsrcbkg[stage1_sort_ind][:2*minframes]
-    stage1_svalue = selected_medsvalue[stage1_sort_ind][:2*minframes]
-    stage1_dvalue = selected_meddvalue[stage1_sort_ind][:2*minframes]
-
     # next, sort by lowest stdev of the background
-    stage2_sort_ind = (np.argsort(stage1_stdev_bgv))
+    stage1_sort_ind = (np.argsort(stage1_stdev_bgv))
 
-    stage2_frames = stage1_frames[stage2_sort_ind][:minframes]
-    stage2_median_bgv = stage1_median_bgv[stage2_sort_ind][:minframes]
-    stage2_stdev_bgv = stage1_stdev_bgv[stage2_sort_ind][:minframes]
-    stage2_svalue = stage1_svalue[stage2_sort_ind][:minframes]
-    stage2_dvalue = stage1_dvalue[stage2_sort_ind][:minframes]
+    stage1_frames = selected_frames[stage1_sort_ind[:2*minframes]]
+    stage1_median_bgv = selected_medsrcbkg[stage1_sort_ind[:2*minframes]]
+    stage1_stdev_bgv = selected_stdsrcbkg[stage1_sort_ind[:2*minframes]]
+    stage1_svalue = selected_medsvalue[stage1_sort_ind[:2*minframes]]
+    stage1_dvalue = selected_meddvalue[stage1_sort_ind[:2*minframes]]
+
+    # sort using the lowest background
+    stage2_sort_ind = (np.argsort(selected_medsrcbkg))
+
+    stage2_frames = stage1_frames[stage2_sort_ind[:minframes]]
+    stage2_median_bgv = stage1_median_bgv[stage2_sort_ind[:minframes]]
+    stage2_stdev_bgv = stage1_stdev_bgv[stage2_sort_ind[:minframes]]
+    stage2_svalue = stage1_svalue[stage2_sort_ind[:minframes]]
+    stage2_dvalue = stage1_dvalue[stage2_sort_ind[:minframes]]
 
     # next, sort by roundest stars
     stage3_sort_ind = (np.argsort(np.fabs(stage2_dvalue)))
@@ -1246,11 +1252,11 @@ def select_photref_frames(fitsdir,
     # next, sort by highest S value
     stage4_sort_ind = (np.argsort(stage3_svalue))[::-1]
 
-    stage4_frames = stage3_frames[stage4_sort_ind[:minframes]]
-    stage4_median_bgv = stage3_median_bgv[stage4_sort_ind[:minframes]]
-    stage4_stdev_bgv = stage3_stdev_bgv[stage4_sort_ind[:minframes]]
-    stage4_svalue = stage3_svalue[stage4_sort_ind[:minframes]]
-    stage4_dvalue = stage3_svalue[stage4_sort_ind[:minframes]]
+    stage4_frames = stage3_frames[stage4_sort_ind]
+    stage4_median_bgv = stage3_median_bgv[stage4_sort_ind]
+    stage4_stdev_bgv = stage3_stdev_bgv[stage4_sort_ind]
+    stage4_svalue = stage3_svalue[stage4_sort_ind]
+    stage4_dvalue = stage3_svalue[stage4_sort_ind]
 
     print('%sZ: selected %s final frames as photref' %
           (datetime.utcnow().isoformat(), len(stage4_frames)))
