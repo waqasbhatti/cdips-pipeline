@@ -1244,11 +1244,11 @@ def select_photref_frames(fitsdir,
     # next, sort by roundest stars
     stage2_sort_ind = (np.argsort(np.fabs(stage1_dvalue)))
 
-    stage2_frames = stage2_frames[stage2_sort_ind]
-    stage2_median_bgv = stage2_median_bgv[stage2_sort_ind]
-    stage2_stdev_bgv = stage2_stdev_bgv[stage2_sort_ind]
-    stage2_svalue = stage2_svalue[stage2_sort_ind]
-    stage2_dvalue = stage2_svalue[stage2_sort_ind]
+    stage2_frames = stage1_frames[stage2_sort_ind]
+    stage2_median_bgv = stage1_median_bgv[stage2_sort_ind]
+    stage2_stdev_bgv = stage1_stdev_bgv[stage2_sort_ind]
+    stage2_svalue = stage1_svalue[stage2_sort_ind]
+    stage2_dvalue = stage1_svalue[stage2_sort_ind]
 
     final_bgvmed_ind = stage2_median_bgv < maxbackgroundmedian
     final_bgvstd_ind = stage2_stdev_bgv < maxbackgroundstdev
