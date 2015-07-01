@@ -1219,20 +1219,20 @@ def select_photref_frames(fitsdir,
     # sort using the lowest background
     stage1_sort_ind = (np.argsort(selected_medsrcbkg))
 
-    stage1_frames = selected_frames[stage1_sort_ind]
-    stage1_median_bgv = selected_medsrcbkg[stage1_sort_ind]
-    stage1_stdev_bgv = selected_stdsrcbkg[stage1_sort_ind]
-    stage1_svalue = selected_medsvalue[stage1_sort_ind]
-    stage1_dvalue = selected_meddvalue[stage1_sort_ind]
+    stage1_frames = selected_frames[stage1_sort_ind][:2*minframes]
+    stage1_median_bgv = selected_medsrcbkg[stage1_sort_ind][:2*minframes]
+    stage1_stdev_bgv = selected_stdsrcbkg[stage1_sort_ind][:2*minframes]
+    stage1_svalue = selected_medsvalue[stage1_sort_ind][:2*minframes]
+    stage1_dvalue = selected_meddvalue[stage1_sort_ind][:2*minframes]
 
     # next, sort by lowest stdev of the background
     stage2_sort_ind = (np.argsort(stage1_stdev_bgv))
 
-    stage2_frames = stage1_frames[stage2_sort_ind]
-    stage2_median_bgv = stage1_median_bgv[stage2_sort_ind]
-    stage2_stdev_bgv = stage1_stdev_bgv[stage2_sort_ind]
-    stage2_svalue = stage1_svalue[stage2_sort_ind]
-    stage2_dvalue = stage1_dvalue[stage2_sort_ind]
+    stage2_frames = stage1_frames[stage2_sort_ind][:minframes]
+    stage2_median_bgv = stage1_median_bgv[stage2_sort_ind][:minframes]
+    stage2_stdev_bgv = stage1_stdev_bgv[stage2_sort_ind][:minframes]
+    stage2_svalue = stage1_svalue[stage2_sort_ind][:minframes]
+    stage2_dvalue = stage1_dvalue[stage2_sort_ind][:minframes]
 
     # next, sort by roundest stars
     stage3_sort_ind = (np.argsort(np.fabs(stage2_dvalue)))
