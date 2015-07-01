@@ -1221,8 +1221,8 @@ def select_photref_frames(fitsdir,
     # 3. D closest to 0
     # 4. largest S
 
-    # next, sort by lowest stdev of the background
-    stage1_sort_ind = (np.argsort(selected_stdsrcbkg))
+    # first sort selector
+    stage1_sort_ind = (np.argsort(selected_medsvalue))[::-1]
 
     stage1_frames = selected_frames[stage1_sort_ind[:2*minframes]]
     stage1_median_bgv = selected_medsrcbkg[stage1_sort_ind[:2*minframes]]
@@ -1233,11 +1233,11 @@ def select_photref_frames(fitsdir,
     # sort using the lowest background
     stage2_sort_ind = (np.argsort(stage1_median_bgv))
 
-    stage2_frames = stage1_frames[stage2_sort_ind[:minframes]]
-    stage2_median_bgv = stage1_median_bgv[stage2_sort_ind[:minframes]]
-    stage2_stdev_bgv = stage1_stdev_bgv[stage2_sort_ind[:minframes]]
-    stage2_svalue = stage1_svalue[stage2_sort_ind[:minframes]]
-    stage2_dvalue = stage1_dvalue[stage2_sort_ind[:minframes]]
+    stage2_frames = stage1_frames[stage2_sort_ind]
+    stage2_median_bgv = stage1_median_bgv[stage2_sort_ind]
+    stage2_stdev_bgv = stage1_stdev_bgv[stage2_sort_ind]
+    stage2_svalue = stage1_svalue[stage2_sort_ind]
+    stage2_dvalue = stage1_dvalue[stage2_sort_ind]
 
     # next, sort by roundest stars
     stage3_sort_ind = (np.argsort(np.fabs(stage2_dvalue)))
@@ -1248,14 +1248,14 @@ def select_photref_frames(fitsdir,
     stage3_svalue = stage2_svalue[stage3_sort_ind]
     stage3_dvalue = stage2_svalue[stage3_sort_ind]
 
-    # next, sort by highest S value
-    stage4_sort_ind = (np.argsort(stage3_svalue))[::-1]
+    # next, sort by lowest background stdev
+    stage4_sort_ind = (np.argsort(stage3_stdev_bgv))
 
-    stage4_frames = stage3_frames[stage4_sort_ind]
-    stage4_median_bgv = stage3_median_bgv[stage4_sort_ind]
-    stage4_stdev_bgv = stage3_stdev_bgv[stage4_sort_ind]
-    stage4_svalue = stage3_svalue[stage4_sort_ind]
-    stage4_dvalue = stage3_svalue[stage4_sort_ind]
+    stage4_frames = stage3_frames[stage4_sort_ind[:minframes]]
+    stage4_median_bgv = stage3_median_bgv[stage4_sort_ind[:minframes]]
+    stage4_stdev_bgv = stage3_stdev_bgv[stage4_sort_ind[:minframes]]
+    stage4_svalue = stage3_svalue[stage4_sort_ind[:minframes]]
+    stage4_dvalue = stage3_svalue[stage4_sort_ind[:minframes]]
 
     print('%sZ: selected %s final frames as photref' %
           (datetime.utcnow().isoformat(), len(stage4_frames)))
