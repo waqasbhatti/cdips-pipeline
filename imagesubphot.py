@@ -899,10 +899,10 @@ def select_photref_frames(fitsdir,
                           srclistdir=None,
                           srclistext='.fistar',
                           minframes=80,
-                          maxhourangle=1.5,
+                          maxhourangle=2.0,
                           maxmoonphase=25.0,
                           maxmoonelev=-12.0,
-                          maxzenithdist=20.0,
+                          maxzenithdist=30.0,
                           maxbackgroundstdev=50.0,
                           forcecollectinfo=False):
     '''This selects a group of photometric reference frames that will later be
