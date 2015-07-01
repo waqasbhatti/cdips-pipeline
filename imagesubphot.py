@@ -1171,14 +1171,13 @@ def select_photref_frames(fitsdir,
         outpostfix = (
             fitsglob.replace('*','').replace('?','').replace('.fits','')
             )
-        outpf = open(os.path.join(fitsdir,
+        inpf = open(os.path.join(fitsdir,
                                   'TM-imagesub-photref-%s.pkl' % outpostfix),
                      'wb')
 
         print('%sZ: loading existing photref select info from %s' %
               (datetime.utcnow().isoformat(), outpf))
 
-        inpf = open(outpf, 'rb')
         infodict = pickle.load(inpf)
         inpf.close()
 
