@@ -1173,7 +1173,7 @@ def select_photref_frames(fitsdir,
             )
         inpf = open(os.path.join(fitsdir,
                                   'TM-imagesub-photref-%s.pkl' % outpostfix),
-                     'wb')
+                     'rb')
 
         print('%sZ: loading existing photref select info from %s' %
               (datetime.utcnow().isoformat(), inpf))
