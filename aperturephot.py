@@ -5493,8 +5493,6 @@ def plot_magrms_comparison(reference_stats_file,
             )
 
         nonzero_ind = np.where(tf3_compcol_ratios > 0.0)
-        print(len(nonzero_ind[0]), type(nonzero_ind[0]))
-
         xcol = (np.array(ref_tf3_mag))[nonzero_ind[0]]
         ycol = tf3_compcol_ratios[nonzero_ind[0]]
 
