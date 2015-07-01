@@ -1430,7 +1430,7 @@ def combine_frames(framelist,
 
 def photometry_on_combined_photref(
         photref_frame,
-        photref_sourcelist,  # this is the matched source list (.sourcelist)
+        fovcatalog,
         srclist_idcol='1',
         srclist_xycol='7,8',
         ccdgain=None,
@@ -1438,9 +1438,11 @@ def photometry_on_combined_photref(
         ccdexptime=None,
         apertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
         outfile=None
-):
-    '''This runs fiphot in the special iphot mode on the combined photometric
-    reference frame. See cmrawphot.sh for the correct commandline to use.
+        ):
+    '''
+    This does source extraction, WCS, catalog projection, and then runs fiphot
+    in the special iphot mode on the combined photometric reference frame. See
+    cmrawphot.sh for the correct commandline to use.
 
     Chelsea's apertures='2.95:7.0:6.0,3.35:7.0:6.0,3.95:7.0:6.0'
 
@@ -1452,7 +1454,20 @@ def photometry_on_combined_photref(
                                                 ['GAIN',
                                                  'GAIN1',
                                                  'GAIN2',
-                                                 'EXPTIME'])
+                                                 'EXPTIME',
+                                                 'RAC',
+                                                 'DECC'])
+
+    # get the RA and DEC from the frame header
+    if 'RAC' in header and 'DECC' in header:
+        frame_ra = header['RAC']*360.0/24.0
+        frame_dec = header['DECC']
+    else:
+        print('ERR! %sZ: no RAC or DECC defined for %s' %
+              (datetime.utcnow().isoformat(),
+               photref_frame))
+        return None
+
 
     # handle the gain and exptime parameters
     if not ccdgain:
@@ -1468,13 +1483,10 @@ def photometry_on_combined_photref(
         ccdexptime = header['EXPTIME'] if 'EXPTIME' in header else None
 
     if not (ccdgain or ccdexptime):
-        print('%sZ: no GAIN or EXPTIME defined for %s' %
+        print('ERR! %sZ: no GAIN or EXPTIME defined for %s' %
               (datetime.utcnow().isoformat(),
                photref_frame))
         return None
-
-    # figure out the fitsbase from the fits sourcelist
-    fitsbase = os.path.basename(photref_sourcelist).strip('.sourcelist')
 
     # handle the zeropoints
     if not zeropoint:
@@ -1485,7 +1497,7 @@ def photometry_on_combined_photref(
         if frameinfo:
             zeropoint = ZEROPOINTS[int(frameinfo[0][-1])]
         else:
-            print('%sZ: no zeropoint magnitude defined for %s' %
+            print('ERR! %sZ: no zeropoint magnitude defined for %s' %
                   (datetime.utcnow().isoformat(),
                    photref_frame))
             return None
@@ -1493,6 +1505,15 @@ def photometry_on_combined_photref(
     # figure out the output path
     if not outfile:
         outfile = os.path.abspath(photref_frame.strip('.fits.fz') + '.cmrawphot')
+
+
+    # FIRST: add source extraction
+
+    # SECOND: add WCS
+
+    # THIRD: add catalog projection to sourcelist
+
+    # FINALLY, run the cmrawphot command
 
     # now assemble the command
     cmdtorun = COMBINEDREFPHOTCMD.format(
