@@ -2818,7 +2818,7 @@ def parallel_collect_aperturephot_lightcurves(framedir,
     # if the photometry index DB doesn't exist, nothing we can do
     else:
 
-        print('ERR! %sZ: %s specified photometry index DB does not exist!' %
+        print('ERR! %sZ: specified photometry index DB does not exist!' %
               (datetime.utcnow().isoformat(), ))
 
 
@@ -5492,7 +5492,8 @@ def plot_magrms_comparison(reference_stats_file,
             np.array(ref_tf3_compcol)/np.array(comp_tf3_compcol)
             )
 
-        xcol, ycol = ref_tf3_mag, tf3_compcol_ratios
+        nonzero_ind = tf3_compcol_ratios > 0.0
+        xcol, ycol = ref_tf3_mag[nonzero_ind], tf3_compcol_ratios[nonzero_ind]
 
         xlabel, ylabel = ('FOV catalog SDSS r mag',
                           'TF3 median abs. dev. %s/%s' % (ref_name, comp_name))

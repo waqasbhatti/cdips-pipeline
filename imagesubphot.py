@@ -1155,7 +1155,9 @@ def select_photref_frames(fitsdir,
 
         # write this info dict to a file so we can quickly load it later
 
-        outpostfix = fitsglob.replace('*','').replace('?','').replace('.fits','')
+        outpostfix = (
+            fitsglob.replace('*','').replace('?','').replace('.fits','')
+            )
 
         outpf = open(os.path.join(fitsdir,
                                   'TM-imagesub-photref-%s.pkl' % outpostfix),
