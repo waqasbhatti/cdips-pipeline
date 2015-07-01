@@ -903,6 +903,7 @@ def select_photref_frames(fitsdir,
                           maxmoonphase=25.0,
                           maxmoonelev=-12.0,
                           maxzenithdist=20.0,
+                          maxbackgroundstdev=50.0,
                           forcecollectinfo=False):
     '''This selects a group of photometric reference frames that will later be
     stacked and medianed to form the single photometric reference frame.
@@ -1195,9 +1196,13 @@ def select_photref_frames(fitsdir,
     # get low zenith distance nights
     zenithind = infodict['zenithdist'] < maxzenithdist
 
+    # get nights with background stdev < max_bgv_stdev (to possibly remove
+    # cloudy nights)
+    backgroundstdevind = infodict['stdsrcbkg'] < maxbackgroundstdev
+
     # this is the final operating set of frames that will be sorted for the
     # following tests
-    selectind = haind & moonind & zenithind
+    selectind = haind & moonind & zenithind & backgroundstdevind
 
     selected_frames = infodict['frames'][selectind]
     selected_ngoodobj = infodict['ngoodobjs'][selectind]
