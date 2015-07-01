@@ -845,49 +845,6 @@ def transform_frames_to_astromref(fitsdir,
     return {x:y for (x,y) in results}
 
 
-def generate_astromref_registration_info(astromrefsrclist,
-                                         outfile,
-                                         xycols=(1,2)):
-    '''This generates a registration information file using the astrometry
-    reference frame. This file is then used by the convolution step somehow to
-    figure out the convolution kernel? In any case, it's needed for:
-
-    - generating convolved reference frames to be ultimately stacked into a
-      single photometric reference frame
-
-    - do the convolution of the reference frame to each -xtrns target frame when
-      doing the image subtraction
-
-    '''
-
-    # get the x and y coordinate columns from the source list (fistar)
-    srcxy = np.genfromtxt(astromrefsrclist,
-                          usecols=xycols,
-                          dtype='f8,f8',
-                          names=['x','y'])
-
-    # set up the grid (this weirdness is transcribed directly from Chelsea's
-    # regslct.py) TODO: figure out WTF this does
-
-    BX = 30.; BY = 30.
-    mx = np.zeros(BX*BY)-1
-    my = np.zeros(BX*BY)-1
-    ma = np.zeros(BX*BY)
-    xsize = 2048.
-    ysize = 2048.
-    bx = (srcxy['x']*BX/xsize).astype(int)
-    by = (srcxy['y']*BY/ysize).astype(int)
-    mx[by*bx+bx] = srcxy['x']
-    my[by*bx+bx] = srcxy['y']
-
-    outf = open(outfile,'wb')
-
-    for i in xrange(int(BX*BY)):
-        outf.write("%8.0f %8.0f %8.0f\n" % (mx[i],my[i],20))
-
-    outf.close()
-
-
 ##################################
 ## PHOTOMETRIC REFERENCE FRAMES ##
 ##################################
@@ -1275,6 +1232,50 @@ def select_photref_frames(fitsdir,
             )
 
     return candidate_master_photref, final_frames.tolist(), infodict
+
+
+
+def generate_masterphotref_registration_info(masterphotref_fistar,
+                                             outfile,
+                                             xycols=(1,2)):
+    '''This generates a registration information file using the master
+    photometric reference frame. This file is then used by the convolution step
+    somehow to figure out the convolution kernel? In any case, it's needed for:
+
+    - generating convolved reference frames to be ultimately stacked into a
+      single photometric reference frame
+
+    - do the convolution of the reference frame to each -xtrns target frame when
+      doing the image subtraction
+
+    '''
+
+    # get the x and y coordinate columns from the source list (fistar)
+    srcxy = np.genfromtxt(masterphotref_fistar,
+                          usecols=xycols,
+                          dtype='f8,f8',
+                          names=['x','y'])
+
+    # set up the grid (this weirdness is transcribed directly from Chelsea's
+    # regslct.py) TODO: figure out WTF this does
+
+    BX = 30.; BY = 30.
+    mx = np.zeros(BX*BY)-1
+    my = np.zeros(BX*BY)-1
+    ma = np.zeros(BX*BY)
+    xsize = 2048.
+    ysize = 2048.
+    bx = (srcxy['x']*BX/xsize).astype(int)
+    by = (srcxy['y']*BY/ysize).astype(int)
+    mx[by*bx+bx] = srcxy['x']
+    my[by*bx+bx] = srcxy['y']
+
+    outf = open(outfile,'wb')
+
+    for i in xrange(int(BX*BY)):
+        outf.write("%8.0f %8.0f %8.0f\n" % (mx[i],my[i],20))
+
+    outf.close()
 
 
 
