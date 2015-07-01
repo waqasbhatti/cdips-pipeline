@@ -5492,7 +5492,7 @@ def plot_magrms_comparison(reference_stats_file,
             np.array(ref_tf3_compcol)/np.array(comp_tf3_compcol)
             )
 
-        nonzero_ind = tf3_compcol_ratios > 0.0
+        nonzero_ind = np.where(tf3_compcol_ratios > 0.0)
         xcol, ycol = ref_tf3_mag[nonzero_ind], tf3_compcol_ratios[nonzero_ind]
 
         xlabel, ylabel = ('FOV catalog SDSS r mag',
