@@ -1176,7 +1176,7 @@ def select_photref_frames(fitsdir,
                      'wb')
 
         print('%sZ: loading existing photref select info from %s' %
-              (datetime.utcnow().isoformat(), outpf))
+              (datetime.utcnow().isoformat(), inpf))
 
         infodict = pickle.load(inpf)
         inpf.close()
