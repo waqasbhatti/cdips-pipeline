@@ -1528,7 +1528,8 @@ def photometry_on_combined_photref(
                                frame_dec)
 
     # THIRD: run do_photometry to get a .sourcelist file with HATID,X,Y
-    photf = do_photometry(photref_frame, fovcatalog)
+    photf = do_photometry(os.path.abspath(photref_frame),
+                          os.path.abspath(fovcatalog))
     photref_sourcelist = os.path.abspath(photref_frame.strip('.fits.fz') +
                                          '.sourcelist')
 
