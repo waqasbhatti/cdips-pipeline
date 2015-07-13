@@ -1530,7 +1530,8 @@ def photometry_on_combined_photref(
     # THIRD: run do_photometry to get a .sourcelist file with HATID,X,Y
     photf = do_photometry(os.path.abspath(photref_frame),
                           os.path.abspath(fovcatalog),
-                          outdir=os.path.dirname(os.path.abspath(photref_frame)))
+                          outdir=os.path.dirname(os.path.abspath(photref_frame)),
+                          zeropoint=zeropoint)
     photref_sourcelist = os.path.abspath(photref_frame.strip('.fits.fz') +
                                          '.sourcelist')
 
@@ -1545,7 +1546,7 @@ def photometry_on_combined_photref(
         zeropoint=zeropoint,
         exptime=ccdexptime,
         aperturestring=apertures,
-        photrefbase=fitsbase,
+        photrefbase=os.path.splitext(os.path.basename(photref_frame))[0],
         outfile=outfile
     )
 
