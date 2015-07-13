@@ -1434,6 +1434,7 @@ def combine_frames(framelist,
 def photometry_on_combined_photref(
         photref_frame,
         fovcatalog,
+        ccdnumber,
         ccdgain=None,
         zeropoint=None,
         ccdexptime=None,
@@ -1490,18 +1491,15 @@ def photometry_on_combined_photref(
         return None
 
     # handle the zeropoints
-    if not zeropoint:
-
-        # if the zeropoint isn't provided and if this is a HAT frame, the ccd
-        # number will get us the zeropoint in the ZEROPOINTS dictionary
-        frameinfo = FRAMEREGEX.findall(photref_sourcelist)
-        if frameinfo:
-            zeropoint = ZEROPOINTS[int(frameinfo[0][-1])]
-        else:
-            print('ERR! %sZ: no zeropoint magnitude defined for %s' %
-                  (datetime.utcnow().isoformat(),
-                   photref_frame))
-            return None
+    # if the zeropoint isn't provided and if this is a HAT frame, the ccd
+    # number will get us the zeropoint in the ZEROPOINTS dictionary
+    if not zeropoint and ccdnumber in ZEROPOINTS:
+        zeropoint = ZEROPOINTS[ccdnumber]
+    else:
+        print('ERR! %sZ: no zeropoint magnitude defined for %s' %
+              (datetime.utcnow().isoformat(),
+               photref_frame))
+        return None
 
     # figure out the output path
     if not outfile:
