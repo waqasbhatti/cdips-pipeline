@@ -2740,5 +2740,3 @@ def parallel_run_tfa(lcdir,
           (datetime.utcnow().isoformat(), len(epdlcfiles)))
 
     return {x:y for x,y in zip(epdlcfiles, results)}
-
-
