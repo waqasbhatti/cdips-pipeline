@@ -1256,7 +1256,7 @@ def generate_masterphotref_registration_info(masterphotref_fistar,
 
     # get the x and y coordinate columns from the source list (fistar)
     srcinfo = np.genfromtxt(masterphotref_fistar,
-                            usecols=tuple(list(xycols) + list(fluxcol)),
+                            usecols=tuple(list(xycols) + [fluxcol])),
                             dtype='f8,f8,f8',
                             names=['x','y','flux'])
 
