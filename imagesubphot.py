@@ -985,7 +985,7 @@ def select_photref_frames(fitsdir,
             # decide if the phot file is binary or not. read the first 600
             # bytes and look for the '--binary-output' text
             with open(phot,'rb') as photf:
-                header = photf.read(600)
+                header = photf.read(1000)
 
             if '--binary-output' in header and HAVEBINPHOT:
 
@@ -1240,7 +1240,8 @@ def select_photref_frames(fitsdir,
 
 def generate_masterphotref_registration_info(masterphotref_fistar,
                                              outfile,
-                                             xycols=(1,2)):
+                                             xycols=(1,2),
+                                             fluxcol=8):
     '''This generates a registration information file using the master
     photometric reference frame. This file is then used by the convolution step
     somehow to figure out the convolution kernel? In any case, it's needed for:
@@ -1254,31 +1255,36 @@ def generate_masterphotref_registration_info(masterphotref_fistar,
     '''
 
     # get the x and y coordinate columns from the source list (fistar)
-    srcxy = np.genfromtxt(masterphotref_fistar,
-                          usecols=xycols,
-                          dtype='f8,f8',
-                          names=['x','y'])
+    srcinfo = np.genfromtxt(masterphotref_fistar,
+                            usecols=tuple(list(xycols) + list(fluxcol)),
+                            dtype='f8,f8,f8',
+                            names=['x','y','flux'])
+
+    refx, refy, refflux = srcinfo['x'], srcinfo['y'], srcinfo['flux']
 
     # set up the grid (this weirdness is transcribed directly from Chelsea's
     # regslct.py) TODO: figure out WTF this does
 
     BX = 30.; BY = 30.
+
     mx = np.zeros(BX*BY)-1
     my = np.zeros(BX*BY)-1
-    ma = np.zeros(BX*BY)
+    fluxblock = np.zeros(BX*BY)
+
     xsize = 2048.
     ysize = 2048.
+
     bx = (srcxy['x']*BX/xsize).astype(int)
     by = (srcxy['y']*BY/ysize).astype(int)
-    mx[by*bx+bx] = srcxy['x']
-    my[by*bx+bx] = srcxy['y']
+    idx = by*BX+bx
 
-    outf = open(outfile,'wb')
+    for i, j in zip(idx, flux):
+        if fluxblock[i] < j:
+            mx[i] = x[i]
+            my[i] = y[i]
+            fluxblock[i] = j
 
-    for i in xrange(int(BX*BY)):
-        outf.write("%8.0f %8.0f %8.0f\n" % (mx[i],my[i],20))
-
-    outf.close()
+    np.savetxt(outfile, np.transpose((mx, my, np.ones(BX*BY)*20)))
 
 
 
@@ -1337,6 +1343,7 @@ def photref_convolution_worker(task):
         if os.path.exists(outfile):
             os.remove(outfile)
         return frametoconvolve, None
+
 
 
 def convolve_photref_frames(photreflist,
