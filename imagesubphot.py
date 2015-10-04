@@ -1274,8 +1274,8 @@ def generate_masterphotref_registration_info(masterphotref_fistar,
     xsize = 2048.
     ysize = 2048.
 
-    bx = (srcxy['x']*BX/xsize).astype(int)
-    by = (srcxy['y']*BY/ysize).astype(int)
+    bx = (refx*BX/xsize).astype(int)
+    by = (refy*BY/ysize).astype(int)
     idx = by*BX+bx
 
     for i, j in zip(idx, flux):
