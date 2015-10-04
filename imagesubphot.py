@@ -1538,6 +1538,7 @@ def photometry_on_combined_photref(
     photf = do_photometry(os.path.abspath(photref_frame),
                           os.path.abspath(fovcatalog),
                           outdir=os.path.dirname(os.path.abspath(photref_frame)),
+                          extractsources=False,
                           zeropoint=zeropoint)
     photref_sourcelist = os.path.abspath(photref_frame.strip('.fits.fz') +
                                          '.sourcelist')
