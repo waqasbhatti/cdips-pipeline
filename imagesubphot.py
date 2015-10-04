@@ -1280,8 +1280,8 @@ def generate_masterphotref_registration_info(masterphotref_fistar,
 
     for i, j in zip(idx, refflux):
         if fluxblock[i] < j:
-            mx[i] = x[i]
-            my[i] = y[i]
+            mx[i] = refx[i]
+            my[i] = refy[i]
             fluxblock[i] = j
 
     np.savetxt(outfile, np.transpose((mx, my, np.ones(BX*BY)*20)))
