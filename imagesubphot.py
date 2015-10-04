@@ -414,7 +414,7 @@ def select_astromref_frame(fitsdir,
         # decide if the phot file is binary or not. read the first 600
         # bytes and look for the '--binary-output' text
         with open(phot,'rb') as photf:
-            header = photf.read(600)
+            header = photf.read(1000)
 
         if '--binary-output' in header and HAVEBINPHOT:
 
