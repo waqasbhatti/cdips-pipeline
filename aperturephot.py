@@ -1184,14 +1184,7 @@ def do_photometry(fits,
 
         if fiphotfile:
 
-            # check if this frame is worth our time later
-            framedata = collect_image_info(fits, framesources,
-                                           minsrcbgv=minsrcbgv,
-                                           maxmadbgv=maxmadbgv,
-                                           maxframebgv=maxframebgv,
-                                           minnstars=minnstars)
-
-            return fiphotfile, framedata
+            return fiphotfile, None
 
         else:
 
