@@ -1278,7 +1278,7 @@ def generate_masterphotref_registration_info(masterphotref_fistar,
     by = (refy*BY/ysize).astype(int)
     idx = by*BX+bx
 
-    for i, j in zip(idx, flux):
+    for i, j in zip(idx, refflux):
         if fluxblock[i] < j:
             mx[i] = x[i]
             my[i] = y[i]
