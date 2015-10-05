@@ -824,9 +824,9 @@ def fitscoords_to_jpeg(fits_image,
             )
 
         if coordbox:
-            out_fname = 'X%sX%s-Y%sY%s-%s' % (coordbox[0], coordbox[1],
-                                              coordbox[2], coordbox[3],
-                                              out_fname)
+            out_fname = '%s-X%sX%s-Y%sY%s.jpg' % (out_fname.rstrip('.jpg'),
+                                                  coordbox[0], coordbox[1],
+                                                  coordbox[2], coordbox[3])
 
     scipy.misc.imsave(out_fname,resized_img)
 
