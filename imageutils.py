@@ -767,6 +767,73 @@ def fits_to_full_jpeg(fits_image,
 
 
 
+def fitscoords_to_jpeg(fits_image,
+                       out_fname=None,
+                       ext=None,
+                       resize=False,
+                       flip=True,
+                       coordbox=None,
+                       outsizex=770,
+                       outsizey=770,
+                       annotate=True,
+                       scale_func=clipped_linscale_img,
+                       scale_func_params={'cap':255.0,
+                                          'lomult':2,
+                                          'himult':2.5}):
+    '''
+    This converts a FITS image to a full frame JPEG.
+
+    '''
+    compressed_ext = compressed_fits_ext(fits_image)
+
+    if ext is None and compressed_ext:
+        img, hdr = read_fits(fits_image,
+                             ext=compressed_ext[0])
+    elif (ext is not None):
+        img, hdr = read_fits(fits_image,ext=ext)
+    else:
+        img, hdr = read_fits(fits_image)
+
+    #trimmed_img = trim_image(img, hdr)
+    trimmed_img = img
+    jpegaspect = float(img.shape[1])/float(img.shape[0])
+    scaled_img = scale_func(trimmed_img,**scale_func_params)
+
+    if coordbox:
+        scaled_img = scaled_image[coordbox[0]:coordbox[1],coordbox[2]:coordbox[3]]
+
+
+    if resize:
+        resized_img = scipy.misc.imresize(scaled_img,
+                                          (int(img.shape[1]/2.2),
+                                           int(img.shape[0]/2.2)))
+    else:
+        resized_img = scaled_img
+
+    if not out_fname:
+
+        out_fname = '%s-%s-%s-%s-proj%s-%s.jpg' % (
+            fits_image.rstrip('.fits.fz'),
+            hdr['IMAGETYP'].lower() if 'IMAGETYP' in hdr else 'typeunknown',
+            hdr['EXPTIME'] if 'EXPTIME' in hdr else 'expunknown',
+            hdr['FILTERS'].replace('+','') if 'FILTERS' in hdr else 'filtunknown',
+            hdr['PROJID'] if 'PROJID' in hdr else 'unknown',
+            hdr['OBJECT'] if 'OBJECT' in hdr else 'objectunknown'
+            )
+
+    scipy.misc.imsave(out_fname,resized_img)
+
+    # flip the saved image
+    if flip:
+        outimg = Image.open(out_fname)
+        outimg = outimg.transpose(Image.FLIP_TOP_BOTTOM)
+        outimg.save(out_fname)
+
+
+    return out_fname
+
+
+
 def nparr_to_full_jpeg(nparr,
                        out_fname,
                        outsizex=770,
