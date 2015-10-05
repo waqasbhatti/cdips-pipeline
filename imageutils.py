@@ -712,6 +712,7 @@ def fits_to_full_jpeg(fits_image,
                       flip=True,
                       outsizex=770,
                       outsizey=770,
+                      annotate=True,
                       scale_func=clipped_linscale_img,
                       scale_func_params={'cap':255.0,
                                          'lomult':2,
@@ -760,6 +761,7 @@ def fits_to_full_jpeg(fits_image,
         outimg = Image.open(out_fname)
         outimg = outimg.transpose(Image.FLIP_TOP_BOTTOM)
         outimg.save(out_fname)
+
 
     return out_fname
 
