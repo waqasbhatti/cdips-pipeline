@@ -823,6 +823,11 @@ def fitscoords_to_jpeg(fits_image,
             hdr['OBJECT'] if 'OBJECT' in hdr else 'objectunknown'
             )
 
+        if coordbox:
+            out_fname = 'X%sX%s-Y%sY%s-%s' % (coordbox[0], coordbox[1],
+                                              coordbox[2], coordbox[3],
+                                              out_fname)
+
     scipy.misc.imsave(out_fname,resized_img)
 
     # flip the saved image
