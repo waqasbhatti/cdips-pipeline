@@ -800,7 +800,9 @@ def fitscoords_to_jpeg(fits_image,
     scaled_img = scale_func(trimmed_img,**scale_func_params)
 
     if coordbox:
-        scaled_img = scaled_img[coordbox[0]:coordbox[1],coordbox[2]:coordbox[3]]
+        # numpy is y,x
+        scaled_img = scaled_img[coordbox[2]:coordbox[3],
+                                coordbox[0]:coordbox[1]]
 
 
     if resize:
