@@ -1924,7 +1924,7 @@ def get_lc_for_object(framedir,
     '''
 
     # make a list of the iphots
-    iphotlist = sorted(os.path.join(framedir, iphotglob))
+    iphotlist = sorted(glob.glob(os.path.join(framedir, iphotglob)))
 
     lclines = {}
 
