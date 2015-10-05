@@ -1931,7 +1931,7 @@ def get_lc_for_object(framedir,
     for iphotf in iphotlist:
 
         infd = open(iphotf,'rb')
-        objectline = [x.strip() for x in iphotf.readlines() if lcobject in x]
+        objectline = [x.strip() for x in infd.readlines() if lcobject in x]
         infd.close()
 
         # find the associated fits frame
