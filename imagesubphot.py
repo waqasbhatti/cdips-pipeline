@@ -1633,22 +1633,39 @@ convolve_and_subtract_frames below.
     task[2] -> the convolution target's registration info file
     task[3] -> the kernel specification for the convolution
     task[4] -> the output directory where to place the results
+    task[5] -> whether this is a reverse subtraction
 
     '''
 
-    frametoconvolve, targetframe, convregfile, kernelspec, outdir = task
+    (frametoconvolve, targetframe, convregfile,
+     kernelspec, outdir, reversesubtrack) = task
+
+    # swap these if we're convolving the targetframe to the referenceframe
+    if reversesubtract:
+        frametoconvolve, targetframe = targetframe, frametoconvolve
 
     if not outdir:
-        outfile = os.path.join(os.path.dirname(frametoconvolve),
-                               'subtracted-%s' % os.path.basename(frametoconvolve))
+        if reversesubtract:
+            outfile = os.path.join(os.path.dirname(frametoconvolve),
+                                   'rev-subtracted-%s' %
+                                   os.path.basename(frametoconvolve))
+        else:
+            outfile = os.path.join(os.path.dirname(frametoconvolve),
+                                   'subtracted-%s' %
+                                   os.path.basename(frametoconvolve))
+
         outkernel = os.path.join(os.path.dirname(frametoconvolve),
-                                 '%s-kernel' % os.path.basename(frametoconvolve))
+                                 '%s-kernel' %
+                                 os.path.basename(frametoconvolve))
 
     else:
+        if reverse
         outfile = os.path.join(outdir,
-                               'subtracted-%s' % os.path.basename(frametoconvolve))
+                               'subtracted-%s' %
+                               os.path.basename(frametoconvolve))
         outkernel = os.path.join(outdir,
-                                 '%s-kernel' % os.path.basename(frametoconvolve))
+                                 '%s-kernel' %
+                                 os.path.basename(frametoconvolve))
 
     cmdtorun = CONVOLVESUBFRAMESCMD.format(
         targetframe=targetframe,
@@ -1689,6 +1706,7 @@ convolve_and_subtract_frames below.
 def convolve_and_subtract_frames(fitsdir,
                                  combinedphotref,
                                  photrefregfile,
+                                 reversesubtract=False,
                                  fitsglob='*-xtrns.fits',
                                  kernelspec='b/4;i/4;d=4/4',
                                  nworkers=16,
@@ -1706,7 +1724,8 @@ def convolve_and_subtract_frames(fitsdir,
                                             fitsglob))
 
     # make a list of tasks
-    tasks = [(x, combinedphotref, photrefregfile, kernelspec, outdir)
+    tasks = [(x, combinedphotref, photrefregfile,
+              kernelspec, outdir, reversesubtract)
              for x in transframelist]
 
     print('%sZ: %s frames to convolve to %s and subtract' %
