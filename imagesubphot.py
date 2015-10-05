@@ -293,7 +293,7 @@ SUBFRAMEPHOTCMD = (
     "fiphot --input-subtracted {subtractedframe} "
     "--input-raw-photometry {photrefrawphot} "
     "--sky-fit mode,iterations=2,sigma=3 "
-    "--format IXY-----,BbMms "
+    "--format IXY-----,BbFfMms "
     "--mag-flux {zeropoint},{exptime} "
     "--gain {ccdgain} "
     "--disjoint-radius {disjointradius} "
