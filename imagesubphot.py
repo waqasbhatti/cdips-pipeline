@@ -1904,6 +1904,68 @@ def photometry_on_subtracted_frames(subframedir,
 
 
 
+#############################################
+## AD HOC LC COLLECTION FOR SINGLE OBJECTS ##
+#############################################
+
+def get_lc_for_object(framedir,
+                      lcobject,
+                      outfile,
+                      frameglob='1-*_?.fits',
+                      iphotglob='1-*_?.iphot',
+                      measurecols=(10,15,20,25),
+                      datekeyword='BJD'):
+    '''This pulls out the photometry for an arbitrary object.
+
+    Gets the line for the object from the iphot files and generates a flux light
+    curve. Assumes 5 apertures and that the iphots are the same name pattern as
+    the fits files so it can get JD out of their headers.
+
+    '''
+
+    # make a list of the iphots
+    iphotlist = sorted(os.path.join(framedir, iphotglob))
+
+    lclines = {}
+
+    for iphotf in iphotlist:
+
+        infd = open(iphotf,'rb')
+        objectline = [x.strip() for x in iphotf.readlines() if lcobject in x]
+        infd.close()
+
+        # find the associated fits frame
+        fitspath = iphotf.replace('.iphot','.fits')
+
+        # if we found this object in the LC, then grab its info
+        if len(objectline) == 1 and os.path.exists(fitspath):
+
+            objectline = objectline.split()
+            framemeasures = [objectline[ind] for ind in measurecols]
+
+            # find this object's JD
+            framedate = imageutils.get_header_keyword(fitspath,
+                                                      datekeyword)
+            lclines[framedate] = framemeasures
+            print('found %s in iphot %s, frame %s, JD: %s, mags: %s' %
+                  (lcobject, iphotf, fitspath, framedate, framemeasures))
+
+    # now that we've collected the LC, write it out to disk
+    outfd = open(outfile, 'wb')
+
+    for date in sorted(lclines.keys()):
+
+        outline = '{framedate} {framemeasures}\n'
+        framedate = date
+        framemeasures = ' '.join(lclines[date])
+        outfd.write(outline.format(framedate=framedate,
+                                   framemeasures=framemeasures))
+
+    outfd.close()
+
+    return outfile
+
+
 ###########################
 ## LIGHTCURVE COLLECTION ##
 ###########################
@@ -1916,6 +1978,7 @@ def make_photometry_indexdb(framedir,
                             photext='iphot',
                             maxframes=None,
                             overwrite=False):
+
     '''
     This is like make_photometry_index below, but uses an sqlite3 database
     instead of an in-memory disk.
