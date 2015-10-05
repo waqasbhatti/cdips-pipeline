@@ -1940,7 +1940,7 @@ def get_lc_for_object(framedir,
         # if we found this object in the LC, then grab its info
         if len(objectline) == 1 and os.path.exists(fitspath):
 
-            objectline = objectline.split()
+            objectline = objectline[0].split()
             framemeasures = [objectline[ind] for ind in measurecols]
 
             # find this object's JD
