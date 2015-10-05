@@ -773,6 +773,7 @@ def fitscoords_to_jpeg(fits_image,
                        resize=False,
                        flip=True,
                        coordbox=None,
+                       coordcenter=None,
                        outsizex=770,
                        outsizey=770,
                        annotate=True,
@@ -782,6 +783,16 @@ def fitscoords_to_jpeg(fits_image,
                                           'himult':2.5}):
     '''
     This converts a FITS image to a full frame JPEG.
+
+    if coordbox and not coordcenter:
+        coordbox = [xmin, xmax, ymin, max] of box to cut out of FITS
+
+    elif coordcenter and not coordbox:
+        coordcenter = [xcenter, ycenter, xwidth, ywidth]
+
+    else:
+        do nothing, since we can't have both at the same time
+
 
     '''
     compressed_ext = compressed_fits_ext(fits_image)
@@ -794,16 +805,22 @@ def fitscoords_to_jpeg(fits_image,
     else:
         img, hdr = read_fits(fits_image)
 
-    #trimmed_img = trim_image(img, hdr)
     trimmed_img = img
     jpegaspect = float(img.shape[1])/float(img.shape[0])
     scaled_img = scale_func(trimmed_img,**scale_func_params)
 
-    if coordbox:
+    if coordbox and not coordcenter:
         # numpy is y,x
         scaled_img = scaled_img[coordbox[2]:coordbox[3],
                                 coordbox[0]:coordbox[1]]
 
+    elif coordcenter and not coordbox:
+        # numpy is y,x
+        xmin, xmax = (coordcenter[0] - coordcenter[2]/2.0,
+                      coordcenter[0] + coordcenter[2]/2.0)
+        ymin, ymax = (coordcenter[1] - coordcenter[3]/2.0,
+                      coordcenter[1] + coordcenter[3]/2.0)
+        scaled_img = scaled_img[ymin:ymax, xmin:xmax]
 
     if resize:
         resized_img = scipy.misc.imresize(scaled_img,
@@ -823,10 +840,19 @@ def fitscoords_to_jpeg(fits_image,
             hdr['OBJECT'] if 'OBJECT' in hdr else 'objectunknown'
             )
 
-        if coordbox:
-            out_fname = '%s-X%sX%s-Y%sY%s.jpg' % (out_fname.rstrip('.jpg'),
-                                                  coordbox[0], coordbox[1],
-                                                  coordbox[2], coordbox[3])
+        if coordbox and not coordcenter:
+            out_fname = '%s-X%sX%s-Y%sY%s.jpg' % (
+                out_fname.rstrip('.jpg'),
+                coordbox[0], coordbox[1],
+                coordbox[2], coordbox[3]
+            )
+
+        elif coordcenter and not coordbox:
+            out_fname = '%s-XC%sYC%s-XW%sYW%s.jpg' % (
+                out_fname.rstrip('.jpg'),
+                coordcenter[0], coordcenter[1],
+                coordcenter[2], coordcenter[3]
+            )
 
     scipy.misc.imsave(out_fname,resized_img)
 
