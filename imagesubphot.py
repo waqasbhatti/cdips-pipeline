@@ -2166,7 +2166,7 @@ def get_iphot_line_sed(iphot, linenum, iphotlinechars=260):
 
     try:
 
-        pout = subprocess.check_output("sed '%sq;d' %s" % (linenum, iphot),
+        pout = subprocess.check_output("sed '%sq;d' %s" % (linenum+1, iphot),
                                        shell=True)
         return pout
 
