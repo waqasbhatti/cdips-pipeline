@@ -2205,7 +2205,7 @@ def collect_imagesubphot_lightcurve(hatid,
                                     photindex,
                                     outdir,
                                     skipcollected=True,
-                                    iphotlinefunc=get_iphot_line_tail,
+                                    iphotlinefunc=get_iphot_line_sed,
                                     iphotlinechars=260):
     '''
     This collects the imagesubphot lightcurve of a single object into a .ilc
