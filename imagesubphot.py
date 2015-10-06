@@ -1646,30 +1646,37 @@ convolve_and_subtract_frames below.
 
     if not outdir:
         if reversesubtract:
-            outfile = os.path.join(os.path.dirname(frametoconvolve),
+            outfile = os.path.join(os.path.dirname(targetframe),
                                    'rev-subtracted-%s' %
-                                   os.path.basename(frametoconvolve))
+                                   os.path.basename(targetframe))
+
+            outkernel = os.path.join(os.path.dirname(targetframe),
+                                     '%s-kernel' %
+                                     os.path.basename(targetframe))
         else:
             outfile = os.path.join(os.path.dirname(frametoconvolve),
                                    'subtracted-%s' %
                                    os.path.basename(frametoconvolve))
 
-        outkernel = os.path.join(os.path.dirname(frametoconvolve),
-                                 '%s-kernel' %
-                                 os.path.basename(frametoconvolve))
+            outkernel = os.path.join(os.path.dirname(frametoconvolve),
+                                     '%s-kernel' %
+                                     os.path.basename(frametoconvolve))
 
     else:
         if reversesubtract:
             outfile = os.path.join(outdir,
                                    'rev-subtracted-%s' %
-                                   os.path.basename(frametoconvolve))
+                                   os.path.basename(targetframe))
+            outkernel = os.path.join(outdir,
+                                     '%s-kernel' %
+                                     os.path.basename(targetframe))
         else:
             outfile = os.path.join(outdir,
                                    'subtracted-%s' %
                                    os.path.basename(frametoconvolve))
-        outkernel = os.path.join(outdir,
-                                 '%s-kernel' %
-                                 os.path.basename(frametoconvolve))
+            outkernel = os.path.join(outdir,
+                                     '%s-kernel' %
+                                     os.path.basename(frametoconvolve))
 
     cmdtorun = CONVOLVESUBFRAMESCMD.format(
         targetframe=targetframe,
