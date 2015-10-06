@@ -2175,12 +2175,37 @@ def get_iphot_line_sed(iphot, linenum, iphotlinechars=260):
         return ''
 
 
+def get_iphot_line_tail(iphot, linenum, iphotlinechars=260):
+    '''
+    This uses the tail utility to pull the line out of the iphot.
+
+    Following: http://stackoverflow.com/questions/6022384
+
+    tail -n+{linenum} {file} | head -n1
+
+
+    '''
+
+    try:
+
+        pout = subprocess.check_output(
+            "tail -n+{linenum} {iphot} | head -n1".format(linenum=linenum+1,
+                                                          iphot=iphot),
+            shell=True
+        )
+        return pout
+
+    except subprocess.CalledProcessError:
+
+        return ''
+
+
 
 def collect_imagesubphot_lightcurve(hatid,
                                     photindex,
                                     outdir,
                                     skipcollected=True,
-                                    iphotlinefunc=get_iphot_line_sed,
+                                    iphotlinefunc=get_iphot_line_tail,
                                     iphotlinechars=260):
     '''
     This collects the imagesubphot lightcurve of a single object into a .ilc
@@ -2276,12 +2301,14 @@ def collect_imagesubphot_lightcurve(hatid,
                     iphotlinechars=iphotlinechars
                     ).split()
 
-                # parse these lines and prepare the output
-                rstfc_elems = FRAMEREGEX.findall(os.path.basename(phot))
-                rstfc = '%s-%s_%s' % (rstfc_elems[0])
-                out_line = '%s %s %s\n' % (framerjd, rstfc,
-                                           ' '.join(phot_elem))
-                outf.write(out_line)
+                if len(phot_elem) > 0:
+
+                    # parse these lines and prepare the output
+                    rstfc_elems = FRAMEREGEX.findall(os.path.basename(phot))
+                    rstfc = '%s-%s_%s' % (rstfc_elems[0])
+                    out_line = '%s %s %s\n' % (framerjd, rstfc,
+                                               ' '.join(phot_elem))
+                    outf.write(out_line)
 
             # if this frame isn't available, ignore it
             except Exception as e:
