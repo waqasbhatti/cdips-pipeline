@@ -2153,12 +2153,33 @@ def get_iphot_line_linecache(iphot, linenum, iphotlinechars=260):
     return getline(iphot, linenum)
 
 
+def get_iphot_line_sed(iphot, linenum, iphotlinechars=260):
+    '''
+    This uses the sed utility to pull the line out of the iphot.
+
+    Following: http://stackoverflow.com/questions/6022384
+
+    sed '{linenum}q;d' file
+
+
+    '''
+
+    try:
+
+        pout = subprocess.check_output("sed '%sq;d'" % linenum, shell=True)
+        return pout
+
+    except subprocess.CalledProcessError:
+
+        return ''
+
+
 
 def collect_imagesubphot_lightcurve(hatid,
                                     photindex,
                                     outdir,
                                     skipcollected=True,
-                                    iphotlinefunc=get_iphot_line,
+                                    iphotlinefunc=get_iphot_line_sed,
                                     iphotlinechars=260):
     '''
     This collects the imagesubphot lightcurve of a single object into a .ilc
