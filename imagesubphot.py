@@ -1638,7 +1638,7 @@ convolve_and_subtract_frames below.
     '''
 
     (frametoconvolve, targetframe, convregfile,
-     kernelspec, outdir, reversesubtrack) = task
+     kernelspec, outdir, reversesubtract) = task
 
     # swap these if we're convolving the targetframe to the referenceframe
     if reversesubtract:
@@ -1659,10 +1659,14 @@ convolve_and_subtract_frames below.
                                  os.path.basename(frametoconvolve))
 
     else:
-        if reverse
-        outfile = os.path.join(outdir,
-                               'subtracted-%s' %
-                               os.path.basename(frametoconvolve))
+        if reversesubtract:
+            outfile = os.path.join(outdir,
+                                   'rev-subtracted-%s' %
+                                   os.path.basename(frametoconvolve))
+        else:
+            outfile = os.path.join(outdir,
+                                   'subtracted-%s' %
+                                   os.path.basename(frametoconvolve))
         outkernel = os.path.join(outdir,
                                  '%s-kernel' %
                                  os.path.basename(frametoconvolve))
