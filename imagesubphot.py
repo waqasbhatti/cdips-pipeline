@@ -1943,7 +1943,7 @@ def get_lc_for_object(framedir,
                       outfile,
                       frameglob='1-*_?.fits',
                       iphotglob='1-*_?.iphot',
-                      measurecols=(10,15,20,25),
+                      measurecols=(10,12,15,17,20,22,25,27),
                       datekeyword='BJD'):
     '''This pulls out the photometry for an arbitrary object.
 
