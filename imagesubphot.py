@@ -2143,6 +2143,7 @@ def get_iphot_line(iphot, linenum, iphotlinechars=260):
     return iphotline
 
 
+
 def get_iphot_line_linecache(iphot, linenum, iphotlinechars=260):
     '''
     This uses linecache's getline function to get the line out of the file
@@ -2151,6 +2152,7 @@ def get_iphot_line_linecache(iphot, linenum, iphotlinechars=260):
     '''
 
     return getline(iphot, linenum)
+
 
 
 def get_iphot_line_sed(iphot, linenum, iphotlinechars=260):
@@ -2174,30 +2176,6 @@ def get_iphot_line_sed(iphot, linenum, iphotlinechars=260):
 
         return ''
 
-
-def get_iphot_line_tail(iphot, linenum, iphotlinechars=260):
-    '''
-    This uses the tail utility to pull the line out of the iphot.
-
-    Following: http://stackoverflow.com/questions/6022384
-
-    tail -n+{linenum} {file} | head -n1
-
-
-    '''
-
-    try:
-
-        pout = subprocess.check_output(
-            "tail -n+{linenum} {iphot} | head -n1".format(linenum=linenum+1,
-                                                          iphot=iphot),
-            shell=True
-        )
-        return pout
-
-    except subprocess.CalledProcessError:
-
-        return ''
 
 
 

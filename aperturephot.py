@@ -1218,7 +1218,7 @@ def parallel_photometry_worker(task):
         badframesdir = os.path.join(task[1]['outdir'],'badframes')
 
         # make sure all is OK with this frame
-        if framephot and frameinfo and frameinfo['frameok']:
+        if framephot:
             result = (framephot, frameinfo)
 
         # if the frame photometry is bad or the frame isn't OK, delete its
