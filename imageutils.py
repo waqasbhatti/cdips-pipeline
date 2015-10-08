@@ -893,8 +893,8 @@ def fitscoords_to_jpeg(fits_image,
 
         # make a circle at the center of the frame
         lx, ly = outimg.size[0], outimg.size[1]
-        bx0, bx1 = int(lx/2 - 8), int(lx/2 + 8)
-        by0, by1 = int(ly/2 - 8), int(ly/2 + 8)
+        bx0, bx1 = int(lx/2 - 15), int(lx/2 + 15)
+        by0, by1 = int(ly/2 - 15), int(ly/2 + 15)
         draw.ellipse([bx0,by0,bx1,by1], outline=255)
 
         del draw
