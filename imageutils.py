@@ -853,7 +853,8 @@ def fitscoords_to_jpeg(fits_image,
             fits_image.rstrip('.fits.fz'),
             hdr['IMAGETYP'].lower() if 'IMAGETYP' in hdr else 'typeunknown',
             hdr['EXPTIME'] if 'EXPTIME' in hdr else 'expunknown',
-            hdr['FILTERS'].replace('+','') if 'FILTERS' in hdr else 'filtunknown',
+            (hdr['FILTERS'].replace('+','') if
+             'FILTERS' in hdr else 'filtunknown'),
             hdr['PROJID'] if 'PROJID' in hdr else 'unknown',
             hdr['OBJECT'] if 'OBJECT' in hdr else 'objectunknown'
             )
@@ -880,6 +881,16 @@ def fitscoords_to_jpeg(fits_image,
         outimg = outimg.transpose(Image.FLIP_TOP_BOTTOM)
         outimg.save(out_fname)
 
+    # annotate the image if told to do so
+    if annotate:
+        outimg = Image.open(out_fname)
+        draw = ImageDraw.Draw(outimg)
+        annotation = "%s" % (
+            os.path.basename(fits_image).rstrip('.fits.fz'),
+        )
+        draw.text((4,4),annotation,fill=255)
+        del draw
+        outimg.save(out_fname)
 
     return out_fname
 
