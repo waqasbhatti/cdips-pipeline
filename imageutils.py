@@ -883,12 +883,20 @@ def fitscoords_to_jpeg(fits_image,
 
     # annotate the image if told to do so
     if annotate:
+
         outimg = Image.open(out_fname)
         draw = ImageDraw.Draw(outimg)
         annotation = "%s" % (
             os.path.basename(fits_image).rstrip('.fits.fz'),
         )
         draw.text((4,4),annotation,fill=255)
+
+        # make a circle at the center of the frame
+        lx, ly = img.size[0], img.size[1]
+        bx0, bx1 = int(lx/2 - 5), int(lx/2 + 5)
+        by0, by1 = int(ly/2 - 5), int(ly/2 + 5)
+        draw.ellipse([bx0,by0,bx1,by1], outline=255)
+
         del draw
         outimg.save(out_fname)
 
