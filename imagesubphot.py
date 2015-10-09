@@ -2241,7 +2241,8 @@ def collect_imagesubphot_lightcurve(hatid,
                                     outdir,
                                     skipcollected=True,
                                     iphotlinefunc=get_iphot_line,
-                                    iphotlinechars=338):
+                                    iphotlinechars=338,
+                                    mindetections=50):
     '''
     This collects the imagesubphot lightcurve of a single object into a .ilc
     file.
@@ -2303,7 +2304,9 @@ def collect_imagesubphot_lightcurve(hatid,
     cur.execute(PHOT_SELECT_CMD, (str(hatid),))
     rows = cur.fetchall()
 
-    if rows and len(rows) > 0:
+    # make sure we have enough observations for this object to make it
+    # worthwhile
+    if rows and len(rows) >= mindetections:
 
         # prepare the output file
         outfile = os.path.join(os.path.abspath(outdir), '%s.ilc' % hatid)
@@ -2364,13 +2367,13 @@ def collect_imagesubphot_lightcurve(hatid,
 
         returnf = outfile
 
-    # if the hatid isn't found in the photometry index, then we can't do
-    # anything
+    # if the hatid isn't found in the photometry index or it has less than the
+    # required number of detections, then we can't do anything
     else:
 
         print('ERR! %sZ: object %s is not in the '
-              'photometry index, ignoring...' %
-              (datetime.utcnow().isoformat(), hatid))
+              'photometry index or has less than %s detections, ignoring...' %
+              (datetime.utcnow().isoformat(), hatid, mindetections))
 
         returnf = None
 
@@ -2388,7 +2391,7 @@ def imagesublc_collection_worker(task):
     task[0] -> hatid
     task[1] -> photindex DB name
     task[2] -> outdir
-    task[3] -> {skipcollected, iphotlinefunc, iphotlinechars}
+    task[3] -> {skipcollected, iphotlinefunc, iphotlinechars, mindetections}
 
     '''
 
@@ -2408,20 +2411,21 @@ def imagesublc_collection_worker(task):
 
 
 def parallel_collect_imagesub_lightcurves(
-    framedir,
-    outdir,
-    frameglob='subtracted-*-xtrns.fits',
-    photindexdb=None,
-    photdir=None,
-    photext='iphot',
-    maxframes=None,
-    overwritephotindex=False,
-    skipcollectedlcs=True,
-    iphotlinefunc=get_iphot_line,
-    iphotlinechars=338,
-    nworkers=16,
-    maxworkertasks=1000
-    ):
+        framedir,
+        outdir,
+        frameglob='subtracted-*-xtrns.fits',
+        photindexdb=None,
+        photdir=None,
+        photext='iphot',
+        maxframes=None,
+        overwritephotindex=False,
+        skipcollectedlcs=True,
+        iphotlinefunc=get_iphot_line,
+        iphotlinechars=338,
+        mindetections=50,
+        nworkers=16,
+        maxworkertasks=1000
+):
     '''
     This collects all .iphot files into lightcurves.
 
@@ -2461,7 +2465,8 @@ def parallel_collect_imagesub_lightcurves(
                   outdir,
                   {'skipcollected':skipcollectedlcs,
                    'iphotlinefunc':iphotlinefunc,
-                   'iphotlinechars':iphotlinechars}) for hatid in hatids]
+                   'iphotlinechars':iphotlinechars,
+                   'mindetections':mindetections}) for hatid in hatids]
 
         # now start up the parallel collection
         print('%sZ: %s HATIDs to get LCs for, starting...' %
