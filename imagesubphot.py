@@ -157,6 +157,7 @@ import os.path
 import glob
 import multiprocessing as mp
 import subprocess
+from subprocess import check_output
 import shlex
 from datetime import datetime
 import re
@@ -1584,7 +1585,7 @@ def photometry_on_combined_photref(
                           extractsources=False,
                           zeropoint=zeropoint)
     photref_sourcelist = os.path.abspath(photref_frame.strip('.fits.fz') +
-                                         '.sourcelist')
+                                         '.projcatalog')
 
     # FINALLY, run the cmrawphot command using the locations and IDs from the
     # .sourcelist produced by do_photometry
@@ -1592,7 +1593,7 @@ def photometry_on_combined_photref(
         photref=photref_frame,
         srclist=photref_sourcelist,
         srclist_idcol='1',
-        srclist_xycol='7,8',
+        srclist_xycol='13,14',
         ccdgain=ccdgain,
         zeropoint=zeropoint,
         exptime=ccdexptime,
@@ -1938,12 +1939,13 @@ def photometry_on_subtracted_frames(subframedir,
 ## AD HOC LC COLLECTION FOR SINGLE OBJECTS ##
 #############################################
 
-def get_lc_for_object(framedir,
-                      lcobject,
+
+
+def get_lc_for_object(lcobject,
+                      framedir,
                       outfile,
                       frameglob='1-*_?.fits',
                       iphotglob='1-*_?.iphot',
-                      measurecols=(10,12,15,17,20,22,25,27),
                       datekeyword='BJD'):
     '''This pulls out the photometry for an arbitrary object.
 
@@ -1958,11 +1960,15 @@ def get_lc_for_object(framedir,
 
     lclines = {}
 
+    regexstr = r'({lcobject}.*)'.format(lcobject=lcobject)
+    lcobjregex = re.compile(regexstr)
+
     for iphotf in iphotlist:
 
         infd = open(iphotf,'rb')
-        objectline = [x.strip() for x in infd.readlines() if lcobject in x]
+        iphotcontents = infd.read()
         infd.close()
+        objectline = lcobjregex.findall(iphotcontents)
 
         # find the associated fits frame
         fitspath = iphotf.replace('.iphot','.fits')
@@ -1970,15 +1976,12 @@ def get_lc_for_object(framedir,
         # if we found this object in the LC, then grab its info
         if len(objectline) == 1 and os.path.exists(fitspath):
 
-            objectline = objectline[0].split()
-            framemeasures = [objectline[ind] for ind in measurecols]
+            objectline = objectline[0].rstrip()
 
             # find this object's JD
             framedate = imageutils.get_header_keyword(fitspath,
                                                       datekeyword)
-            lclines[framedate] = framemeasures
-            print('found %s in iphot %s, frame %s, JD: %s, mags: %s' %
-                  (lcobject, iphotf, fitspath, framedate, framemeasures))
+            lclines[framedate] = objectline
 
     # now that we've collected the LC, write it out to disk
     outfd = open(outfile, 'wb')
@@ -1987,13 +1990,38 @@ def get_lc_for_object(framedir,
 
         outline = '{framedate} {framemeasures}\n'
         framedate = date
-        framemeasures = ' '.join(lclines[date])
+        framemeasures = lclines[date]
         outfd.write(outline.format(framedate=framedate,
                                    framemeasures=framemeasures))
 
     outfd.close()
 
     return outfile
+
+
+
+def parallel_get_lcs(cmrawphot,
+                     framedir,
+                     outdir,
+                     frameglob='1-*_?.fits',
+                     iphotglob='1-*_?.iphot',
+                     nworkers=16,
+                     maxworkertasks=5000):
+
+    '''
+    This does a dumb LC collection since the other methods are crap.
+
+    '''
+
+    # get a list of the HATIDs from the cmrawphot
+    with open(cmrawphot,'rb') as infd:
+        hatids = sorted([x.split()[0] for x in infd.readlines()])
+
+
+
+
+
+
 
 
 ###########################
@@ -2128,7 +2156,7 @@ def make_photometry_indexdb(framedir,
 
 
 
-def get_iphot_line(iphot, linenum, iphotlinechars=260):
+def get_iphot_line(iphot, linenum, lcobject, iphotlinechars=338):
     '''
     This gets a random iphot line out of the file iphot.
 
@@ -2136,15 +2164,26 @@ def get_iphot_line(iphot, linenum, iphotlinechars=260):
 
     iphotf = open(iphot, 'rb')
     filelinenum = iphotlinechars*linenum
-    iphotf.seek(filelinenum)
-    iphotline = iphotf.read(iphotlinechars)
+
+    if filelinenum > 0:
+        iphotf.seek(filelinenum - 100)
+    else:
+        iphotf.seek(filelinenum)
+
+    iphotline = iphotf.read(iphotlinechars + 100)
+
+    linestart = iphotline.index(lcobject)
+    iphotline = iphotline[linestart:]
+    lineend = iphotline.index('\n')
+    iphotline = iphotline[:lineend]
+
     iphotf.close()
 
     return iphotline
 
 
 
-def get_iphot_line_linecache(iphot, linenum, iphotlinechars=260):
+def get_iphot_line_linecache(iphot, linenum, lcobject, iphotlinechars=260):
     '''
     This uses linecache's getline function to get the line out of the file
     iphot.
@@ -2155,7 +2194,7 @@ def get_iphot_line_linecache(iphot, linenum, iphotlinechars=260):
 
 
 
-def get_iphot_line_sed(iphot, linenum, iphotlinechars=260):
+def get_iphot_line_sed(iphot, linenum, lcobject, iphotlinechars=260):
     '''
     This uses the sed utility to pull the line out of the iphot.
 
@@ -2179,12 +2218,30 @@ def get_iphot_line_sed(iphot, linenum, iphotlinechars=260):
 
 
 
+def iphot_line_tail(iphot, linenum, lcobject, iphotlinechars=338):
+    '''
+    Uses head | tail.
+
+    '''
+
+    try:
+        cmd = 'head -n {headline} {iphot} | tail -n 1'.format(
+            headline=linenum+1,
+            iphot=iphot
+        )
+
+        pout = check_output(cmd, shell=True)
+        return poutput.rstrip(' \n')
+    except:
+        return ''
+
+
 def collect_imagesubphot_lightcurve(hatid,
                                     photindex,
                                     outdir,
                                     skipcollected=True,
-                                    iphotlinefunc=get_iphot_line_sed,
-                                    iphotlinechars=260):
+                                    iphotlinefunc=get_iphot_line,
+                                    iphotlinechars=338):
     '''
     This collects the imagesubphot lightcurve of a single object into a .ilc
     file.
@@ -2272,12 +2329,15 @@ def collect_imagesubphot_lightcurve(hatid,
 
             try:
 
-                # next, get the requested line from phot file
-                phot_elem = iphotlinefunc(
-                    os.path.join(photdir, phot),
-                    photline,
-                    iphotlinechars=iphotlinechars
-                    ).split()
+                # open the phot
+                infd = open(os.path.join(photdir, phot),'rb')
+                for ind, line in enumerate(infd):
+                    if ind == photline:
+                        photelemline = line.rstrip(' \n')
+                        break
+                infd.close()
+
+                phot_elem = photelemline.split()
 
                 if len(phot_elem) > 0:
 
@@ -2358,7 +2418,7 @@ def parallel_collect_imagesub_lightcurves(
     overwritephotindex=False,
     skipcollectedlcs=True,
     iphotlinefunc=get_iphot_line,
-    iphotlinechars=260,
+    iphotlinechars=338,
     nworkers=16,
     maxworkertasks=1000
     ):
