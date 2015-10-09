@@ -2183,7 +2183,7 @@ def get_iphot_line(iphot, linenum, lcobject, iphotlinechars=338):
 
 
 
-def get_iphot_line_linecache(iphot, linenum, iphotlinechars=260):
+def get_iphot_line_linecache(iphot, linenum, lcobject, iphotlinechars=260):
     '''
     This uses linecache's getline function to get the line out of the file
     iphot.
@@ -2194,7 +2194,7 @@ def get_iphot_line_linecache(iphot, linenum, iphotlinechars=260):
 
 
 
-def get_iphot_line_sed(iphot, linenum, iphotlinechars=260):
+def get_iphot_line_sed(iphot, linenum, lcobject, iphotlinechars=260):
     '''
     This uses the sed utility to pull the line out of the iphot.
 
@@ -2218,7 +2218,7 @@ def get_iphot_line_sed(iphot, linenum, iphotlinechars=260):
 
 
 
-def iphot_line_tail(iphot, linenum, iphotlinechars=338):
+def iphot_line_tail(iphot, linenum, lcobject, iphotlinechars=338):
     '''
     Uses head | tail.
 
@@ -2333,6 +2333,7 @@ def collect_imagesubphot_lightcurve(hatid,
                 phot_elem = iphotlinefunc(
                     os.path.join(photdir, phot),
                     photline,
+                    hatid,
                     iphotlinechars=iphotlinechars
                     ).split()
 
