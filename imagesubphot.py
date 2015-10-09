@@ -1585,7 +1585,7 @@ def photometry_on_combined_photref(
                           extractsources=False,
                           zeropoint=zeropoint)
     photref_sourcelist = os.path.abspath(photref_frame.strip('.fits.fz') +
-                                         '.sourcelist')
+                                         '.projcatalog')
 
     # FINALLY, run the cmrawphot command using the locations and IDs from the
     # .sourcelist produced by do_photometry
@@ -1593,7 +1593,7 @@ def photometry_on_combined_photref(
         photref=photref_frame,
         srclist=photref_sourcelist,
         srclist_idcol='1',
-        srclist_xycol='7,8',
+        srclist_xycol='13,14',
         ccdgain=ccdgain,
         zeropoint=zeropoint,
         exptime=ccdexptime,
@@ -2156,7 +2156,7 @@ def make_photometry_indexdb(framedir,
 
 
 
-def get_iphot_line(iphot, linenum, iphotlinechars=338):
+def get_iphot_line(iphot, linenum, lcobject, iphotlinechars=338):
     '''
     This gets a random iphot line out of the file iphot.
 
@@ -2164,9 +2164,19 @@ def get_iphot_line(iphot, linenum, iphotlinechars=338):
 
     iphotf = open(iphot, 'rb')
     filelinenum = iphotlinechars*linenum
-    iphotf.seek(filelinenum)
-    iphotline = iphotf.read(iphotlinechars+10)
-    iphotline = iphotline.split('\n')[0]
+
+    if filelinenum > 0:
+        iphotf.seek(filelinenum - 100)
+    else:
+        iphotf.seek(filelinenum)
+
+    iphotline = iphotf.read(iphotlinechars + 100)
+
+    linestart = iphotline.index(lcobject)
+    iphotline = iphotline[linestart:]
+    lineend = iphotline.index('\n')
+    iphotline = iphotline[:lineend]
+
     iphotf.close()
 
     return iphotline
@@ -2230,7 +2240,7 @@ def collect_imagesubphot_lightcurve(hatid,
                                     photindex,
                                     outdir,
                                     skipcollected=True,
-                                    iphotlinefunc=iphot_line_tail,
+                                    iphotlinefunc=get_iphot_line,
                                     iphotlinechars=338):
     '''
     This collects the imagesubphot lightcurve of a single object into a .ilc
