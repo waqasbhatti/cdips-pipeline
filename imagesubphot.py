@@ -2330,7 +2330,7 @@ def collect_imagesubphot_lightcurve(hatid,
             try:
 
                 # open the phot
-                infd = open(phot,'rb')
+                infd = open(os.path.join(photdir, phot),'rb')
                 for ind, line in enumerate(infd):
                     if ind == photline:
                         photelemline = line.rstrip(' \n')
