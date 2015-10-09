@@ -2329,13 +2329,15 @@ def collect_imagesubphot_lightcurve(hatid,
 
             try:
 
-                # next, get the requested line from phot file
-                phot_elem = iphotlinefunc(
-                    os.path.join(photdir, phot),
-                    photline,
-                    hatid,
-                    iphotlinechars=iphotlinechars
-                    ).split()
+                # open the phot
+                infd = open(phot,'rb')
+                for ind, line in enumerate(infd):
+                    if ind == photline:
+                        photelemline = line.rstrip(' \n')
+                        break
+                infd.close()
+
+                phot_elem = photelemline.split()
 
                 if len(phot_elem) > 0:
 
