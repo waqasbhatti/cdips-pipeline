@@ -157,6 +157,7 @@ import os.path
 import glob
 import multiprocessing as mp
 import subprocess
+from subprocess import check_output
 import shlex
 from datetime import datetime
 import re
@@ -2207,11 +2208,29 @@ def get_iphot_line_sed(iphot, linenum, iphotlinechars=260):
 
 
 
+def iphot_line_tail(iphot, linenum, iphotlinechars=338):
+    '''
+    Uses head | tail.
+
+    '''
+
+    try:
+        cmd = 'head -n {headline} {iphot} | tail -n 1'.format(
+            headline=linenum+1,
+            iphot=iphot
+        )
+
+        pout = check_output(cmd, shell=True)
+        return poutput.rstrip(' \n')
+    except:
+        return ''
+
+
 def collect_imagesubphot_lightcurve(hatid,
                                     photindex,
                                     outdir,
                                     skipcollected=True,
-                                    iphotlinefunc=get_iphot_line,
+                                    iphotlinefunc=iphot_line_tail,
                                     iphotlinechars=338):
     '''
     This collects the imagesubphot lightcurve of a single object into a .ilc
