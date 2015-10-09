@@ -2163,8 +2163,8 @@ def get_iphot_line(iphot, linenum, iphotlinechars=338):
 
     iphotf = open(iphot, 'rb')
     filelinenum = iphotlinechars*linenum
-    iphotf.seek(filelinenum+10)
-    iphotline = iphotf.read(iphotlinechars)
+    iphotf.seek(filelinenum)
+    iphotline = iphotf.read(iphotlinechars+10)
     iphotline = iphotline.split('\n')[0]
     iphotf.close()
 
