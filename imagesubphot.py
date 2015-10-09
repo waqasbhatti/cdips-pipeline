@@ -1996,6 +1996,31 @@ def get_lc_for_object(framedir,
     return outfile
 
 
+
+def parallel_get_lcs(cmrawphot,
+                     framedir,
+                     outdir,
+                     frameglob='1-*_?.fits',
+                     iphotglob='1-*_?.iphot',
+                     nworkers=16,
+                     maxworkertasks=5000):
+
+    '''
+    This does a dumb LC collection since the other methods are crap.
+
+    '''
+
+    # get a list of the HATIDs from the cmrawphot
+    with open(cmrawphot,'rb') as infd:
+        hatids = sorted([x.split()[0] for x in infd.readlines()])
+
+
+
+
+
+
+
+
 ###########################
 ## LIGHTCURVE COLLECTION ##
 ###########################
@@ -2128,7 +2153,7 @@ def make_photometry_indexdb(framedir,
 
 
 
-def get_iphot_line(iphot, linenum, iphotlinechars=260):
+def get_iphot_line(iphot, linenum, iphotlinechars=338):
     '''
     This gets a random iphot line out of the file iphot.
 
@@ -2136,8 +2161,9 @@ def get_iphot_line(iphot, linenum, iphotlinechars=260):
 
     iphotf = open(iphot, 'rb')
     filelinenum = iphotlinechars*linenum
-    iphotf.seek(filelinenum)
+    iphotf.seek(filelinenum+10)
     iphotline = iphotf.read(iphotlinechars)
+    iphotline = iphotline.split('\n')[0]
     iphotf.close()
 
     return iphotline
@@ -2183,8 +2209,8 @@ def collect_imagesubphot_lightcurve(hatid,
                                     photindex,
                                     outdir,
                                     skipcollected=True,
-                                    iphotlinefunc=get_iphot_line_sed,
-                                    iphotlinechars=260):
+                                    iphotlinefunc=get_iphot_line,
+                                    iphotlinechars=338):
     '''
     This collects the imagesubphot lightcurve of a single object into a .ilc
     file.
@@ -2358,7 +2384,7 @@ def parallel_collect_imagesub_lightcurves(
     overwritephotindex=False,
     skipcollectedlcs=True,
     iphotlinefunc=get_iphot_line,
-    iphotlinechars=260,
+    iphotlinechars=338,
     nworkers=16,
     maxworkertasks=1000
     ):
