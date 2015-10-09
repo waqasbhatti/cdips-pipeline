@@ -1938,8 +1938,10 @@ def photometry_on_subtracted_frames(subframedir,
 ## AD HOC LC COLLECTION FOR SINGLE OBJECTS ##
 #############################################
 
-def get_lc_for_object(framedir,
-                      lcobject,
+
+
+def get_lc_for_object(lcobject,
+                      framedir,
                       outfile,
                       frameglob='1-*_?.fits',
                       iphotglob='1-*_?.iphot',
@@ -1957,11 +1959,15 @@ def get_lc_for_object(framedir,
 
     lclines = {}
 
+    regexstr = r'({lcobject}.*)'.format(lcobject=lcobject)
+    lcobjregex = re.compile(regexstr)
+
     for iphotf in iphotlist:
 
         infd = open(iphotf,'rb')
-        objectline = [x.strip() for x in infd.readlines() if lcobject in x]
+        iphotcontents = infd.read()
         infd.close()
+        objectline = lcobjregex.findall(iphotcontents)
 
         # find the associated fits frame
         fitspath = iphotf.replace('.iphot','.fits')
@@ -1969,7 +1975,7 @@ def get_lc_for_object(framedir,
         # if we found this object in the LC, then grab its info
         if len(objectline) == 1 and os.path.exists(fitspath):
 
-            objectline = objectline[0].rstrip('\n')
+            objectline = objectline[0].rstrip()
 
             # find this object's JD
             framedate = imageutils.get_header_keyword(fitspath,
