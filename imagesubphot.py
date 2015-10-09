@@ -1943,7 +1943,6 @@ def get_lc_for_object(framedir,
                       outfile,
                       frameglob='1-*_?.fits',
                       iphotglob='1-*_?.iphot',
-                      measurecols=(10,12,15,17,20,22,25,27),
                       datekeyword='BJD'):
     '''This pulls out the photometry for an arbitrary object.
 
@@ -1970,15 +1969,12 @@ def get_lc_for_object(framedir,
         # if we found this object in the LC, then grab its info
         if len(objectline) == 1 and os.path.exists(fitspath):
 
-            objectline = objectline[0].split()
-            framemeasures = [objectline[ind] for ind in measurecols]
+            objectline = objectline[0].rstrip('\n')
 
             # find this object's JD
             framedate = imageutils.get_header_keyword(fitspath,
                                                       datekeyword)
-            lclines[framedate] = framemeasures
-            print('found %s in iphot %s, frame %s, JD: %s, mags: %s' %
-                  (lcobject, iphotf, fitspath, framedate, framemeasures))
+            lclines[framedate] = objectline
 
     # now that we've collected the LC, write it out to disk
     outfd = open(outfile, 'wb')
@@ -1987,7 +1983,7 @@ def get_lc_for_object(framedir,
 
         outline = '{framedate} {framemeasures}\n'
         framedate = date
-        framemeasures = ' '.join(lclines[date])
+        framemeasures = lclines[date]
         outfd.write(outline.format(framedate=framedate,
                                    framemeasures=framemeasures))
 
