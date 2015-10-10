@@ -2732,7 +2732,7 @@ def epd_lightcurve_imagesub(ilcfile,
 
         # now write the EPD LCs out to the outfile
         if not outfile:
-            outfile = '%s.epdlc' % ilcfile.strip('.%s' % ilcext)
+            outfile = '%s.epdlc' % ilcfile.rstrip('.%s' % ilcext)
 
         inf = open(ilcfile,'rb')
         inflines = inf.readlines()
