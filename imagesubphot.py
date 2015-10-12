@@ -1391,25 +1391,25 @@ def photref_convolution_worker(task):
 
 
 def convolve_photref_frames(photreflist,
-                            targetframe,
+                            photrefframe,
                             convregfile,
                             kernelspec='b/4;i/4;d=4/4',
                             nworkers=16,
                             maxworkertasks=1000,
                             outdir=None):
 
-    '''This convolves all photref frames in photreflist to the targetframe. See
+    '''This convolves all photref frames in photreflist to the photrefframe. See
     getref() in run_ficonv.py.
 
     '''
 
     # make a list of tasks
 
-    tasks = [(x, targetframe, convregfile, kernelspec, outdir)
+    tasks = [(x, photrefframe, convregfile, kernelspec, outdir)
              for x in photreflist]
 
     print('%sZ: %s photref files to convolve to %s' %
-          (datetime.utcnow().isoformat(), len(photreflist), targetframe))
+          (datetime.utcnow().isoformat(), len(photreflist), photrefframe))
 
     pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
@@ -1489,6 +1489,7 @@ def photometry_on_combined_photref(
         ccdgain=None,
         zeropoint=None,
         ccdexptime=None,
+        extractsources=True,
         apertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
         outfile=None
         ):
@@ -1582,7 +1583,7 @@ def photometry_on_combined_photref(
     photf = do_photometry(os.path.abspath(photref_frame),
                           os.path.abspath(fovcatalog),
                           outdir=os.path.dirname(os.path.abspath(photref_frame)),
-                          extractsources=False,
+                          extractsources=extractsources,
                           zeropoint=zeropoint)
     photref_sourcelist = os.path.abspath(photref_frame.strip('.fits.fz') +
                                          '.projcatalog')
