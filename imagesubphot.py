@@ -2774,28 +2774,41 @@ def serial_run_epd_imagesub(ilcdir,
     00 rjd    Reduced Julian Date (RJD = JD - 2400000.0)
     01 rstfc  Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
     02 hat    HAT ID of the object
-    03 xcc    original X coordinate on CCD before shifting to astromref
-    04 ycc    original y coordinate on CCD before shifting to astromref
-    05 xic    shifted X coordinate on CCD after shifting to astromref
-    06 yic    shifted Y coordinate on CCD after shifting to astromref
+    03 xcc    original X coordinate on CCD on photref frame
+    04 ycc    original y coordinate on CCD on photref frame
+    05 xic    shifted X coordinate on CCD on subtracted frame
+    06 yic    shifted Y coordinate on CCD on subtracted frame
     07 fsv    Measured S value
     08 fdv    Measured D value
     09 fkv    Measured K value
     10 bgv    Background value
     11 bge    Background measurement error
-    12 irm1   Instrumental magnitude in aperture 1
-    13 ire1   Instrumental magnitude error for aperture 1
-    14 irq1   Instrumental magnitude quality flag for aperture 1 (0/G OK, X bad)
-    15 irm2   Instrumental magnitude in aperture 2
-    16 ire2   Instrumental magnitude error for aperture 2
-    17 irq2   Instrumental magnitude quality flag for aperture 2 (0/G OK, X bad)
-    18 irm3   Instrumental magnitude in aperture 3
-    19 ire3   Instrumental magnitude error for aperture 3
-    20 irq3   Instrumental magnitude quality flag for aperture 3 (0/G OK, X bad)
-    21 ep1    EPD magnitude for aperture 1
-    22 ep2    EPD magnitude for aperture 2
-    23 ep3    EPD magnitude for aperture 3
 
+    12 ifl1   Flux in aperture 1 (ADU)
+    13 ife1   Flux error in aperture 1 (ADU)
+    14 irm1   Instrumental magnitude in aperture 1
+    15 ire1   Instrumental magnitude error for aperture 1
+    16 irq1   Instrumental magnitude quality flag for aperture 1 (0/G OK, X bad)
+
+    17 ifl2   Flux in aperture 2 (ADU)
+    18 ife2   Flux error in aperture 2 (ADU)
+    19 irm2   Instrumental magnitude in aperture 2
+    20 ire2   Instrumental magnitude error for aperture 2
+    21 irq2   Instrumental magnitude quality flag for aperture 2 (0/G OK, X bad)
+
+    22 ifl3   Flux in aperture 3 (ADU)
+    23 ife3   Flux error in aperture 3 (ADU)
+    24 irm3   Instrumental magnitude in aperture 3
+    25 ire3   Instrumental magnitude error for aperture 3
+    26 irq3   Instrumental magnitude quality flag for aperture 3 (0/G OK, X bad)
+
+    27 ep1    EPD magnitude for aperture 1
+    28 ep2    EPD magnitude for aperture 2
+    29 ep3    EPD magnitude for aperture 3
+
+    30 tf1    TFA magnitude for aperture 1
+    31 tf2    TFA magnitude for aperture 2
+    32 tf3    TFA magnitude for aperture 3
 
     '''
 

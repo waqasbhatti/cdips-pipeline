@@ -5376,79 +5376,85 @@ def plot_stats_file(statsfile, outdir, outprefix,
 
     for plot in STATS_PLOTS:
 
-        if binned and not STATS_PLOTS[plot]['binned']:
-            print('not making %s for binned LCs' % plot)
-            continue
+        try:
 
-        if logy:
-            logypostfix = '-logy'
-        else:
-            logypostfix = ''
-        if logx:
-            logxpostfix = '-logx'
-        else:
-            logxpostfix = ''
+            if binned and not STATS_PLOTS[plot]['binned']:
+                print('not making %s for binned LCs' % plot)
+                continue
 
-        outfile = os.path.join(outdir, '%s-%s%s%s.png' % (outprefix,
-                                                          plot,
-                                                          logxpostfix,
-                                                          logypostfix))
+            if logy:
+                logypostfix = '-logy'
+            else:
+                logypostfix = ''
+            if logx:
+                logxpostfix = '-logx'
+            else:
+                logxpostfix = ''
 
-        xcol, ycol = (stats[STATS_PLOTS[plot]['xcol']],
-                      stats[STATS_PLOTS[plot]['ycol']])
-        xlabel, ylabel = (STATS_PLOTS[plot]['xlabel'],
-                          STATS_PLOTS[plot]['ylabel'])
-        title = '%s - %s - %s' % (outprefix,
-                                  len(xcol),
-                                  STATS_PLOTS[plot]['title'])
+            outfile = os.path.join(outdir, '%s-%s%s%s.png' % (outprefix,
+                                                              plot,
+                                                              logxpostfix,
+                                                              logypostfix))
 
-        # make the plot
-        if logy:
-            plt.scatter(xcol, ycol,
-                        s=1,
-                        marker='.')
-            plt.yscale('log',basex=10.0)
-        elif logx:
-            plt.scatter(xcol, ycol,
-                        s=1,
-                        marker='.')
-            plt.xscale('log',basex=10.0)
-        elif logx and logy:
-            plt.scatter(xcol, ycol,
-                        s=1,
-                        marker='.')
-            plt.xscale('log',basex=10.0)
-            plt.yscale('log',basex=10.0)
-        else:
-            plt.scatter(xcol, ycol,
-                        s=1,
-                        marker='.')
+            xcol, ycol = (stats[STATS_PLOTS[plot]['xcol']],
+                          stats[STATS_PLOTS[plot]['ycol']])
+            xlabel, ylabel = (STATS_PLOTS[plot]['xlabel'],
+                              STATS_PLOTS[plot]['ylabel'])
+            title = '%s - %s - %s' % (outprefix,
+                                      len(xcol),
+                                      STATS_PLOTS[plot]['title'])
+
+            # make the plot
+            if logy:
+                plt.scatter(xcol, ycol,
+                            s=1,
+                            marker='.')
+                plt.yscale('log',basex=10.0)
+            elif logx:
+                plt.scatter(xcol, ycol,
+                            s=1,
+                            marker='.')
+                plt.xscale('log',basex=10.0)
+            elif logx and logy:
+                plt.scatter(xcol, ycol,
+                            s=1,
+                            marker='.')
+                plt.xscale('log',basex=10.0)
+                plt.yscale('log',basex=10.0)
+            else:
+                plt.scatter(xcol, ycol,
+                            s=1,
+                            marker='.')
 
 
-        plt.xlabel(xlabel)
-        plt.ylabel(ylabel)
-        plt.title(title)
-        plt.xlim(rangex)
+            plt.xlabel(xlabel)
+            plt.ylabel(ylabel)
+            plt.title(title)
+            plt.xlim(rangex)
 
-        if binned:
-            plt.ylim((0.0001,1.0))
-            plt.hlines([0.001,0.002,0.003],
-                       xmin=5.0,xmax=15.0,colors='b')
-            plt.hlines([0.0005],
-                       xmin=5.0,xmax=15.0,colors='r')
+            if binned:
+                plt.ylim((0.0001,1.0))
+                plt.hlines([0.001,0.002,0.003],
+                           xmin=5.0,xmax=15.0,colors='b')
+                plt.hlines([0.0005],
+                           xmin=5.0,xmax=15.0,colors='r')
 
-        else:
-            # make the horizontal lines for 10, 5, 1 mmag
-            plt.ylim((0.0009,1.0))
-            plt.hlines([0.001, 0.002, 0.003, 0.004, 0.005],
-                       xmin=5.0,xmax=15.0,colors='b')
+            else:
+                # make the horizontal lines for 10, 5, 1 mmag
+                plt.ylim((0.0009,1.0))
+                plt.hlines([0.001, 0.002, 0.003, 0.004, 0.005],
+                           xmin=5.0,xmax=15.0,colors='b')
 
-        plt.savefig(outfile)
-        plt.close()
+            plt.savefig(outfile)
+            plt.close()
 
-        print('%sZ: made %s plot: %s' %
-              (datetime.utcnow().isoformat(), title, outfile))
+            print('%sZ: made %s plot: %s' %
+                  (datetime.utcnow().isoformat(), title, outfile))
 
+        except Exception as e:
+
+            print('%sZ: %s plot failed! Error was: %s' %
+                  (datetime.utcnow().isoformat(), title, e))
 
 
 def plot_magrms_comparison(reference_stats_file,
