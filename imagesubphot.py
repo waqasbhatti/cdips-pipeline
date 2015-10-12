@@ -1585,8 +1585,15 @@ def photometry_on_combined_photref(
                           outdir=os.path.dirname(os.path.abspath(photref_frame)),
                           extractsources=extractsources,
                           zeropoint=zeropoint)
-    photref_sourcelist = os.path.abspath(photref_frame.strip('.fits.fz') +
-                                         '.projcatalog')
+
+    if extractsources:
+        photref_sourcelist = os.path.abspath(photref_frame.strip('.fits.fz') +
+                                             '.sourcelist')
+        srclist_xy = '7,8'
+    else:
+        photref_sourcelist = os.path.abspath(photref_frame.strip('.fits.fz') +
+                                             '.projcatalog')
+        srclist_xy = '13,14'
 
     # FINALLY, run the cmrawphot command using the locations and IDs from the
     # .sourcelist produced by do_photometry
@@ -1594,7 +1601,7 @@ def photometry_on_combined_photref(
         photref=photref_frame,
         srclist=photref_sourcelist,
         srclist_idcol='1',
-        srclist_xycol='13,14',
+        srclist_xycol=srclist_xy,
         ccdgain=ccdgain,
         zeropoint=zeropoint,
         exptime=ccdexptime,
