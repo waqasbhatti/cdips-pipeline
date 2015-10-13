@@ -3543,7 +3543,7 @@ def run_tfa_singlelc(epdlc,
             else:
 
                 print('%sZ: aperture %s TFA failed for %s! Error was: %s' %
-                      (datetime.utcnow().isoformat(), magind+1, epdlc), tfa_stderr)
+                      (datetime.utcnow().isoformat(), magind+1, epdlc, tfa_stderr))
 
                 tfalc_output.append(None)
 
