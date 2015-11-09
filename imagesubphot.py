@@ -2033,30 +2033,6 @@ def get_lc_for_object(lcobject,
 
 
 
-def parallel_get_lcs(cmrawphot,
-                     framedir,
-                     outdir,
-                     frameglob='1-*_?.fits',
-                     iphotglob='1-*_?.iphot',
-                     nworkers=16,
-                     maxworkertasks=5000):
-
-    '''
-    This does a dumb LC collection since the other methods are crap.
-
-    '''
-
-    # get a list of the HATIDs from the cmrawphot
-    with open(cmrawphot,'rb') as infd:
-        hatids = sorted([x.split()[0] for x in infd.readlines()])
-
-
-
-
-
-
-
-
 ###########################
 ## LIGHTCURVE COLLECTION ##
 ###########################
