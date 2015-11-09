@@ -1346,48 +1346,55 @@ def photref_convolution_worker(task):
 
     frametoconvolve, targetframe, convregfile, kernelspec, outdir = task
 
-    if not outdir:
-        outfile = os.path.join(os.path.dirname(frametoconvolve),
-                               'PHOTREF-%s' % os.path.basename(frametoconvolve))
+    try:
 
-    else:
-        outfile = os.path.join(outdir,
-                               'PHOTREF-%s' % os.path.basename(frametoconvolve))
+        if not outdir:
+            outfile = os.path.join(os.path.dirname(frametoconvolve),
+                                   'PHOTREF-%s' % os.path.basename(frametoconvolve))
 
-    cmdtorun = PHOTREFCONVOLVECMD.format(
-        targetframe=targetframe,
-        frametoconvolve=frametoconvolve,
-        convregfile=convregfile,
-        kernelspec=kernelspec,
-        outputfile=outfile
-    )
+        else:
+            outfile = os.path.join(outdir,
+                                   'PHOTREF-%s' % os.path.basename(frametoconvolve))
 
-    if DEBUG:
-        print(cmdtorun)
+        cmdtorun = PHOTREFCONVOLVECMD.format(
+            targetframe=targetframe,
+            frametoconvolve=frametoconvolve,
+            convregfile=convregfile,
+            kernelspec=kernelspec,
+            outputfile=outfile
+        )
 
-    returncode = os.system(cmdtorun)
+        if DEBUG:
+            print(cmdtorun)
 
-    if returncode == 0:
-        print('%sZ: photref convolution OK: %s -> %s' %
-              (datetime.utcnow().isoformat(), frametoconvolve, outfile))
+        returncode = os.system(cmdtorun)
 
-        framejpg = fits_to_full_jpeg(
-            outfile,
-            out_fname=os.path.join(
-                os.path.dirname(outfile),
-                ('JPEG-CONVPHOTREF-%s.jpg' %
-                 os.path.basename(outfile).strip('.fits.fz'))
+        if returncode == 0:
+            print('%sZ: photref convolution OK: %s -> %s' %
+                  (datetime.utcnow().isoformat(), frametoconvolve, outfile))
+
+            framejpg = fits_to_full_jpeg(
+                outfile,
+                out_fname=os.path.join(
+                    os.path.dirname(outfile),
+                    ('JPEG-CONVPHOTREF-%s.jpg' %
+                     os.path.basename(outfile).strip('.fits.fz'))
+                    )
                 )
-            )
 
-        return frametoconvolve, outfile
-    else:
-        print('ERR! %sZ: photref convolution failed for %s' %
-              (datetime.utcnow().isoformat(), frametoconvolve,))
-        if os.path.exists(outfile):
-            os.remove(outfile)
+            return frametoconvolve, outfile
+        else:
+            print('ERR! %sZ: photref convolution failed for %s' %
+                  (datetime.utcnow().isoformat(), frametoconvolve,))
+            if os.path.exists(outfile):
+                os.remove(outfile)
+            return frametoconvolve, None
+
+    except Exception as e:
+
+        print('ERR! %sZ: photref convolution failed for %s, exception %s' %
+              (datetime.utcnow().isoformat(), frametoconvolve, e))
         return frametoconvolve, None
-
 
 
 def convolve_photref_frames(photreflist,
@@ -1649,77 +1656,85 @@ convolve_and_subtract_frames below.
     (frametoconvolve, targetframe, convregfile,
      kernelspec, outdir, reversesubtract) = task
 
-    # swap these if we're convolving the targetframe to the referenceframe
-    if reversesubtract:
-        frametoconvolve, targetframe = targetframe, frametoconvolve
+    try:
 
-    if not outdir:
+        # swap these if we're convolving the targetframe to the referenceframe
         if reversesubtract:
-            outfile = os.path.join(os.path.dirname(targetframe),
-                                   'rev-subtracted-%s' %
-                                   os.path.basename(targetframe))
+            frametoconvolve, targetframe = targetframe, frametoconvolve
 
-            outkernel = os.path.join(os.path.dirname(targetframe),
-                                     '%s-kernel' %
-                                     os.path.basename(targetframe))
+        if not outdir:
+            if reversesubtract:
+                outfile = os.path.join(os.path.dirname(targetframe),
+                                       'rev-subtracted-%s' %
+                                       os.path.basename(targetframe))
+
+                outkernel = os.path.join(os.path.dirname(targetframe),
+                                         '%s-kernel' %
+                                         os.path.basename(targetframe))
+            else:
+                outfile = os.path.join(os.path.dirname(frametoconvolve),
+                                       'subtracted-%s' %
+                                       os.path.basename(frametoconvolve))
+
+                outkernel = os.path.join(os.path.dirname(frametoconvolve),
+                                         '%s-kernel' %
+                                         os.path.basename(frametoconvolve))
+
         else:
-            outfile = os.path.join(os.path.dirname(frametoconvolve),
-                                   'subtracted-%s' %
-                                   os.path.basename(frametoconvolve))
+            if reversesubtract:
+                outfile = os.path.join(outdir,
+                                       'rev-subtracted-%s' %
+                                       os.path.basename(targetframe))
+                outkernel = os.path.join(outdir,
+                                         '%s-kernel' %
+                                         os.path.basename(targetframe))
+            else:
+                outfile = os.path.join(outdir,
+                                       'subtracted-%s' %
+                                       os.path.basename(frametoconvolve))
+                outkernel = os.path.join(outdir,
+                                         '%s-kernel' %
+                                         os.path.basename(frametoconvolve))
 
-            outkernel = os.path.join(os.path.dirname(frametoconvolve),
-                                     '%s-kernel' %
-                                     os.path.basename(frametoconvolve))
+        cmdtorun = CONVOLVESUBFRAMESCMD.format(
+            targetframe=targetframe,
+            frametoconvolve=frametoconvolve,
+            convregfile=convregfile,
+            kernelspec=kernelspec,
+            outputkernel=outkernel,
+            outputfile=outfile
+        )
 
-    else:
-        if reversesubtract:
-            outfile = os.path.join(outdir,
-                                   'rev-subtracted-%s' %
-                                   os.path.basename(targetframe))
-            outkernel = os.path.join(outdir,
-                                     '%s-kernel' %
-                                     os.path.basename(targetframe))
-        else:
-            outfile = os.path.join(outdir,
-                                   'subtracted-%s' %
-                                   os.path.basename(frametoconvolve))
-            outkernel = os.path.join(outdir,
-                                     '%s-kernel' %
-                                     os.path.basename(frametoconvolve))
+        if DEBUG:
+            print(cmdtorun)
 
-    cmdtorun = CONVOLVESUBFRAMESCMD.format(
-        targetframe=targetframe,
-        frametoconvolve=frametoconvolve,
-        convregfile=convregfile,
-        kernelspec=kernelspec,
-        outputkernel=outkernel,
-        outputfile=outfile
-    )
+        returncode = os.system(cmdtorun)
 
-    if DEBUG:
-        print(cmdtorun)
+        if returncode == 0:
+            print('%sZ: convolution and subtraction OK: %s -> %s' %
+                  (datetime.utcnow().isoformat(), frametoconvolve, outfile))
 
-    returncode = os.system(cmdtorun)
-
-    if returncode == 0:
-        print('%sZ: convolution and subtraction OK: %s -> %s' %
-              (datetime.utcnow().isoformat(), frametoconvolve, outfile))
-
-        framejpg = fits_to_full_jpeg(
-            outfile,
-            out_fname=os.path.join(
-                os.path.dirname(outfile),
-                ('JPEG-SUBTRACTEDCONV-%s.jpg' %
-                 os.path.basename(outfile).strip('.fits.fz'))
+            framejpg = fits_to_full_jpeg(
+                outfile,
+                out_fname=os.path.join(
+                    os.path.dirname(outfile),
+                    ('JPEG-SUBTRACTEDCONV-%s.jpg' %
+                     os.path.basename(outfile).strip('.fits.fz'))
+                    )
                 )
-            )
 
-        return frametoconvolve, outfile
-    else:
-        print('ERR! %sZ: convolution and subtraction failed for %s' %
-              (datetime.utcnow().isoformat(), frametoconvolve,))
-        if os.path.exists(outfile):
-            os.remove(outfile)
+            return frametoconvolve, outfile
+        else:
+            print('ERR! %sZ: convolution and subtraction failed for %s' %
+                  (datetime.utcnow().isoformat(), frametoconvolve,))
+            if os.path.exists(outfile):
+                os.remove(outfile)
+            return frametoconvolve, None
+
+    except Exception as e:
+
+        print('ERR! %sZ: photref convolution failed for %s, exception %s' %
+              (datetime.utcnow().isoformat(), frametoconvolve, e))
         return frametoconvolve, None
 
 
@@ -1783,75 +1798,85 @@ def subframe_photometry_worker(task):
      subframekernel, subframeitrans, subframexysdk,
      outdir) = task
 
-    # get the CCD info out of the subframe
-    header = imageutils.get_header_keyword_list(subframe,
-                                                ['GAIN',
-                                                 'GAIN1',
-                                                 'GAIN2',
-                                                 'EXPTIME'])
+    try:
 
-    if 'GAIN1' in header and 'GAIN2' in header:
-        ccdgain = (header['GAIN1'] + header['GAIN2'])/2.0
-    elif 'GAIN' in header:
-        ccdgain = header['GAIN']
-    else:
-        ccdgain = None
+        # get the CCD info out of the subframe
+        header = imageutils.get_header_keyword_list(subframe,
+                                                    ['GAIN',
+                                                     'GAIN1',
+                                                     'GAIN2',
+                                                     'EXPTIME'])
 
-    ccdexptime = header['EXPTIME'] if 'EXPTIME' in header else None
+        if 'GAIN1' in header and 'GAIN2' in header:
+            ccdgain = (header['GAIN1'] + header['GAIN2'])/2.0
+        elif 'GAIN' in header:
+            ccdgain = header['GAIN']
+        else:
+            ccdgain = None
 
-    if not (ccdgain or ccdexptime):
-        print('%sZ: no GAIN or EXPTIME defined for %s' %
-              (datetime.utcnow().isoformat(),
-               subframe))
-        return subframe, None
+        ccdexptime = header['EXPTIME'] if 'EXPTIME' in header else None
 
-    # get the zeropoint. if this is a HAT frame, the ccd number will get us the
-    # zeropoint in the ZEROPOINTS dictionary
-    frameinfo = FRAMEREGEX.findall(os.path.basename(subframe))
+        if not (ccdgain or ccdexptime):
+            print('%sZ: no GAIN or EXPTIME defined for %s' %
+                  (datetime.utcnow().isoformat(),
+                   subframe))
+            return subframe, None
 
-    if frameinfo:
-        zeropoint = ZEROPOINTS[int(frameinfo[0][-1])]
-    else:
-        print('%sZ: no zeropoint magnitude defined for %s' %
-              (datetime.utcnow().isoformat(),
-               subframe))
-        return subframe, None
+        # get the zeropoint. if this is a HAT frame, the ccd number will get us the
+        # zeropoint in the ZEROPOINTS dictionary
+        frameinfo = FRAMEREGEX.findall(os.path.basename(subframe))
 
-    frameiphot = '%s-%s_%s.iphot' % (frameinfo[0][0],
-                                     frameinfo[0][1],
-                                     frameinfo[0][2])
+        if frameinfo:
+            zeropoint = ZEROPOINTS[int(frameinfo[0][-1])]
+        else:
+            print('%sZ: no zeropoint magnitude defined for %s' %
+                  (datetime.utcnow().isoformat(),
+                   subframe))
+            return subframe, None
 
-    if outdir:
-        outfile = os.path.join(os.path.abspath(outdir),
-                               frameiphot)
-    else:
-        outfile = os.path.join(os.path.abspath(os.path.dirname(subframe)),
-                               frameiphot)
+        frameiphot = '%s-%s_%s.iphot' % (frameinfo[0][0],
+                                         frameinfo[0][1],
+                                         frameinfo[0][2])
+
+        if outdir:
+            outfile = os.path.join(os.path.abspath(outdir),
+                                   frameiphot)
+        else:
+            outfile = os.path.join(os.path.abspath(os.path.dirname(subframe)),
+                                   frameiphot)
 
 
-    cmdtorun = SUBFRAMEPHOTCMD.format(
-        subtractedframe=subframe,
-        photrefrawphot=photrefrawphot,
-        zeropoint=zeropoint,
-        exptime=ccdexptime,
-        ccdgain=ccdgain,
-        disjointradius=disjointrad,
-        subtractedkernel=subframekernel,
-        subtracteditrans=subframeitrans,
-        subtractedxysdk=subframexysdk,
-        outiphot=outfile
-        )
+        cmdtorun = SUBFRAMEPHOTCMD.format(
+            subtractedframe=subframe,
+            photrefrawphot=photrefrawphot,
+            zeropoint=zeropoint,
+            exptime=ccdexptime,
+            ccdgain=ccdgain,
+            disjointradius=disjointrad,
+            subtractedkernel=subframekernel,
+            subtracteditrans=subframeitrans,
+            subtractedxysdk=subframexysdk,
+            outiphot=outfile
+            )
 
-    if DEBUG:
-        print(cmdtorun)
+        if DEBUG:
+            print(cmdtorun)
 
-    returncode = os.system(cmdtorun)
+        returncode = os.system(cmdtorun)
 
-    if returncode == 0:
-        print('%sZ: subtracted frame photometry OK for %s -> %s' %
-              (datetime.utcnow().isoformat(), subframe, outfile))
-        return subframe, outfile
-    else:
+        if returncode == 0:
+            print('%sZ: subtracted frame photometry OK for %s -> %s' %
+                  (datetime.utcnow().isoformat(), subframe, outfile))
+            return subframe, outfile
+        else:
+            print('ERR! %sZ: subtracted frame photometry failed for %s' %
+                  (datetime.utcnow().isoformat(), subframe,))
+            if os.path.exists(outfile):
+                os.remove(outfile)
+            return subframe, None
+
+    except Exception as e:
+
         print('ERR! %sZ: subtracted frame photometry failed for %s' %
               (datetime.utcnow().isoformat(), subframe,))
         if os.path.exists(outfile):
