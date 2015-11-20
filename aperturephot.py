@@ -5578,10 +5578,10 @@ def plot_magrms_comparison(reference_stats_file,
         xcol = (np.array(ref_mag))[nonzero_ind[0]]
         ycol = compcol_ratios[nonzero_ind[0]]
 
-        xlabel, ylabel = ('FOV catalog SDSS r mag',
-                          'TF3 median abs. dev. %s/%s' % (ref_name, comp_name))
-        title = 'comparison of TF3 median abs. dev. - %s/%s' % (ref_name,
-                                                                comp_name)
+        xlabel = 'FOV catalog SDSS r mag'
+        ylabel = 'TFA median abs. dev. %s/%s' % (ref_name, comp_name)
+
+        title = 'TFA median abs. dev. - %s/%s' % (ref_name, comp_name)
 
         # make the plot
         if logy:
