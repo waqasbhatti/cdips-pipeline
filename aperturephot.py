@@ -5666,7 +5666,7 @@ def rollup_plots(projid,
             ccd=ccd,
             phottype=phottype
         )
-        plot_stats_file(statfile,'.',phottype,logy=True)
+        plot_stats_file(statfile,'.',rmsplotprefix,logy=True)
 
 
     # make the comparison plots
@@ -5679,7 +5679,11 @@ def rollup_plots(projid,
 
         for otherccd in otherccds:
 
-            otherstatfile = os.path.join(projdir,'ccd%s-tfa-lcstats.txt' % ccd)
+            otherstatfile = os.path.join(projdir,
+                                         'ccd%s-tfa-lcstats.txt' %
+                                         otherccd)
+
+            print('comparison plot between ccd %s and ccd %s' % (ccd, otherccd)
 
             tf3outfile = (
                 'projid%s-ccd%s-ccd%s-comparison.png' % (projid, ccd, otherccd)
