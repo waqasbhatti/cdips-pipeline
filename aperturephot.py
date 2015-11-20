@@ -5355,6 +5355,14 @@ STATS_PLOTS = {
         'ylabel':'TF3 median abs. dev.',
         'binned':True
         },
+    'catalog-r-mag-vs-mad-bestap':{
+        'xcol':'cat_mag',
+        'ycol':('mad_tf1','mad_tf2','mad_tf3'),
+        'title':'FOV catalog SDSS r mag vs. TFA bestap MAD',
+        'xlabel':'FOV catalog SDSS r mag',
+        'ylabel':'TFA best aperture median abs. dev.',
+        'binned':True
+        },
     }
 
 
@@ -5396,13 +5404,37 @@ def plot_stats_file(statsfile, outdir, outprefix,
                                                               logxpostfix,
                                                               logypostfix))
 
-            xcol, ycol = (stats[STATS_PLOTS[plot]['xcol']],
-                          stats[STATS_PLOTS[plot]['ycol']])
-            xlabel, ylabel = (STATS_PLOTS[plot]['xlabel'],
-                              STATS_PLOTS[plot]['ylabel'])
-            title = '%s - %s - %s' % (outprefix,
-                                      len(xcol),
-                                      STATS_PLOTS[plot]['title'])
+            # if this is a bestap plot, then do special processing
+            if 'bestap' in plot:
+
+                xcol = stats[STATS_PLOTS[plot]['xcol']]
+
+                ycol1 = stats[STATS_PLOTS[plot]['ycol'][0]]
+                ycol2 = stats[STATS_PLOTS[plot]['ycol'][1]]
+                ycol3 = stats[STATS_PLOTS[plot]['ycol'][2]]
+
+                # make a column stack of the MAD arrays
+                bestapstack = np.column_stack((ycol1, ycol2, ycol3))
+
+                # get the min of each row of the stack, this is the best MAD
+                ycol = np.amin(bestapstack,axis=1)
+
+                xlabel, ylabel = (STATS_PLOTS[plot]['xlabel'],
+                                  STATS_PLOTS[plot]['ylabel'])
+                title = '%s - %s - %s' % (outprefix,
+                                          len(xcol),
+                                          STATS_PLOTS[plot]['title'])
+
+            # otherwise, make the same old boring plots
+            else:
+
+                xcol, ycol = (stats[STATS_PLOTS[plot]['xcol']],
+                              stats[STATS_PLOTS[plot]['ycol']])
+                xlabel, ylabel = (STATS_PLOTS[plot]['xlabel'],
+                                  STATS_PLOTS[plot]['ylabel'])
+                title = '%s - %s - %s' % (outprefix,
+                                          len(xcol),
+                                          STATS_PLOTS[plot]['title'])
 
             # make the plot
             if logy:
