@@ -5578,8 +5578,10 @@ def plot_magrms_comparison(reference_stats_file,
 
         else:
 
-            comp_compcol = [comp_stats[comp_col][comp_stats['lcobj'] == x]
-                            for x in common_objects]
+            comp_compcol = np.ravel(
+                [comp_stats[comp_col][comp_stats['lcobj'] == x]
+                 for x in common_objects]
+            )
 
         # get the ratios
         compcol_ratios = (
