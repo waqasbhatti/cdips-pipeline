@@ -5538,7 +5538,7 @@ def plot_magrms_comparison(reference_stats_file,
 
             ret_tf_compcolstack = np.column_stack((ref_tf1_compcol,
                                                    ref_tf2_compcol,
-                                                   ref_tf3_compscol))
+                                                   ref_tf3_compcol))
 
             # get the min of each row of the stack, this is the best MAD
             ref_compcol = np.amin(ref_tf_compcolstack,axis=1)
@@ -5559,7 +5559,7 @@ def plot_magrms_comparison(reference_stats_file,
 
             comp_tf_compcolstack = np.column_stack((comp_tf1_compcol,
                                                     comp_tf2_compcol,
-                                                    comp_tf3_compscol))
+                                                    comp_tf3_compcol))
 
             # get the min of each row of the stack, this is the best MAD
             comp_compcol = np.amin(comp_tf_compcolstack,axis=1)
