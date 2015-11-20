@@ -5536,7 +5536,7 @@ def plot_magrms_comparison(reference_stats_file,
             ref_tf3_compcol = [ref_stats['mad_tf3'][ref_stats['lcobj'] == x]
                                for x in common_objects]
 
-            ret_tf_compcolstack = np.column_stack((ref_tf1_compcol,
+            ref_tf_compcolstack = np.column_stack((ref_tf1_compcol,
                                                    ref_tf2_compcol,
                                                    ref_tf3_compcol))
 
