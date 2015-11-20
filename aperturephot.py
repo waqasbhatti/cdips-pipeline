@@ -5522,19 +5522,25 @@ def plot_magrms_comparison(reference_stats_file,
     if len(common_objects) > 0:
 
         # put together the data for the common objects
-        ref_mag = [ref_stats['cat_mag'][ref_stats['lcobj'] == x]
-                       for x in common_objects]
-        comp_mag = [comp_stats['cat_mag'][comp_stats['lcobj'] == x]
-                        for x in common_objects]
+        ref_mag = np.ravel([ref_stats['cat_mag'][ref_stats['lcobj'] == x]
+                            for x in common_objects])
+        comp_mag = np.ravel([comp_stats['cat_mag'][comp_stats['lcobj'] == x]
+                             for x in common_objects])
 
         if ref_col == 'mad_tfbestap':
 
-            ref_tf1_compcol = [ref_stats['mad_tf1'][ref_stats['lcobj'] == x]
-                               for x in common_objects]
-            ref_tf2_compcol = [ref_stats['mad_tf2'][ref_stats['lcobj'] == x]
-                               for x in common_objects]
-            ref_tf3_compcol = [ref_stats['mad_tf3'][ref_stats['lcobj'] == x]
-                               for x in common_objects]
+            ref_tf1_compcol = np.ravel(
+                [ref_stats['mad_tf1'][ref_stats['lcobj'] == x]
+                 for x in common_objects]
+            )
+            ref_tf2_compcol = np.ravel(
+                [ref_stats['mad_tf2'][ref_stats['lcobj'] == x]
+                 for x in common_objects]
+            )
+            ref_tf3_compcol = np.ravel(
+                [ref_stats['mad_tf3'][ref_stats['lcobj'] == x]
+                 for x in common_objects]
+            )
 
             ref_tf_compcolstack = np.column_stack((ref_tf1_compcol,
                                                    ref_tf2_compcol,
@@ -5545,17 +5551,23 @@ def plot_magrms_comparison(reference_stats_file,
 
         else:
 
-            ref_compcol = [ref_stats[ref_col][ref_stats['lcobj'] == x]
-                            for x in common_objects]
+            ref_compcol = np.ravel([ref_stats[ref_col][ref_stats['lcobj'] == x]
+                                    for x in common_objects])
 
         if comp_col == 'mad_tfbestap':
 
-            comp_tf1_compcol = [comp_stats['mad_tf1'][comp_stats['lcobj'] == x]
-                               for x in common_objects]
-            comp_tf2_compcol = [comp_stats['mad_tf2'][comp_stats['lcobj'] == x]
-                               for x in common_objects]
-            comp_tf3_compcol = [comp_stats['mad_tf3'][comp_stats['lcobj'] == x]
-                               for x in common_objects]
+            comp_tf1_compcol = np.ravel(
+                [comp_stats['mad_tf1'][comp_stats['lcobj'] == x]
+                 for x in common_objects]
+            )
+            comp_tf2_compcol = np.ravel(
+                [comp_stats['mad_tf2'][comp_stats['lcobj'] == x]
+                 for x in common_objects]
+            )
+            comp_tf3_compcol = np.ravel(
+                [comp_stats['mad_tf3'][comp_stats['lcobj'] == x]
+                 for x in common_objects]
+            )
 
             comp_tf_compcolstack = np.column_stack((comp_tf1_compcol,
                                                     comp_tf2_compcol,
