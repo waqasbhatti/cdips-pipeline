@@ -5645,85 +5645,67 @@ def plot_magrms_comparison(reference_stats_file,
         print('no common objects to use for comparison!')
 
 
-def plot_ismphot_comparison(apphot_stats_file,
-                            ismphot_stats_file,
-                            ref_name, comp_name,
-                            outfile,
-                            comp_cols=(0,1,13),
-                            logy=False, logx=False,
-                            rangex=(5.9,14.1)):
-
-    ref_stats = read_stats_file(apphot_stats_file)
-    comp_stats = np.genfromtxt(ismphot_stats_file,
-                               usecols=comp_cols,
-                               dtype='S17,f8,f8',
-                               names=['lcobj','cat_mag','mad_tf3'])
-
-    ref_objects = ref_stats['lcobj']
-    comp_objects = comp_stats['lcobj']
-
-    common_objects = np.intersect1d(ref_objects, comp_objects)
-
-    print('common objects = %s' % len(common_objects))
-
-    if len(common_objects) > 0:
-
-        # put together the data for the common objects
-        ref_tf3_mag = [ref_stats['cat_mag'][ref_stats['lcobj'] == x]
-                       for x in common_objects]
-        ref_tf3_compcol = [ref_stats['mad_tf3'][ref_stats['lcobj'] == x]
-                           for x in common_objects]
-
-        comp_tf3_mag = [comp_stats['cat_mag'][comp_stats['lcobj'] == x]
-                        for x in common_objects]
-        comp_tf3_compcol = [comp_stats['mad_tf3'][comp_stats['lcobj'] == x]
-                            for x in common_objects]
-
-        tf3_compcol_ratios = np.array(comp_tf3_compcol)/np.array(ref_tf3_compcol)
-
-        xcol, ycol = ref_tf3_mag, tf3_compcol_ratios
-
-        xlabel, ylabel = ('FOV catalog SDSS r mag',
-                          'TF3 median abs. dev. %s/%s' % (comp_name, ref_name))
-        title = 'comparison of TF3 median abs. dev. - %s/%s' % (comp_name,
-                                                                ref_name)
-
-        # make the plot
-        if logy:
-            plt.scatter(xcol, ycol,
-                        s=1,
-                        marker='.')
-            plt.yscale('log')
-        elif logx:
-            plt.scatter(xcol, ycol,
-                        s=1,
-                        marker='.')
-            plt.xscale('log')
-        elif logx and logy:
-            plt.scatter(xcol, ycol,
-                        s=1,
-                        marker='.')
-            plt.xscale('log')
-            plt.yscale('log')
-        else:
-            plt.scatter(xcol, ycol,
-                        s=1,
-                        marker='.')
 
 
-        plt.xlabel(xlabel)
-        plt.ylabel(ylabel)
-        plt.title(title)
-        plt.xlim(rangex)
-        plt.ylim(-0.5,4)
+def rollup_plots(projid,
+                 projdir,
+                 ccdlist=[5,6,7,8],
+                 phottype='ism'):
+    '''
+    This makes the mag-RMS plots and the comparison plots for all of the ccds.
 
-        # make the horizontal lines for 10, 5, 1 mmag
-        plt.hlines([-2.0,-1.5,0.5,1,1.5,2.0],
-                   xmin=5.0,xmax=15.0,colors='r')
+    '''
 
-        plt.savefig(outfile)
-        plt.close()
 
-    else:
+    # make the rms plots
+    for ccd in ccdlist:
 
-        print('no common objects to use for comparison!')
+        statfile = os.path.join(projdir,'ccd%s-tfa-lcstats.txt' % ccd)
+        rmsplotprefix = 'projid{projid}-ccd{ccd}-{phottype}'.format(
+            projid=projid,
+            ccd=ccd,
+            phottype=phottype
+        )
+        plot_stats_file(statfile,'.',rmsplottype,logy=True)
+
+
+    # make the comparison plots
+    for ccd in ccdlist:
+
+        thisindex = ccdlist.index(ccd)
+        otherccds = ccdlist[thisindex+1:]
+
+        thisstatfile = os.path.join(projdir,'ccd%s-tfa-lcstats.txt' % ccd)
+
+        for otherccd in otherccds:
+
+            otherstatfile = os.path.join(projdir,'ccd%s-tfa-lcstats.txt' % ccd)
+
+            tf3outfile = (
+                'projid%s-ccd%s-ccd%s-comparison.png' % (projid, ccd, otherccd)
+            )
+            tf3reftitle = 'projid%s-ccd%s-tf3' % (projid, ccd)
+            tf3comptitle = 'projid%s-ccd%s-tf3' % (projid, otherccd)
+
+            bestapoutfile = (
+                'projid%s-ccd%s-ccd%s-bestap-comparison.png' % (projid,
+                                                                ccd,
+                                                                otherccd)
+            )
+            bestapreftitle = 'projid%s-ccd%s-bestap' % (projid, ccd)
+            bestapcomptitle = 'projid%s-ccd%s-bestap' % (projid, otherccd)
+
+            # TF3 plot first
+            plot_magrms_comparison(thisstatfile,
+                                   otherstatfile,
+                                   tf3reftitle,
+                                   tf3comptitle,
+                                   tf3outfile,
+                                   ref_col='mad_tf3',comp_col='mad_tf3')
+            # bestap plot next
+            plot_magrms_comparison(thisstatfile,
+                                   otherstatfile,
+                                   bestapreftitle,
+                                   bestapcomptitle,
+                                   bestapoutfile,
+                                   ref_col='mad_tfbestap',comp_col='mad_tfbestap')
