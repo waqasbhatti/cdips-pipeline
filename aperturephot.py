@@ -5666,7 +5666,7 @@ def rollup_plots(projid,
             ccd=ccd,
             phottype=phottype
         )
-        plot_stats_file(statfile,'.',rmsplottype,logy=True)
+        plot_stats_file(statfile,'.',phottype,logy=True)
 
 
     # make the comparison plots
