@@ -5683,7 +5683,7 @@ def rollup_plots(projid,
                                          'ccd%s-tfa-lcstats.txt' %
                                          otherccd)
 
-            print('comparison plot between ccd %s and ccd %s' % (ccd, otherccd)
+            print('comparison plot between ccd %s and ccd %s' % (ccd, otherccd))
 
             tf3outfile = (
                 'projid%s-ccd%s-ccd%s-comparison.png' % (projid, ccd, otherccd)
