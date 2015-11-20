@@ -5458,7 +5458,7 @@ def plot_stats_file(statsfile, outdir, outprefix,
                             s=1,
                             marker='.')
 
-
+            # put the labels on the plot
             plt.xlabel(xlabel)
             plt.ylabel(ylabel)
             plt.title(title)
@@ -5476,6 +5476,13 @@ def plot_stats_file(statsfile, outdir, outprefix,
                 plt.ylim((0.0009,1.0))
                 plt.hlines([0.001, 0.002, 0.003, 0.004, 0.005],
                            xmin=5.0,xmax=15.0,colors='b')
+
+            # put the grid on the plot
+            plt.gca().grid(color='#a9a9a9',
+                           alpha=0.9,
+                           zorder=0,
+                           linewidth=1.0,
+                           linestyle=':')
 
             plt.savefig(outfile)
             plt.close()
@@ -5515,23 +5522,61 @@ def plot_magrms_comparison(reference_stats_file,
     if len(common_objects) > 0:
 
         # put together the data for the common objects
-        ref_tf3_mag = [ref_stats['cat_mag'][ref_stats['lcobj'] == x]
+        ref_mag = [ref_stats['cat_mag'][ref_stats['lcobj'] == x]
                        for x in common_objects]
-        ref_tf3_compcol = [ref_stats[ref_col][ref_stats['lcobj'] == x]
-                           for x in common_objects]
-
-        comp_tf3_mag = [comp_stats['cat_mag'][comp_stats['lcobj'] == x]
+        comp_mag = [comp_stats['cat_mag'][comp_stats['lcobj'] == x]
                         for x in common_objects]
-        comp_tf3_compcol = [comp_stats[comp_col][comp_stats['lcobj'] == x]
+
+        if ref_col == 'mad_tfbestap':
+
+            ref_tf1_compcol = [ref_stats['mad_tf1'][ref_stats['lcobj'] == x]
+                               for x in common_objects]
+            ref_tf2_compcol = [ref_stats['mad_tf2'][ref_stats['lcobj'] == x]
+                               for x in common_objects]
+            ref_tf3_compcol = [ref_stats['mad_tf3'][ref_stats['lcobj'] == x]
+                               for x in common_objects]
+
+            ret_tf_compcolstack = np.column_stack((ref_tf1_compcol,
+                                                   ref_tf2_compcol,
+                                                   ref_tf3_compscol))
+
+            # get the min of each row of the stack, this is the best MAD
+            ref_compcol = np.amin(ref_tf_compcolstack,axis=1)
+
+        else:
+
+            ref_compcol = [ref_stats[ref_col][ref_stats['lcobj'] == x]
                             for x in common_objects]
 
-        tf3_compcol_ratios = (
-            np.array(ref_tf3_compcol)/np.array(comp_tf3_compcol)
+        if comp_col == 'mad_tfbestap':
+
+            comp_tf1_compcol = [comp_stats['mad_tf1'][comp_stats['lcobj'] == x]
+                               for x in common_objects]
+            comp_tf2_compcol = [comp_stats['mad_tf2'][comp_stats['lcobj'] == x]
+                               for x in common_objects]
+            comp_tf3_compcol = [comp_stats['mad_tf3'][comp_stats['lcobj'] == x]
+                               for x in common_objects]
+
+            comp_tf_compcolstack = np.column_stack((comp_tf1_compcol,
+                                                    comp_tf2_compcol,
+                                                    comp_tf3_compscol))
+
+            # get the min of each row of the stack, this is the best MAD
+            comp_compcol = np.amin(comp_tf_compcolstack,axis=1)
+
+        else:
+
+            comp_compcol = [comp_stats[comp_col][comp_stats['lcobj'] == x]
+                            for x in common_objects]
+
+        # get the ratios
+        compcol_ratios = (
+            np.array(ref_compcol)/np.array(comp_compcol)
             )
 
-        nonzero_ind = np.where(tf3_compcol_ratios > 0.0)
-        xcol = (np.array(ref_tf3_mag))[nonzero_ind[0]]
-        ycol = tf3_compcol_ratios[nonzero_ind[0]]
+        nonzero_ind = np.where(compcol_ratios > 0.0)
+        xcol = (np.array(ref_mag))[nonzero_ind[0]]
+        ycol = compcol_ratios[nonzero_ind[0]]
 
         xlabel, ylabel = ('FOV catalog SDSS r mag',
                           'TF3 median abs. dev. %s/%s' % (ref_name, comp_name))
@@ -5570,6 +5615,13 @@ def plot_magrms_comparison(reference_stats_file,
         # make the horizontal lines for 10, 5, 1 mmag
         plt.hlines([-2.0,-1.5,0.5,1,1.5,2.0],
                    xmin=5.0,xmax=15.0,colors='r')
+
+        # put the grid on the plot
+        plt.gca().grid(color='#a9a9a9',
+                       alpha=0.9,
+                       zorder=0,
+                       linewidth=1.0,
+                       linestyle=':')
 
         plt.savefig(outfile)
         plt.close()
