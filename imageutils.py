@@ -3,19 +3,11 @@
 '''
 imageutils.py - Waqas Bhatti (wbhatti@astro.princeton.edu) - Jan 2013
 
-This contains various utilities suitable for quick-processing HAT
-images. Intended for use with the real-time image diagnostics functionality of
-webcontrol interface.
+This contains various utilities for:
 
-Contains functions for:
-
-1. reading quickastrom files, and getting out the tracking correction, number of
-   sources, etc.
-2. reading hatphot output and generating FWHM statistics for a grid placed on
-   the image
-3. generating stamps for an image, converting an image to JPEGs
-4. getting the value of a certain keyword from the FITS header for a series of
-   FITS files
+- generating stamps for an image, converting an image to JPEGs
+- getting the value of a certain keyword from the FITS header for a series of
+  FITS files
 
 Important FITS header keywords:
 
@@ -37,8 +29,6 @@ import os
 import os.path
 import sys
 import logging
-import bz2
-import base64
 import glob
 
 import numpy as np
