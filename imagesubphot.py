@@ -420,14 +420,18 @@ def select_astromref_frame(fitsdir,
         if '--binary-output' in header and HAVEBINPHOT:
 
             photdata_f = read_fiphot(phot)
-            photdata = {
-                'mag':np.array(photdata_f['per aperture'][2]['mag']),
-                'err':np.array(photdata_f['per aperture'][2]['mag err']),
-                'flag':np.array(
-                    photdata_f['per aperture'][2]['status flag']
-                    )
-                }
-            del photdata_f
+            if photdata_f:
+                photdata = {
+                    'mag':np.array(photdata_f['per aperture'][2]['mag']),
+                    'err':np.array(photdata_f['per aperture'][2]['mag err']),
+                    'flag':np.array(
+                        photdata_f['per aperture'][2]['status flag']
+                        )
+                    }
+                del photdata_f
+            else:
+                print('no photdata in %s, skipping...' % phot)
+                continue
 
         elif '--binary-output' in header and not HAVEBINPHOT:
 
