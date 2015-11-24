@@ -1617,8 +1617,7 @@ def photometry_on_combined_photref(
         outfile=outfile
     )
 
-    if DEBUG:
-        print(cmdtorun)
+    print('fiphot command: %s' % cmdtorun)
 
     returncode = os.system(cmdtorun)
 

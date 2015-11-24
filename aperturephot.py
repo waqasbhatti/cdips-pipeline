@@ -307,6 +307,7 @@ def anet_solve_frame(srclist,
                      wcsout,
                      ra,
                      dec,
+                     centerfromframe=False,
                      width=13,
                      tweak=6,
                      radius=4,
@@ -337,6 +338,20 @@ def anet_solve_frame(srclist,
     just get the bright stars. This makes anet faster.
 
     '''
+
+    if centerfromframe:
+
+        # find the frame
+        srcframe = os.path.basename(srclist)
+        srcframe = os.path.splitext(srcframe)[0] + '.fits'
+
+        # get the RA and DEC header keywords
+        if os.path.exists(os.path.join(os.path.dirname(srclist), srcframe)):
+
+            ra = get_header_keyword(srcframe,'rac')
+            dec = get_header_keyword(srcframe,'decc')
+            ra = ra*360.0/24.0
+
 
     ANETCMDSTR = ("anet -r {ra} -d {dec} -w {width} "
                   "--tweak {tweak} --radius {radius} "
