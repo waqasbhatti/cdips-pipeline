@@ -5676,13 +5676,16 @@ def rollup_plots(projid,
     for ccd in ccdlist:
 
         statfile = os.path.join(projdir,'ccd%s-tfa-lcstats.txt' % ccd)
-        rmsplotprefix = 'projid{projid}-ccd{ccd}-{phottype}'.format(
-            projid=projid,
-            ccd=ccd,
-            phottype=phottype
-        )
-        plot_stats_file(statfile,'.',rmsplotprefix,logy=True)
 
+        if os.path.exists(statfile):
+            rmsplotprefix = 'projid{projid}-ccd{ccd}-{phottype}'.format(
+                projid=projid,
+                ccd=ccd,
+                phottype=phottype
+            )
+            plot_stats_file(statfile,'.',rmsplotprefix,logy=True)
+        else:
+            print('statsfile for CCD%s not present, skipping...' % ccd)
 
     # make the comparison plots
     for ccd in ccdlist:
@@ -5692,39 +5695,52 @@ def rollup_plots(projid,
 
         thisstatfile = os.path.join(projdir,'ccd%s-tfa-lcstats.txt' % ccd)
 
-        for otherccd in otherccds:
+        if os.path.exists(thisstatfile):
 
-            otherstatfile = os.path.join(projdir,
-                                         'ccd%s-tfa-lcstats.txt' %
-                                         otherccd)
+            for otherccd in otherccds:
 
-            print('comparison plot between ccd %s and ccd %s' % (ccd, otherccd))
+                otherstatfile = os.path.join(projdir,
+                                             'ccd%s-tfa-lcstats.txt' %
+                                             otherccd)
 
-            tf3outfile = (
-                'projid%s-ccd%s-ccd%s-comparison.png' % (projid, ccd, otherccd)
-            )
-            tf3reftitle = 'projid%s-ccd%s-tf3' % (projid, ccd)
-            tf3comptitle = 'projid%s-ccd%s-tf3' % (projid, otherccd)
+                if os.path.exists(otherstatfile):
 
-            bestapoutfile = (
-                'projid%s-ccd%s-ccd%s-bestap-comparison.png' % (projid,
-                                                                ccd,
-                                                                otherccd)
-            )
-            bestapreftitle = 'projid%s-ccd%s-bestap' % (projid, ccd)
-            bestapcomptitle = 'projid%s-ccd%s-bestap' % (projid, otherccd)
+                    print(
+                        'comparison plot between ccd %s and ccd %s' % (ccd,
+                                                                       otherccd)
+                    )
 
-            # TF3 plot first
-            plot_magrms_comparison(thisstatfile,
-                                   otherstatfile,
-                                   tf3reftitle,
-                                   tf3comptitle,
-                                   tf3outfile,
-                                   ref_col='mad_tf3',comp_col='mad_tf3')
-            # bestap plot next
-            plot_magrms_comparison(thisstatfile,
-                                   otherstatfile,
-                                   bestapreftitle,
-                                   bestapcomptitle,
-                                   bestapoutfile,
-                                   ref_col='mad_tfbestap',comp_col='mad_tfbestap')
+                    tf3outfile = (
+                        'projid%s-ccd%s-ccd%s-comparison.png' % (projid,
+                                                                 ccd,
+                                                                 otherccd)
+                    )
+                    tf3reftitle = 'projid%s-ccd%s-tf3' % (projid, ccd)
+                    tf3comptitle = 'projid%s-ccd%s-tf3' % (projid, otherccd)
+
+                    bestapoutfile = (
+                        'projid%s-ccd%s-ccd%s-bestap-comparison.png' % (
+                            projid,
+                            ccd,
+                            otherccd
+                        )
+                    )
+                    bestapreftitle = 'projid%s-ccd%s-bestap' % (projid, ccd)
+                    bestapcomptitle = 'projid%s-ccd%s-bestap' % (projid,
+                                                                 otherccd)
+
+                    # TF3 plot first
+                    plot_magrms_comparison(thisstatfile,
+                                           otherstatfile,
+                                           tf3reftitle,
+                                           tf3comptitle,
+                                           tf3outfile,
+                                           ref_col='mad_tf3',comp_col='mad_tf3')
+                    # bestap plot next
+                    plot_magrms_comparison(thisstatfile,
+                                           otherstatfile,
+                                           bestapreftitle,
+                                           bestapcomptitle,
+                                           bestapoutfile,
+                                           ref_col='mad_tfbestap',
+                                           comp_col='mad_tfbestap')
