@@ -1746,7 +1746,7 @@ def get_magfit_frames(fitsdir,
             # decide if the fiphot file is binary or not. read the first 600
             # bytes and look for the '--binary-output' text
             with open(fiphot,'rb') as fiphotf:
-                header = fiphotf.read(600)
+                header = fiphotf.read(1000)
 
             if '--binary-output' in header and HAVEBINPHOT:
 
