@@ -1763,7 +1763,7 @@ def get_magfit_frames(fitsdir,
                         }
                 else:
 
-                    print('no photdata in %s, skipping...' % phot)
+                    print('no photdata in this file, skipping...')
                     continue
 
                 del photdata_f
