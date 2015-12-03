@@ -1751,13 +1751,21 @@ def get_magfit_frames(fitsdir,
             if '--binary-output' in header and HAVEBINPHOT:
 
                 photdata_f = read_fiphot(fiphot)
-                photdata = {
-                    'mag':np.array(photdata_f['per aperture'][2]['mag']),
-                    'err':np.array(photdata_f['per aperture'][2]['mag err']),
-                    'flag':np.array(
-                        photdata_f['per aperture'][2]['status flag']
-                        )
-                    }
+
+                if photdata_f:
+
+                    photdata = {
+                        'mag':np.array(photdata_f['per aperture'][2]['mag']),
+                        'err':np.array(photdata_f['per aperture'][2]['mag err']),
+                        'flag':np.array(
+                            photdata_f['per aperture'][2]['status flag']
+                            )
+                        }
+                else:
+
+                    print('no photdata in %s, skipping...' % phot)
+                    continue
+
                 del photdata_f
 
             elif '--binary-output' in header and not HAVEBINPHOT:
