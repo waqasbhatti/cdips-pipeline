@@ -2138,7 +2138,7 @@ def run_magfit(sphotref_frame,
 
     lcohpsrv1 invocation:
 
-    python /home/hatuser/wbhatti/src/MagnitudeFittingOrig.py HATSouth single /nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/ccd5-fits/1-404411d_5.fits /nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/ccd5-fits/1-404411d_5.fits -p 8 --log-config=/home/hatuser/wbhatti/src/logging.conf --config-file=/nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/photometry-ap/ccd5-magfit.cfg --manual-frame-list=/nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/photometry-ap/ccd5-magfit-frames.list --stat
+    python /home/hatuser/wbhatti/src/MagnitudeFittingOrig.py HATSouth single /nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/ccd5-fits/1-404411d_5.fits /nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/ccd5-fits/1-404411d_5.fiphot -p 8 --log-config=/home/hatuser/wbhatti/src/logging.conf --config-file=/nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/photometry-ap/ccd5-magfit.cfg --manual-frame-list=/nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/photometry-ap/ccd5-magfit-frames.list --stat
 
 
     '''
