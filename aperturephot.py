@@ -4197,6 +4197,14 @@ def parallel_lc_statistics(lcdir,
 
     if a value is missing, it will be np.nan.
 
+    For ISM (LC format as of 2015/11/01):
+
+    parallel_lc_statistics('ccd8-LC','*.epdlc','../G545-riz.catalog',
+                           rmcols=[14,19,24],
+                           epcols=[27,28,29],
+                           tfcols=[30,31,32],
+                           sigclip=3.0,outfile='ccd8-tfa-lcstats.txt')
+
     '''
 
     lcfiles = glob.glob(os.path.join(lcdir, lcglob))
