@@ -1577,7 +1577,7 @@ def photometry_on_combined_photref(
                                       '.fistar-astrometry')
     astromfistar = extract_frame_sources(photref_frame,
                                          astromfistarf,
-                                         fluxthreshold=10000)
+                                         fluxthreshold=15000)
 
 
     # SECOND: add WCS
