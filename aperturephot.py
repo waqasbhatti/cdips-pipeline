@@ -2138,8 +2138,13 @@ def run_magfit(sphotref_frame,
 
     lcohpsrv1 invocation:
 
-    python /home/hatuser/wbhatti/src/MagnitudeFittingOrig.py HATSouth single /nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/ccd5-fits/1-404411d_5.fits /nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/ccd5-fits/1-404411d_5.fiphot -p 8 --log-config=/home/hatuser/wbhatti/src/logging.conf --config-file=/nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/photometry-ap/ccd5-magfit.cfg --manual-frame-list=/nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/photometry-ap/ccd5-magfit-frames.list --stat
+    single photref
 
+    python /home/hatuser/wbhatti/src/MagnitudeFittingOrig.py HATSouth single /nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid16/photometry-ap/G557-ccd5-work/1-470798a_5.fits /nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid16/photometry-ap/G557-ccd5-work/1-470798a_5.fiphot -p 8 --log-config=/home/hatuser/wbhatti/src/logging.conf --config-file=/nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid16/photometry-ap/ccd5-magfit.cfg --manual-frame-list=/nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid16/photometry-ap/ccd5-magfit-frames.list --stat
+
+    master photref:
+
+    nohup python /home/hatuser/wbhatti/src/MagnitudeFittingOrig.py HATSouth master /nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid16/photometry-ap/G557-ccd6-work/1-470789a_6.fits /nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid16/photometry-ap/G557-ccd6-work/1-470789a_6.fiphot -p 8 --log-config=/home/hatuser/wbhatti/src/logging.conf --config-file=/nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid16/photometry-ap/ccd6-magfit.cfg --manual-frame-list=/nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid16/photometry-ap/ccd6-magfit-frames.list --stat > ccd6-mmagfit.log
 
     '''
 
