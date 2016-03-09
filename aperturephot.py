@@ -344,12 +344,13 @@ def anet_solve_frame(srclist,
         # find the frame
         srcframe = os.path.basename(srclist)
         srcframe = os.path.splitext(srcframe)[0] + '.fits'
+        srcframepath = os.path.join(os.path.dirname(srclist), srcframe)
 
         # get the RA and DEC header keywords
-        if os.path.exists(os.path.join(os.path.dirname(srclist), srcframe)):
+        if os.path.exists(srcframepath):
 
-            ra = get_header_keyword(srcframe,'rac')
-            dec = get_header_keyword(srcframe,'decc')
+            ra = get_header_keyword(srcframepath,'rac')
+            dec = get_header_keyword(srcframepath,'decc')
             ra = ra*360.0/24.0
 
 
