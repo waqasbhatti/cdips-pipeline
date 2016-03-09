@@ -425,6 +425,7 @@ def parallel_anet(srclistdir,
                   fistarglob='?-*_?.fistar-astrometry',
                   nworkers=16,
                   maxtasksperworker=1000,
+                  centerfromframe=True,
                   width=13,
                   tweak=6,
                   radius=4,
@@ -462,7 +463,8 @@ def parallel_anet(srclistdir,
          ra, dec, {'width':width,
                    'tweak':tweak,
                    'radius':radius,
-                   'cols':cols}]
+                   'cols':cols,
+                   'centerfromframe':centerfromframe}]
         for x in fistarlist
         ]
 
