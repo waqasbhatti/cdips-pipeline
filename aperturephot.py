@@ -1089,6 +1089,7 @@ def run_fiphot(fits,
 def do_photometry(fits,
                   fovcatalog,
                   extractsources=True,
+                  fluxthreshold=500.0,
                   fovcat_xycols=(12,13),
                   fiphot_xycols='7,8', # set for matched source list
                   outdir=None,
@@ -1163,7 +1164,8 @@ def do_photometry(fits,
                 fits,
                 os.path.join(
                     outdir,
-                    os.path.basename(fits).strip('.fits.fz') + '.fistar'
+                    os.path.basename(fits).strip('.fits.fz') + '.fistar',
+                    fluxthreshold=fluxthreshold
                     )
                 )
 
@@ -1276,6 +1278,7 @@ def parallel_fitsdir_photometry(
         fitsdir,
         outdir,
         fovcatalog,
+        fluxthreshold=500.0,
         ccdextent=None,
         pixborders=0.0,
         aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
@@ -1320,6 +1323,7 @@ def parallel_fitsdir_photometry(
                'aperturelist':aperturelist,
                'removesourcetemp':removesourcetemp,
                'removesourcelist':removesourcelist,
+               'fluxthreshold':fluxthreshold,
                'binaryoutput':binaryoutput,
                'minsrcbgv':minsrcbgv,
                'maxmadbgv':maxmadbgv,
