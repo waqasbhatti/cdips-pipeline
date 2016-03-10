@@ -1165,7 +1165,7 @@ def do_photometry(fits,
                 os.path.join(
                     outdir,
                     os.path.basename(fits).strip('.fits.fz') + '.fistar',
-                    )
+                    ),
                 fluxthreshold=fluxthreshold
                 )
 
