@@ -3120,6 +3120,7 @@ def parallel_run_epd(rlcdir,
 def choose_tfa_template(statsfile,
                         fovcatalog,
                         epdlcdir,
+                        ignoretfamin=False,
                         fovcat_idcol=0,
                         fovcat_xicol=3,
                         fovcat_etacol=4,
@@ -3278,7 +3279,8 @@ def choose_tfa_template(statsfile,
         else:
             print("aperture %s: not enough stars suitable for TFA!" %
                   aperture)
-            tfa_stars = None
+            if not ignoretfamin:
+                tfa_stars = None
 
         # now get these stars IDs, LC fnames, xis, etas, and other things needed
         # for the first stage of TFA (this will choose exactly
