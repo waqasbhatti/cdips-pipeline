@@ -3279,8 +3279,11 @@ def choose_tfa_template(statsfile,
         else:
             print("aperture %s: not enough stars suitable for TFA!" %
                   aperture)
+
             if not ignoretfamin:
                 tfa_stars = None
+            else:
+                tfa_stars = good_tfa_objects
 
         # now get these stars IDs, LC fnames, xis, etas, and other things needed
         # for the first stage of TFA (this will choose exactly
