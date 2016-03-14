@@ -5517,15 +5517,15 @@ def plot_stats_file(statsfile, outdir, outprefix,
             if binned:
                 plt.ylim((0.0001,1.0))
                 plt.hlines([0.001,0.002,0.003],
-                           xmin=5.0,xmax=15.0,colors='b')
+                           xmin=rangex[0],xmax=rangex[1],colors='b')
                 plt.hlines([0.0005],
-                           xmin=5.0,xmax=15.0,colors='r')
+                           xmin=rangex[0],xmax=rangex[1],colors='r')
 
             else:
                 # make the horizontal lines for 10, 5, 1 mmag
                 plt.ylim((0.0009,1.0))
                 plt.hlines([0.001, 0.002, 0.003, 0.004, 0.005],
-                           xmin=5.0,xmax=15.0,colors='b')
+                           xmin=rangex[0],xmax=rangex[1],colors='b')
 
             # put the grid on the plot
             plt.gca().grid(color='#a9a9a9',
@@ -5678,7 +5678,7 @@ def plot_magrms_comparison(reference_stats_file,
 
         # make the horizontal lines for 10, 5, 1 mmag
         plt.hlines([-2.0,-1.5,0.5,1,1.5,2.0],
-                   xmin=5.0,xmax=15.0,colors='r')
+                   xmin=rangex[0],xmax=rangex[1],colors='r')
 
         # put the grid on the plot
         plt.gca().grid(color='#a9a9a9',
