@@ -313,10 +313,10 @@ def anet_solve_frame(srclist,
                      tweak=6,
                      radius=4,
                      cols=(2,3)):
-    '''
-    This uses anet to solve a frame by using its extracted sources and returns a
-    .wcs file containing the astrometric transformation between frame x,y and
-    RA/DEC.
+    '''This uses anet to solve frame astrometry.
+
+    Uses the frame extracted sources (.fistar file) and returns a .wcs file
+    containing the astrometric transformation between frame x,y and RA/DEC.
 
     Example anet command:
 
@@ -324,19 +324,19 @@ def anet_solve_frame(srclist,
 
     assuming an ~/.anetrc file with the following contents:
 
-    xsize = 2048
-    ysize = 2048
-    tweak = 3
-    xcol = 2
-    ycol = 3
-    verify = 1
-    log = 1
-    indexpath = /P/HP0/CAT/ANET_INDEX/ucac4_2014/
+    xsize = 2048  # the width of the frame in pixels
+    ysize = 2048  # the height of the frame in pixels
+    tweak = 3     # the order of polynomial fit to frame distortion
+    xcol = 2      # the column to be used for x coord (1-indexed)
+    ycol = 3      # the column to be used for y coord (1-indexed)
+    verify = 1    # number of verify iterations to run
+    log = 1       # set to 1 to log operations
+    indexpath = /P/HP0/CAT/ANET_INDEX/ucac4_2014/   # path to the indexes
 
     otherwise, we'll need to provide these as kwargs to the anet executable.
 
-    The input sourcelist can come from fistar, with a fluxthreshold set 10000 to
-    just get the bright stars. This makes anet faster.
+    The input sourcelist can come from fistar, with a fluxthreshold set to 10000
+    to just get the bright stars. This makes anet way faster.
 
     '''
 
@@ -347,11 +347,16 @@ def anet_solve_frame(srclist,
         srcframe = os.path.splitext(srcframe)[0] + '.fits'
         srcframepath = os.path.join(os.path.dirname(srclist), srcframe)
 
-        # get the RA and DEC header keywords
+        # get the RA, DEC, and FOV header keywords
         if os.path.exists(srcframepath):
 
             ra = get_header_keyword(srcframepath,'rac')
             dec = get_header_keyword(srcframepath,'decc')
+            fov = get_header_keyword(srcframepath,'fov')
+
+            if fov is not None:
+                width = fov
+
             ra = ra*360.0/24.0
 
 
