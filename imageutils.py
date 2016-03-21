@@ -758,7 +758,7 @@ def fits_to_full_jpeg(fits_image,
     if annotate:
         outimg = Image.open(out_fname)
         draw = ImageDraw.Draw(outimg)
-        annotation = "%s: %s - %s - %s - %s - %s" % (
+        annotation = "%s: %s - %s - %s - PR%s - %s" % (
             os.path.basename(fits_image).rstrip('.fits.fz'),
             hdr['IMAGETYP'].lower() if 'IMAGETYP' in hdr else 'typeunknown',
             hdr['EXPTIME'] if 'EXPTIME' in hdr else 'expunknown',
