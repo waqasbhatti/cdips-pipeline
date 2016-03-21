@@ -220,7 +220,8 @@ CCDEXTENT = {'x':[0.0,2048.0],
 # from Chelsea's src directory on phs3: run_phot_astrom.py (2014-12-15)
 # FIXME: check where these came from and fix if out of date, especially if
 # cameras moved around
-ZEROPOINTS = {5:17.11,
+ZEROPOINTS = {3:17.11,
+              5:17.11,
               6:17.11,
               7:17.11,
               8:16.63}
