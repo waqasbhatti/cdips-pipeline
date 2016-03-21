@@ -1503,7 +1503,7 @@ def photometry_on_combined_photref(
         ccdexptime=None,
         extractsources=True,
         apertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
-        outfile=None
+        outfile=None,
         framewidth=None,
         searchradius=8.0,
         ):
