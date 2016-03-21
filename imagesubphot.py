@@ -1504,6 +1504,8 @@ def photometry_on_combined_photref(
         extractsources=True,
         apertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
         outfile=None
+        framewidth=None,
+        searchradius=8.0,
         ):
     '''
     This does source extraction, WCS, catalog projection, and then runs fiphot
@@ -1522,7 +1524,8 @@ def photometry_on_combined_photref(
                                                  'GAIN2',
                                                  'EXPTIME',
                                                  'RAC',
-                                                 'DECC'])
+                                                 'DECC',
+                                                 'FOV'])
 
     # get the RA and DEC from the frame header for astrometry
     if 'RAC' in header and 'DECC' in header:
@@ -1534,6 +1537,15 @@ def photometry_on_combined_photref(
                photref_frame))
         return None
 
+    # figure out the width of the frame for astrometry
+    if 'FOV' in header:
+        framewidth = header['FOV']
+    elif framewidth is None:
+        print('ERR! %sZ: no frame width defined for %s, '
+              'astrometry not possible' %
+              (datetime.utcnow().isoformat(),
+               photref_frame))
+        return None
 
     # handle the gain and exptime parameters
     if not ccdgain:
@@ -1589,7 +1601,9 @@ def photometry_on_combined_photref(
     wcsfile = anet_solve_frame(astromfistar,
                                wcsf,
                                frame_ra,
-                               frame_dec)
+                               frame_dec,
+                               width=framewidth,
+                               radius=searchradius)
 
     # THIRD: run do_photometry to get a .sourcelist file with HATID,X,Y
     photf = do_photometry(os.path.abspath(photref_frame),
