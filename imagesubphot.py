@@ -431,7 +431,7 @@ def select_astromref_frame(fitsdir,
                     }
                 del photdata_f
             else:
-                print('no photdata in this file, skipping...')
+                print('no photdata in %s, skipping...' % phot)
                 continue
 
         elif '--binary-output' in header and not HAVEBINPHOT:
