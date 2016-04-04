@@ -2550,7 +2550,7 @@ def lc_concatenate_worker(task):
         newlcndet = len(newlclines)
 
         concatlc = baselclines.extend(newlclines)
-        concatlcndet = len(concatlc)
+        finalndet = len(concatlc)
 
         with open(baselcfile,'wb') as outfd:
             for line in concatlc:
