@@ -2534,36 +2534,38 @@ def lc_concatenate_worker(task):
 
     '''
 
-    baselcfile = task[0]
-    newlcfile = task[1]
+    try:
 
-    baselcf = open(baselcfile, 'rb')
-    baselclines = baselcf.readlines()
-    baselcf.close()
-    baselcndet = len(baselclines)
+        baselcfile = task[0]
+        newlcfile = task[1]
 
-    newlcf = open(newlcfile, 'rb')
-    newlclines = newlcf.readlines()
-    newlcf.close()
-    newlcndet = len(newlclines)
+        baselcf = open(baselcfile, 'rb')
+        baselclines = baselcf.readlines()
+        baselcf.close()
+        baselcndet = len(baselclines)
 
-    baselclines.extend(newlclines)
-    finalndet = len(baselclines)
+        newlcf = open(newlcfile, 'rb')
+        newlclines = newlcf.readlines()
+        newlcf.close()
+        newlcndet = len(newlclines)
 
-    with open(baselcfile,'wb') as outfd:
-        for line in baselclines:
-            outfd.write(line)
+        baselclines.extend(newlclines)
+        finalndet = len(baselclines)
 
-    print('%sZ: concat LC OK: %s with ndet %s -> %s with ndet %s' %
-          (datetime.utcnow().isoformat(),
-           baselcfile, baselcndet, baselcfile, finalndet ))
-    return baselcfile, baselcfile
+        with open(baselcfile,'wb') as outfd:
+            for line in baselclines:
+                outfd.write(line)
 
-    # except Exception as e:
+        print('%sZ: concat LC OK: %s with ndet %s -> %s with ndet %s' %
+              (datetime.utcnow().isoformat(),
+               baselcfile, baselcndet, baselcfile, finalndet ))
+        return baselcfile, baselcfile
 
-    #     print('ERR! %sZ: concat LC task failed: %s, error: %s' %
-    #           (datetime.utcnow().isoformat(), repr(task), e ))
-    #     return task[0], None
+    except Exception as e:
+
+        print('ERR! %sZ: concat LC task failed: %s, error: %s' %
+              (datetime.utcnow().isoformat(), repr(task), e ))
+        return task[0], None
 
 
 
