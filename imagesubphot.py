@@ -2569,7 +2569,6 @@ def lc_concatenate_worker(task):
 
 
 
-
 def parallel_concatenate_lightcurves(baselcdir,
                                      newlcdir,
                                      lcext='ilc',
