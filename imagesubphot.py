@@ -2516,11 +2516,137 @@ def parallel_collect_imagesub_lightcurves(
               (datetime.utcnow().isoformat(), ))
 
 
+
+def lc_concatenate_worker(task):
+    '''This is the parallel worker for the function below.
+
+    task is a tuple:
+
+    task[0] = base LC file
+    task[1] = new LC file to be concatenated to base
+    task[2] = zero-indexed column number to use to sort resulting LC
+              (if None, then no sorting is done)
+
+    FIXME: this currently uses a dumb method, make it faster by streaming newlc
+    lines to baselc file directly
+
+    FIXME: add sorting by any column
+
+    '''
+
+    try:
+
+        baselcfile = task[0]
+        newlcfile = task[1]
+
+        baselcf = open(baselcfile, 'rb')
+        baselclines = baselcf.readlines()
+        baselcf.close()
+        baselcndet = len(baselclines)
+
+        newlcf = open(newlcfile, 'rb')
+        newlclines = newlcf.readlines()
+        newlcf.close()
+        newlcndet = len(newlclines)
+
+        concatlc = baselclines.extend(newlclines)
+        concatlcndet = len(concatlc)
+
+        with open(baselcfile,'wb') as outfd:
+            for line in concatlc:
+                outf.write(line)
+
+        print('%sZ: concat LC OK: %s with ndet %s -> %s with ndet %s' %
+              (datetime.utcnow().isoformat(),
+               task[0], basendet, concatlc, finalndet ))
+        return task[0], concatlc
+
+    except Exception as e:
+
+        print('ERR! %sZ: concat LC task failed: %s, error: %s' %
+              (datetime.utcnow().isoformat(), repr(task), e ))
+        return task[0], None
+
+
+
+
+def parallel_concatenate_lightcurves(baselcdir,
+                                     newlcdir,
+                                     lcext='ilc',
+                                     sortcol=0,
+                                     nworkers=16,
+                                     maxworkertasks=1000):
+    '''This concatenates light curves in baselcdir with newlcdir.
+
+    Searches for light curves in the baselcdir, then searches for LCs in the
+    newlcdir. Concatenates the light curves of matching objects together and
+    writes them to the baselcdir.
+
+    Useful for adding night-by-night reductions to a set of already reduced
+    LCs. The proposed workflow is:
+
+    - reduce the night to photometry files using the same photometry base
+      (cmrawphot) used for all the nights before
+    - create a photindexdb for the night's photometry
+    - collect night's photometry into light curves
+    - use parallel_concatenate_lightcurves to add night's LCs to base LCs
+    - rerun post-processing, EPD, TFA, etc.
+
+    '''
+
+    baselcpaths = sorted(glob.glob(os.path.join(baselcdir),
+                                  '*.{lcext}'.format(lcext=lcext)))
+    newlcpaths = sorted(glob.glob(os.path.join(newlcdir),
+                                  '*.{lcext}'.format(lcext=lcext)))
+
+    baselcbnames = set([os.path.basename(x) for x in baselcpaths])
+    newlcbnames = set([os.path.basename(x) for x in newlcpaths])
+
+    # find the intersection of the base and new LC sets
+    print('%sZ: finding light curves... ' %
+          (datetime.utcnow().isoformat(), ))
+    worklcbnames = list(baselcbnames.intersect(newlcbnames))
+
+    if len(worklcbnames) > 0:
+
+        print('%sZ: %s LCs match between base: %s, new: %s ' %
+              (datetime.utcnow().isoformat(),
+               len(worklcbnames),
+               baselcdir,
+               newlcdir))
+
+        tasks = [(os.path.join(baselcdir,x),
+                  os.path.join(newlcdir,x),
+                  sortcol) for x in worklcbnames]
+
+        # now start up the parallel collection
+        print('%sZ: starting...' %
+              (datetime.utcnow().isoformat(), ))
+        pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+        # fire up the pool of workers
+        results = pool.map(lc_concatenate_worker, tasks)
+
+        # wait for the processes to complete work
+        pool.close()
+        pool.join()
+
+        return {x:y for (x,y) in results}
+
+
+    else:
+
+        print('ERR! %sZ: no LCs match between base: %s, new: %s' %
+              (datetime.utcnow().isoformat(), baselcdir, newlcdir ))
+        return None
+
+
 ############################################
 ## SPECIAL EPD FUNCTIONS FOR IMAGESUB LCS ##
 ############################################
 
 def epd_diffmags_imagesub(coeff, fsv, fdv, fkv, xcc, ycc, mag):
+
     '''
     This calculates the difference in mags after EPD coefficients are calculated
     for imagesub lightcurves. The only difference is that we don't use the
