@@ -2556,7 +2556,7 @@ def lc_concatenate_worker(task):
 
     print('%sZ: concat LC OK: %s with ndet %s -> %s with ndet %s' %
           (datetime.utcnow().isoformat(),
-           baselcfile, basendet, baselcfile, finalndet ))
+           baselcfile, baselcndet, baselcfile, finalndet ))
     return baselcfile, baselcfile
 
     # except Exception as e:
