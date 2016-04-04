@@ -2552,12 +2552,12 @@ def lc_concatenate_worker(task):
 
     with open(baselcfile,'wb') as outfd:
         for line in baselclines:
-            outf.write(line)
+            outfd.write(line)
 
     print('%sZ: concat LC OK: %s with ndet %s -> %s with ndet %s' %
           (datetime.utcnow().isoformat(),
-           task[0], basendet, concatlc, finalndet ))
-    return task[0], concatlc
+           baselcfile, basendet, baselcfile, finalndet ))
+    return baselcfile, baselcfile
 
     # except Exception as e:
 
