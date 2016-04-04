@@ -2547,11 +2547,11 @@ def lc_concatenate_worker(task):
     newlcf.close()
     newlcndet = len(newlclines)
 
-    concatlc = baselclines.extend(newlclines)
-    finalndet = len(concatlc)
+    baselclines.extend(newlclines)
+    finalndet = len(baselclines)
 
     with open(baselcfile,'wb') as outfd:
-        for line in concatlc:
+        for line in baselclines:
             outf.write(line)
 
     print('%sZ: concat LC OK: %s with ndet %s -> %s with ndet %s' %
