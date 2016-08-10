@@ -1396,7 +1396,14 @@ def collect_image_info(fits, fistar,
     # the overall image background
     # assume this is the same as the median for now
     # previously, we were assuming that this is 100 ADU below the median
-    framebgv = float(extract_img_background(frame,median_diffbelow=0.0)[0])
+    imgbackg = extract_img_background(frame,median_diffbelow=0.0)
+
+    # at some point this used to return an array, now it doesn't?
+    # guard against this madness
+    if isinstance(imgbackg,np.ndarray):
+        framebgv = float(imgbackg[0])
+    elif isinstance(imgbackg,int) or isinstance(imgbackg,float):
+        framebgv = float(imgbackg)
 
     # get the fistar file columns we need
     framecols = np.genfromtxt(fistar,
