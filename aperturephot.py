@@ -1359,6 +1359,98 @@ def parallel_fitsdir_photometry(
         return returndict
 
 
+
+def parallel_fitslist_photometry(
+        fitslist,
+        outdir,
+        photokey,
+        fovcatalog,
+        fluxthreshold=500.0,
+        ccdextent=None,
+        pixborders=0.0,
+        aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
+        removesourcetemp=True,
+        removesourcelist=False,
+        binaryoutput=True,
+        nworkers=16,
+        maxtasksperworker=1000,
+        saveresults=True,
+        rejectbadframes=True,
+        minsrcbgv=200.0,
+        maxmadbgv=150.0,
+        maxframebgv=2000.0,
+        minnstars=500
+        ):
+    '''
+    This does photometry for all FITS files in the given list using nworkers
+    parallel workers.
+
+    photokey is required to set the name of the output photometry info pickle.
+
+    '''
+
+    # get a list of all fits files in the directory
+    goodlist = [x for x in fitslist if os.path.exists(x)]
+
+    # if we have no files, then bail out
+    if not goodlist:
+        print('%sZ: no good FITS in list, bailing out...' %
+              (datetime.utcnow().isoformat(),))
+        return
+
+
+    print('%sZ: found %s FITS files in input list, starting photometry...' %
+          (datetime.utcnow().isoformat(),
+           len(goodlist)))
+
+    if outdir and not os.path.exists(outdir):
+
+        print('%sZ: making new output directory %s' %
+              (datetime.utcnow().isoformat(),
+               outdir))
+        os.mkdir(outdir)
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxtasksperworker)
+
+    tasks = [[(x, fovcatalog),
+              {'outdir':outdir,
+               'ccdextent':ccdextent,
+               'pixborders':pixborders,
+               'aperturelist':aperturelist,
+               'removesourcetemp':removesourcetemp,
+               'removesourcelist':removesourcelist,
+               'fluxthreshold':fluxthreshold,
+               'binaryoutput':binaryoutput,
+               'minsrcbgv':minsrcbgv,
+               'maxmadbgv':maxmadbgv,
+               'maxframebgv':maxframebgv,
+               'minnstars':minnstars}, rejectbadframes] for x in goodlist]
+
+    # if the badframes directory doesn't exist, make it
+    badframesdir = os.path.join(outdir, 'badframes')
+
+    if not os.path.exists(badframesdir):
+        os.mkdir(badframesdir)
+
+    # fire up the pool of workers
+    results = pool.map(parallel_photometry_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    # this is the return dictionary
+    returndict = {x:y for (x,y) in results}
+
+    if saveresults:
+        resultsfile = open(os.path.join(outdir,
+                                        'TM-photometry-%s.pkl' % photokey),'wb')
+        pickle.dump(returndict, resultsfile)
+        resultsfile.close()
+    else:
+        return returndict
+
+
 ##############################
 ## FRAME INFO AND FILTERING ##
 ##############################
