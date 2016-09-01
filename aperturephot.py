@@ -1355,8 +1355,8 @@ def parallel_fitsdir_photometry(
         resultsfile = open(os.path.join(outdir,'TM-photometry.pkl'),'wb')
         pickle.dump(returndict, resultsfile)
         resultsfile.close()
-    else:
-        return returndict
+
+    return returndict
 
 
 
@@ -1447,8 +1447,9 @@ def parallel_fitslist_photometry(
                                         'TM-photometry-%s.pkl' % photokey),'wb')
         pickle.dump(returndict, resultsfile)
         resultsfile.close()
-    else:
-        return returndict
+
+    return returndict
+
 
 
 ##############################
