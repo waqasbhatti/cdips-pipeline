@@ -49,12 +49,12 @@ FRAMEREGEX = re.compile(r'(\d{1})\-(\d{6}\w{0,1})_(\d{1})')
 FIELD_REGEX = re.compile('^G(\d{2})(\d{2})([\+\-]\d{2})(\d{2})_(\w{3})$')
 FIELD_CCDS = [5,6,7,8]
 FIELD_REFBASEDIR = '/P/HP0/BASE/reference-frames'
+REFINFO = os.path.join(FIELD_REFBASEDIR,'refinfo.sqlite')
 
 
 ######################
 ## REFERENCE FRAMES ##
 ######################
-
 
 def find_reference_frame(field,
                          refbasedir=FIELD_REFBASEDIR,
