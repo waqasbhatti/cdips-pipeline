@@ -362,13 +362,12 @@ def select_astromref_frame(fitsdir,
 
     '''
 
-    # first, get the frames
-    fitslist = glob.glob(os.path.join(fitsdir, fitsglob))
-
-    if not srclistdir:
-        srclistdir = fitsdir
-    if not photdir:
-        photdir = fitsdir
+    # if fitsdir is already a list, then use it directly
+    if isinstance(fitsdir, list):
+        fitslist = fitsdir
+    # otherwise, get the list of fits to use
+    else:
+        fitslist = glob.glob(os.path.join(fitsdir, fitsglob))
 
     print('%sZ: %s FITS files found in %s matching glob %s, '
           'finding photometry and source lists...' %
@@ -382,15 +381,29 @@ def select_astromref_frame(fitsdir,
     # associate the frames with their fiphot files
     for fits in fitslist:
 
-        photpath = os.path.join(
-            photdir,
-            os.path.basename(fits).strip('.fits.fz') + photext
-            )
+        # find the fistar file
+        if not srclistdir and not isinstance(fitsdir, list):
+            srclistdir = fitsdir
+        elif not srclistdir and isinstance(fitsdir, list):
+            srclistdir = os.path.dirname(fits)
+
         srclistpath = os.path.join(
             srclistdir,
             os.path.basename(fits).strip('.fits.fz') + srclistext
             )
 
+        # find the fiphot file
+        if not photdir and not isinstance(fitsdir, list):
+            photdir = fitsdir
+        elif not photdir and isinstance(fitsdir, list):
+            photdir = os.path.dirname(fits)
+
+        photpath = os.path.join(
+            photdir,
+            os.path.basename(fits).strip('.fits.fz') + photext
+            )
+
+        # check if they both exist and add to list of good fits
         if os.path.exists(photpath) and os.path.exists(srclistpath):
             goodframes.append(fits)
             goodphots.append(photpath)
@@ -400,7 +413,6 @@ def select_astromref_frame(fitsdir,
     # we only work on goodframes now
     print('%sZ: selecting an astrometric reference frame...' %
           (datetime.utcnow().isoformat(),))
-
 
     median_sval = []
     median_dval = []
@@ -733,12 +745,16 @@ def get_astromref_shifts(fistardir,
 
     '''
 
-    fistarlist = glob.glob(os.path.join(os.path.abspath(fistardir), fistarglob))
+    if isinstance(fistardir, list):
+        fistarlist = fistardir
+    else:
+        fistarlist = glob.glob(os.path.join(os.path.abspath(fistardir),
+                                            fistarglob))
 
-    print('%sZ: %s files to process in %s' %
-          (datetime.utcnow().isoformat(), len(fistarlist), fistardir))
+    print('%sZ: %s files to process' %
+          (datetime.utcnow().isoformat(), len(fistarlist)))
 
-    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+    pool = mp.Pool(nworkers, maxtasksperchild=maxworkertasks)
 
     tasks = [(x, astromreffistar, outdir) for x in fistarlist]
 
@@ -835,10 +851,13 @@ def transform_frames_to_astromref(fitsdir,
 
     '''
 
-    fitslist = glob.glob(os.path.join(os.path.abspath(fitsdir), fitsglob))
+    if isinstance(fitsdir, list):
+        fitslist = fitsdir
+    else:
+        fitslist = glob.glob(os.path.join(os.path.abspath(fitsdir), fitsglob))
 
-    print('%sZ: %s files to process in %s' %
-          (datetime.utcnow().isoformat(), len(fitslist), fitsdir))
+    print('%sZ: %s files to process' %
+          (datetime.utcnow().isoformat(), len(fitslist)))
 
     pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
