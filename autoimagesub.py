@@ -64,14 +64,16 @@ def generate_astromref(fitsfiles,
                        projectid=None,
                        refdir=REFBASEDIR,
                        refinfo=REFINFO):
-    '''
-    This chooses an astrometry reference frame from the frames in fitfiles.
+    '''This chooses an astrometry reference frame from the frames in fitfiles.
 
     writes the frame to refdir.
 
     ref frames have the following filename pattern:
 
     proj{projectid}-ccd{ccd}-{field}-astromref.fits
+
+    if field, ccd, or projectid are None, these values are taken from the FITS
+    file headers.
 
     '''
 
