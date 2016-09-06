@@ -48,7 +48,9 @@ FRAMEREGEX = re.compile(r'(\d{1})\-(\d{6}\w{0,1})_(\d{1})')
 # this defines the field string and CCDs
 FIELD_REGEX = re.compile('^G(\d{2})(\d{2})([\+\-]\d{2})(\d{2})_(\w{3})$')
 FIELD_CCDS = [5,6,7,8]
-FIELD_REFBASEDIR = '/P/HP0/BASE/reference-frames'
+
+# defines where the reference frames go
+REFBASEDIR = '/P/HP0/BASE/reference-frames'
 REFINFO = os.path.join(FIELD_REFBASEDIR,'refinfo.sqlite')
 
 
@@ -56,7 +58,27 @@ REFINFO = os.path.join(FIELD_REFBASEDIR,'refinfo.sqlite')
 ## REFERENCE FRAMES ##
 ######################
 
-def find_reference_frame(field, refinfo=REFINFO):
+def generate_astromref(fitsfiles,
+                       field=None,
+                       ccd=None,
+                       projectid=None,
+                       refdir=REFBASEDIR,
+                       refinfo=REFINFO):
+    '''
+    This chooses an astrometry reference frame from the frames in fitfiles.
+
+    writes the frame to refdir.
+
+    ref frames have the following filename pattern:
+
+    proj{projectid}-ccd{ccd}-{field}-astromref.fits
+
+    '''
+
+
+
+
+def find_astromref(field, refinfo=REFINFO):
     '''
     This finds the reference frame for the field.
 
