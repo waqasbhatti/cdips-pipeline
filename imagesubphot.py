@@ -923,13 +923,13 @@ def select_photref_frames(fitsdir,
     ficombine)
 
     '''
-    # first, get the frames
-    fitslist = glob.glob(os.path.join(fitsdir, fitsglob))
 
-    if not srclistdir:
-        srclistdir = fitsdir
-    if not photdir:
-        photdir = fitsdir
+    if isinstance(fitslist, list):
+        fitslist = fitsdir
+    else:
+        fitslist = glob.glob(os.path.join(fitsdir, fitsglob))
+
+
 
     print('%sZ: %s FITS files found in %s matching glob %s, '
           'finding photometry and source lists...' %
@@ -944,6 +944,18 @@ def select_photref_frames(fitsdir,
     for fits in fitslist:
 
         fitsbase = os.path.splitext(os.path.basename(fits))[0]
+
+        # find the fistar file
+        if not srclistdir and not isinstance(fitsdir, list):
+            srclistdir = fitsdir
+        elif not srclistdir and isinstance(fitsdir, list):
+            srclistdir = os.path.dirname(fits)
+
+        # find the fiphot file
+        if not photdir and not isinstance(fitsdir, list):
+            photdir = fitsdir
+        elif not photdir and isinstance(fitsdir, list):
+            photdir = os.path.dirname(fits)
 
         # if the xtrns files are passed in, make sure we look at the
         # right fistar and fiphot files
