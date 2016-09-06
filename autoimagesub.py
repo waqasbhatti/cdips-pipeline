@@ -56,9 +56,7 @@ REFINFO = os.path.join(FIELD_REFBASEDIR,'refinfo.sqlite')
 ## REFERENCE FRAMES ##
 ######################
 
-def find_reference_frame(field,
-                         refbasedir=FIELD_REFBASEDIR,
-                         refver='latest'):
+def find_reference_frame(field,refinfo=REFINFO):
     '''
     This finds the reference frame for the field.
 
