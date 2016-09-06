@@ -1803,9 +1803,12 @@ def convolve_and_subtract_frames(fitsdir,
 
     '''
 
-    # find all the files to process
-    transframelist = glob.glob(os.path.join(os.path.abspath(fitsdir),
-                                            fitsglob))
+    if isinstance(fitsdir, list):
+        transframelist = fitsdir
+    else:
+        # find all the files to process
+        transframelist = glob.glob(os.path.join(os.path.abspath(fitsdir),
+                                                fitsglob))
 
     # make a list of tasks
     tasks = [(x, combinedphotref, photrefregfile,
@@ -1953,9 +1956,12 @@ def photometry_on_subtracted_frames(subframedir,
 
     '''
 
-    # find all the subtracted frames
-    subframelist = glob.glob(os.path.join(os.path.abspath(subframedir),
-                                          subframeglob))
+    if isinstance(subframedir, list):
+        subframelist = subframedir
+    else:
+        # find all the subtracted frames
+        subframelist = glob.glob(os.path.join(os.path.abspath(subframedir),
+                                              subframeglob))
 
 
     # we need to find the accompanying kernel, itrans, and xysdk files for each
@@ -2129,10 +2135,12 @@ def make_photometry_indexdb(framedir,
     cur.execute(META_INSERT_CMD, (photdir, framedir))
     db.commit()
 
-
-    # first, find all the frames
-    framelist = glob.glob(os.path.join(os.path.abspath(framedir),
-                                       frameglob))
+    if isinstance(framedir, list):
+        framelist = framedir
+    else:
+        # first, find all the frames
+        framelist = glob.glob(os.path.join(os.path.abspath(framedir),
+                                           frameglob))
 
     # restrict to maxframes max frames
     if maxframes:
@@ -2498,6 +2506,7 @@ def parallel_collect_imagesub_lightcurves(
 
         photdbf = os.path.join(framedir,'TM-imagesubphot-index.sqlite')
 
+        # this picks up framedir/framelist for make_photometry_indexdb
         photindexdb = make_photometry_indexdb(framedir,
                                               photdbf,
                                               frameglob=frameglob,
@@ -3001,7 +3010,11 @@ def serial_run_epd_imagesub(ilcdir,
     if not os.path.exists(outdir):
         os.mkdir(outdir)
 
-    ilcfiles = glob.glob(os.path.join(ilcdir, ilcglob))
+    # pick up the list/dir of input light curves
+    if isinstance(ilcdir, list):
+        ilcfiles = ilcdir
+    else:
+        ilcfiles = glob.glob(os.path.join(ilcdir, ilcglob))
 
     for ilc in ilcfiles:
 
@@ -3166,7 +3179,11 @@ def parallel_run_tfa(lcdir,
 
     '''
 
-    epdlcfiles = glob.glob(os.path.join(lcdir, epdlc_glob))
+    # pick up the list/dir of EPD LCs to run TFA on
+    if isinstance(lcdir, list):
+        epdlcfiles = lcdir
+    else:
+        epdlcfiles = glob.glob(os.path.join(lcdir, epdlc_glob))
 
     tasks = [(x, templatefiles, {'epdlc_jdcol':epdlc_jdcol,
                                  'epdlc_magcol':epdlc_magcol,
