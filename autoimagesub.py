@@ -302,7 +302,7 @@ def frames_astromref_worker(task):
             # calculate the shift and write the itrans back to the frame's
             # directory
             shifted_fistar, shifted_itrans = ism.astromref_shift_worker(
-                framefistar, areffistar, outdir)
+                (framefistar, areffistar, outdir)
             )
 
             # if the shift calculation is successful, shift the image itself
