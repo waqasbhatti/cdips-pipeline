@@ -42,5 +42,6 @@ CREATE TABLE photrefs (
        target_stdsrcbgv real,
        target_medsval real,
        target_meddval real,
+       comment text,
        primary key(field, projectid, ccd, isactive)
 );
