@@ -282,7 +282,9 @@ def frames_astromref_worker(task):
             os.path.basename(frame)
         )
 
-        if felems and felems[0]:
+        framefistar = frame.replace('.fits','.fistar')
+
+        if felems and felems[0] and os.path.exists(framefistar):
 
             ccd = felems[0][2]
             frameinfo = {'field':frameelems['object'],
@@ -300,7 +302,7 @@ def frames_astromref_worker(task):
             # calculate the shift and write the itrans back to the frame's
             # directory
             shifted_fistar, shifted_itrans = ism.astromref_shift_worker(
-                (areffistar, framearef['framepath'], outdir)
+                framefistar, areffistar, outdir)
             )
 
             # if the shift calculation is successful, shift the image itself
@@ -331,7 +333,8 @@ def frames_astromref_worker(task):
 
         else:
 
-            print('ERR! %sZ: could not figure out CCD for frame: %s' %
+            print('ERR! %sZ: could not figure out '
+                  'CCD info or fistar for frame: %s' %
                   (datetime.utcnow().isoformat(), frame))
             return frame, None
 
