@@ -112,7 +112,9 @@ def generate_astromref(fitsfiles,
                                                  ['object',
                                                   'projid'])
 
-            felems = FRAMEREGEX.findall(os.path.basename(astromref))
+            felems = FRAMEREGEX.findall(
+                os.path.basename(astromref['astromref'])
+            )
 
             if felems and felems[0]:
 
