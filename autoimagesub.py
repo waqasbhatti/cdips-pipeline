@@ -54,7 +54,7 @@ FIELD_CCDS = [5,6,7,8]
 
 # defines where the reference frames go
 REFBASEDIR = '/P/HP0/BASE/reference-frames'
-REFINFO = os.path.join(FIELD_REFBASEDIR,'refinfo.sqlite')
+REFINFO = os.path.join(FIELD_REFBASEDIR,'TM-refinfo.sqlite')
 
 
 ######################
