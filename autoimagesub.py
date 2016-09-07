@@ -136,7 +136,7 @@ def generate_astromref(fitsfiles,
                      "framepath, jpegpath, sval, dval, bgv, ndet, "
                      "comment) values "
                      "(?, ?, ?, ?, ?, "
-                     "?, ?, ?, ?, ?, "
+                     "?, ?, ?, ?, ?, ?, "
                      "?)")
             params = (frameinfo['field'],
                       frameinfo['projectid'],
