@@ -56,6 +56,34 @@ FIELD_CCDS = [5,6,7,8]
 REFBASEDIR = '/P/HP0/BASE/reference-frames'
 REFINFO = os.path.join(REFBASEDIR,'TM-refinfo.sqlite')
 
+###############
+## UTILITIES ##
+###############
+
+def find_original_fits_fieldprojectidccd(dirlist,
+                                         field,
+                                         projectid,
+                                         ccd):
+    '''This searches in dirlist for all original FITS files matching the specified
+    projectid, field, and ccd combination.
+
+    Returns a flat list of FITS.
+
+    '''
+
+
+
+def find_arefshifted_fits_fieldprojectidccd(dirlist,
+                                            field,
+                                            projectid,
+                                            ccd):
+    '''This searches in dirlist for all astromref-shifted FITS files matching the
+    specified projectid, field, and ccd combination.
+
+    Returns a flat list of FITS.
+
+    '''
+
 
 ##################################
 ## ASTROMETRIC REFERENCE FRAMES ##
@@ -68,6 +96,7 @@ def generate_astromref(fitsfiles,
                        projectid=None,
                        refdir=REFBASEDIR,
                        refinfo=REFINFO):
+
     '''This chooses an astrometry reference frame from the frames in fitfiles.
 
     writes the frame to refdir.
@@ -377,3 +406,22 @@ def framelist_to_astromref(fitsfiles,
 ##################################
 ## PHOTOMETRIC REFERENCE FRAMES ##
 ##################################
+
+def generate_photref_candidates(fitsfiles,
+                                makeactive=True,
+                                minframes=50,
+                                maxhourangle=3.0,
+                                maxmoonphase=25.0,
+                                maxmoonelev=0.0,
+                                maxzenithdist=30.0,
+                                maxbackgroundstdev=10.0,
+                                maxbackgroundmedian=1000.0,
+                                forcecollectinfo=False):
+    '''This uses ism.select_photref_frames run on fitsfiles to get photref
+    candidates.
+
+    fitsfiles must be a list of frames, which have been already transformed to
+    the astromref, and are all from a single projectid, ccd, field combination
+    for this operation to make sense.
+
+    '''
