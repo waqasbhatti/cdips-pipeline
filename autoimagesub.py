@@ -108,7 +108,7 @@ def generate_astromref(fitsfiles,
         else:
 
             # get the frame info
-            frameelems = get_header_keyword_list(astromref,
+            frameelems = get_header_keyword_list(astromref['astromref'],
                                                  ['object',
                                                   'projid'])
 
