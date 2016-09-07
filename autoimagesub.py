@@ -312,20 +312,20 @@ def frames_astromref_worker(task):
 
                 if shifted_frame and os.path.exists(shifted_frame):
 
-                    print('%sZ: SHIFT OK %s -> %s',
+                    print('%sZ: SHIFT OK %s -> %s' %
                           (datetime.utcnow().isoformat(), frame, shifted_frame))
 
                     return frame, shifted_frame
 
                 else:
 
-                    print('ERR! %sZ: SHIFT OPERATION FAILED for %s',
+                    print('ERR! %sZ: SHIFT OPERATION FAILED for %s' %
                           (datetime.utcnow().isoformat(), frame))
                     return frame, None
 
             else:
 
-                print('ERR! %sZ: SHIFT CALCULATION FAILED for %s',
+                print('ERR! %sZ: SHIFT CALCULATION FAILED for %s' %
                       (datetime.utcnow().isoformat(), frame))
                 return frame, None
 
