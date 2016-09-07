@@ -475,8 +475,8 @@ def xtrnsfits_convsubphot(xtrnsfits,
     If findnewobjects is True, this will run source extraction on each
     subtracted frame, remove all known sources from the photref, see if there
     are any new sources, add them to the source catalog as HAT-999 objects if
-    there are no matches to them within catmatcharcsec arcseconds, add them to
-    the cmrawphot, and then run aperturephot on them.
+    there are no matches to them within catmatcharcsec arcseconds, regenerate
+    the cmrawphot for the combined photref, and then run aperturephot on them.
 
     '''
 
