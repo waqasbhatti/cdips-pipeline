@@ -346,17 +346,32 @@ def frames_astromref_worker(task):
 
 
 
-def frames_to_astromref(fitsfiles,
-                        outdir=None,
-                        refinfo=REFINFO,
-                        nworkers=16,
-                        maxworkertasks=1000):
+def framelist_to_astromref(fitsfiles,
+                           outdir=None,
+                           refinfo=REFINFO,
+                           nworkers=16,
+                           maxworkertasks=1000):
     '''This calculates the shifts between frames in fitsfiles and the appropriate
     astromref for the projectid, field and CCD, then shifts each frame to the
     astromref's coordinate system.
 
     '''
 
+    print('%sZ: %s files to process' %
+          (datetime.utcnow().isoformat(), len(fitsfiles)))
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+    tasks = [(x, outdir, refinfo) for x in fitsfiles if os.path.exists(x)]
+
+    # fire up the pool of workers
+    results = pool.map(frames_astromref_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    return {x:y for (x,y) in results}
 
 
 ##################################
