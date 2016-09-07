@@ -369,10 +369,10 @@ def select_astromref_frame(fitsdir,
     else:
         fitslist = glob.glob(os.path.join(fitsdir, fitsglob))
 
-    print('%sZ: %s FITS files found in %s matching glob %s, '
+    print('%sZ: %s FITS files found, '
           'finding photometry and source lists...' %
           (datetime.utcnow().isoformat(),
-           len(fitslist), fitsdir, fitsglob))
+           len(fitslist)))
 
     goodframes = []
     goodphots = []
