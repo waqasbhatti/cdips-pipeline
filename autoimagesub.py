@@ -213,12 +213,42 @@ def generate_astromref(fitsfiles,
 
 
 
-def find_astromref(projectid, field, ccd, refinfo=REFINFO):
+def get_astromref(projectid, field, ccd, refinfo=REFINFO):
     '''This finds the reference frame for the field, projectid, and ccd
-    combination.
+    combination using the TM-refinfo.sqlite database.
 
-    reference frames are found in:
-
-    {REFBASEDIR}/{field}
 
     '''
+
+    db = sqlite3.connect(REFINFO)
+    cur = db.cursor()
+
+    query = ('select field, projectid, ccd, unixtime, '
+             'framepath, jpegpath, sval, dval, bgv, ndet, comment '
+             'from astromrefs where '
+             'projectid = ? and field = ? and ccd = ? and '
+             'isactive = 1')
+    params = (projectid, field, ccd)
+
+    try:
+
+        cur.execute(query, params)
+        rows = cur.fetchone()
+
+        astromref = {x:y for (x,y) in zip(('field','projectid','ccd',
+                                           'unixtime','framepath','jpegpath',
+                                           'sval','dval','bgv',
+                                           'ndet','comment'),rows)}
+
+        returnval = astromref
+
+    except Exception as e:
+
+        print('ERR! %sZ: could not get astromref info '
+              'from DB! error was: %s' %
+              (datetime.utcnow().isoformat(), e))
+        returnval = None
+
+    db.close()
+
+    return returnval
