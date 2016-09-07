@@ -553,8 +553,19 @@ def select_astromref_frame(fitsdir,
                      os.path.basename(selectedreference).strip('.fits.fz'))
                     )
                 )
+        else:
+            framejpg = None
 
-        return selectedreference
+        return {
+            'astromref':selectedreference,
+            'framejpg':framejpg,
+            'sval':median_sval[best_frame_ind[0]],
+            'dval':median_dval[best_frame_ind[0]],
+            'bgv':median_background[best_frame_ind[0]],
+            'ndet':good_detections[best_frame_ind[0]],
+            'comment':'astromref chosen using sval, dval, bgval, ndet'
+        }
+
 
     # otherwise, fall back to to the frames with the best values of S, D and
     # a large number of detections
@@ -575,8 +586,18 @@ def select_astromref_frame(fitsdir,
                      os.path.basename(selectedreference).strip('.fits.fz'))
                     )
                 )
+        else:
+            framejpg = None
 
-        return selectedreference
+        return {
+            'astromref':selectedreference,
+            'framejpg':framejpg,
+            'sval':median_sval[sdndet_ind[0]],
+            'dval':median_dval[sdndet_ind[0]],
+            'bgv':median_background[sdndet_ind[0]],
+            'ndet':good_detections[sdndet_ind[0]],
+            'comment':'astromref chosen using sval, dval, ndet'
+        }
 
 
     # otherwise, fall back to to the frames with the best values of S and D
@@ -598,7 +619,19 @@ def select_astromref_frame(fitsdir,
                     )
                 )
 
-        return selectedreference
+        else:
+            framejpg = None
+
+        return {
+            'astromref':selectedreference,
+            'framejpg':framejpg,
+            'sval':median_sval[sd_ind[0]],
+            'dval':median_dval[sd_ind[0]],
+            'bgv':median_background[sd_ind[0]],
+            'ndet':good_detections[sd_ind[0]],
+            'comment':'astromref chosen using sval, dval'
+        }
+
 
     # if that fails, fail back to the best S value frame
     elif len(median_sval_ind) > 0:
@@ -618,8 +651,19 @@ def select_astromref_frame(fitsdir,
                      os.path.basename(selectedreference).strip('.fits.fz'))
                     )
                 )
+        else:
+            framejpg = None
 
-        return selectedreference
+        return {
+            'astromref':selectedreference,
+            'framejpg':framejpg,
+            'sval':median_sval[median_sval_ind[0]],
+            'dval':median_dval[median_sval_ind[0]],
+            'bgv':median_background[median_sval_ind[0]],
+            'ndet':good_detections[median_sval_ind[0]],
+            'comment':'astromref chosen using sval'
+        }
+
 
     else:
 
