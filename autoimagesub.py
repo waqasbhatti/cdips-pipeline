@@ -57,9 +57,9 @@ REFBASEDIR = '/P/HP0/BASE/reference-frames'
 REFINFO = os.path.join(REFBASEDIR,'TM-refinfo.sqlite')
 
 
-######################
-## REFERENCE FRAMES ##
-######################
+##################################
+## ASTROMETRIC REFERENCE FRAMES ##
+##################################
 
 def generate_astromref(fitsfiles,
                        makeactive=True,
@@ -142,11 +142,15 @@ def generate_astromref(fitsfiles,
                                   )[0]
                                )
             areftargetjpeg = areftargetfits.replace('.fits','.jpeg')
+            areftargetfistar = areftargetfits.replace('.fits','.fistar')
 
+            # copy the frame, jpeg, and fistar to the reference-frames dir
             shutil.copy(astromref['astromref'],os.path.join(REFBASEDIR,
                                                             areftargetfits))
             shutil.copy(astromref['framejpg'],os.path.join(REFBASEDIR,
                                                             areftargetjpeg))
+            shutil.copy(astromref['astromref'].replace('.fits','.fistar'),
+                        os.path.join(REFBASEDIR, areftargetfistar))
 
             # now, put together the information and write to the refinfo sqlite
 
@@ -252,3 +256,106 @@ def get_astromref(projectid, field, ccd, refinfo=REFINFO):
     db.close()
 
     return returnval
+
+
+
+def frames_astromref_worker(task):
+    '''
+    This is the parallel worker for frames_to_astromref.
+
+    task[0] = fits file
+    task[1] = outdir
+    task[2] = refinfo
+
+    '''
+
+    try:
+
+        frame, outdir, refinfo = task
+
+        # figure out this frame's field, ccd, and projectid
+        frameelems = get_header_keyword_list(frame,
+                                             ['object',
+                                              'projid'])
+
+        felems = FRAMEREGEX.findall(
+            os.path.basename(frame)
+        )
+
+        if felems and felems[0]:
+
+            ccd = felems[0][2]
+            frameinfo = {'field':frameelems['object'],
+                         'ccd':ccd,
+                         'projectid':frameelems['projid']}
+
+
+            # find this frame's associated active astromref
+            framearef = get_astromref(frameinfo['projectid'],
+                                      frameinfo['field'],
+                                      frameinfo['ccd'],
+                                      refinfo=refinfo)
+            areffistar = framearef['framepath'].replace('.fits','.fistar')
+
+            # calculate the shift and write the itrans back to the frame's
+            # directory
+            shifted_fistar, shifted_itrans = ism.astromref_shift_worker(
+                (areffistar, framearef['framepath'], outdir)
+            )
+
+            # if the shift calculation is successful, shift the image itself
+            if shifted_itrans and os.path.exists(shifted_itrans):
+
+                frame_to_shift, shifted_frame = ism.frame_to_astromref_worker(
+                    (frame, None, None)
+                )
+
+                if shifted_frame and os.path.exists(shifted_frame):
+
+                    print('%sZ: SHIFT OK %s -> %s',
+                          (datetime.utcnow().isoformat(), frame, shifted_frame))
+
+                    return frame, shifted_frame
+
+                else:
+
+                    print('ERR! %sZ: SHIFT OPERATION FAILED for %s',
+                          (datetime.utcnow().isoformat(), frame))
+                    return frame, None
+
+            else:
+
+                print('ERR! %sZ: SHIFT CALCULATION FAILED for %s',
+                      (datetime.utcnow().isoformat(), frame))
+                return frame, None
+
+        else:
+
+            print('ERR! %sZ: could not figure out CCD for frame: %s' %
+                  (datetime.utcnow().isoformat(), frame))
+            return frame, None
+
+    except Exception as e:
+
+        print('ERR! %sZ: could not shift frame %s to astromref, error was: %s' %
+              (datetime.utcnow().isoformat(), frame, e))
+        return frame, None
+
+
+
+def frames_to_astromref(fitsfiles,
+                        outdir=None,
+                        refinfo=REFINFO,
+                        nworkers=16,
+                        maxworkertasks=1000):
+    '''This calculates the shifts between frames in fitsfiles and the appropriate
+    astromref for the projectid, field and CCD, then shifts each frame to the
+    astromref's coordinate system.
+
+    '''
+
+
+
+##################################
+## PHOTOMETRIC REFERENCE FRAMES ##
+##################################
