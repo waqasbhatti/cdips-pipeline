@@ -375,14 +375,14 @@ def frames_astromref_worker(task):
 
 
 
-def framelist_to_astromref(fitsfiles,
-                           outdir=None,
-                           refinfo=REFINFO,
-                           nworkers=16,
-                           maxworkertasks=1000):
+def framelist_make_xtrnsfits(fitsfiles,
+                             outdir=None,
+                             refinfo=REFINFO,
+                             nworkers=16,
+                             maxworkertasks=1000):
     '''This calculates the shifts between frames in fitsfiles and the appropriate
     astromref for the projectid, field and CCD, then shifts each frame to the
-    astromref's coordinate system.
+    astromref's coordinate system, generating -xtrns.fits files.
 
     '''
 
@@ -407,16 +407,16 @@ def framelist_to_astromref(fitsfiles,
 ## PHOTOMETRIC REFERENCE FRAMES ##
 ##################################
 
-def generate_photref_candidates(fitsfiles,
-                                makeactive=True,
-                                minframes=50,
-                                maxhourangle=3.0,
-                                maxmoonphase=25.0,
-                                maxmoonelev=0.0,
-                                maxzenithdist=30.0,
-                                maxbackgroundstdev=10.0,
-                                maxbackgroundmedian=1000.0,
-                                forcecollectinfo=False):
+def generate_photref_candidates_from_xtrns(fitsfiles,
+                                           makeactive=True,
+                                           minframes=50,
+                                           maxhourangle=3.0,
+                                           maxmoonphase=25.0,
+                                           maxmoonelev=0.0,
+                                           maxzenithdist=30.0,
+                                           maxbackgroundstdev=10.0,
+                                           maxbackgroundmedian=1000.0,
+                                           forcecollectinfo=False):
     '''This uses ism.select_photref_frames run on fitsfiles to get photref
     candidates.
 
@@ -425,3 +425,62 @@ def generate_photref_candidates(fitsfiles,
     for this operation to make sense.
 
     '''
+
+
+def generate_combined_photref(photreftarget,
+                              photrefcandidates,
+                              makeactive=True,
+                              field=None,
+                              ccd=None,
+                              projectid=None,
+                              refdir=REFBASEDIR,
+                              refinfo=REFINFO,
+                              combinetype='median',
+                              kernelspec='b/4;i/4;d=4/4',
+                              ccdgain=None,
+                              zeropoint=None,
+                              ccdexptime=None,
+                              extractsources=True,
+                              apertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
+                              framewidth=None,
+                              searchradius=8.0,
+                              nworkers=16,
+                              maxworkertasks=1000):
+    '''This generates a combined photref from photref target and candidates and
+    updates the TM-refinfo.sqlite database.
+
+    '''
+
+##################################
+## IMAGE SUBTRACTION PHOTOMETRY ##
+##################################
+
+def frames_convsubphot_worker(task):
+    '''
+    This is a parallel worker for framelist_convsubphot_photref below.
+
+    '''
+
+
+
+def xtrnsfits_convsubphot(xtrnsfits,
+                          outdir=None,
+                          refinfo=REFINFO,
+                          findnewobjects=True,
+                          nworkers=16,
+                          maxworkertasks=1000):
+    '''This convolves, subtracts, and does photometry of known photref sources for
+    all FITS files in the xtrnsfits list of FITS transformed to astromrefs.
+
+    If findnewobjects is True, this will run source extraction on each
+    subtracted frame, remove all known sources from the photref, see if there
+    are any new sources, add them to the source catalog as HAT-999 objects if
+    there are no matches to them within catmatcharcsec arcseconds, add them to
+    the cmrawphot, and then run aperturephot on them.
+
+    '''
+
+
+#########################
+## PHOTOMETRY DATABASE ##
+#########################
