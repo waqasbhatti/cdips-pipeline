@@ -455,7 +455,7 @@ def generate_combined_photref(photreftarget,
 ## IMAGE SUBTRACTION PHOTOMETRY ##
 ##################################
 
-def frames_convsubphot_worker(task):
+def xtrsfits_convsubphot_worker(task):
     '''
     This is a parallel worker for framelist_convsubphot_photref below.
 
