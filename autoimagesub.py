@@ -74,7 +74,7 @@ def generate_astromref(fitsfiles,
 
     ref frames have the following filename pattern:
 
-    proj{projectid}-ccd{ccd}-{field}-astromref.fits
+    proj{projectid}-ccd{ccd}-{field}-astromref-{origfname}.fits
 
     if field, ccd, or projectid are None, these values are taken from the FITS
     file headers.
@@ -129,6 +129,25 @@ def generate_astromref(fitsfiles,
                       (datetime.utcnow().isoformat(), astromref['astromref']))
                 return
 
+            # now that we have the astromref frame, copy it over to the
+            # system-wide reference-images directory along with its JPEG
+            # snapshot
+            areftargetfits = ('proj{projectid}-{field}-'
+                              'ccd{ccd}-astromref-{origfname}.fits').format(
+                                  projectid=frameinfo['projectid'],
+                                  field=frameinfo['field'],
+                                  ccd=frameinfo['ccd'],
+                                  origfname=os.path.splitext(
+                                      os.path.basename(astromref['astromref'])
+                                  )[0]
+                               )
+            areftargetjpeg = areftargetfits.replace('.fits','.jpeg')
+
+            shutil.copy(astromref['astromref'],os.path.join(REFBASEDIR,
+                                                            areftargetfits))
+            shutil.copy(astromref['framejpg'],os.path.join(REFBASEDIR,
+                                                            areftargetjpeg))
+
             # now, put together the information and write to the refinfo sqlite
 
             query = ("insert into astromrefs "
@@ -144,14 +163,15 @@ def generate_astromref(fitsfiles,
                       1 if makeactive else 0,
                       time.time(),
 
-                      astromref['astromref'],
-                      astromref['framejpg'],
+                      os.path.join(REFBASEDIR,areftargetfits),
+                      os.path.join(REFBASEDIR,areftargetjpeg),
                       astromref['sval'],
                       astromref['dval'],
                       astromref['bgv'],
                       astromref['ndet'],
 
-                      astromref['comment'])
+                      (astromref['comment'] +
+                       '; original: %s' % astromref['astromref']))
 
             db = sqlite3.connect(refinfo)
             cur = db.cursor()
@@ -193,16 +213,12 @@ def generate_astromref(fitsfiles,
 
 
 
-
-
-def find_astromref(field, refinfo=REFINFO):
-    '''
-    This finds the reference frame for the field.
+def find_astromref(projectid, field, ccd, refinfo=REFINFO):
+    '''This finds the reference frame for the field, projectid, and ccd
+    combination.
 
     reference frames are found in:
 
     {REFBASEDIR}/{field}
-
-
 
     '''
