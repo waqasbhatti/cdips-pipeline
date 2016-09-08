@@ -841,21 +841,32 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
 
     # the master photref is the frame we'll convolve all of the rest of the
     # photrefs to. it's the softest of these frames
-    candidate_master_photref = final_frames[np.nanargmin(final_svalues)]
+    try:
 
-    # make JPEGs of the selected photref frames
-    for final_frame in final_frames:
+        candidate_master_photref = final_frames[np.nanargmin(final_svalues)]
 
-        framejpg = fits_to_full_jpeg(
-            final_frame,
-            out_fname=os.path.join(
-                os.path.dirname(final_frame),
-                ('JPEG-PHOTREF-%s.jpg' %
-                 os.path.basename(final_frame).strip('.fits.fz'))
+        # make JPEGs of the selected photref frames
+        for final_frame in final_frames:
+
+            framejpg = fits_to_full_jpeg(
+                final_frame,
+                out_fname=os.path.join(
+                    os.path.dirname(final_frame),
+                    ('JPEG-PHOTREF-%s.jpg' %
+                     os.path.basename(final_frame).strip('.fits.fz'))
+                    )
                 )
-            )
 
-    return candidate_master_photref, final_frames.tolist(), frameinfo
+        return candidate_master_photref, final_frames.tolist(), frameinfo
+
+    except Exception as e:
+
+        print('%sZ: selection failed, some criteria '
+              'may be too strict for this frame list' %
+              (datetime.utcnow().isoformat()))
+
+        return None, None, frameinfo
+
 
 
 
