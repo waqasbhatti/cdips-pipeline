@@ -926,8 +926,8 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
                        'maxzenithdist':maxzenithdist,
                        'maxbackgroundstdev':maxbackgroundstdev,
                        'maxbackgroundmedian':maxbackgroundmedian,
-                       'masterphotref':candidate_master_photref,
-                       'photrefs':final_frames,
+                       'masterphotref':os.path.abspath(candidate_master_photref),
+                       'photrefs':[os.path.abspath(x) for x in final_frames],
                        'photrefjpegs':final_jpegs}
 
         # dump the photrefinfo to a pickle
