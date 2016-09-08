@@ -451,21 +451,85 @@ def generate_combined_photref(photreftarget,
 
     '''
 
+
+
+def get_combined_photref(projectid, field, ccd, refinfo=REFINFO):
+    '''
+    This gets the combined photref for the given combo of projid, field, ccd.
+
+    '''
+
+
+
 ##################################
 ## IMAGE SUBTRACTION PHOTOMETRY ##
 ##################################
+
+def find_new_sources(subtractedframe,
+                     fluxthreshold=1000,
+                     catmatcharcsec=3.0,
+                     refinfo=REFINFO):
+    '''
+    This finds new sources in the subtracted frame.
+
+    '''
+
 
 def xtrsfits_convsubphot_worker(task):
     '''
     This is a parallel worker for framelist_convsubphot_photref below.
 
+    task[0] = xtrnsfits file
+    task[1] = outdir
+    task[2] = kernelspec
+    task[3] = reversesubtract boolean
+    task[4] = findnewobjects boolean
+
     '''
+
+    frame, outdir, kernelspec, reversesubtract, findnewobjects = task
+
+    try:
+
+        # first, figure out the input frame's projid, field, and ccd
+        frameelems = get_header_keyword_list(frame,
+                                             ['object',
+                                              'projid'])
+        felems = FRAMEREGEX.findall(
+            os.path.basename(frame)
+        )
+        field, ccd, projectid = (frameelems['object'],
+                                 felems[0][2],
+                                 frameelems['projid'])
+
+        # then, find the associated combined photref frame
+
+        # then, find the associated combined photref registration file
+
+        # then, find the associated combined photref's cmrawphot for photometry
+
+        # generate the output subtracted frame filename and kernel filename
+
+        # do the subtraction (take care of reversesubtract here)
+
+        # find new objects in the subtracted frame if told to do so
+
+        # then do photometry on the subtracted frame
+
+
+    except Exception as e:
+
+        print('ERR! %sZ: could not do convsubphot on frame %s, error was: %s' %
+              (datetime.utcnow().isoformat(), frame, e))
+        return frame, None
+
 
 
 
 def xtrnsfits_convsubphot(xtrnsfits,
                           outdir=None,
                           refinfo=REFINFO,
+                          kernelspec='b/4;i/4;d=4/4',
                           findnewobjects=True,
                           nworkers=16,
                           maxworkertasks=1000):
