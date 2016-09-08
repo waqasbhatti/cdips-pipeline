@@ -32,7 +32,7 @@ import random
 import cPickle as pickle
 import sqlite3
 import time
-from hashlib import md5
+from hashlib import md5, sha256
 import gzip
 
 import numpy as np
@@ -760,7 +760,35 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
                                    forcecollectinfo=False,
                                    nworkers=nworkers,
                                    maxworkertasks=maxworkertasks)
-    cachekey = md5(repr(fitsfiles)).hexdigest()
+
+    # this is the cachekey used to store the photref selection info
+    cachekey = '%s-%i-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f' % (repr(fitsfiles),
+                                                        minframes,
+                                                        maxhourangle,
+                                                        maxmoonphase,
+                                                        maxmoonelev,
+                                                        maxzenithdist,
+                                                        maxbackgroundstdev,
+                                                        maxbackgroundmedian)
+    cachekey = sha256(cachekey).hexdigest()
+    cachedir = os.path.join(FRAMEINFOCACHEDIR,'photref-%s' % cachekey)
+    cacheinfofile = os.path.join(cachedir, 'selection-info.pkl.gz')
+
+    # get the data from the cache if it exists and we're allowed to use it
+    if ((not forcecollectinfo) and
+        os.path.exists(cachedir) and
+        os.path.exists(cacheinfofile)):
+
+        with gzip.open(cacheinfofile) as infd:
+            photrefinfo = pickle.load(cacheinfofile)
+
+        print('%sZ: candidate photref JPEGs in: %s, '
+              'cached photrefinfo from: %s' %
+              (datetime.utcnow().isoformat(), cachedir, cacheinfofile))
+
+        return photrefinfo
+
+    ## OTHERWISE, RUN THE FULL PROCESS ##
 
     # then, apply our conditions to these fits files to generate a list of
     # photref candidates
@@ -869,25 +897,47 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
         candidate_master_photref = final_frames[np.nanargmin(final_svalues)]
         final_jpegs = []
 
-        # make JPEGs of the selected photref frames
+        # make JPEGs of the selected photref frames and copy them to the
+        # cachedir
+        if not os.path.exists(cachedir):
+            print('WRN! %sZ: making new photref cache directory: %s' %
+                  (datetime.utcnow().isoformat(), cachedir))
+            os.mkdir(cachedir)
+
         for final_frame in final_frames:
 
             framejpg = fits_to_full_jpeg(
                 final_frame,
                 out_fname=os.path.join(
-                    os.path.dirname(final_frame),
+                    cachedir,
                     ('JPEG-PHOTREF-%s.jpg' %
                      os.path.basename(final_frame).strip('.fits.fz'))
                     )
                 )
             final_jpegs.append(framejpg)
 
-        return {'framelist':fitsfiles,
-                'frameinfo':frameinfo,
-                'cachekey':cachekey,
-                'masterphotref':candidate_master_photref,
-                'photrefs':final_frames,
-                'photrefjpegs':final_jpegs}
+        photrefinfo = {'framelist':fitsfiles,
+                       'frameinfo':frameinfo,
+                       'cachekey':cachekey,
+                       'minframes':minframes,
+                       'maxhourangle':maxhourangle,
+                       'maxmoonphase':maxmoonphase,
+                       'maxmoonelev':maxmoonelev,
+                       'maxzenithdist':maxzenithdist,
+                       'maxbackgroundstdev':maxbackgroundstdev,
+                       'maxbackgroundmedian':maxbackgroundmedian,
+                       'masterphotref':candidate_master_photref,
+                       'photrefs':final_frames,
+                       'photrefjpegs':final_jpegs}
+
+        # dump the photrefinfo to a pickle
+        with gzip.open(cacheinfofile,'wb') as outfd:
+            pickle.dump(photrefinfo, outfd, pickle.HIGHEST_PROTOCOL)
+
+        print('%sZ: candidate photref JPEGs in: %s, photrefinfo dumped to: %s' %
+              (datetime.utcnow().isoformat(), cachedir, cacheinfofile))
+
+        return photrefinfo
 
     except Exception as e:
 
@@ -898,6 +948,12 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
         return {'framelist':fitsfiles,
                 'frameinfo':frameinfo,
                 'cachekey':cachekey,
+                'maxhourangle':maxhourangle,
+                'maxmoonphase':maxmoonphase,
+                'maxmoonelev':maxmoonelev,
+                'maxzenithdist':maxzenithdist,
+                'maxbackgroundstdev':maxbackgroundstdev,
+                'maxbackgroundmedian':maxbackgroundmedian,
                 'masterphotref':None,
                 'photrefs':None,
                 'photrefjpegs':None}
