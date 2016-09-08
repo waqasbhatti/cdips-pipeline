@@ -861,7 +861,7 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
 
     except Exception as e:
 
-        print('%sZ: selection failed, some criteria '
+        print('ERR! %sZ: selection failed, some criteria '
               'may be too strict for this frame list' %
               (datetime.utcnow().isoformat()))
 
