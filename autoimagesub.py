@@ -557,7 +557,7 @@ def get_frame_info_for_photref_candidates(frame):
             print('WRN! %sZ: %s is a binary phot file, '
                   'but no binary phot reader is present, skipping...' %
                   (datetime.utcnow().isoformat(), photpath))
-            continue
+            return frame, None
 
         else:
 
