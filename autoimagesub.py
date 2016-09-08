@@ -765,21 +765,42 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
     # photref candidates
     # filter on hour angle
     haind = np.fabs(frameinfo['hourangle']) < maxhourangle
+    print('%sZ: %s frames with hour angle < %s' %
+          (datetime.utcnow().isoformat(),
+           len(np.where(haind)[0]),
+           maxhourangle))
 
     # get dark nights
     moonind = ((np.fabs(frameinfo['moonphase']) < maxmoonphase) |
                (frameinfo['moonelev'] < maxmoonelev))
+    print('%sZ: %s frames with moon phase < %s or moon elev < %s' %
+          (datetime.utcnow().isoformat(),
+           len(np.where(moonind)[0]),
+           maxmoonphase,
+           maxmoonelev))
 
     # get low zenith distance nights
     zenithind = frameinfo['zenithdist'] < maxzenithdist
+    print('%sZ: %s frames with zenith distance < %s' %
+          (datetime.utcnow().isoformat(),
+           len(np.where(zenithind)[0]),
+           maxzenithdist))
 
     # get nights with background stdev < max_bgv_stdev (to possibly remove
     # cloudy nights)
     backgroundstdevind = frameinfo['stdsrcbgv'] < maxbackgroundstdev
+    print('%sZ: %s frames with background stdev < %s' %
+          (datetime.utcnow().isoformat(),
+           len(np.where(backgroundstdevind)[0]),
+           maxbackgroundstdev))
 
     # get nights with background median < maxbackgroundmedian (to possibly
     # remove cloudy nights)
     backgroundmedind = frameinfo['medsrcbgv'] < maxbackgroundmedian
+    print('%sZ: %s frames with background median < %s' %
+          (datetime.utcnow().isoformat(),
+           len(np.where(backgroundmedind)[0]),
+           maxbackgroundmedian))
 
     # this is the final operating set of frames that will be sorted for the
     # following tests
@@ -797,8 +818,8 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
     selected_medsvalue = frameinfo['medsval'][selectind]
     selected_meddvalue = frameinfo['meddval'][selectind]
 
-    print('%sZ: selected %s frames with acceptable '
-          'HA, Z, moon phase, and elevation for further filtering...' %
+    print('\n%sZ: selected %s frames with acceptable '
+          'HA, Z, moon phase, background, and elevation for further filtering...\n' %
           (datetime.utcnow().isoformat(), len(selected_frames)))
 
     # we select in the following order
