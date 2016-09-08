@@ -38,6 +38,15 @@ import aperturephot as ap
 import imagesubphot as ism
 from imageutils import get_header_keyword_list
 
+# get fiphot binary reader
+try:
+    from HATpipepy.Common.BinPhot import read_fiphot
+    HAVEBINPHOT = True
+except:
+    print("can't import binary fiphot reading functions from "
+          "HATpipe, binary fiphot files will be unreadable!")
+    HAVEBINPHOT = False
+
 
 ############
 ## CONFIG ##
