@@ -33,6 +33,7 @@ import cPickle as pickle
 import sqlite3
 import time
 from hashlib import md5
+import gzip
 
 import numpy as np
 
@@ -506,7 +507,7 @@ def framelist_make_xtrnsfits(fitsfiles,
 ## PHOTOMETRIC REFERENCE FRAMES ##
 ##################################
 
-def get_frame_info_for_photref_candidates(frame):
+def get_frame_info(frame):
     '''
     This gets the needed info from a frame for selecting photref candidates.
 
@@ -639,6 +640,101 @@ def get_frame_info_for_photref_candidates(frame):
 
 
 
+def fitslist_frameinfo(fitslist,
+                       forcecollectinfo=False,
+                       nworkers=8,
+                       maxworkertasks=1000):
+    '''
+    This runs a parallel get_frame_info job.
+
+    '''
+
+    # check if we have it in the frameinfo cache, if so, use it. if not, redo
+    # the info collection, and then write it back to the cache.
+    cachefile = os.path.join(FRAMEINFOCACHEDIR,
+                             ('frameinfo-%s.pkl.gz' %
+                              md5(repr(fitslist)).hexdigest()))
+
+    if os.path.exists(cachefile) and not forcecollectinfo:
+
+        with gzip.open(cachefile,'rb') as infd:
+            frameinfo = pickle.load(infd)
+
+        print('%sZ: frameinfo found in cache file: %s' %
+              (datetime.utcnow().isoformat(), cachefile))
+
+        return frameinfo
+
+    # if the cache doesn't exist, we'll run the frameinfo procedure and write
+    # the results back to the cache
+    else:
+
+        print('%sZ: getting frameinfo for %s frames...' %
+              (datetime.utcnow().isoformat(), len(fitslist)))
+
+        pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+        tasks = fitslist
+
+        # fire up the pool of workers
+        results = pool.map(get_frame_info, tasks)
+
+        # wait for the processes to complete work
+        pool.close()
+        pool.join()
+
+        # now turn everything into ndarrays
+        frames = np.array([x[0] for x in results])
+        zenithdist = np.array([(x[1]['zenithdist']
+                                if x[1] else np.nan) for x in results])
+        moondist = np.array([(x[1]['moondist']
+                                if x[1] else np.nan) for x in results])
+        moonelev = np.array([(x[1]['moonelev']
+                                if x[1] else np.nan) for x in results])
+        moonphase = np.array([(x[1]['moonphase']
+                                if x[1] else np.nan) for x in results])
+        hourangle = np.array([(x[1]['hourangle']
+                                if x[1] else np.nan) for x in results])
+        ngoodobjects = np.array([(x[1]['ngoodobjects']
+                                if x[1] else np.nan) for x in results])
+        medmagerr = np.array([(x[1]['medmagerr']
+                                if x[1] else np.nan) for x in results])
+        magerrmad = np.array([(x[1]['magerrmad']
+                                if x[1] else np.nan) for x in results])
+        medsrcbgv = np.array([(x[1]['medsrcbgv']
+                                if x[1] else np.nan) for x in results])
+        stdsrcbgv = np.array([(x[1]['stdsrcbgv']
+                                if x[1] else np.nan) for x in results])
+        medsval = np.array([(x[1]['medsval']
+                                if x[1] else np.nan) for x in results])
+        meddval = np.array([(x[1]['meddval']
+                                if x[1] else np.nan) for x in results])
+
+
+        outdict = {'frames':frames,
+                   'zenithdist':zenithdist,
+                   'moondist':moondist,
+                   'moonelev':moonelev,
+                   'moonphase':moonphase,
+                   'hourangle':hourangle,
+                   'ngoodobjects':ngoodobjects,
+                   'medmagerr':medmagerr,
+                   'magerrmad':magerrmad,
+                   'medsrcbgv':medsrcbgv,
+                   'stdsrcbgv':stdsrcbgv,
+                   'medsval':medsval,
+                   'meddval':meddval}
+
+        with gzip.open(cachefile,'wb') as outfd:
+            pickle.dump(frameinfo, outfd, pickle.HIGHEST_PROTOCOL)
+
+        print('%sZ: wrote frameinfo to cache file: %s' %
+              (datetime.utcnow().isoformat(), cachefile))
+
+        return outdict
+
+
+
 def generate_photref_candidates_from_xtrns(fitsfiles,
                                            makeactive=True,
                                            minframes=50,
@@ -648,7 +744,9 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
                                            maxzenithdist=30.0,
                                            maxbackgroundstdev=10.0,
                                            maxbackgroundmedian=1000.0,
-                                           forcecollectinfo=False):
+                                           forcecollectinfo=False,
+                                           nworkers=8,
+                                           maxworkertasks=1000):
     '''This uses ism.select_photref_frames run on fitsfiles to get photref
     candidates.
 
@@ -659,12 +757,15 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
     '''
 
     # first, get all the info from these fits files.
-
-    # check if we have it in the fitsinfo cache, if so, use it. if not, redo the
-    # info collection, and then write it back to the cache.
+    frameinfo = fitslist_frameinfo(fitsfiles,
+                                   forcecollectinfo=False,
+                                   nworkers=nworkers,
+                                   maxworkertasks=maxworkertasks)
 
     # then, apply our conditions to these fits files to generate a list of
     # photref candidates
+
+
 
 
 
