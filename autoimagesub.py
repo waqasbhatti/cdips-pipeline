@@ -764,8 +764,99 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
 
     # then, apply our conditions to these fits files to generate a list of
     # photref candidates
+    # filter on hour angle
+    haind = np.fabs(frameinfo['hourangle']) < maxhourangle
 
+    # get dark nights
+    moonind = ((np.fabs(frameinfo['moonphase']) < maxmoonphase) |
+               (frameinfo['moonelev'] < maxmoonelev))
 
+    # get low zenith distance nights
+    zenithind = frameinfo['zenithdist'] < maxzenithdist
+
+    # get nights with background stdev < max_bgv_stdev (to possibly remove
+    # cloudy nights)
+    backgroundstdevind = frameinfo['stdsrcbkg'] < maxbackgroundstdev
+
+    # get nights with background median < maxbackgroundmedian (to possibly
+    # remove cloudy nights)
+    backgroundmedind = frameinfo['medsrcbkg'] < maxbackgroundmedian
+
+    # this is the final operating set of frames that will be sorted for the
+    # following tests
+    selectind = haind & moonind & zenithind & backgroundstdevind
+
+    selected_frames = frameinfo['frames'][selectind]
+    selected_ngoodobj = frameinfo['ngoodobjs'][selectind]
+
+    selected_medmagerr = frameinfo['medmagerr'][selectind]
+    selected_magerrmad = frameinfo['magerrmad'][selectind]
+
+    selected_medsrcbkg = frameinfo['medsrcbkg'][selectind]
+    selected_stdsrcbkg = frameinfo['stdsrcbkg'][selectind]
+
+    selected_medsvalue = frameinfo['medsvalue'][selectind]
+    selected_meddvalue = frameinfo['meddvalue'][selectind]
+
+    print('%sZ: selected %s frames with acceptable '
+          'HA, Z, moon phase, and elevation for further filtering...' %
+          (datetime.utcnow().isoformat(), len(selected_frames)))
+
+    # we select in the following order
+    # 1. D closest to 0
+    # 2. largest S
+
+    # then we get filter out any images that have background >
+    # maxbackgroundmedian and backgroundstdev > maxbackgroundstdev
+
+    # first sort selector
+    stage1_sort_ind = (np.argsort(selected_medsvalue))[::-1]
+
+    stage1_frames = selected_frames[stage1_sort_ind[:2*minframes]]
+    stage1_median_bgv = selected_medsrcbkg[stage1_sort_ind[:2*minframes]]
+    stage1_stdev_bgv = selected_stdsrcbkg[stage1_sort_ind[:2*minframes]]
+    stage1_svalue = selected_medsvalue[stage1_sort_ind[:2*minframes]]
+    stage1_dvalue = selected_meddvalue[stage1_sort_ind[:2*minframes]]
+
+    # next, sort by roundest stars
+    stage2_sort_ind = (np.argsort(np.fabs(stage1_dvalue)))
+
+    stage2_frames = stage1_frames[stage2_sort_ind]
+    stage2_median_bgv = stage1_median_bgv[stage2_sort_ind]
+    stage2_stdev_bgv = stage1_stdev_bgv[stage2_sort_ind]
+    stage2_svalue = stage1_svalue[stage2_sort_ind]
+    stage2_dvalue = stage1_dvalue[stage2_sort_ind]
+
+    final_bgvmed_ind = stage2_median_bgv < maxbackgroundmedian
+    final_bgvstd_ind = stage2_stdev_bgv < maxbackgroundstdev
+    final_selector_ind = final_bgvmed_ind & final_bgvstd_ind
+
+    final_frames = stage2_frames[final_selector_ind][:minframes]
+    final_median_bgv = stage2_median_bgv[final_selector_ind][:minframes]
+    final_stdev_bgv = stage2_stdev_bgv[final_selector_ind][:minframes]
+    final_svalues = stage2_svalue[final_selector_ind][:minframes]
+    final_dvalues = stage2_dvalue[final_selector_ind][:minframes]
+
+    print('%sZ: selected %s final frames as photref' %
+          (datetime.utcnow().isoformat(), len(final_frames)))
+
+    # the master photref is the frame we'll convolve all of the rest of the
+    # photrefs to. it's the softest of these frames
+    candidate_master_photref = final_frames[np.nanargmin(final_svalues)]
+
+    # make JPEGs of the selected photref frames
+    for final_frame in final_frames:
+
+        framejpg = fits_to_full_jpeg(
+            final_frame,
+            out_fname=os.path.join(
+                os.path.dirname(final_frame),
+                ('JPEG-PHOTREF-%s.jpg' %
+                 os.path.basename(final_frame).strip('.fits.fz'))
+                )
+            )
+
+    return candidate_master_photref, final_frames.tolist(), frameinfo
 
 
 
