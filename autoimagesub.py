@@ -780,7 +780,7 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
         os.path.exists(cacheinfofile)):
 
         with gzip.open(cacheinfofile) as infd:
-            photrefinfo = pickle.load(cacheinfofile)
+            photrefinfo = pickle.load(infd)
 
         print('%sZ: candidate photref JPEGs in: %s, '
               'cached photrefinfo from: %s' %
