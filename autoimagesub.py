@@ -974,7 +974,43 @@ def amend_candidate_photrefs(photrefinfo):
 
     print('reviewing photrefinfo for %s\n' % cachedir)
 
-    # first, update the masterphotref
+    # now deal with the photrefs:
+    print('-- CANDIDATE PHOTREFS --\n')
+
+    initialphotrefs = photrefinfo['photrefs'][::]
+    initialphotrefjpegs = photrefinfo['photrefjpegs'][::]
+
+    for frame, jpeg in zip(initialphotrefs, initialphotrefjpegs):
+
+        breakloop = False
+
+        photref_prompt = (
+            'photref = %s, jpeg = %s\n'
+            '[ENTER] to keep this, or [x] to remove: ' %
+            (frame, os.path.basename(jpeg))
+        )
+
+        while not breakloop:
+
+            photref_check = raw_input(photref_prompt)
+
+            if photref_check and photref_check == 'x':
+
+                photrefinfo['photrefs'].remove(frame)
+                photrefinfo['photrefjpegs'].remove(jpeg)
+                os.remove(jpeg)
+
+                print('REMOVED photref %s' % frame)
+                breakloop = True
+
+            elif not photref_check:
+                breakloop = True
+
+    print('\nfinal photrefs set to:')
+    for frame in photrefinfo['photrefs']:
+        print(frame)
+
+    # next, update the masterphotref
     masterphotref_prompt = (
         'current masterphotref = %s\n'
         '[ENTER] to keep this, or new masterphot: ' %
@@ -982,6 +1018,8 @@ def amend_candidate_photrefs(photrefinfo):
     )
 
     breakloop = False
+
+    print('-- MASTERPHOTREF --\n')
 
     # loop until masterphotref is satisfied
     while not breakloop:
@@ -1009,42 +1047,7 @@ def amend_candidate_photrefs(photrefinfo):
         elif not masterphotref_amendment:
             breakloop = True
 
-
-    print('masterphotref set to %s\n' % photrefinfo['masterphotref'])
-
-    # now deal with the photrefs:
-
-    initialphotrefs = photrefinfo['photrefs'][::]
-    initialphotrefjpegs = photrefinfo['photrefjpegs'][::]
-
-    for frame, jpeg in zip(initialphotrefs, initialphotrefjpegs):
-
-        breakloop = False
-
-        photref_prompt = (
-            'photref = %s, jpeg = %s\n'
-            '[ENTER] to keep this, or [x] to remove: ' %
-            (frame, jpeg)
-        )
-
-        while not breakloop:
-
-            photref_check = raw_input(photref_prompt)
-
-            if photref_check and photref_check == 'x':
-
-                photrefinfo['photrefs'].remove(frame)
-                photrefinfo['photrefjpegs'].remove(jpeg)
-                os.remove(jpeg)
-                print('removed photref %s' % frame)
-                breakloop = True
-
-            elif not photref_check:
-                breakloop = True
-
-    print('final photrefs set to:')
-    for frame in photrefinfo['photrefs']:
-        print(frame)
+    print('\nmasterphotref set to %s\n' % photrefinfo['masterphotref'])
 
     # update the cache info file
     print('\nupdating photref cached selection-info pickle...')
