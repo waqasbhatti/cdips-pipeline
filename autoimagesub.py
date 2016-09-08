@@ -108,7 +108,7 @@ def find_original_fits_fieldprojectidccd(dirlist,
           (datetime.utcnow().isoformat(), fglob))
     fitslist = []
     for fdir in dirlist:
-        fitslist.append(glob.glob(os.path.join(fdir, fglob)))
+        fitslist.extend(glob.glob(os.path.join(fdir, fglob)))
     fitslist = sorted(fitslist)
 
     raise Exception('eek')
