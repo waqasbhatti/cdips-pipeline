@@ -911,7 +911,7 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
                 out_fname=os.path.join(
                     cachedir,
                     ('JPEG-PHOTREF-%s.jpg' %
-                     os.path.basename(final_frame).strip('.fits.fz'))
+                     os.path.basename(final_frame).rstrip('.fits.fz'))
                     )
                 )
             final_jpegs.append(framejpg)
@@ -1062,25 +1062,28 @@ def amend_candidate_photrefs(photrefinfo):
     return photrefinfo
 
 
-def generate_combined_photref(photrefinfo,
-                              makeactive=True,
-                              field=None,
-                              ccd=None,
-                              projectid=None,
-                              refdir=REFBASEDIR,
-                              refinfo=REFINFO,
-                              combinetype='median',
-                              kernelspec='b/4;i/4;d=4/4',
-                              ccdgain=None,
-                              zeropoint=None,
-                              ccdexptime=None,
-                              extractsources=True,
-                              apertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
-                              framewidth=None,
-                              searchradius=8.0,
-                              nworkers=8,
-                              maxworkertasks=1000):
 
+def generate_combined_photref(
+        photrefinfo,
+        photreftype,
+        makeactive=True,
+        field=None,
+        ccd=None,
+        projectid=None,
+        refdir=REFBASEDIR,
+        refinfo=REFINFO,
+        combinetype='median',
+        kernelspec='b/4;i/4;d=4/4',
+        ccdgain=None,
+        zeropoint=None,
+        ccdexptime=None,
+        extractsources=True,
+        apertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
+        framewidth=None,
+        searchradius=8.0,
+        nworkers=8,
+        maxworkertasks=1000
+):
     '''This generates a combined photref from photref target and candidates and
     updates the TM-refinfo.sqlite database.
 
@@ -1090,13 +1093,24 @@ def generate_combined_photref(photrefinfo,
     photrefinfo['photrefjpegs'] arrays as needed using the
     amend_candidate_photrefs function above.
 
+    photreftype is the type of the combined photref produced. it must be one of
+    the following strings:
+
+    'oneframe' -> single HATPI frame
+    'onehour' -> up to 120 HATPI frames
+    'onenight' -> up to 960 HATPI frames
+
     '''
 
 
 
 
 
-def get_combined_photref(projectid, field, ccd, refinfo=REFINFO):
+def get_combined_photref(projectid,
+                         field,
+                         ccd,
+                         photreftype,
+                         refinfo=REFINFO):
     '''
     This gets the combined photref for the given combo of projid, field, ccd.
 
