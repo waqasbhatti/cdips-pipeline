@@ -60,10 +60,42 @@ REFINFO = os.path.join(REFBASEDIR,'TM-refinfo.sqlite')
 ## UTILITIES ##
 ###############
 
+def fits_fieldprojectidccd_worker(frame):
+    '''
+    This is a worker for the two functions below.
+
+    '''
+
+    try:
+
+        # first, figure out the input frame's projid, field, and ccd
+        frameelems = get_header_keyword_list(frame,
+                                             ['object',
+                                              'projid'])
+        felems = FRAMEREGEX.findall(
+            os.path.basename(frame)
+        )
+        field, ccd, projectid = (frameelems['object'],
+                                 felems[0][2],
+                                 frameelems['projid'])
+
+        return frame, (field, projectid, ccd)
+
+    except Exception as e:
+
+        print('ERR! %sZ: could get info from frame %s, error was: %s' %
+              (datetime.utcnow().isoformat(), frame, e))
+        return frame, None
+
+
+
 def find_original_fits_fieldprojectidccd(dirlist,
                                          field,
                                          projectid,
-                                         ccd):
+                                         ccd,
+                                         fglob='?-???????_?.fits',
+                                         nworkers=8,
+                                         maxworkertasks=1000):
     '''This searches in dirlist for all original FITS files matching the specified
     projectid, field, and ccd combination.
 
@@ -71,18 +103,65 @@ def find_original_fits_fieldprojectidccd(dirlist,
 
     '''
 
+    # first, go through the directories and get all the original FITS files
+    print('%sZ: finding frames matching %s...' %
+          (datetime.utcnow().isoformat(), fglob))
+    fitslist = []
+    for fdir in dirlist:
+        fitslist.append(glob.glob(os.path.join(fdir, fglob)))
+    fitslist = sorted(fitslist)
+
+    # next, run through all these files and get the info needed
+    print('%sZ: %s frames found, getting info...' %
+          (datetime.utcnow().isoformat(), len(fitslist)))
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+    tasks = fitslist
+
+    # fire up the pool of workers
+    results = pool.map(fits_fieldprojectidccd_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    # now filter the results based on the requested field, projectid, and ccd
+    matchingframes = []
+
+    for elem in results:
+
+        if (elem[1] and
+            elem[1][0] == field and
+            elem[1][1] == projectid and
+            elem[1][2] == ccd):
+            matchingframes.append(elem[0])
+
+    return matchingframes
+
 
 
 def find_arefshifted_fits_fieldprojectidccd(dirlist,
                                             field,
                                             projectid,
-                                            ccd):
+                                            ccd,
+                                            fglob='?-???????_?-xtrns.fits',
+                                            nworkers=8,
+                                            maxworkertasks=1000):
     '''This searches in dirlist for all astromref-shifted FITS files matching the
     specified projectid, field, and ccd combination.
 
     Returns a flat list of FITS.
 
     '''
+
+    return find_original_fits_fieldprojectidccd(dirlist,
+                                                field,
+                                                projectid,
+                                                ccd,
+                                                fglob=fglob,
+                                                nworkers=nworkers,
+                                                maxworkertasks=maxworkertasks)
 
 
 ##################################
