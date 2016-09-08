@@ -72,6 +72,10 @@ REFINFO = os.path.join(REFBASEDIR,'TM-refinfo.sqlite')
 # define where the frameinfo cache is
 FRAMEINFOCACHEDIR = '/P/HP0/BASE/frameinfo-cache'
 
+# these define the field catalog location and properties
+FIELDCAT_DIR = '/P/HP0/BASE/field-catalogs'
+
+
 ###############
 ## UTILITIES ##
 ###############
@@ -1072,6 +1076,7 @@ def generate_combined_photref(
         projectid=None,
         refdir=REFBASEDIR,
         refinfo=REFINFO,
+        fovcatdir=FIELDCAT_DIR,
         combinetype='median',
         kernelspec='b/4;i/4;d=4/4',
         ccdgain=None,
@@ -1108,7 +1113,9 @@ def generate_combined_photref(
                        'regfile' -> convolution registration file path
                        'combinetype'- > combine type
                        'reftype' -> combined photref type
+                       'phottype' -> either 're-extracted' or 'cat-projected'
                        'photaps' -> photometry apertures for combined photref
+                       'fovcat' -> fovcat file used for photometry
                        'kernelspec' -> convolution kernel specs}
 
     and updates the cached selection-info pickle file as well.
@@ -1120,6 +1127,28 @@ def generate_combined_photref(
 
     '''
 
+    # get the field, ccd, projectid first (from the convolvetarget =
+    # masterphotref)
+
+    # make the convolution registration file
+
+    # convolve all candidate photrefs to the masterphotref
+
+    # combine all the photrefs into a single combinedphotref, using combinetype
+
+    # find the fovcat file for the field, ccd, projectid, photreftype combo
+    # photrettype = 'oneframe' -> default field--riz.catalog
+    # photrettype = 'onehour' -> default field-riz-18.0.catalog
+    # photrettype = 'onenight' -> default field-riz-20.0.catalog
+
+    # run photometry on the combinedphotref and generate a cmrawphot file
+
+    # update the TM-refinfo.sqlite database
+
+    # update the cache photref selection-info.pkl.gz file
+
+    # return the updated photrefinfo dict
+
 
 
 def get_combined_photref(projectid,
@@ -1127,8 +1156,9 @@ def get_combined_photref(projectid,
                          ccd,
                          photreftype,
                          refinfo=REFINFO):
-    '''
-    This gets the combined photref for the given combo of projid, field, ccd.
+    '''This gets the combined photref for the given combo of projid, field, ccd.
+
+    Used for the convsubphot functions below.
 
     '''
 
@@ -1139,11 +1169,16 @@ def get_combined_photref(projectid,
 ##################################
 
 def find_new_sources(subtractedframe,
+                     fovcat,
+                     cmrawphot,
                      fluxthreshold=1000,
                      catmatcharcsec=3.0,
                      refinfo=REFINFO):
-    '''
-    This finds new sources in the subtracted frame.
+    '''This finds new sources in the subtracted frame.
+
+    Used in the convsubphot functions below.
+
+    Adds new sources to the fovcat and cmrawphot.
 
     '''
 
