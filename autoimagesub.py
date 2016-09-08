@@ -652,7 +652,7 @@ def fitslist_frameinfo(fitslist,
     # check if we have it in the frameinfo cache, if so, use it. if not, redo
     # the info collection, and then write it back to the cache.
     cachefile = os.path.join(FRAMEINFOCACHEDIR,
-                             ('frameinfo-%s.pkl.gz' %
+                             ('TM-frameinfo-%s.pkl.gz' %
                               md5(repr(fitslist)).hexdigest()))
 
     if os.path.exists(cachefile) and not forcecollectinfo:
