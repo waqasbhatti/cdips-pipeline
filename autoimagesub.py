@@ -528,7 +528,7 @@ def get_frame_info_for_photref_candidates(frame):
 
 
         # 1. get the data from FITS header
-        headerdata = imageutils.get_header_keyword_list(
+        headerdata = get_header_keyword_list(
             frame,
             ['Z','MOONDIST','MOONELEV','MOONPH','HA']
         )
