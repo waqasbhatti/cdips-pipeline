@@ -770,8 +770,8 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
                                                         maxzenithdist,
                                                         maxbackgroundstdev,
                                                         maxbackgroundmedian)
-    cachekey = sha256(cachekey).hexdigest()
-    cachedir = os.path.join(FRAMEINFOCACHEDIR,'photref-%s' % cachekey)
+    cachekey = md5(cachekey).hexdigest()
+    cachedir = os.path.join(FRAMEINFOCACHEDIR,'TM-photref-%s' % cachekey)
     cacheinfofile = os.path.join(cachedir, 'selection-info.pkl.gz')
 
     # get the data from the cache if it exists and we're allowed to use it
