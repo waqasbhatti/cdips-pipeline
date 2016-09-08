@@ -23,6 +23,7 @@ CREATE TABLE photrefs (
        field text,
        projectid integer,
        ccd integer,
+       photreftype text,
        isactive integer,
        unixtime double precision,
        framepath text,
@@ -42,6 +43,6 @@ CREATE TABLE photrefs (
        target_stdsrcbgv real,
        target_medsval real,
        target_meddval real,
-       comment text,
-       primary key(field, projectid, ccd, isactive)
+       comment text, -- photref selection-info pickle path
+       primary key(field, projectid, ccd, photreftype, isactive)
 );

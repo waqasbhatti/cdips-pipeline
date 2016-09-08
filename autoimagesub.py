@@ -1100,9 +1100,25 @@ def generate_combined_photref(
     'onehour' -> up to 120 HATPI frames
     'onenight' -> up to 960 HATPI frames
 
+    updates photrefinfo with the following dict and keys:
+
+    'combinedphotref':{'frame': -> combined photref frame path
+                       'jpeg' -> combined photref jpeg path
+                       'cmrawphot' -> cmrawphot file path
+                       'regfile' -> convolution registration file path
+                       'combinetype'- > combine type
+                       'reftype' -> combined photref type
+                       'photaps' -> photometry apertures for combined photref
+                       'kernelspec' -> convolution kernel specs}
+
+    and updates the cached selection-info pickle file as well.
+
+    the output combined photref frame, jpeg, cmrawphot (and byproducts) go to
+    the REFBASEDIR, using the following prototype for the filename:
+
+    {REFBASEDIR}/{projectid}-{field}-ccd{ccd}-combinedphotref-{photreftype}.fits
+
     '''
-
-
 
 
 
