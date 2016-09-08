@@ -79,7 +79,7 @@ def fits_fieldprojectidccd_worker(frame):
                                  felems[0][2],
                                  frameelems['projid'])
 
-        return frame, (field, projectid, ccd)
+        return frame, (field, projectid, int(ccd))
 
     except Exception as e:
 
