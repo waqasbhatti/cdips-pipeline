@@ -1062,7 +1062,6 @@ def amend_candidate_photrefs(photrefinfo):
     return photrefinfo
 
 
-
 def generate_combined_photref(photrefinfo,
                               makeactive=True,
                               field=None,
@@ -1079,7 +1078,7 @@ def generate_combined_photref(photrefinfo,
                               apertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
                               framewidth=None,
                               searchradius=8.0,
-                              nworkers=16,
+                              nworkers=8,
                               maxworkertasks=1000):
 
     '''This generates a combined photref from photref target and candidates and
@@ -1092,6 +1091,8 @@ def generate_combined_photref(photrefinfo,
     amend_candidate_photrefs function above.
 
     '''
+
+
 
 
 
