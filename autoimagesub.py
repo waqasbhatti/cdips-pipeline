@@ -726,7 +726,7 @@ def fitslist_frameinfo(fitslist,
                    'meddval':meddval}
 
         with gzip.open(cachefile,'wb') as outfd:
-            pickle.dump(frameinfo, outfd, pickle.HIGHEST_PROTOCOL)
+            pickle.dump(outdict, outfd, pickle.HIGHEST_PROTOCOL)
 
         print('%sZ: wrote frameinfo to cache file: %s' %
               (datetime.utcnow().isoformat(), cachefile))
