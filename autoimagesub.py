@@ -736,7 +736,6 @@ def fitslist_frameinfo(fitslist,
 
 
 def generate_photref_candidates_from_xtrns(fitsfiles,
-                                           makeactive=True,
                                            minframes=50,
                                            maxhourangle=3.0,
                                            maxmoonphase=25.0,
@@ -776,11 +775,11 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
 
     # get nights with background stdev < max_bgv_stdev (to possibly remove
     # cloudy nights)
-    backgroundstdevind = frameinfo['stdsrcbkg'] < maxbackgroundstdev
+    backgroundstdevind = frameinfo['stdsrcbgv'] < maxbackgroundstdev
 
     # get nights with background median < maxbackgroundmedian (to possibly
     # remove cloudy nights)
-    backgroundmedind = frameinfo['medsrcbkg'] < maxbackgroundmedian
+    backgroundmedind = frameinfo['medsrcbgv'] < maxbackgroundmedian
 
     # this is the final operating set of frames that will be sorted for the
     # following tests
@@ -792,8 +791,8 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
     selected_medmagerr = frameinfo['medmagerr'][selectind]
     selected_magerrmad = frameinfo['magerrmad'][selectind]
 
-    selected_medsrcbkg = frameinfo['medsrcbkg'][selectind]
-    selected_stdsrcbkg = frameinfo['stdsrcbkg'][selectind]
+    selected_medsrcbgv = frameinfo['medsrcbgv'][selectind]
+    selected_stdsrcbgv = frameinfo['stdsrcbgv'][selectind]
 
     selected_medsvalue = frameinfo['medsvalue'][selectind]
     selected_meddvalue = frameinfo['meddvalue'][selectind]
@@ -813,8 +812,8 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
     stage1_sort_ind = (np.argsort(selected_medsvalue))[::-1]
 
     stage1_frames = selected_frames[stage1_sort_ind[:2*minframes]]
-    stage1_median_bgv = selected_medsrcbkg[stage1_sort_ind[:2*minframes]]
-    stage1_stdev_bgv = selected_stdsrcbkg[stage1_sort_ind[:2*minframes]]
+    stage1_median_bgv = selected_medsrcbgv[stage1_sort_ind[:2*minframes]]
+    stage1_stdev_bgv = selected_stdsrcbgv[stage1_sort_ind[:2*minframes]]
     stage1_svalue = selected_medsvalue[stage1_sort_ind[:2*minframes]]
     stage1_dvalue = selected_meddvalue[stage1_sort_ind[:2*minframes]]
 
