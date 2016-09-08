@@ -137,7 +137,7 @@ def find_original_fits_fieldprojectidccd(dirlist,
             elem[1][2] == ccd):
             matchingframes.append(elem[0])
 
-    return matchingframes
+    return matchingframes, results
 
 
 
