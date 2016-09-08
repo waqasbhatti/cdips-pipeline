@@ -32,6 +32,7 @@ import random
 import cPickle as pickle
 import sqlite3
 import time
+from hashlib import md5
 
 import numpy as np
 
@@ -66,6 +67,9 @@ FIELD_CCDS = [5,6,7,8]
 # defines where the reference frames go
 REFBASEDIR = '/P/HP0/BASE/reference-frames'
 REFINFO = os.path.join(REFBASEDIR,'TM-refinfo.sqlite')
+
+# define where the frameinfo cache is
+FRAMEINFOCACHEDIR = '/P/HP0/BASE/frameinfo-cache'
 
 ###############
 ## UTILITIES ##
@@ -654,6 +658,13 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
 
     '''
 
+    # first, get all the info from these fits files.
+
+    # check if we have it in the fitsinfo cache, if so, use it. if not, redo the
+    # info collection, and then write it back to the cache.
+
+    # then, apply our conditions to these fits files to generate a list of
+    # photref candidates
 
 
 
