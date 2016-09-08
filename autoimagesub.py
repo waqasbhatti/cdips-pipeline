@@ -760,6 +760,7 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
                                    forcecollectinfo=False,
                                    nworkers=nworkers,
                                    maxworkertasks=maxworkertasks)
+    cachekey = md5(repr(fitsfiles)).hexdigest()
 
     # then, apply our conditions to these fits files to generate a list of
     # photref candidates
@@ -819,7 +820,8 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
     selected_meddvalue = frameinfo['meddval'][selectind]
 
     print('\n%sZ: selected %s frames with acceptable '
-          'HA, Z, moon phase, background, and elevation for further filtering...\n' %
+          'HA, Z, moon phase, background, and elevation '
+          'for further filtering...\n' %
           (datetime.utcnow().isoformat(), len(selected_frames)))
 
     # we select in the following order
@@ -865,6 +867,7 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
     try:
 
         candidate_master_photref = final_frames[np.nanargmin(final_svalues)]
+        final_jpegs = []
 
         # make JPEGs of the selected photref frames
         for final_frame in final_frames:
@@ -877,8 +880,14 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
                      os.path.basename(final_frame).strip('.fits.fz'))
                     )
                 )
+            final_jpegs.append(framejpg)
 
-        return candidate_master_photref, final_frames.tolist(), frameinfo
+        return {'framelist':fitsfiles,
+                'frameinfo':frameinfo,
+                'cachekey':cachekey,
+                'masterphotref':candidate_master_photref,
+                'photrefs':final_frames,
+                'photrefjpegs':final_jpegs}
 
     except Exception as e:
 
@@ -886,8 +895,12 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
               'may be too strict for this frame list' %
               (datetime.utcnow().isoformat()))
 
-        return None, None, frameinfo
-
+        return {'framelist':fitsfiles,
+                'frameinfo':frameinfo,
+                'cachekey':cachekey,
+                'masterphotref':None,
+                'photrefs':None,
+                'photrefjpegs':None}
 
 
 
