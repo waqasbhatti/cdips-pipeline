@@ -1116,7 +1116,7 @@ def generate_combined_photref(
     the output combined photref frame, jpeg, cmrawphot (and byproducts) go to
     the REFBASEDIR, using the following prototype for the filename:
 
-    {REFBASEDIR}/{projectid}-{field}-ccd{ccd}-combinedphotref-{photreftype}.fits
+    {REFBASEDIR}/proj{projid}-{field}-ccd{ccd}-combinedphotref-{photreftype}.XXX
 
     '''
 
