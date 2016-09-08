@@ -111,6 +111,8 @@ def find_original_fits_fieldprojectidccd(dirlist,
         fitslist.append(glob.glob(os.path.join(fdir, fglob)))
     fitslist = sorted(fitslist)
 
+    raise Exception('eek')
+
     # next, run through all these files and get the info needed
     print('%sZ: %s frames found, getting info...' %
           (datetime.utcnow().isoformat(), len(fitslist)))
