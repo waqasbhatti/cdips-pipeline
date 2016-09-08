@@ -786,7 +786,7 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
     selectind = haind & moonind & zenithind & backgroundstdevind
 
     selected_frames = frameinfo['frames'][selectind]
-    selected_ngoodobj = frameinfo['ngoodobjs'][selectind]
+    selected_ngoodobj = frameinfo['ngoodobjects'][selectind]
 
     selected_medmagerr = frameinfo['medmagerr'][selectind]
     selected_magerrmad = frameinfo['magerrmad'][selectind]
@@ -794,8 +794,8 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
     selected_medsrcbgv = frameinfo['medsrcbgv'][selectind]
     selected_stdsrcbgv = frameinfo['stdsrcbgv'][selectind]
 
-    selected_medsvalue = frameinfo['medsvalue'][selectind]
-    selected_meddvalue = frameinfo['meddvalue'][selectind]
+    selected_medsvalue = frameinfo['medsval'][selectind]
+    selected_meddvalue = frameinfo['meddval'][selectind]
 
     print('%sZ: selected %s frames with acceptable '
           'HA, Z, moon phase, and elevation for further filtering...' %
