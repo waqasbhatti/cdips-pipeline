@@ -960,8 +960,107 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
 
 
 
-def generate_combined_photref(photreftarget,
-                              photrefcandidates,
+def amend_candidate_photrefs(photrefinfo):
+    '''This is an interactive way to update masterphotref, photrefs, and
+    photrefjpegs after reviewing them.
+
+    This will automatically update the photrefinfo cache.
+
+    '''
+
+    cachekey = photrefinfo['cachekey']
+    cachedir = os.path.join(FRAMEINFOCACHEDIR,'TM-photref-%s' % cachekey)
+    cacheinfofile = os.path.join(cachedir, 'selection-info.pkl.gz')
+
+    print('reviewing photrefinfo for %s\n' % cachedir)
+
+    # first, update the masterphotref
+    masterphotref_prompt = (
+        'current masterphotref = %s\n'
+        '[ENTER] to keep this, or new masterphot: ' %
+        photrefinfo['masterphotref']
+    )
+
+    breakloop = False
+
+    # loop until masterphotref is satisfied
+    while not breakloop:
+
+        masterphotref_amendment = raw_input(masterphotref_prompt)
+
+        if masterphotref_amendment and os.path.exists(masterphotref_amendment):
+
+            photrefinfo['masterphotref'] = masterphotref_amendment[::]
+
+            masterphotref_prompt = (
+                'new masterphotref = %s\n'
+                '[ENTER] to keep this, or new masterphot: ' %
+                photrefinfo['masterphotref']
+            )
+
+        elif masterphotref_amendment and not os.path.exists(masterphotref_amendment):
+
+            masterphotref_prompt = (
+                'masterphotref = %s does not exist\n'
+                'new masterphot: ' %
+                masterphotref_amendment
+            )
+
+        elif not masterphotref_amendment:
+            breakloop = True
+
+
+    print('masterphotref set to %s\n' % photrefinfo['masterphotref'])
+
+    # now deal with the photrefs:
+
+    initialphotrefs = photrefinfo['photrefs'][::]
+    initialphotrefjpegs = photrefinfo['photrefjpegs'][::]
+
+    for frame, jpeg in zip(initialphotrefs, initialphotrefjpegs):
+
+        breakloop = False
+
+        photref_prompt = (
+            'photref = %s, jpeg = %s\n'
+            '[ENTER] to keep this, or [x] to remove: ' %
+            (frame, jpeg)
+        )
+
+        while not breakloop:
+
+            photref_check = raw_input(photref_prompt)
+
+            if photref_check and photref_check == 'x':
+
+                photrefinfo['photrefs'].remove(frame)
+                photrefinfo['photrefjpegs'].remove(jpeg)
+                os.remove(jpeg)
+                print('removed photref %s' % frame)
+                breakloop = True
+
+            elif not photref_check:
+                breakloop = True
+
+    print('final photrefs set to:')
+    for frame in photrefinfo['photrefs']:
+        print(frame)
+
+    # update the cache info file
+    print('\nupdating photref cached selection-info pickle...')
+
+    # dump the photrefinfo to a pickle
+    with gzip.open(cacheinfofile,'wb') as outfd:
+        pickle.dump(photrefinfo, outfd, pickle.HIGHEST_PROTOCOL)
+
+    print('%sZ: candidate photref JPEGs in: %s, photrefinfo dumped to: %s' %
+          (datetime.utcnow().isoformat(), cachedir, cacheinfofile))
+
+    return photrefinfo
+
+
+
+def generate_combined_photref(photrefinfo,
                               makeactive=True,
                               field=None,
                               ccd=None,
@@ -979,8 +1078,15 @@ def generate_combined_photref(photreftarget,
                               searchradius=8.0,
                               nworkers=16,
                               maxworkertasks=1000):
+
     '''This generates a combined photref from photref target and candidates and
     updates the TM-refinfo.sqlite database.
+
+    Use this after reviewing the results from
+    generate_photref_candidates_from_xtrns function above. Amend the
+    photrefinfo['masterphotref'], photrefinfo['photrefs'], and
+    photrefinfo['photrefjpegs'] arrays as needed using the
+    amend_candidate_photrefs function above.
 
     '''
 
