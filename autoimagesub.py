@@ -33,6 +33,8 @@ import cPickle as pickle
 import sqlite3
 import time
 
+import numpy as np
+
 
 import aperturephot as ap
 import imagesubphot as ism
