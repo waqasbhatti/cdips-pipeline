@@ -977,8 +977,8 @@ def amend_candidate_photrefs(photrefinfo):
     # now deal with the photrefs:
     print('-- CANDIDATE PHOTREFS --\n')
 
-    initialphotrefs = photrefinfo['photrefs'][::]
-    initialphotrefjpegs = photrefinfo['photrefjpegs'][::]
+    initialphotrefs = sorted(photrefinfo['photrefs'][::])
+    initialphotrefjpegs = sorted(photrefinfo['photrefjpegs'][::])
 
     for frame, jpeg in zip(initialphotrefs, initialphotrefjpegs):
 
@@ -1019,7 +1019,7 @@ def amend_candidate_photrefs(photrefinfo):
 
     breakloop = False
 
-    print('-- MASTERPHOTREF --\n')
+    print('\n-- MASTERPHOTREF --\n')
 
     # loop until masterphotref is satisfied
     while not breakloop:
@@ -1047,7 +1047,7 @@ def amend_candidate_photrefs(photrefinfo):
         elif not masterphotref_amendment:
             breakloop = True
 
-    print('\nmasterphotref set to %s\n' % photrefinfo['masterphotref'])
+    print('\nmasterphotref set to %s' % photrefinfo['masterphotref'])
 
     # update the cache info file
     print('\nupdating photref cached selection-info pickle...')
