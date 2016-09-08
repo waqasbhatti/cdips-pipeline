@@ -99,7 +99,7 @@ def find_original_fits_fieldprojectidccd(dirlist,
     '''This searches in dirlist for all original FITS files matching the specified
     projectid, field, and ccd combination.
 
-    Returns a flat list of FITS.
+    Returns a flat list of matching FITS, and list of all fits + their info.
 
     '''
 
@@ -137,6 +137,11 @@ def find_original_fits_fieldprojectidccd(dirlist,
             elem[1][2] == ccd):
             matchingframes.append(elem[0])
 
+    print('%sZ: %s frames with field = %s, projectid = %s, and ccd = %s' %
+          (datetime.utcnow().isoformat(),
+           len(matchingframes),
+           field, projectid, ccd))
+
     return matchingframes, results
 
 
@@ -151,7 +156,7 @@ def find_arefshifted_fits_fieldprojectidccd(dirlist,
     '''This searches in dirlist for all astromref-shifted FITS files matching the
     specified projectid, field, and ccd combination.
 
-    Returns a flat list of FITS.
+    Returns a flat list of matching FITS, and list of all fits + their info.
 
     '''
 
