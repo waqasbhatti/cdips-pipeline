@@ -1356,9 +1356,9 @@ def generate_combined_photref(
              "?, ?, ?, "
              "?)")
     params = (
-        frameinfo['field'],
-        frameinfo['projectid'],
-        frameinfo['ccd'],
+        masterphotrefinfo['field'],
+        masterphotrefinfo['projectid'],
+        masterphotrefinfo['ccd'],
         photreftype,
         1 if makeactive else 0,
         time.time(),
@@ -1394,29 +1394,24 @@ def generate_combined_photref(
 
     try:
 
-        astromref.update(frameinfo)
         cur.execute(query, params)
         db.commit()
 
-        print('%sZ: using astromref %s for '
+        print('%sZ: will use combinedphotref %s for '
               'field %s, ccd %s, project id %s, database updated.' %
               (datetime.utcnow().isoformat(),
-               astromref['astromref'],
-               astromref['field'],
-               astromref['ccd'],
-               astromref['projectid']))
-
-        returnval = astromref
+               combinedphotref,
+               masterphotrefinfo['field'],
+               masterphotrefinfo['ccd'],
+               masterphotref['projectid']))
 
     except Exception as e:
 
         print('ERR! %sZ: could not update refinfo DB! error was: %s' %
               (datetime.utcnow().isoformat(), e))
-        returnval = None
         db.rollback()
 
     db.close()
-
 
     # return the updated photrefinfo dict
     return photrefinfo
