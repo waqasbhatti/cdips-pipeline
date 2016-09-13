@@ -1431,21 +1431,28 @@ def get_combined_photref(projectid,
 
     '''
 
-    db = sqlite3.connect(refinfo, detect_types=sqlite3.PARSE_DECLTYPES)
+    db = sqlite3.connect(refinfo)
     cur = db.cursor()
 
-    query = ('select field,projectid,ccd,photreftype,unixtime,'
-             'framepath,jpegpath,convolvetarget,convolveregpath,'
-             'cmrawphotpath,target_zenithdist,target_moondist,'
-             'target_moonelev,target_moonphase,target_hourangle,'
-             'target_ndet,target_medmagerr,target_magerrmad,'
-             'target_medsrcbgv,target_stdsrcbgv,target_medsval,'
-             'target_meddval,photrefinfo from photrefs where '
-             'projectid = ? and field = ? and ccd = ? and photreftype = ? and '
-             'isactive = 1')
-    params = (projectid, field, ccd, photreftype)
+    query = (
+        'select field,projectid,ccd,photreftype,unixtime,'
+        'framepath,jpegpath,convolvetarget,convolveregpath,'
+        'cmrawphotpath,target_zenithdist,target_moondist,'
+        'target_moonelev,target_moonphase,target_hourangle,'
+        'target_ndet,target_medmagerr,target_magerrmad,'
+        'target_medsrcbgv,target_stdsrcbgv,target_medsval,'
+        'target_meddval,photrefinfo from photrefs where '
+        '(isactive = 1) and '
+        '(projectid = ?) and '
+        '(ccd = ?) and '
+        '(field = ?) and '
+        '(photreftype = ?)'
+    )
+    params = (projectid, ccd, field, photreftype)
 
-    raise Exception('stop')
+    cur.execute(query, params)
+
+    raise Exception("FUCK THIS SHIT!")
 
     try:
 
