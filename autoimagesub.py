@@ -1077,7 +1077,7 @@ def generate_combined_photref(
         refdir=REFBASEDIR,
         refinfo=REFINFO,
         fovcatdir=FIELDCAT_DIR,
-        combinetype='median',
+        combinemethod='median',
         kernelspec='b/4;i/4;d=4/4',
         ccdgain=None,
         zeropoint=None,
@@ -1111,7 +1111,7 @@ def generate_combined_photref(
                        'jpeg' -> combined photref jpeg path
                        'cmrawphot' -> cmrawphot file path
                        'regfile' -> convolution registration file path
-                       'combinetype'- > combine type
+                       'combinemethod'- > combine type
                        'reftype' -> combined photref type
                        'phottype' -> either 're-extracted' or 'cat-projected'
                        'photaps' -> photometry apertures for combined photref
@@ -1202,7 +1202,7 @@ def generate_combined_photref(
         return
 
     # combine all the convolved photrefs into a single combinedphotref, using
-    # combinetype
+    # combinemethod
 
     # the output combinedphotref path
     combinedphotrefpath = os.path.join(
@@ -1305,7 +1305,7 @@ def generate_combined_photref(
         'jpeg':combinedphotref.replace('.fits','.jpg'),
         'cmrawphot':cphotref_photometry[1],
         'regfile':regfpath,
-        'combinetype':combinetype,
+        'combinemethod':combinemethod,
         'kernelspec':kernelspec,
         'phottype':'re-extracted' if extractsources else 'cat-projected',
         'photaps':apertures,
