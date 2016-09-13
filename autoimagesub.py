@@ -1526,6 +1526,10 @@ def find_new_sources(subtractedframe,
 
     Adds new sources to the fovcat and cmrawphot.
 
+    FIXME: this should make stamps around the new sources and save them to the
+    newsources-<hash> cache directory. Then, we can look at these stamp FITS and
+    JPEGS and train a classifier on actual source detections.
+
     '''
 
 
