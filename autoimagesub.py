@@ -1528,7 +1528,7 @@ def find_new_sources(subtractedframe,
 
 
 
-def xtrsfits_convsubphot_worker(task):
+def xtrnsfits_convsubphot_worker(task):
     '''
     This is a parallel worker for framelist_convsubphot_photref below.
 
