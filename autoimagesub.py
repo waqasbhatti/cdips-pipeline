@@ -1304,7 +1304,7 @@ def generate_combined_photref(
     combinedphotrefinfo = {
         'reftype':photreftype,
         'frame':combinedphotref,
-        'jpeg':combinedphotref.replace('.fits','.jpg'),
+        'jpeg':'JPEG-COMBINED-%s' % combinedphotref.replace('.fits','.jpg'),
         'cmrawphot':cphotref_photometry[1],
         'regfile':regfpath,
         'combinemethod':combinemethod,
@@ -1327,6 +1327,7 @@ def generate_combined_photref(
         pickle.dump(photrefinfo, outfd, pickle.HIGHEST_PROTOCOL)
 
     # update the TM-refinfo.sqlite database
+
 
     # return the updated photrefinfo dict
     return photrefinfo
