@@ -1143,7 +1143,7 @@ def generate_combined_photref(
 
         ccd = felems[0][2]
         masterphotrefinfo = {'field':frameelems['object'],
-                             'ccd':ccd,
+                             'ccd':int(ccd),
                              'projectid':frameelems['projid']}
 
     else:
@@ -1292,7 +1292,9 @@ def generate_combined_photref(
         searchradius=searchradius
     )
 
-    if not (cphotref_photometry[1] and os.path.exists(cphotref_photometry[1])):
+    if not (cphotref_photometry and
+            cphotref_photometry[1] and
+            os.path.exists(cphotref_photometry[1])):
         print('ERR! %sZ: photometry failed for combinedphotref %s '
               'can\'t continue...' %
               (datetime.utcnow().isoformat(), combinedphotref))
