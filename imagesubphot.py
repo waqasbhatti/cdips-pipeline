@@ -1920,8 +1920,8 @@ def subframe_photometry_worker(task):
                    subframe))
             return subframe, None
 
-        # get the zeropoint. if this is a HAT frame, the ccd number will get us the
-        # zeropoint in the ZEROPOINTS dictionary
+        # get the zeropoint. if this is a HAT frame, the ccd number will get us
+        # the zeropoint in the ZEROPOINTS dictionary
         frameinfo = FRAMEREGEX.findall(os.path.basename(subframe))
 
         if frameinfo:
