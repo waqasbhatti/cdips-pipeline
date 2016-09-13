@@ -1488,6 +1488,9 @@ def get_combined_photref(projectid,
                                           'target_meddval',
                                           'photrefinfo'),rows)}
 
+        # load the JSON string for photrefinfo
+        cphotref['photrefinfo'] = json.loads(cphotref['photrefinfo'])
+
         returnval = cphotref
 
     except Exception as e:
