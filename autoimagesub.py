@@ -1405,14 +1405,13 @@ def generate_combined_photref(
                combinedphotref,
                masterphotrefinfo['field'],
                masterphotrefinfo['ccd'],
-               masterphotref['projectid']))
+               masterphotrefinfo['projectid']))
 
     except Exception as e:
 
         print('ERR! %sZ: could not update refinfo DB! error was: %s' %
               (datetime.utcnow().isoformat(), e))
         db.rollback()
-        raise
 
     db.close()
 
