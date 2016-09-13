@@ -1130,24 +1130,193 @@ def generate_combined_photref(
     # get the field, ccd, projectid first (from the convolvetarget =
     # masterphotref)
 
+    masterphotref = photrefinfo['masterphotref']
+
+    frameelems = get_header_keyword_list(masterphotref,
+                                         ['object','projid'])
+
+    felems = FRAMEREGEX.findall(
+        os.path.basename(masterphotref)
+    )
+
+    if felems and felems[0]:
+
+        ccd = felems[0][2]
+        masterphotrefinfo = {'field':frameelems['object'],
+                             'ccd':ccd,
+                             'projectid':frameelems['projid']}
+
+    else:
+
+        print('ERR! %sZ: could not figure out CCD for masterphotref: %s' %
+              (datetime.utcnow().isoformat(), masterphotref))
+        return
+
     # make the convolution registration file
 
-    # convolve all candidate photrefs to the masterphotref
+    photreffname = ('proj{projid}-{field}-ccd{ccd}'
+                    '-combinedphotref-{photreftype}.{fileext}')
 
-    # combine all the photrefs into a single combinedphotref, using combinetype
+    regfpath = os.path.join(
+        refdir,
+        photreffname.format(
+            projid=masterphotrefinfo['projectid'],
+            field=masterphotrefinfo['field'],
+            ccd=masterphotrefinfo['ccd'],
+            photreftype=photreftype,
+            fileext='reg'
+        )
+    )
+
+    masterphotref_fistar = masterphotref.replace('-xtrns.fits','.fistar')
+
+    if not os.path.exists(masterphotref_fistar):
+        print('ERR! %sZ: no fistar available for masterphotref: %s' %
+              (datetime.utcnow().isoformat(), masterphotref))
+        return
+
+    # conv registration file
+    ism.genreg(masterphotref_fistar,
+               regfpath)
+
+    if not os.path.exists(regfpath):
+        print('ERR! %sZ: could not make regfile for masterphotref: %s' %
+              (datetime.utcnow().isoformat(), masterphotref))
+        return
+
+    # convolve all candidate photrefs to the masterphotref
+    convresult = ism.convolve_photref_frames(photrefinfo['photrefs'],
+                                             masterphotref,
+                                             regfpath,
+                                             kernelspec=kernelspec,
+                                             nworkers=nworkers,
+                                             maxworkertasks=maxworkertasks)
+
+    # get the convolved photref frames
+    convphotrefs = [convresult[x] for x in convresult
+                    if os.path.exists(convresult[x])]
+
+    if len(convphotrefs) == 0:
+        print('ERR! %sZ: convolution of photrefs to masterphotref: %s failed' %
+              (datetime.utcnow().isoformat(), masterphotref))
+        return
+
+    # combine all the convolved photrefs into a single combinedphotref, using
+    # combinetype
+
+    # the output combinedphotref path
+    combinedphotrefpath = os.path.join(
+        refdir,
+        photreffname.format(
+            projid=masterphotrefinfo['projectid'],
+            field=masterphotrefinfo['field'],
+            ccd=masterphotrefinfo['ccd'],
+            photreftype=photreftype,
+            fileext='fits'
+        )
+    )
+
+    combinedphotref = ism.combine_frames(convphotrefs,
+                                         combinedphotrefpath,
+                                         combinemethod=combinemethod)
+
+    if not (combinedphotref[1] and os.path.exists(combinedphotref[1])):
+        print('ERR! %sZ: combining conv photrefs '
+              'into masterphotref: %s failed' %
+              (datetime.utcnow().isoformat(), masterphotref))
+        return
+
+    # rearrange the returned combinedphotref filename
+    combinedphotref = combinedphotref[1]
 
     # find the fovcat file for the field, ccd, projectid, photreftype combo
-    # photrettype = 'oneframe' -> default field--riz.catalog
-    # photrettype = 'onehour' -> default field-riz-18.0.catalog
-    # photrettype = 'onenight' -> default field-riz-20.0.catalog
+    # photreftype = 'oneframe' -> default field-gri.catalog
+    # photreftype = 'onehour' -> default field-gri-18.0.catalog
+    # photreftype = 'onenight' -> default field-gri-20.0.catalog
+
+    fovcat_template = '{field}{bandspec}{magspec}.catalog'
+
+    if photreftype == 'oneframe':
+        photref_fovcatpath = os.path.join(
+            fovcatdir,
+            fovcat_template.format(
+                field=masterphotrefinfo['field'],
+                bandspec='-gri',
+                magspec=''
+                )
+            )
+    elif photreftype == 'onehour':
+        photref_fovcatpath = os.path.join(
+            fovcatdir,
+            fovcat_template.format(
+                field=masterphotrefinfo['field'],
+                bandspec='-gri',
+                magspec='-18.0'
+                )
+            )
+    elif photreftype == 'onenight':
+        photref_fovcatpath = os.path.join(
+            fovcatdir,
+            fovcat_template.format(
+                field=masterphotrefinfo['field'],
+                bandspec='-gri',
+                magspec='-20.0'
+                )
+            )
+    else:
+        print('ERR! %sZ: unknown photreftype: %s specified '
+              'can\'t continue...' %
+              (datetime.utcnow().isoformat(), masterphotref))
+        return
+
+    if not os.path.exists(photref_fovcatpath):
+        print('ERR! %sZ: no FOV catalog available '
+              'for field %s, photreftype %s, '
+              'can\'t do photometry on combinedphotref %s' %
+              (datetime.utcnow().isoformat(),
+               masterphotref, photreftype, combinedphotref))
+        return
+
 
     # run photometry on the combinedphotref and generate a cmrawphot file
+    cphotref_photometry = ism.photometry_on_combined_photref(
+        combinedphotref,
+        photref_fovcatpath,
+        masterphotrefinfo['ccd'],
+        ccdgain=ccdgain,
+        zeropoint=zeropoint,
+        ccdexptime=ccdexptime,
+        extractsources=extractsources,
+        apertures=apertures,
+        framewidth=framewidth,
+        searchradius=searchradius
+    )
+
+    if not (cphotref_photometry[1] and os.path.exists(cphotref_photometry[1])):
+        print('ERR! %sZ: photometry failed for combinedphotref %s '
+              'can\'t continue...' %
+              (datetime.utcnow().isoformat(), combinedphotref))
+        return
+
+    # update the cache photref selection-info.pkl.gz file
+    combinedphotrefinfo = {
+        'reftype':photreftype,
+        'frame':combinedphotref,
+        'jpeg':combinedphotref.replace('.fits','.jpg'),
+        'cmrawphot':cphotref_photometry[1],
+        'regfile':regfpath,
+        'combinetype':combinetype,
+        'kernelspec':kernelspec,
+        'phottype':'re-extracted' if extractsources else 'cat-projected',
+        'photaps':apertures
+        'fovcat':photref_fovcatpath,
+    }
+    photrefinfo['combinedphotref'] = combinedphotrefinfo
 
     # update the TM-refinfo.sqlite database
 
-    # update the cache photref selection-info.pkl.gz file
-
     # return the updated photrefinfo dict
+    return photrefinfo
 
 
 
