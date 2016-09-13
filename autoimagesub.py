@@ -1431,6 +1431,51 @@ def get_combined_photref(projectid,
 
     '''
 
+    db = sqlite3.connect(REFINFO)
+    cur = db.cursor()
+
+    query = ('select * from photrefs where '
+             'projectid = ? and field = ? and ccd = ? and photreftype = ? and '
+             'isactive = 1')
+    params = (projectid, field, ccd, photreftype)
+
+    try:
+
+        cur.execute(query, params)
+        rows = cur.fetchone()
+
+        cphotref = {x:y for (x,y) in zip(('field','projectid','ccd',
+                                          'photreftype','isactive','unixtime',
+                                          'framepath','jpegpath',
+                                          'convolvetarget','convolveregpath',
+                                          'cmrawphotpath',
+                                          'target_zenithdist',
+                                          'target_moondist',
+                                          'target_moonelev',
+                                          'target_moonphase',
+                                          'target_hourangle',
+                                          'target_ndet',
+                                          'target_medmagerr',
+                                          'target_magerrmad',
+                                          'target_medsrcbgv',
+                                          'target_stdsrcbgv',
+                                          'target_medsval',
+                                          'target_meddval',
+                                          'photrefinfo'),rows)}
+
+        returnval = cphotref
+
+    except Exception as e:
+
+        print('ERR! %sZ: could not get combinedphotref info '
+              'from DB! error was: %s' %
+              (datetime.utcnow().isoformat(), e))
+        returnval = None
+
+    db.close()
+
+    return returnval
+
 
 
 ##################################
@@ -1476,10 +1521,11 @@ def xtrsfits_convsubphot_worker(task):
             os.path.basename(frame)
         )
         field, ccd, projectid = (frameelems['object'],
-                                 felems[0][2],
+                                 int(felems[0][2]),
                                  frameelems['projid'])
 
         # then, find the associated combined photref frame
+
 
         # then, find the associated combined photref registration file
 
