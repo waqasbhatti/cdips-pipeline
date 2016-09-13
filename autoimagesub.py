@@ -1089,6 +1089,7 @@ def generate_combined_photref(
         zeropoint=None,
         ccdexptime=None,
         extractsources=True,
+        astrometrysrcthreshold=25000,
         apertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
         framewidth=None,
         searchradius=8.0,

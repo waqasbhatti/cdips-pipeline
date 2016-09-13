@@ -1581,6 +1581,7 @@ def photometry_on_combined_photref(
         outfile=None,
         framewidth=None,
         searchradius=8.0,
+        astrometrysourcethreshold=25000,
         ):
     '''
     This does source extraction, WCS, catalog projection, and then runs fiphot
@@ -1663,10 +1664,11 @@ def photometry_on_combined_photref(
           (datetime.utcnow().isoformat(), photref_frame))
     astromfistarf = os.path.abspath(photref_frame.strip('.fits.fz') +
                                       '.fistar-astrometry')
-    astromfistar = extract_frame_sources(photref_frame,
-                                         astromfistarf,
-                                         fluxthreshold=15000)
-
+    astromfistar = extract_frame_sources(
+        photref_frame,
+        astromfistarf,
+        fluxthreshold=astrometrysourcethreshold
+    )
 
     # SECOND: add WCS
     print('%sZ: running astrometry solution for %s...' %
