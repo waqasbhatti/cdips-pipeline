@@ -1296,7 +1296,8 @@ def generate_combined_photref(
         extractsources=extractsources,
         apertures=apertures,
         framewidth=framewidth,
-        searchradius=searchradius
+        searchradius=searchradius,
+        astrometrysourcethreshold=astrometrysrcthreshold,
     )
 
     if not (cphotref_photometry and
