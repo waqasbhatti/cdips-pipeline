@@ -274,7 +274,7 @@ def generate_astromref(fitsfiles,
                                       os.path.basename(astromref['astromref'])
                                   )[0]
                                )
-            areftargetjpeg = areftargetfits.replace('.fits','.jpeg')
+            areftargetjpeg = areftargetfits.replace('.fits','.jpg')
             areftargetfistar = areftargetfits.replace('.fits','.fistar')
 
             # copy the frame, jpeg, and fistar to the reference-frames dir
@@ -1266,7 +1266,7 @@ def generate_combined_photref(
     else:
         print('ERR! %sZ: unknown photreftype: %s specified '
               'can\'t continue...' %
-              (datetime.utcnow().isoformat(), masterphotref))
+              (datetime.utcnow().isoformat(), photreftype))
         return
 
     if not os.path.exists(photref_fovcatpath):
@@ -1326,7 +1326,96 @@ def generate_combined_photref(
                cacheinfofile))
         pickle.dump(photrefinfo, outfd, pickle.HIGHEST_PROTOCOL)
 
+
     # update the TM-refinfo.sqlite database
+
+    # first, get the frame info from the combinedphotref
+    _, photref_frameinfo = get_frame_info(combinedphotref)
+
+    if not photref_frameinfo:
+        print('ERR! %sZ: could not extract frame info from combinedphotref %s' %
+              (datetime.utcnow().isoformat(), combinedphotref))
+        return
+
+
+    query = ("insert into photrefs "
+             "(field, projectid, ccd, photreftype, isactive, unixtime, "
+             "framepath, jpegpath, "
+             "convolvetarget, convolveregpath, cmrawphotpath, "
+             "target_zenithdist, target_moondist, target_moonelev, "
+             "target_moonphase, target_hourangle, target_ndet, "
+             "target_medmagerr, target_magerrmad, target_medsrcbgv, "
+             "target_stdsrcbgv, target_medsval, target_meddval, "
+             "photrefinfo) values "
+             "(?, ?, ?, ?, ?, ?, "
+             "?, ?, "
+             "?, ?, ?, "
+             "?, ?, ?, "
+             "?, ?, ?, "
+             "?, ?, ?, "
+             "?, ?, ?, "
+             "?)")
+    params = (
+        frameinfo['field'],
+        frameinfo['projectid'],
+        frameinfo['ccd'],
+        photreftype,
+        1 if makeactive else 0,
+        time.time(),
+
+        photrefinfo['combinedphotref']['frame'],
+        photrefinfo['combinedphotref']['jpeg'],
+
+        masterphotref,
+        photrefinfo['combinedphotref']['regfile'],
+        photrefinfo['combinedphotref']['cmrawphot'],
+
+        photref_frameinfo['zenithdist'],
+        photref_frameinfo['moondist'],
+        photref_frameinfo['moonelev'],
+
+        photref_frameinfo['moonphase'],
+        photref_frameinfo['hourangle'],
+        photref_frameinfo['ngoodobjects'],
+
+        photref_frameinfo['medmagerr'],
+        photref_frameinfo['magerrmad'],
+        photref_frameinfo['medsrcbgv'],
+
+        photref_frameinfo['stdsrcbgv'],
+        photref_frameinfo['medsval'],
+        photref_frameinfo['meddval'],
+
+        json.dumps(photrefinfo['combinedphotref'],ensure_ascii=True)
+    )
+
+    db = sqlite3.connect(refinfo)
+    cur = db.cursor()
+
+    try:
+
+        astromref.update(frameinfo)
+        cur.execute(query, params)
+        db.commit()
+
+        print('%sZ: using astromref %s for '
+              'field %s, ccd %s, project id %s, database updated.' %
+              (datetime.utcnow().isoformat(),
+               astromref['astromref'],
+               astromref['field'],
+               astromref['ccd'],
+               astromref['projectid']))
+
+        returnval = astromref
+
+    except Exception as e:
+
+        print('ERR! %sZ: could not update refinfo DB! error was: %s' %
+              (datetime.utcnow().isoformat(), e))
+        returnval = None
+        db.rollback()
+
+    db.close()
 
 
     # return the updated photrefinfo dict
