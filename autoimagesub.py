@@ -310,7 +310,10 @@ def generate_astromref(fitsfiles,
                       (astromref['comment'] +
                        '; original: %s' % astromref['astromref']))
 
-            db = sqlite3.connect(refinfo)
+            db = sqlite3.connect(
+                refinfo,
+                detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES
+            )
             cur = db.cursor()
 
             try:
@@ -357,7 +360,10 @@ def get_astromref(projectid, field, ccd, refinfo=REFINFO):
 
     '''
 
-    db = sqlite3.connect(refinfo)
+    db = sqlite3.connect(
+        refinfo,
+        detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES
+    )
     cur = db.cursor()
 
     query = ('select field, projectid, ccd, unixtime, '
@@ -1391,7 +1397,10 @@ def generate_combined_photref(
         json.dumps(photrefinfo['combinedphotref'],ensure_ascii=True)
     )
 
-    db = sqlite3.connect(refinfo)
+    db = sqlite3.connect(
+        refinfo,
+        detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES
+    )
     cur = db.cursor()
 
     try:
@@ -1431,7 +1440,10 @@ def get_combined_photref(projectid,
 
     '''
 
-    db = sqlite3.connect(refinfo)
+    db = sqlite3.connect(
+        refinfo,
+        detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES
+    )
     cur = db.cursor()
 
     query = (
