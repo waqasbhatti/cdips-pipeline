@@ -357,7 +357,7 @@ def get_astromref(projectid, field, ccd, refinfo=REFINFO):
 
     '''
 
-    db = sqlite3.connect(REFINFO)
+    db = sqlite3.connect(refinfo)
     cur = db.cursor()
 
     query = ('select field, projectid, ccd, unixtime, '
@@ -1431,7 +1431,7 @@ def get_combined_photref(projectid,
 
     '''
 
-    db = sqlite3.connect(REFINFO)
+    db = sqlite3.connect(refinfo)
     cur = db.cursor()
 
     query = ('select * from photrefs where '
@@ -1471,9 +1471,10 @@ def get_combined_photref(projectid,
               'from DB! error was: %s' %
               (datetime.utcnow().isoformat(), e))
         returnval = None
+        db.close()
+
         raise
 
-    db.close()
 
     return returnval
 
