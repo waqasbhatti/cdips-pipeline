@@ -1304,7 +1304,9 @@ def generate_combined_photref(
     combinedphotrefinfo = {
         'reftype':photreftype,
         'frame':combinedphotref,
-        'jpeg':'JPEG-COMBINED-%s' % combinedphotref.replace('.fits','.jpg'),
+        'jpeg':combinedphotref.replace('.fits',
+                                       '.jpg').replace('proj',
+                                                       'JPEG-COMBINED-proj'),
         'cmrawphot':cphotref_photometry[1],
         'regfile':regfpath,
         'combinemethod':combinemethod,
@@ -1410,6 +1412,7 @@ def generate_combined_photref(
         print('ERR! %sZ: could not update refinfo DB! error was: %s' %
               (datetime.utcnow().isoformat(), e))
         db.rollback()
+        raise
 
     db.close()
 
