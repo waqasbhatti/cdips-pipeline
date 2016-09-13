@@ -1439,6 +1439,8 @@ def get_combined_photref(projectid,
              'isactive = 1')
     params = (projectid, field, ccd, photreftype)
 
+    raise Exception('stop')
+
     try:
 
         cur.execute(query, params)
