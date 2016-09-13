@@ -1527,19 +1527,25 @@ def find_new_sources(subtractedframe,
     '''
 
 
+
 def xtrsfits_convsubphot_worker(task):
     '''
     This is a parallel worker for framelist_convsubphot_photref below.
 
     task[0] = xtrnsfits file
-    task[1] = outdir
-    task[2] = kernelspec
-    task[3] = reversesubtract boolean
-    task[4] = findnewobjects boolean
+    task[1] = photreftype to use <"oneframe"|"onehour"|"onenight">
+    task[2] = outdir
+    task[3] = kernelspec
+    task[4] = reversesubtract boolean
+    task[5] = findnewobjects boolean
+    task[6] = photdisjointradius
+    task[7] = refinfo
 
     '''
 
-    frame, outdir, kernelspec, reversesubtract, findnewobjects = task
+    (frame, photreftype, outdir,
+     kernelspec, reversesubtract, findnewobjects, photdisjointradius,
+     refinfo) = task
 
     try:
 
@@ -1554,26 +1560,71 @@ def xtrsfits_convsubphot_worker(task):
                                  int(felems[0][2]),
                                  frameelems['projid'])
 
-        # then, find the associated combined photref frame
-
-
-        # then, find the associated combined photref registration file
-
-        # then, find the associated combined photref's cmrawphot for photometry
-
-        # generate the output subtracted frame filename and kernel filename
+        # then, find the associated combined photref frame, regfile, cmrawphot
+        cphotref = get_combined_photref(projectid, field, ccd, photreftype,
+                                        refinfo=refinfo)
+        cphotref_frame = cphotref['framepath']
+        cphotref_reg = cphotref['convolveregpath']
+        cphotref_cmrawphot = cphotref['cmrawphotpath']
 
         # do the subtraction (take care of reversesubtract here)
+        _, convsub = ism.subframe_convolution_worker(
+            (frame, cphotref_frame, cphotref_reg,
+             kernelspec, outdir, reversesubtract)
+        )
+
+        if not (convsub and os.path.exists(convsub)):
+            print('ERR! %sZ: convulution and subtraction failed on frame %s' %
+                  (datetime.utcnow().isoformat(), frame))
+            return frame, None
+
 
         # find new objects in the subtracted frame if told to do so
+        if findnewobjects:
+            pass
+
+        # find matching kernel, itrans, and xysdk files for each subtracted
+        # frame
+        frameinfo = FRAMEREGEX.findall(os.path.basename(convsub))
+        kernel = '%s-%s_%s-xtrns.fits-kernel' % (frameinfo[0][0],
+                                                 frameinfo[0][1],
+                                                 frameinfo[0][2])
+        kernel = os.path.abspath(os.path.join(os.path.dirname(convsub),kernel))
+
+        itrans = '%s-%s_%s.itrans' % (frameinfo[0][0],
+                                      frameinfo[0][1],
+                                      frameinfo[0][2])
+        itrans = os.path.abspath(os.path.join(os.path.dirname(convsub),itrans))
+
+        xysdk = '%s-%s_%s.xysdk' % (frameinfo[0][0],
+                                    frameinfo[0][1],
+                                    frameinfo[0][2])
+        xysdk = os.path.abspath(os.path.join(os.path.dirname(convsub),xysdk))
+
 
         # then do photometry on the subtracted frame
+        _, subphot = ism.subframe_photometry_worker(
+            (convsub, cphotref_cmrawphot, photdisjointradius,
+             kernel, itrans, xysdk, os.path.dirname(convsub))
+        )
 
+        if subphot and os.path.exists(subphot):
+            print('%sZ: CONVSUBPHOT OK: frame %s, '
+                  'subtracted frame %s, photometry file %s' %
+                  (datetime.utcnow().isoformat(), frame, convsub, subphot))
+            return frame, (convsub, subphot)
+        else:
+            print('%sZ: CONVSUBPHOT FAILED: frame %s' %
+                  (datetime.utcnow().isoformat(), frame))
+            return frame, (convsub, subphot)
 
     except Exception as e:
 
         print('ERR! %sZ: could not do convsubphot on frame %s, error was: %s' %
               (datetime.utcnow().isoformat(), frame, e))
+
+        raise
+
         return frame, None
 
 
@@ -1583,6 +1634,7 @@ def xtrnsfits_convsubphot(xtrnsfits,
                           outdir=None,
                           refinfo=REFINFO,
                           kernelspec='b/4;i/4;d=4/4',
+                          photdisjointradius=2,
                           findnewobjects=True,
                           nworkers=16,
                           maxworkertasks=1000):
