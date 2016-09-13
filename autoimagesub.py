@@ -1431,7 +1431,7 @@ def get_combined_photref(projectid,
 
     '''
 
-    db = sqlite3.connect(refinfo)
+    db = sqlite3.connect(refinfo, detect_types=sqlite3.PARSE_DECLTYPES)
     cur = db.cursor()
 
     query = ('select * from photrefs where '
