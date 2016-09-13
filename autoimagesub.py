@@ -1471,6 +1471,7 @@ def get_combined_photref(projectid,
               'from DB! error was: %s' %
               (datetime.utcnow().isoformat(), e))
         returnval = None
+        raise
 
     db.close()
 
