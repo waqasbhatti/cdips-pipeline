@@ -1308,7 +1308,7 @@ def generate_combined_photref(
         'combinetype':combinetype,
         'kernelspec':kernelspec,
         'phottype':'re-extracted' if extractsources else 'cat-projected',
-        'photaps':apertures
+        'photaps':apertures,
         'fovcat':photref_fovcatpath,
     }
     photrefinfo['combinedphotref'] = combinedphotrefinfo
