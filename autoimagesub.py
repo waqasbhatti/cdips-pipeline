@@ -1455,14 +1455,14 @@ def get_combined_photref(projectid,
         'target_medsrcbgv,target_stdsrcbgv,target_medsval,'
         'target_meddval,photrefinfo from photrefs where '
         '(isactive = 1) and '
-        '(projectid = ?) and '
-        '(ccd = ?) and '
-        '(field = ?) and '
-        '(photreftype = ?)'
+        '(projectid = %i) and '
+        '(ccd = %i) and '
+        '(field = "%s") and '
+        '(photreftype = "%s")'
     )
     params = (projectid, ccd, field, photreftype)
-
-    cur.execute(query, params)
+    query = query % params
+    cur.execute(query)
 
     raise Exception("FUCK THIS SHIT!")
 
