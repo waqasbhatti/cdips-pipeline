@@ -1313,6 +1313,17 @@ def generate_combined_photref(
     }
     photrefinfo['combinedphotref'] = combinedphotrefinfo
 
+    cachekey = photrefinfo['cachekey']
+    cachedir = os.path.join(FRAMEINFOCACHEDIR,'TM-photref-%s' % cachekey)
+    cacheinfofile = os.path.join(cachedir, 'selection-info.pkl.gz')
+
+    with gzip.open(cacheinfofile, 'wb') as outfd:
+        print('%sZ: combined photref JPEG: %s, photrefinfo updated: %s' %
+              (datetime.utcnow().isoformat(),
+               photrefinfo['combinedphotref']['jpeg'],
+               cacheinfofile))
+        pickle.dump(photrefinfo, outfd, pickle.HIGHEST_PROTOCOL)
+
     # update the TM-refinfo.sqlite database
 
     # return the updated photrefinfo dict
