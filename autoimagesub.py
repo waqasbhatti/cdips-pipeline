@@ -1434,7 +1434,13 @@ def get_combined_photref(projectid,
     db = sqlite3.connect(refinfo, detect_types=sqlite3.PARSE_DECLTYPES)
     cur = db.cursor()
 
-    query = ('select * from photrefs where '
+    query = ('select field,projectid,ccd,photreftype,unixtime,'
+             'framepath,jpegpath,convolvetarget,convolveregpath,'
+             'cmrawphotpath,target_zenithdist,target_moondist,'
+             'target_moonelev,target_moonphase,target_hourangle,'
+             'target_ndet,target_medmagerr,target_magerrmad,'
+             'target_medsrcbgv,target_stdsrcbgv,target_medsval,'
+             'target_meddval,photrefinfo from photrefs where '
              'projectid = ? and field = ? and ccd = ? and photreftype = ? and '
              'isactive = 1')
     params = (projectid, field, ccd, photreftype)
@@ -1447,7 +1453,7 @@ def get_combined_photref(projectid,
         rows = cur.fetchone()
 
         cphotref = {x:y for (x,y) in zip(('field','projectid','ccd',
-                                          'photreftype','isactive','unixtime',
+                                          'photreftype','unixtime',
                                           'framepath','jpegpath',
                                           'convolvetarget','convolveregpath',
                                           'cmrawphotpath',
