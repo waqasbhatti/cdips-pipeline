@@ -434,12 +434,14 @@ def frames_astromref_worker(task):
     task[0] = fits file
     task[1] = outdir
     task[2] = refinfo
+    task[3] = warpcheck
+    task[4] = warpcheck kwargs {'threshold', 'margins'}
 
     '''
 
     try:
 
-        frame, outdir, refinfo = task
+        frame, outdir, refinfo, warpcheck, warpcheckkwargs = task
 
         # figure out this frame's field, ccd, and projectid
         frameelems = get_header_keyword_list(frame,
@@ -482,10 +484,56 @@ def frames_astromref_worker(task):
 
                 if shifted_frame and os.path.exists(shifted_frame):
 
-                    print('%sZ: SHIFT OK %s -> %s' %
-                          (datetime.utcnow().isoformat(), frame, shifted_frame))
+                    # check if the frame has warped too much after the shift,
+                    # these frames look like they're folding into/out of the
+                    # z-direction. we need to throw these away.
+                    if warpcheck:
 
-                    return frame, shifted_frame
+                        notwarped, warpinfo = check_frame_warping(
+                            shifted_frame,
+                            **warpcheckkwargs
+                        )
+
+                        # if image is OK, return it
+                        if notwarped:
+
+                            print('%sZ: SHIFT OK %s -> %s' %
+                                  (datetime.utcnow().isoformat(),
+                                   frame, shifted_frame))
+
+                            return frame, shifted_frame
+
+                        # otherwise, move it to the badframes subdir and mark it
+                        # as warped
+                        else:
+
+                            badframesdir = os.path.join(os.path.dirname(frame),
+                                                        'badframes')
+                            if not os.path.exists(badframesdir):
+                                os.mkdir(badframesdir)
+
+                            # find all the components of this frame and move
+                            # them to the badframes subdir
+                            badframeglob = glob.glob(
+                                os.path.join(
+                                    os.path.dirname(shifted_frame),
+                                    '*%s*.*' % (
+                                        os.path.splitext(
+                                            os.path.basename(frame)
+                                        )[0]
+                                    )
+                                )
+                            )
+
+                            for x in badframesglob:
+                                shutil.move(x, badframesdir)
+
+                            print('WRN! %sZ: SHIFT HAS WARPED '
+                                  'IMAGE, moved %s and metadata to %s, ' %
+                                  (datetime.utcnow().isoformat(),
+                                   frame, badframesdir))
+
+                            return frame, None
 
                 else:
 
@@ -517,6 +565,9 @@ def frames_astromref_worker(task):
 def framelist_make_xtrnsfits(fitsfiles,
                              outdir=None,
                              refinfo=REFINFO,
+                             warpcheck=True,
+                             warpthreshold=2000.0,
+                             warpmargins=100,
                              nworkers=16,
                              maxworkertasks=1000):
     '''This calculates the shifts between frames in fitsfiles and the appropriate
@@ -530,7 +581,9 @@ def framelist_make_xtrnsfits(fitsfiles,
 
     pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
-    tasks = [(x, outdir, refinfo) for x in fitsfiles if os.path.exists(x)]
+    tasks = [(x, outdir, refinfo, warpcheck,
+              {'threshold':warpthreshold, 'margins':warpmargins})
+             for x in fitsfiles if os.path.exists(x)]
 
     # fire up the pool of workers
     results = pool.map(frames_astromref_worker, tasks)
@@ -540,6 +593,7 @@ def framelist_make_xtrnsfits(fitsfiles,
     pool.join()
 
     return {x:y for (x,y) in results}
+
 
 
 ##################################
