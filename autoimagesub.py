@@ -1610,26 +1610,6 @@ def get_combined_photref(projectid,
 ## IMAGE SUBTRACTION PHOTOMETRY ##
 ##################################
 
-def find_new_sources(subtractedframe,
-                     fovcat,
-                     cmrawphot,
-                     fluxthreshold=1000,
-                     catmatcharcsec=3.0,
-                     refinfo=REFINFO):
-    '''This finds new sources in the subtracted frame.
-
-    Used in the convsubphot functions below.
-
-    Adds new sources to the fovcat and cmrawphot.
-
-    FIXME: this should make stamps around the new sources and save them to the
-    newsources-<hash> cache directory. Then, we can look at these stamp FITS and
-    JPEGS and train a classifier on actual source detections.
-
-    '''
-
-
-
 def xtrnsfits_convsubphot_worker(task):
     '''
     This is a parallel worker for framelist_convsubphot_photref below.
