@@ -1909,6 +1909,7 @@ def subframe_photometry_worker(task):
     task[4] -> subtracted frame itrans file
     task[5] -> subtracted frame xysdk file
     task[6] -> output directory
+    task[7] -> photrefprefix
 
     '''
 
@@ -1953,9 +1954,19 @@ def subframe_photometry_worker(task):
                    subframe))
             return subframe, None
 
-        frameiphot = '%s-%s_%s.iphot' % (frameinfo[0][0],
-                                         frameinfo[0][1],
-                                         frameinfo[0][2])
+        if photrefprefix and photrefprefix == 'oneframe':
+            photrefbit = 'oneframeref-'
+        elif photrefprefix and photrefprefix == 'onehour':
+            photrefbit = 'onehourref-'
+        elif photrefprefix and photrefprefix == 'onenight':
+            photrefbit = 'onenightref-'
+        else:
+            photrefbit = ''
+
+        frameiphot = '%s%s-%s_%s.iphot' % (photrefbit,
+                                           frameinfo[0][0],
+                                           frameinfo[0][1],
+                                           frameinfo[0][2])
 
         if outdir:
             outfile = os.path.join(os.path.abspath(outdir),
@@ -2011,6 +2022,7 @@ def photometry_on_subtracted_frames(subframedir,
                                     subframeitransdir=None,
                                     subframexysdkdir=None,
                                     photdisjointradius=2,
+                                    photrefprefix=None,
                                     nworkers=16,
                                     maxworkertasks=1000,
                                     outdir=None):
@@ -2042,13 +2054,25 @@ def photometry_on_subtracted_frames(subframedir,
     if not subframexysdkdir:
         subframexysdkdir = subframedir
 
+    if photrefprefix and photrefprefix == 'oneframe':
+        photrefbit = 'oneframeref-'
+    elif photrefprefix and photrefprefix == 'onehour':
+        photrefbit = 'onehourref-'
+    elif photrefprefix and photrefprefix == 'onenight':
+        photrefbit = 'onenightref-'
+    else:
+        photrefbit = ''
+
+
     # find matching kernel, itrans, and xysdk files for each subtracted frame
     for subframe in subframelist:
 
+
         frameinfo = FRAMEREGEX.findall(os.path.basename(subframe))
-        kernel = '%s-%s_%s-xtrns.fits-kernel' % (frameinfo[0][0],
-                                                 frameinfo[0][1],
-                                                 frameinfo[0][2])
+        kernel = '%s%s-%s_%s-xtrns.fits-kernel' % (photrefbit,
+                                                   frameinfo[0][0],
+                                                   frameinfo[0][1],
+                                                   frameinfo[0][2])
         kernel = os.path.abspath(os.path.join(subframekerneldir,kernel))
 
         itrans = '%s-%s_%s.itrans' % (frameinfo[0][0],
@@ -2071,7 +2095,8 @@ def photometry_on_subtracted_frames(subframedir,
                           kernel,
                           itrans,
                           xysdk,
-                          outdir))
+                          outdir,
+                          photrefprefix))
 
     # now start up the parallel photometry
     print('%sZ: %s good frames to run photometry on in %s, starting...' %
