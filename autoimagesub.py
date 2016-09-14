@@ -525,7 +525,7 @@ def frames_astromref_worker(task):
                                 )
                             )
 
-                            for x in badframesglob:
+                            for x in badframeglob:
                                 shutil.move(x, badframesdir)
 
                             print('WRN! %sZ: SHIFT HAS WARPED '
