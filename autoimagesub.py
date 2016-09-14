@@ -84,7 +84,7 @@ with open(PGPASSFILE) as infd:
     pgpass_contents = infd.readlines()
     pgpass_contents = [x.split(':') for x in pgpass_contents]
     PGPASSWORD = [x[-1] for x in pgpass_contents
-                  if (x[2] == PGDATABSE and x[3] == PGUSER)]
+                  if (x[2] == PGDATABASE and x[3] == PGUSER)]
 
 
 ###############
