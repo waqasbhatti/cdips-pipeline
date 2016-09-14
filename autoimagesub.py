@@ -1809,17 +1809,33 @@ def convsub_photometry_to_ismphot_database(convsubfits,
         cursor = database.cursor()
         closedb = True
 
-
+    # start work here
     try:
 
+        # figure out the projectid, field, ccd, photreftype
 
+        # find the frame's accompanying iphot file
 
+        # find the frame's original FITS file (unsubtracted calibrated frame)
 
+        # figure out the frame's JD from the original frame's header
 
+        # update the iphotfiles table file with all of this info. if there's a
+        # uniqueness conflict, i.e. this same combination exists, then overwrite
+        # if told to do so
 
+        # now open the accompanying iphot file, and note all the HATIDs
 
+        # update the iphotobjects table with all of these objects. if there's a
+        # uniqueness conflict, i.e. this same combination exists, then overwrite
+        # if told to do so
+
+        # once everything's OK, commit to the database
+
+        # return True if everything succeeded
         returnval = (consubfits, True)
 
+    # if everything goes wrong, exit cleanly
     except Exception as e:
 
         database.rollback()
@@ -1828,7 +1844,7 @@ def convsub_photometry_to_ismphot_database(convsubfits,
         print('EXC! %sZ: %s\nexception was: %s' %
                (datetime.utcnow().isoformat(),
                 message, format_exc()) )
-        returnval = (convsubfits, None)
+        returnval = (convsubfits, False)
 
 
     if closedb:
