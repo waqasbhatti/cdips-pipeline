@@ -1708,7 +1708,7 @@ def xtrnsfits_convsubphot_worker(task):
         # then do photometry on the subtracted frame
         _, subphot = ism.subframe_photometry_worker(
             (convsub, cphotref_cmrawphot, photdisjointradius,
-             kernel, itrans, xysdk, os.path.dirname(convsub))
+             kernel, itrans, xysdk, os.path.dirname(convsub), photreftype)
         )
 
         if subphot and os.path.exists(subphot):
@@ -1725,8 +1725,6 @@ def xtrnsfits_convsubphot_worker(task):
 
         print('ERR! %sZ: could not do convsubphot on frame %s, error was: %s' %
               (datetime.utcnow().isoformat(), frame, e))
-
-        raise
 
         return frame, None
 
