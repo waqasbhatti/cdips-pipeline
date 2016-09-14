@@ -1672,7 +1672,7 @@ def xtrnsfits_convsubphot_worker(task):
         # do the subtraction (take care of reversesubtract here)
         _, convsub = ism.subframe_convolution_worker(
             (frame, cphotref_frame, cphotref_reg,
-             kernelspec, outdir, reversesubtract)
+             kernelspec, outdir, reversesubtract, photreftype)
         )
 
         if not (convsub and os.path.exists(convsub)):
@@ -1688,9 +1688,10 @@ def xtrnsfits_convsubphot_worker(task):
         # find matching kernel, itrans, and xysdk files for each subtracted
         # frame
         frameinfo = FRAMEREGEX.findall(os.path.basename(convsub))
-        kernel = '%s-%s_%s-xtrns.fits-kernel' % (frameinfo[0][0],
-                                                 frameinfo[0][1],
-                                                 frameinfo[0][2])
+        kernel = '%s-%s-%s_%s-xtrns.fits-kernel' % (photreftype,
+                                                   frameinfo[0][0],
+                                                   frameinfo[0][1],
+                                                   frameinfo[0][2])
         kernel = os.path.abspath(os.path.join(os.path.dirname(convsub),kernel))
 
         itrans = '%s-%s_%s.itrans' % (frameinfo[0][0],
