@@ -5,12 +5,13 @@ create table iphotfiles (
        projectid integer not null default 0,
        field text not null,
        ccd integer not null,
+       photreftype text not null default 'oneframe',
        isactive bool not null default true,
        iphotfilepath text not null,
        framerjd double precision not null,
        framefilepath text not null,
        entrytimestamp timestamp with time zone not null default current_timestamp,
-       primary key (projectid, field, ccd, isactive, iphotfilepath)
+       primary key (projectid, field, ccd, photreftype, isactive, iphotfilepath)
 );
 
 
@@ -19,12 +20,13 @@ create table iphotobjects (
        projectid integer not null,
        field text not null,
        ccd integer not null,
+       photreftype text not null default 'oneframe',
        isactive bool not null default true,
        objectid text not null,
        iphotfilepath text not null,
        iphotfileline integer not null,
        entrytimestamp timestamp with time zone not null default current_timestamp,
-       primary key (projectid, field, ccd, isactive,
+       primary key (projectid, field, ccd, photreftype, isactive,
                     objectid, iphotfilepath, iphotfileline)
 );
 
@@ -43,7 +45,7 @@ CREATE TABLE astromrefs (
        bgv real,
        ndet integer,
        comment text,
-       primary key(field, projectid, ccd, isactive)
+       primary key(projectid, field, ccd, isactive)
 );
 
 
@@ -73,5 +75,5 @@ CREATE TABLE photrefs (
        target_medsval real,
        target_meddval real,
        photrefinfo jsonb, -- photref selection-info pickle JSON
-       primary key(field, projectid, ccd, photreftype, isactive)
+       primary key(projectid, field, ccd, photreftype, isactive)
 );
