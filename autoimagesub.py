@@ -34,6 +34,7 @@ import sqlite3
 import time
 from hashlib import md5, sha256
 import gzip
+from traceback import format_exc
 
 import numpy as np
 import psycopg2 as pg
@@ -80,6 +81,7 @@ FIELDCAT_DIR = '/P/HP0/BASE/field-catalogs'
 PGPASSFILE = '/home/hatuser/.pgpass'
 PGUSER = 'hpx'
 PGDATABASE = 'hpx'
+PGHOST = 'localhost'
 
 with open(PGPASSFILE) as infd:
     pgpass_contents = infd.readlines()
@@ -1777,6 +1779,64 @@ def xtrnsfits_convsubphot(xtrnsfits,
 #########################
 ## PHOTOMETRY DATABASE ##
 #########################
+
+def convsub_photometry_to_ismphot_database(convsubfits,
+                                           projectid=None,
+                                           field=None,
+                                           ccd=None,
+                                           overwrite=False,
+                                           database=None):
+    '''This inserts the ISM photometry from a single convsub FITS into the DB.
+
+    If projectid, field, ccd are not provided, gets them from the FITS
+    file. Also gets the photreftype from the filename of the
+    convolved-subtracted photometry iphot file.
+
+    '''
+
+    # open a database connection
+    if database:
+
+        cursor = database.cursor()
+        closedb = False
+
+    else:
+
+        database = pg.connect(user=PGUSER,
+                              password=PGPASSWORD,
+                              database=PGDATABASE,
+                              host=PGHOST)
+        cursor = database.cursor()
+        closedb = True
+
+
+    try:
+
+
+
+
+
+
+
+        returnval = (consubfits, True)
+
+    except Exception as e:
+
+        database.rollback()
+
+        message = 'failed to insert photometry from %s into DB' % convsubfits
+        print('EXC! %sZ: %s\nexception was: %s' %
+               (datetime.utcnow().isoformat(),
+                message, format_exc()) )
+        returnval = (convsubfits, None)
+
+
+    if closedb:
+        cursor.close()
+        database.close()
+
+    return returnval
+
 
 
 
