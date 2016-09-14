@@ -1639,9 +1639,10 @@ def xtrnsfits_convsubphot_worker(task):
 def xtrnsfits_convsubphot(xtrnsfits,
                           outdir=None,
                           refinfo=REFINFO,
+                          reversesubtract=True,
                           kernelspec='b/4;i/4;d=4/4',
                           photdisjointradius=2,
-                          findnewobjects=True,
+                          findnewobjects=False,
                           nworkers=16,
                           maxworkertasks=1000):
     '''This convolves, subtracts, and does photometry of known photref sources for
@@ -1654,6 +1655,25 @@ def xtrnsfits_convsubphot(xtrnsfits,
     the cmrawphot for the combined photref, and then run aperturephot on them.
 
     '''
+
+    print('%sZ: %s files to process' %
+          (datetime.utcnow().isoformat(), len(fitsfiles)))
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+    tasks = [(x, photreftype, outdir, kernelspec,
+              reversesubtract, findnewobjects, photdisjointradius, refinfo)
+             for x in xtrnsfits if os.path.exists(x)]
+
+    # fire up the pool of workers
+    results = pool.map(xtrnsfits_convsubphot_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    return {x:y for (x,y) in results}
+
 
 
 #########################
