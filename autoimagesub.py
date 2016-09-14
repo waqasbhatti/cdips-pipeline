@@ -1020,19 +1020,21 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
                 )
             final_jpegs.append(framejpg)
 
-        photrefinfo = {'framelist':fitsfiles,
-                       'frameinfo':frameinfo,
-                       'cachekey':cachekey,
-                       'minframes':minframes,
-                       'maxhourangle':maxhourangle,
-                       'maxmoonphase':maxmoonphase,
-                       'maxmoonelev':maxmoonelev,
-                       'maxzenithdist':maxzenithdist,
-                       'maxbackgroundstdev':maxbackgroundstdev,
-                       'maxbackgroundmedian':maxbackgroundmedian,
-                       'masterphotref':os.path.abspath(candidate_master_photref),
-                       'photrefs':[os.path.abspath(x) for x in final_frames],
-                       'photrefjpegs':final_jpegs}
+        photrefinfo = {
+            'framelist':fitsfiles,
+            'frameinfo':frameinfo,
+            'cachekey':cachekey,
+            'minframes':minframes,
+            'maxhourangle':maxhourangle,
+            'maxmoonphase':maxmoonphase,
+            'maxmoonelev':maxmoonelev,
+            'maxzenithdist':maxzenithdist,
+            'maxbackgroundstdev':maxbackgroundstdev,
+            'maxbackgroundmedian':maxbackgroundmedian,
+            'masterphotref':os.path.abspath(candidate_master_photref),
+            'photrefs':[os.path.abspath(x) for x in final_frames],
+            'photrefjpegs':final_jpegs
+        }
 
         # dump the photrefinfo to a pickle
         with gzip.open(cacheinfofile,'wb') as outfd:
