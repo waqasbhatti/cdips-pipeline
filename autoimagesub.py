@@ -39,7 +39,8 @@ import numpy as np
 
 import aperturephot as ap
 import imagesubphot as ism
-from imageutils import get_header_keyword_list, fits_to_full_jpeg
+from imageutils import get_header_keyword_list, fits_to_full_jpeg, \
+    check_frame_warping
 
 # get fiphot binary reader
 try:

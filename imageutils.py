@@ -932,6 +932,7 @@ def check_frame_warping(frame,
     specified threshold, returns False as the image is likely to be
     warped. Otherwise, returns True.
 
+    Copied from astrobase/imageutils.py
 
     '''
 
