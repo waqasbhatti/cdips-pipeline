@@ -75,6 +75,17 @@ FRAMEINFOCACHEDIR = '/P/HP0/BASE/frameinfo-cache'
 # these define the field catalog location and properties
 FIELDCAT_DIR = '/P/HP0/BASE/field-catalogs'
 
+# these define the postgres database credentials
+PGPASSFILE = '/home/hatuser/.pgpass'
+PGUSER = 'hpx'
+PGDATABASE = 'hpx'
+
+with open(PGPASSFILE) as infd:
+    pgpass_contents = infd.readlines()
+    pgpass_contents = [x.split(':') for x in pgpass_contents]
+    PGPASSWORD = [x[-1] for x in pgpasscontents
+                  if (x[2] == PGDATABSE and x[3] == PGUSER)]
+
 
 ###############
 ## UTILITIES ##
