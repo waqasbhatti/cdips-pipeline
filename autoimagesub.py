@@ -36,6 +36,7 @@ from hashlib import md5, sha256
 import gzip
 
 import numpy as np
+import psycopg2 as pg
 
 import aperturephot as ap
 import imagesubphot as ism
