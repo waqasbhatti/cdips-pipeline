@@ -1637,6 +1637,7 @@ def xtrnsfits_convsubphot_worker(task):
 
 
 def xtrnsfits_convsubphot(xtrnsfits,
+                          photreftype,
                           outdir=None,
                           refinfo=REFINFO,
                           reversesubtract=True,
