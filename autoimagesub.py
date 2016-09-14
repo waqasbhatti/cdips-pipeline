@@ -189,6 +189,30 @@ def find_arefshifted_fits_fieldprojectidccd(dirlist,
                                                 maxworkertasks=maxworkertasks)
 
 
+
+def find_convsub_fits_fieldprojectidccd(dirlist,
+                                        field,
+                                        projectid,
+                                        ccd,
+                                        fglob='subtracted-?-???????_?-xtrns.fits',
+                                        nworkers=8,
+                                        maxworkertasks=1000):
+    '''This searches in dirlist for all subtracted and astromref-shifted FITS files
+    matching the specified projectid, field, and ccd combination.
+
+    Returns a flat list of matching FITS, and list of all fits + their info.
+
+    '''
+
+    return find_original_fits_fieldprojectidccd(dirlist,
+                                                field,
+                                                projectid,
+                                                ccd,
+                                                fglob=fglob,
+                                                nworkers=nworkers,
+                                                maxworkertasks=maxworkertasks)
+
+
 ##################################
 ## ASTROMETRIC REFERENCE FRAMES ##
 ##################################
