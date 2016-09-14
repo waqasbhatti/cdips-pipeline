@@ -529,11 +529,22 @@ def frames_astromref_worker(task):
                                 shutil.move(x, badframesdir)
 
                             print('WRN! %sZ: SHIFT HAS WARPED '
-                                  'IMAGE, moved %s and metadata to %s, ' %
+                                  'IMAGE, moved %s and metadata to %s' %
                                   (datetime.utcnow().isoformat(),
                                    frame, badframesdir))
 
                             return frame, None
+
+                    # if we're not checking for warps, just check if the image
+                    # was shifted fine
+                    else:
+
+                        print('%sZ: SHIFT OK %s -> %s' %
+                              (datetime.utcnow().isoformat(),
+                               frame, shifted_frame))
+
+                        return frame, shifted_frame
+
 
                 else:
 
