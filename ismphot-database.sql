@@ -72,6 +72,6 @@ CREATE TABLE photrefs (
        target_stdsrcbgv real,
        target_medsval real,
        target_meddval real,
-       photrefinfo text, -- photref selection-info pickle JSON
+       photrefinfo jsonb, -- photref selection-info pickle JSON
        primary key(field, projectid, ccd, photreftype, isactive)
 );
