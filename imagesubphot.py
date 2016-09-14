@@ -1916,7 +1916,7 @@ def subframe_photometry_worker(task):
     # get the info out of the task
     (subframe, photrefrawphot, disjointrad,
      subframekernel, subframeitrans, subframexysdk,
-     outdir) = task
+     outdir, photrefprefix) = task
 
     try:
 
