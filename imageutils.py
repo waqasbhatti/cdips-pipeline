@@ -917,3 +917,58 @@ def nparr_to_full_jpeg(nparr,
     if out_fname is None:
         out_fname = fits_image + '.jpeg'
     scipy.misc.imsave(out_fname,resized_img)
+
+
+
+def check_frame_warping(frame,
+                        margins=50,
+                        threshold=10.0,
+                        showplot=False):
+    '''This checks if an image is warped (perhaps by a bad shift/convolution).
+
+    Calculates the median of the rows and columns of the image taking into
+    account the margin on either side (as specified by the margins kwarg). Then
+    fits a straight line to the trend. If the chi-sq of the fit is above the
+    specified threshold, returns False as the image is likely to be
+    warped. Otherwise, returns True.
+
+
+    '''
+
+    hdu = pyfits.open(frame)
+    image = hdu[0].data
+    hdu.close()
+
+    clippedimage = image[margins:-margins, margins:-margins]
+    imagecoordnum = np.arange(len(clippedimage))
+
+    # get the medians in the x and y directions
+    medx = np.nanmedian(clippedimage,axis=1)
+    medy = np.nanmedian(clippedimage,axis=0)
+
+    # fit a 1-degree polynomial
+    xfitcoeffs = np.polyfit(imagecoordnum,medx,1)
+    yfitcoeffs = np.polyfit(imagecoordnum,medy,1)
+
+    xfitpoly = np.poly1d(xfitcoeffs)
+    yfitpoly = np.poly1d(yfitcoeffs)
+
+    xfit = xfitpoly(imagecoordnum)
+    yfit = yfitpoly(imagecoordnum)
+
+    xfit_redchisq = np.sum((medx - xfit)*(medx - xfit))/(len(imagecoordnum) - 2)
+    yfit_redchisq = np.sum((medy - yfit)*(medy - yfit))/(len(imagecoordnum) - 2)
+
+    warpinfo = {'medx':medx,
+                'medy':medy,
+                'xfitpoly':xfitpoly,
+                'yfitpoly':yfitpoly,
+                'xfit':xfit,
+                'yfit':yfit,
+                'xfit_redchisq':xfit_redchisq,
+                'yfit_redchisq':yfit_redchisq}
+
+    if (xfit_redchisq > threshold) or (yfit_redchisq > threshold):
+        return False, warpinfo
+    else:
+        return True, warpinfo

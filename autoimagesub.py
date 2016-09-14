@@ -37,7 +37,6 @@ import gzip
 
 import numpy as np
 
-
 import aperturephot as ap
 import imagesubphot as ism
 from imageutils import get_header_keyword_list, fits_to_full_jpeg
@@ -215,6 +214,8 @@ def find_subtracted_fits_fieldprojectidccd(
                                                 maxworkertasks=maxworkertasks)
 
 
+
+
 ##################################
 ## ASTROMETRIC REFERENCE FRAMES ##
 ##################################
@@ -376,6 +377,7 @@ def generate_astromref(fitsfiles,
 
 
     return returnval
+
 
 
 
