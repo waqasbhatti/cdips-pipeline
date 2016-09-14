@@ -1656,23 +1656,32 @@ def xtrnsfits_convsubphot(xtrnsfits,
 
     '''
 
-    print('%sZ: %s files to process' %
-          (datetime.utcnow().isoformat(), len(fitsfiles)))
-
-    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
-
     tasks = [(x, photreftype, outdir, kernelspec,
               reversesubtract, findnewobjects, photdisjointradius, refinfo)
              for x in xtrnsfits if os.path.exists(x)]
 
-    # fire up the pool of workers
-    results = pool.map(xtrnsfits_convsubphot_worker, tasks)
+    print('%sZ: %s files to process' %
+          (datetime.utcnow().isoformat(), len(tasks)))
 
-    # wait for the processes to complete work
-    pool.close()
-    pool.join()
+    if len(tasks) > 0:
 
-    return {x:y for (x,y) in results}
+        pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+
+        # fire up the pool of workers
+        results = pool.map(xtrnsfits_convsubphot_worker, tasks)
+
+        # wait for the processes to complete work
+        pool.close()
+        pool.join()
+
+        return {x:y for (x,y) in results}
+
+    else:
+
+        print('ERR! %sZ: none of the files specified exist, bailing out...' %
+              (datetime.utcnow().isoformat(),))
+        return
 
 
 
