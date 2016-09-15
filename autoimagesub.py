@@ -1902,7 +1902,8 @@ def convsub_photometry_to_ismphot_database(convsubfits,
                      "values ("
                      "%s, %s, %s, %s, %s, "
                      "%s, %s, %s, %s"
-                     ") on conflict do update "
+                     ") on conflict constraint iphotfiles_pkey "
+                     "do update "
                      "set projectid = %s, field = %s, ccd = %s, "
                      "photreftype = %s, convsubtype = %s, "
                      "isactive = %s, iphotfilepath = %s, framerjd = %s, "
@@ -1936,20 +1937,20 @@ def convsub_photometry_to_ismphot_database(convsubfits,
 
         if overwrite:
 
-            query = ("insert into iphotfiles "
+            query = ("insert into iphotobjects "
                      "(projectid, field, ccd, photreftype, convsubtype, "
                      "isactive, objectid, iphotfilepath, iphotfileline) "
                      "values ("
                      "%s, %s, %s, %s, %s, "
                      "%s, %s, %s, %s"
-                     ") on conflict do update set "
+                     ") on conflict constraint iphotobjects_pkey do update set "
                      "projectid = %s, field = %s, ccd = %s, photreftype = %s, "
                      "convsubtype = %s, isactive = %s, objectid = %s, "
                      "iphotfilepath = %s, iphotfileline = %s")
 
         else:
 
-            query = ("insert into iphotfiles "
+            query = ("insert into iphotobjects "
                      "(projectid, field, ccd, photreftype, convsubtype, "
                      "isactive, objectid, iphotfilepath, iphotfileline) "
                      "values ("
