@@ -1858,9 +1858,9 @@ def convsub_photometry_to_ismphot_database(convsubfits,
         # find the frame's accompanying iphot file
         iphotbasename = '%s-%s-%s_%s.iphot' % (subtractiontype,
                                                photreftype,
-                                               frameelems[0][0],
-                                               frameelems[0][1],
-                                               frameelems[0][2])
+                                               felems[0][0],
+                                               felems[0][1],
+                                               felems[0][2])
         iphotpath = os.path.join(convsubdir, iphotbasename)
 
         if not os.path.exists(iphotpath):
@@ -1981,6 +1981,7 @@ def convsub_photometry_to_ismphot_database(convsubfits,
         cursor.close()
         if closedb:
             database.close()
+            print('database closed')
 
     return returnval
 
