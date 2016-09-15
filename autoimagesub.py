@@ -1915,7 +1915,7 @@ def convsub_photometry_to_ismphot_database(convsubfits,
                      ")")
 
         params = (projectid, field, ccd, photreftype, subtractiontype,
-                  True, iphotfilepath, framerjd, originalfitspath)
+                  True, iphotpath, framerjd, originalfitspath)
 
         # execute the query to insert the object
         cursor.execute(query, params)
@@ -1949,7 +1949,7 @@ def convsub_photometry_to_ismphot_database(convsubfits,
         for ind, objectid in enumerate(iphotobjects):
 
             params = (projectid, field, ccd, photreftype, subtractiontype,
-                      True, objectid, iphotfilepath, iphotfileline)
+                      True, objectid, iphotpath, iphotfileline)
             cur.execute(query, params)
 
         database.commit()
@@ -1958,7 +1958,7 @@ def convsub_photometry_to_ismphot_database(convsubfits,
               'inserted into DB OK' %
               (datetime.utcnow().isoformat(),
                convsubfits,
-               iphotfilepath,
+               iphotpath,
                len(iphotobjects)) )
 
         # return True if everything succeeded
