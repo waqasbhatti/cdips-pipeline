@@ -1896,7 +1896,7 @@ def convsub_photometry_to_ismphot_database(convsubfits,
         # if told to do so
         if overwrite:
 
-            print('%WRN! sZ: overwriting existing photometry info in DB for %s'
+            print('WRN! %sZ: overwriting existing photometry info in DB for %s'
                   %
                   (datetime.utcnow().isoformat(), convsubfits))
 
