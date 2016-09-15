@@ -1911,7 +1911,7 @@ def convsub_photometry_to_ismphot_database(convsubfits,
                      "set projectid = %s, field = %s, ccd = %s, "
                      "photreftype = %s, convsubtype = %s, "
                      "isactive = %s, iphotfilepath = %s, framerjd = %s, "
-                     "framefilepath = %s")
+                     "framefilepath = %s, entrytimestamp = current_timestamp")
 
             params = (projectid, field, ccd, photreftype, subtractiontype,
                       True, iphotpath, framerjd, originalfitspath,
@@ -1951,7 +1951,8 @@ def convsub_photometry_to_ismphot_database(convsubfits,
                      "do update set "
                      "projectid = %s, field = %s, ccd = %s, photreftype = %s, "
                      "convsubtype = %s, isactive = %s, objectid = %s, "
-                     "iphotfilepath = %s, iphotfileline = %s")
+                     "iphotfilepath = %s, iphotfileline = %s, "
+                     "entrytimestamp = current_timestamp")
 
         else:
 
