@@ -1856,11 +1856,11 @@ def convsub_photometry_to_ismphot_database(convsubfits,
         convsubdir = os.path.abspath(os.path.dirname(convsubfits))
 
         # find the frame's accompanying iphot file
-        iphotbasename = '%s-%s-%s_%s.iphot' % (subtractiontype,
-                                               photreftype,
-                                               felems[0][0],
-                                               felems[0][1],
-                                               felems[0][2])
+        iphotbasename = '%s-%s-%s-%s_%s.iphot' % (subtractiontype,
+                                                  photreftype,
+                                                  felems[0][0],
+                                                  felems[0][1],
+                                                  felems[0][2])
         iphotpath = os.path.join(convsubdir, iphotbasename)
 
         if not os.path.exists(iphotpath):
@@ -1871,9 +1871,9 @@ def convsub_photometry_to_ismphot_database(convsubfits,
             return (convsubfits, False)
 
         # find the frame's original FITS file (unsubtracted calibrated frame)
-        originalfitsbasename = '%s-%s_%s.fits' % (frameelems[0][0],
-                                                  frameelems[0][1],
-                                                  frameelems[0][2])
+        originalfitsbasename = '%s-%s_%s.fits' % (felems[0][0],
+                                                  felems[0][1],
+                                                  felems[0][2])
         originalfitspath = os.path.join(convsubdir, originalfitsbasename)
 
         if not os.path.exists(originalfitspath):
