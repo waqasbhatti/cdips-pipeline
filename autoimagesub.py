@@ -1814,11 +1814,11 @@ def convsub_photometry_to_ismphot_database(convsubfits,
 
         # figure out the projectid, field, ccd, photreftype
         # first, figure out the input frame's projid, field, and ccd
-        frameelems = get_header_keyword_list(frame,
+        frameelems = get_header_keyword_list(convsubfits,
                                              ['object',
                                               'projid'])
         felems = FRAMEREGEX.findall(
-            os.path.basename(frame)
+            os.path.basename(convsubfits)
         )
         field, ccd, projectid = (frameelems['object'],
                                  int(felems[0][2]),
