@@ -1954,6 +1954,7 @@ def subframe_photometry_worker(task):
                    subframe))
             return subframe, None
 
+        # set up the photreftype in the output filename
         if photrefprefix and photrefprefix == 'oneframe':
             photrefbit = 'oneframeref-'
         elif photrefprefix and photrefprefix == 'onehour':
@@ -1963,10 +1964,22 @@ def subframe_photometry_worker(task):
         else:
             photrefbit = ''
 
-        frameiphot = '%s%s-%s_%s.iphot' % (photrefbit,
-                                           frameinfo[0][0],
-                                           frameinfo[0][1],
-                                           frameinfo[0][2])
+        # set up the subtraction type in the output filename
+        if (os.path.basename(subframe)).startswith('rev-subtracted'):
+            subtractionbit = 'revsub-'
+        elif (os.path.basename(subframe)).startswith('subtracted'):
+            subtractionbit = 'normsub-'
+        else:
+            print('%sZ: unknown subtraction type (not reverse/normal) for %s' %
+                  (datetime.utcnow().isoformat(),
+                   subframe))
+            return subframe, None
+
+        frameiphot = '%s%s%s-%s_%s.iphot' % (subtractionbit,
+                                             photrefbit,
+                                             frameinfo[0][0],
+                                             frameinfo[0][1],
+                                             frameinfo[0][2])
 
         if outdir:
             outfile = os.path.join(os.path.abspath(outdir),

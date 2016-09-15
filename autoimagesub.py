@@ -1813,27 +1813,156 @@ def convsub_photometry_to_ismphot_database(convsubfits,
     try:
 
         # figure out the projectid, field, ccd, photreftype
+        # first, figure out the input frame's projid, field, and ccd
+        frameelems = get_header_keyword_list(frame,
+                                             ['object',
+                                              'projid'])
+        felems = FRAMEREGEX.findall(
+            os.path.basename(frame)
+        )
+        field, ccd, projectid = (frameelems['object'],
+                                 int(felems[0][2]),
+                                 frameelems['projid'])
+
+        # figure out the photreftype
+        if 'oneframeref' in convsubfits:
+            photreftype = 'oneframeref'
+        elif 'onehourref' in convsubfits:
+            photreftype = 'onehourref'
+        elif 'onenightref' in convsubfits:
+            photreftype = 'onenightref'
+        else:
+            print('ERR! %sZ: convsub FITS %s does not '
+                  'have a photreftype, not processing...' %
+                  (datetime.utcnow().isoformat(), convsubfits) )
+            return (convsubfits, False)
+
+
+        # figure out the subtraction type
+        if (os.path.basename(convsubfits)).startswith('rev-subtracted'):
+            subtractionbit = 'revsub'
+            subtractiontype = 'reverse'
+        elif (os.path.basename(convsubfits)).startswith('subtracted'):
+            subtractionbit = 'normsub'
+            subtractiontype = 'normal'
+        else:
+            print('ERR! %sZ: unknown subtraction type '
+                  '(not "reverse"/"normal") for %s, not processing...' %
+                  (datetime.utcnow().isoformat(),
+                   convsubfits))
+            return (convsubfits, False)
+
+
+        convsubdir = os.path.abspath(os.path.dirname(convsubfits))
 
         # find the frame's accompanying iphot file
+        iphotbasename = '%s-%s-%s_%s.iphot' % (subtractiontype,
+                                               photreftype,
+                                               frameelems[0][0],
+                                               frameelems[0][1],
+                                               frameelems[0][2])
+        iphotpath = os.path.join(convsubdir, iphotbasename)
+
+        if not os.path.exists(iphotpath):
+            print('ERR! %sZ: expected iphot %s for '
+                  'convsub FITS %s does not exist, '
+                  'not processing...' %
+                  (datetime.utcnow().isoformat(), iphotpath, convsubfits))
+            return (convsubfits, False)
 
         # find the frame's original FITS file (unsubtracted calibrated frame)
+        originalfitsbasename = '%s-%s_%s.fits' % (frameelems[0][0],
+                                                  frameelems[0][1],
+                                                  frameelems[0][2])
+        originalfitspath = os.path.join(convsubdir, originalfitsbasename)
+
+        if not os.path.exists(originalfitspath):
+            print('%ERR! sZ: expected original FITS %s '
+                  'for convsub FITS %s does not exist, '
+                  'not processing...' %
+                  (datetime.utcnow().isoformat(),
+                   originalfitspath, convsubfits))
+            return (convsubfits, False)
 
         # figure out the frame's JD from the original frame's header
+        framerjd = get_header_keyword(originalfitspath, 'JD')
+
+        # now open the accompanying iphot file, and note all the HATIDs
+        with open(iphotpath,'rb') as infd:
+            iphotobjects = [x.split()[0] for x in infd]
 
         # update the iphotfiles table file with all of this info. if there's a
         # uniqueness conflict, i.e. this same combination exists, then overwrite
         # if told to do so
+        if overwrite:
 
-        # now open the accompanying iphot file, and note all the HATIDs
+            query = ("insert into iphotfiles "
+                     "(projectid, field, ccd, photreftype, convsubtype, "
+                     "isactive, iphotfilepath, framerjd, framefilepath) "
+                     "values ("
+                     "%s, %s, %s, %s, %s, "
+                     "%s, %s, %s, %s"
+                     ") on conflict do update")
+
+        else:
+
+            query = ("insert into iphotfiles "
+                     "(projectid, field, ccd, photreftype, convsubtype, "
+                     "isactive, iphotfilepath, framerjd, framefilepath) "
+                     "values ("
+                     "%s, %s, %s, %s, %s, "
+                     "%s, %s, %s, %s"
+                     ")")
+
+        params = (projectid, field, ccd, photreftype, subtractiontype,
+                  True, iphotfilepath, framerjd, originalfitspath)
+
+        # execute the query to insert the object
+        cursor.execute(query, params)
+        database.commit()
 
         # update the iphotobjects table with all of these objects. if there's a
         # uniqueness conflict, i.e. this same combination exists, then overwrite
         # if told to do so
 
-        # once everything's OK, commit to the database
+        if overwrite:
+
+            query = ("insert into iphotfiles "
+                     "(projectid, field, ccd, photreftype, convsubtype, "
+                     "isactive, objectid, iphotfilepath, iphotfileline) "
+                     "values ("
+                     "%s, %s, %s, %s, %s, "
+                     "%s, %s, %s, %s"
+                     ") on conflict do update")
+
+        else:
+
+            query = ("insert into iphotfiles "
+                     "(projectid, field, ccd, photreftype, convsubtype, "
+                     "isactive, objectid, iphotfilepath, iphotfileline) "
+                     "values ("
+                     "%s, %s, %s, %s, %s, "
+                     "%s, %s, %s, %s"
+                     ")")
+
+        # execute statements for all of the iphot objects
+        for ind, objectid in enumerate(iphotobjects):
+
+            params = (projectid, field, ccd, photreftype, subtractiontype,
+                      True, objectid, iphotfilepath, iphotfileline)
+            cur.execute(query, params)
+
+        database.commit()
+
+        print('%sZ: convsub FITS %s with iphot %s and %s objects '
+              'inserted into DB OK' %
+              (datetime.utcnow().isoformat(),
+               convsubfits,
+               iphotfilepath,
+               len(iphotobjects)) )
 
         # return True if everything succeeded
-        returnval = (consubfits, True)
+        returnval = (convsubfits, True)
 
     # if everything goes wrong, exit cleanly
     except Exception as e:
@@ -1847,9 +1976,11 @@ def convsub_photometry_to_ismphot_database(convsubfits,
         returnval = (convsubfits, False)
 
 
-    if closedb:
+    finally:
+
         cursor.close()
-        database.close()
+        if closedb:
+            database.close()
 
     return returnval
 
