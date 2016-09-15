@@ -83,6 +83,10 @@ PGUSER = 'hpx'
 PGDATABASE = 'hpx'
 PGHOST = 'localhost'
 
+# these define the light curve directory
+LCBASEDIR = '/P/LC'
+
+
 with open(PGPASSFILE) as infd:
     pgpass_contents = infd.readlines()
     pgpass_contents = [x.split(':') for x in pgpass_contents]
@@ -2093,6 +2097,11 @@ def parallel_convsubphot_to_db(convsubfitslist,
 ############################
 ## LIGHT CURVE PRODUCTION ##
 ############################
+
+# we'll make hatlc.sqlite type files, collecting them in /P/LC, under the
+# following organization:
+# {primary_field}/{hatid}-DR{datarelease}-V{lcversion}-PR{projectid}hatlc.sqlite
+# we'll collect all photometry across observed fields and CCDs in the same file
 
 
 
