@@ -1974,6 +1974,7 @@ def convsub_photometry_to_ismphot_database(convsubfits,
                (datetime.utcnow().isoformat(),
                 message, format_exc()) )
         returnval = (convsubfits, False)
+        raise
 
 
     finally:
@@ -1981,7 +1982,6 @@ def convsub_photometry_to_ismphot_database(convsubfits,
         cursor.close()
         if closedb:
             database.close()
-            print('database closed')
 
     return returnval
 
