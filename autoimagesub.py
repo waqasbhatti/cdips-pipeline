@@ -1902,7 +1902,16 @@ def convsub_photometry_to_ismphot_database(convsubfits,
                      "values ("
                      "%s, %s, %s, %s, %s, "
                      "%s, %s, %s, %s"
-                     ") on conflict do update")
+                     ") on conflict do update "
+                     "set projectid = %s, field = %s, ccd = %s, "
+                     "photreftype = %s, convsubtype = %s, "
+                     "isactive = %s, iphotfilepath = %s, framerjd = %s, "
+                     "framefilepath = %s")
+
+            params = (projectid, field, ccd, photreftype, subtractiontype,
+                      True, iphotpath, framerjd, originalfitspath,
+                      projectid, field, ccd, photreftype, subtractiontype,
+                      True, iphotpath, framerjd, originalfitspath)
 
         else:
 
@@ -1913,9 +1922,9 @@ def convsub_photometry_to_ismphot_database(convsubfits,
                      "%s, %s, %s, %s, %s, "
                      "%s, %s, %s, %s"
                      ")")
+            params = (projectid, field, ccd, photreftype, subtractiontype,
+                      True, iphotpath, framerjd, originalfitspath)
 
-        params = (projectid, field, ccd, photreftype, subtractiontype,
-                  True, iphotpath, framerjd, originalfitspath)
 
         # execute the query to insert the object
         cursor.execute(query, params)
@@ -1933,7 +1942,10 @@ def convsub_photometry_to_ismphot_database(convsubfits,
                      "values ("
                      "%s, %s, %s, %s, %s, "
                      "%s, %s, %s, %s"
-                     ") on conflict do update")
+                     ") on conflict do update set "
+                     "projectid = %s, field = %s, ccd = %s, photreftype = %s, "
+                     "convsubtype = %s, isactive = %s, objectid = %s, "
+                     "iphotfilepath = %s, iphotfileline = %s")
 
         else:
 
@@ -1948,8 +1960,15 @@ def convsub_photometry_to_ismphot_database(convsubfits,
         # execute statements for all of the iphot objects
         for ind, objectid in enumerate(iphotobjects):
 
-            params = (projectid, field, ccd, photreftype, subtractiontype,
-                      True, objectid, iphotpath, ind)
+            if overwrite:
+                params = (projectid, field, ccd, photreftype, subtractiontype,
+                          True, objectid, iphotpath, ind,
+                          projectid, field, ccd, photreftype, subtractiontype,
+                          True, objectid, iphotpath, ind,)
+            else:
+                params = (projectid, field, ccd, photreftype, subtractiontype,
+                          True, objectid, iphotpath, ind)
+
             cur.execute(query, params)
 
         database.commit()
