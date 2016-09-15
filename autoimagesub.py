@@ -1856,7 +1856,7 @@ def convsub_photometry_to_ismphot_database(convsubfits,
         convsubdir = os.path.abspath(os.path.dirname(convsubfits))
 
         # find the frame's accompanying iphot file
-        iphotbasename = '%s-%s-%s-%s_%s.iphot' % (subtractiontype,
+        iphotbasename = '%s-%s-%s-%s_%s.iphot' % (subtractionbit,
                                                   photreftype,
                                                   felems[0][0],
                                                   felems[0][1],
