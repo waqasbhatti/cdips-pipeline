@@ -41,8 +41,8 @@ import psycopg2 as pg
 
 import aperturephot as ap
 import imagesubphot as ism
-from imageutils import get_header_keyword_list, fits_to_full_jpeg, \
-    check_frame_warping
+from imageutils import get_header_keyword, get_header_keyword_list, \
+    fits_to_full_jpeg, check_frame_warping
 
 # get fiphot binary reader
 try:
