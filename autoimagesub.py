@@ -1823,9 +1823,12 @@ def convsub_photometry_to_ismphot_database(convsubfits,
         felems = FRAMEREGEX.findall(
             os.path.basename(convsubfits)
         )
-        field, ccd, projectid = (frameelems['object'],
-                                 int(felems[0][2]),
-                                 frameelems['projid'])
+
+        if not (projectid and field and ccd):
+
+            field, ccd, projectid = (frameelems['object'],
+                                     int(felems[0][2]),
+                                     frameelems['projid'])
 
         # figure out the photreftype
         if 'oneframeref' in convsubfits:
@@ -2031,6 +2034,21 @@ def convsub_photometry_to_ismphot_database(convsubfits,
 
 
 
+def parallel_convsubphotdb_worker(task):
+    '''This wraps the function above for use with the parallel driver below.
+
+    task[0] = convsubfits
+    task[1] = {'projectid', 'field', 'ccd', 'overwrite'}
+
+    '''
+
+    convsubfits = task[0]
+    kwargs = task[1]
+
+    return convsub_photometry_to_ismphot_databse(convsubphots,**kwargs)
+
+
+
 def parallel_convsubphot_to_db(convsubfitslist,
                                projectid=None,
                                field=None,
@@ -2042,6 +2060,32 @@ def parallel_convsubphot_to_db(convsubfitslist,
 
     '''
 
+    tasks = [(x, {'projectid':projectid, 'field':field,
+                  'ccd':ccd, 'overwrite':overwrite})
+             for x in convsubfitslist if os.path.exists(x)]
+
+    print('%sZ: %s files to process' %
+          (datetime.utcnow().isoformat(), len(tasks)))
+
+    if len(tasks) > 0:
+
+        pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+
+        # fire up the pool of workers
+        results = pool.map(parallel_convsubphotdb_worker, tasks)
+
+        # wait for the processes to complete work
+        pool.close()
+        pool.join()
+
+        return {x:y for (x,y) in results}
+
+    else:
+
+        print('ERR! %sZ: none of the files specified exist, bailing out...' %
+              (datetime.utcnow().isoformat(),))
+        return
 
 
 
