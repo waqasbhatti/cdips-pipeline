@@ -1991,6 +1991,7 @@ def convsub_photometry_to_ismphot_database(convsubfits,
         returnval = (convsubfits, True)
 
 
+    # catch the overwrite = False scenario
     except pg.IntegrityError as e:
 
         database.rollback()
