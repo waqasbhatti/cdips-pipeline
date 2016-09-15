@@ -1949,7 +1949,7 @@ def convsub_photometry_to_ismphot_database(convsubfits,
         for ind, objectid in enumerate(iphotobjects):
 
             params = (projectid, field, ccd, photreftype, subtractiontype,
-                      True, objectid, iphotpath, iphotfileline)
+                      True, objectid, iphotpath, ind)
             cur.execute(query, params)
 
         database.commit()
