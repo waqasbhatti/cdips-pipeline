@@ -210,7 +210,8 @@ def find_subtracted_fits_fieldprojectidccd(
         field,
         projectid,
         ccd,
-        fglob='subtracted-?-???????_?-xtrns.fits',
+        subtracttype,
+        photreftype,
         nworkers=8,
         maxworkertasks=1000
 ):
@@ -220,6 +221,8 @@ def find_subtracted_fits_fieldprojectidccd(
     Returns a flat list of matching FITS, and list of all fits + their info.
 
     '''
+
+    fglob= '%s-%s-?-???????_?-xtrns.fits' % (subtracttype, photreftype)
 
     return find_original_fits_fieldprojectidccd(dirlist,
                                                 field,
