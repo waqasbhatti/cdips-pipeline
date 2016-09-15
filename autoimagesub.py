@@ -1964,6 +1964,20 @@ def convsub_photometry_to_ismphot_database(convsubfits,
         # return True if everything succeeded
         returnval = (convsubfits, True)
 
+
+    except pg.IntegrityError as e:
+
+        database.rollback()
+
+        message = ('failed to insert photometry from %s '
+                   'into DB because it exists already '
+                   'and overwrite = False'
+                   % convsubfits)
+        print('EXC! %sZ: %s\n%s' %
+               (datetime.utcnow().isoformat(), message, format_exc()) )
+        returnval = (convsubfits, False)
+
+
     # if everything goes wrong, exit cleanly
     except Exception as e:
 
