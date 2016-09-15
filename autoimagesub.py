@@ -1896,6 +1896,10 @@ def convsub_photometry_to_ismphot_database(convsubfits,
         # if told to do so
         if overwrite:
 
+            print('%WRN! sZ: overwriting existing photometry info in DB for %s'
+                  %
+                  (datetime.utcnow().isoformat(), convsubfits))
+
             query = ("insert into iphotfiles "
                      "(projectid, field, ccd, photreftype, convsubtype, "
                      "isactive, iphotfilepath, framerjd, framefilepath) "
@@ -1971,7 +1975,7 @@ def convsub_photometry_to_ismphot_database(convsubfits,
                 params = (projectid, field, ccd, photreftype, subtractiontype,
                           True, objectid, iphotpath, ind)
 
-            cur.execute(query, params)
+            cursor.execute(query, params)
 
         database.commit()
 
