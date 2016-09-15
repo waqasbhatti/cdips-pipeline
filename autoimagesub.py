@@ -1902,7 +1902,7 @@ def convsub_photometry_to_ismphot_database(convsubfits,
                      "values ("
                      "%s, %s, %s, %s, %s, "
                      "%s, %s, %s, %s"
-                     ") on conflict constraint iphotfiles_pkey "
+                     ") on conflict on constraint iphotfiles_pkey "
                      "do update "
                      "set projectid = %s, field = %s, ccd = %s, "
                      "photreftype = %s, convsubtype = %s, "
@@ -1943,7 +1943,8 @@ def convsub_photometry_to_ismphot_database(convsubfits,
                      "values ("
                      "%s, %s, %s, %s, %s, "
                      "%s, %s, %s, %s"
-                     ") on conflict constraint iphotobjects_pkey do update set "
+                     ") on conflict on constraint iphotobjects_pkey "
+                     "do update set "
                      "projectid = %s, field = %s, ccd = %s, photreftype = %s, "
                      "convsubtype = %s, isactive = %s, objectid = %s, "
                      "iphotfilepath = %s, iphotfileline = %s")
