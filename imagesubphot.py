@@ -3070,6 +3070,7 @@ def serial_run_epd_imagesub(ilcdir,
 
     00 rjd    Reduced Julian Date (RJD = JD - 2400000.0)
     01 rstfc  Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
+
     02 hat    HAT ID of the object
     03 xcc    original X coordinate on CCD on photref frame
     04 ycc    original y coordinate on CCD on photref frame

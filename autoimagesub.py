@@ -86,6 +86,9 @@ PGHOST = 'localhost'
 # these define the light curve directory
 LCBASEDIR = '/P/LC'
 
+# this is to recognize a HATID
+HATIDREGEX = re.compile(r'^HAT\-\d{3}\-\d{7}$')
+
 
 with open(PGPASSFILE) as infd:
     pgpass_contents = infd.readlines()
@@ -93,6 +96,7 @@ with open(PGPASSFILE) as infd:
     PGPASSWORD = [x[-1] for x in pgpass_contents
                   if (x[0] == PGHOST and x[2] == PGDATABASE and x[3] == PGUSER)]
     PGPASSWORD = PGPASSWORD[0].strip('\n')
+
 
 
 ###############
@@ -1803,12 +1807,9 @@ def convsub_photometry_to_ismphot_database(convsubfits,
 
     # open a database connection
     if database:
-
         cursor = database.cursor()
         closedb = False
-
     else:
-
         database = pg.connect(user=PGUSER,
                               password=PGPASSWORD,
                               database=PGDATABASE,
@@ -2100,9 +2101,168 @@ def parallel_convsubphot_to_db(convsubfitslist,
 
 # we'll make hatlc.sqlite type files, collecting them in /P/LC, under the
 # following organization:
-# {primary_field}/{hatid}-DR{datarelease}-V{lcversion}-PR{projectid}hatlc.sqlite
+# {primary_field}/{hatid}-DR{datarelease}-V{lcversion}.hatlc.sqlite(.gz)
 # we'll collect all photometry across observed fields and CCDs in the same file
 
+
+def get_iphot_line(iphot, linenum, lcobject, iphotlinechars=338):
+    '''
+    This gets a random iphot line out of the file iphot.
+
+    '''
+
+    iphotf = open(iphot, 'rb')
+    filelinenum = iphotlinechars*linenum
+
+    if filelinenum > 0:
+        iphotf.seek(filelinenum - 100)
+    else:
+        iphotf.seek(filelinenum)
+
+    iphotline = iphotf.read(iphotlinechars + 100)
+
+    linestart = iphotline.index(lcobject)
+    iphotline = iphotline[linestart:]
+    lineend = iphotline.index('\n')
+    iphotline = iphotline[:lineend]
+
+    iphotf.close()
+
+    return iphotline
+
+
+
+def collect_lightcurve(objectid,
+                       datarelease,
+                       lcversion,
+                       objectfield=None,
+                       lcbasedir=LCBASEDIR,
+                       iphotlinechars=338,
+                       updateifexists=True,
+                       database=None):
+    '''This collects lightcurves for objectid into a hatlc.sqlite file.
+
+    We'll collect all photometry across observed fields and CCDs in the same
+    file, organized as below:
+
+    {LCBASEDIR} / DR{datarelease} / {primary_field} /
+    {hatid}-DR{datarelease}-V{lcversion}.hatlc.sqlite
+
+    If an LC doesn't exist for this objectid/datarelease/lcversion, then creates
+    a new sqlitecurve. If one already exists and updateifexists is True, updates
+    the light curve with new observations.
+
+    FIXME: if we're going to run realtime imagesubphot, this will require that a
+    collect_lightcurve is run after every image is taken. This will probably be
+    stupidly slow...
+
+    '''
+
+    # open a database connection
+    if database:
+        database.autocommit = True # this is a readonly connection
+        cursor = database.cursor()
+        closedb = False
+    else:
+        database = pg.connect(user=PGUSER,
+                              password=PGPASSWORD,
+                              database=PGDATABASE,
+                              host=PGHOST)
+        database.autocommit = True
+        cursor = database.cursor()
+        closedb = True
+
+    # start work here
+    try:
+
+        # find the photometry for the specified objectid
+        query = ("select a.projectid, a.field, a.ccd, a.photreftype, "
+                 "a.convsubtype, a.iphotfilepath, a.framefilepath, "
+                 "a.framerjd, b.iphotfileline "
+                 "from iphotfiles a join iphotobjects b on "
+                 "(a.iphotfilepath = b.iphotfilepath) "
+                 "where "
+                 "(isactive = true) and "
+                 "(b.objectid = %s) order by a.framerjd asc")
+        params = (objectid, )
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+
+        # if there are any rows, then there are some detections of this object
+        if rows and len(rows) > 0:
+
+            if HATIDREGEX.match(objectid):
+                primary_field = objectid.split('-')[1]
+            elif objectfield:
+                primary_field = objectfield
+            else:
+                primary_field = 'nofield'
+
+            # prepare the output directory
+            lcdir = os.path.join(LCBASEDIR,
+                                 'DR%s' % datarelease,
+                                 '%s' % primary_field)
+
+            # make the light curve directory if it doesn't exist
+            if not os.path.exists(lcdir):
+                os.mkdirs(lcdir)
+
+            # this is the path to the light curve file itself
+            lcfbasename = '{objectid}-DR{datarelease}-V{lcversion}-hatlc.sqlite'
+            lcfpath = os.path.join(lcdir, lcfbasename)
+
+            # if it doesn't exist, we can make a new file
+            if not os.path.exists(lcfpath):
+
+                sqlcdb = sqlite3.connect(lcfpath)
+                sqlcur = sqlcdb.cursor()
+
+            # check if the path to it exists and if updateifexisting is True
+            # if so, we can update it
+            if updateifexisting:
+
+                print('WRN! %sZ: objectid %s has an '
+                      'existing LC %s, updating...' %
+                      (datetime.utcnow().isoformat(), objectid, lcfpath) )
+
+            # if we're not allowed to update it, fail out
+            else:
+
+                print('ERR! %sZ: objectid %s has an existing LC %s '
+                      'and updateifexisting = False, skipping this object...' %
+                      (datetime.utcnow().isoformat(), objectid, lcfpath) )
+                return objectid, None
+
+            # now read in the iphot files one-by-one and write their photometry
+            # lines to the sqlite
+
+
+
+
+
+    # if everything goes wrong, exit cleanly
+    except Exception as e:
+
+        database.rollback()
+
+        message = 'failed to collect light curve for %s, DR%s, V%s' % (
+            objectid, datarelease, lcversion
+        )
+        print('EXC! %sZ: %s\nexception was: %s' %
+               (datetime.utcnow().isoformat(),
+                message, format_exc()) )
+        returnval = (objectid, None)
+        raise
+
+
+    finally:
+
+        cursor.close()
+        if closedb:
+            database.close()
+
+    return returnval
 
 
 #############################
