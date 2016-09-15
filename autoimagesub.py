@@ -2028,6 +2028,20 @@ def convsub_photometry_to_ismphot_database(convsubfits,
 
 
 
+def parallel_convsubphot_to_db(convsubfitslist,
+                               projectid=None,
+                               field=None,
+                               ccd=None,
+                               overwrite=False,
+                               nworkers=16,
+                               maxworkertasks=1000):
+    '''This runs a convsubphot ingest in parallel.
+
+    '''
+
+
+
+
 
 ############################
 ## LIGHT CURVE PRODUCTION ##
