@@ -44,6 +44,8 @@ import imagesubphot as ism
 from imageutils import get_header_keyword, get_header_keyword_list, \
     fits_to_full_jpeg, check_frame_warping
 
+from numpy import nan
+
 # get fiphot binary reader
 try:
     from HATpipepy.Common.BinPhot import read_fiphot
@@ -62,6 +64,9 @@ DEBUG = False
 
 # used to get the station ID, frame number, and CCD number from a FITS filename
 FRAMEREGEX = re.compile(r'(\d{1})\-(\d{6}\w{0,1})_(\d{1})')
+
+# used to get the station ID, frame number, subframe, and CCD number
+FRAMESUBREGEX = re.compile(r'(\d{1})\-(\d{6})(\w{0,1})_(\d{1})')
 
 # this defines the field string and CCDs
 FIELD_REGEX = re.compile('^G(\d{2})(\d{2})([\+\-]\d{2})(\d{2})_(\w{3})$')
@@ -102,6 +107,26 @@ with open(PGPASSFILE) as infd:
 ###############
 ## UTILITIES ##
 ###############
+
+def smartcast(castee, caster, subval=None):
+    '''
+    This just tries to apply the caster function to castee.
+
+    Returns None on failure.
+
+    '''
+
+    try:
+        return caster(castee)
+    except Exception as e:
+        if caster is float or caster is int:
+            return nan
+        elif caster is str:
+            return ''
+        else:
+            return subval
+
+
 
 def fits_fieldprojectidccd_worker(frame):
     '''
@@ -1637,8 +1662,7 @@ def get_combined_photref(projectid,
 ##################################
 
 def xtrnsfits_convsubphot_worker(task):
-    '''
-    This is a parallel worker for framelist_convsubphot_photref below.
+    '''This is a parallel worker for framelist_convsubphot_photref below.
 
     task[0] = xtrnsfits file
     task[1] = photreftype to use <"oneframe"|"onehour"|"onenight">
@@ -1648,6 +1672,22 @@ def xtrnsfits_convsubphot_worker(task):
     task[5] = findnewobjects boolean
     task[6] = photdisjointradius
     task[7] = refinfo
+
+    FIXME: we must store the apertures used for photometry
+    FIXME: we must store the kernel used for convolution
+
+    FIXME: consider just using a hash to combine all this info in the output
+           iphots and subtracted *-xtrns.fits files
+
+    TODO: think about combining this with the database import step below.
+          - write the iphot to /dev/shm
+          - use pg's \copy protocol to quickly import it into the database
+          - once committed, remove the /dev/shm file
+
+    TODO: we're now planning on writing photometry directly to the pg
+    database. we'll use partitioned tables created automatically per week to
+    hold the photometry. the partition key will be the framejd converted to a pg
+    UTC timestamp.
 
     '''
 
@@ -1802,6 +1842,9 @@ def convsub_photometry_to_ismphot_database(convsubfits,
     If projectid, field, ccd are not provided, gets them from the FITS
     file. Also gets the photreftype from the filename of the
     convolved-subtracted photometry iphot file.
+
+    TODO: consider using the /dev/shm partition to write the temporary ismphot
+    file to and then immediately copying it into the pg database using \copy.
 
     '''
 
@@ -2104,40 +2147,11 @@ def parallel_convsubphot_to_db(convsubfitslist,
 # {primary_field}/{hatid}-DR{datarelease}-V{lcversion}.hatlc.sqlite(.gz)
 # we'll collect all photometry across observed fields and CCDs in the same file
 
-
-def get_iphot_line(iphot, linenum, lcobject, iphotlinechars=338):
-    '''
-    This gets a random iphot line out of the file iphot.
-
-    '''
-
-    iphotf = open(iphot, 'rb')
-    filelinenum = iphotlinechars*linenum
-
-    if filelinenum > 0:
-        iphotf.seek(filelinenum - 100)
-    else:
-        iphotf.seek(filelinenum)
-
-    iphotline = iphotf.read(iphotlinechars + 100)
-
-    linestart = iphotline.index(lcobject)
-    iphotline = iphotline[linestart:]
-    lineend = iphotline.index('\n')
-    iphotline = iphotline[:lineend]
-
-    iphotf.close()
-
-    return iphotline
-
-
-
 def collect_lightcurve(objectid,
                        datarelease,
                        lcversion,
                        objectfield=None,
                        lcbasedir=LCBASEDIR,
-                       iphotlinechars=338,
                        updateifexists=True,
                        database=None):
     '''This collects lightcurves for objectid into a hatlc.sqlite file.
@@ -2218,6 +2232,18 @@ def collect_lightcurve(objectid,
                 sqlcdb = sqlite3.connect(lcfpath)
                 sqlcur = sqlcdb.cursor()
 
+                # read in the hatlc.sql file and execute it to generate the
+                # tables for the hatlc
+                hatlcsqlf = os.path.join(os.path.dirname(__file__),
+                                         'hatlc.sql')
+                with open(hatlcsqlf,'rb') as infd:
+                    hatlcsql = infd.read()
+
+                sqlcur.executescript(hatlcsql)
+                # the lightcurve is now ready to use, but has no information in
+                # it, we'll add this at a later step
+
+
             # check if the path to it exists and if updateifexisting is True
             # if so, we can update it
             if updateifexisting:
@@ -2236,7 +2262,58 @@ def collect_lightcurve(objectid,
 
             # now read in the iphot files one-by-one and write their photometry
             # lines to the sqlite
+            for row in rows:
 
+                (projectid, ofield, ccd, photreftype,
+                 convsubtype, iphot, frame, rjd, iphotline) = row
+
+                # open the iphot file
+                with open(iphot,'rb') as infd:
+                    for ind, line in enumerate(infd):
+                        if ind == iphotline:
+                            photelemline = line.rstrip(' \n')
+                            break
+
+                photelem = photelemline.split()
+
+                if len(photelem) > 0:
+
+                    # get the station, framenumber, subframe, and ccd
+                    framekeyelems = FRAMESUBREGEX.findall(
+                        os.path.basename(iphot)
+                    )
+                    stf, cfn, cfs, fccd = (
+                        framekeyelems[0][0],
+                        framekeyelems[0][1],
+                        framekeyelems[0][2],
+                        framekeyelems[0][3]
+                    )
+                    net = 'HP' # this will be 'HP' for HATPI
+
+                    # these are things we get from the iphot line
+                    # hat, xcc, ycc, xic, yic
+                    # fsv, fdv, fkv, bgv, bge
+                    # ifl1, ife1, irm1, ire1, irq1
+                    # ifl2, ife2, irm2, ire2, irq2
+                    # ifl2, ife2, irm2, ire2, irq2
+
+                    hat, xcc, ycc, xic, yic = photelem[:5]
+                    fsv, fdv, fkv, bgv, bge = photelem[5:10]
+                    ifl1, ife1, irm1, ire1, irq1 = photelem[10:15]
+                    ifl2, ife2, irm2, ire2, irq2 = photelem[15:20]
+                    ifl3, ife3, irm3, ire3, irq3 = photelem[20:]
+
+                    # format these as needed
+                    xcc = smartcast(xcc, float)
+                    ycc = smartcast(ycc, float)
+                    xic = smartcast(xic, float)
+                    yic = smartcast(yic, float)
+
+                    fsv = smartcast(fsv)
+                    fdv = smartcast(fdv)
+                    fkv = smartcast(fkv)
+                    bgv = smartcast(bgv)
+                    bge = smartcast(bge)
 
 
 
