@@ -1430,11 +1430,13 @@ def photref_convolution_worker(task):
 
         if not outdir:
             outfile = os.path.join(os.path.dirname(frametoconvolve),
-                                   'PHOTREF-%s' % os.path.basename(frametoconvolve))
+                                   'PHOTREF-%s' %
+                                   os.path.basename(frametoconvolve))
 
         else:
             outfile = os.path.join(outdir,
-                                   'PHOTREF-%s' % os.path.basename(frametoconvolve))
+                                   'PHOTREF-%s' %
+                                   os.path.basename(frametoconvolve))
 
         cmdtorun = PHOTREFCONVOLVECMD.format(
             targetframe=targetframe,
