@@ -165,6 +165,7 @@ import json
 import shutil
 import random
 import cPickle as pickle
+from hashlib import md5
 
 # used for fast random access to lines in text files
 from linecache import getline
@@ -1583,7 +1584,7 @@ def photometry_on_combined_photref(
         outfile=None,
         framewidth=None,
         searchradius=8.0,
-        astrometrysourcethreshold=25000,
+        astrometrysourcethreshold=50000,
         ):
     '''
     This does source extraction, WCS, catalog projection, and then runs fiphot
@@ -1738,6 +1739,30 @@ def photometry_on_combined_photref(
 ## CONVOLUTION AND SUBTRACTION ##
 #################################
 
+def get_convsubfits_hash(photreftype, subtracttype, kernelspec):
+    '''
+    This calculates a hash for the convsub FITS files.
+
+    '''
+
+    return md5('%s-%s-%s' % (photreftype, subtracttype,
+                             kernelspec)).hexdigest()[:8]
+
+
+
+def get_convsubphot_hash(photreftype, subtracttype,
+                         kernelspec, lcapertures):
+    '''
+    This calculates a hash for the convsub iphot files.
+
+    '''
+
+    return md5('%s-%s-%s-%s' % (photreftype, subtracttype,
+                                kernelspec, lcapertures)).hexdigest()[:8]
+
+
+
+
 def subframe_convolution_worker(task):
     '''This is a parallel worker to convolve the combined photref frame to each
 input frame, subtract them, and then return the subtracted frame. Used by
@@ -1756,14 +1781,11 @@ convolve_and_subtract_frames below.
     (frametoconvolve, targetframe, convregfile,
      kernelspec, outdir, reversesubtract, photrefprefix) = task
 
-    if photrefprefix and photrefprefix == 'oneframe':
-        photrefbit = 'oneframeref-'
-    elif photrefprefix and photrefprefix == 'onehour':
-        photrefbit = 'onehourref-'
-    elif photrefprefix and photrefprefix == 'onenight':
-        photrefbit = 'onenightref-'
-    else:
-        photrefbit = ''
+    # get the hash to prepend to the file
+    outfitshash = get_convsubfits_hash(photrefprefix,
+                                       ('reverse' if reversesubtract else
+                                        'normal'),
+                                       kernelspec)
 
     try:
 
@@ -1774,43 +1796,43 @@ convolve_and_subtract_frames below.
         if not outdir:
             if reversesubtract:
                 outfile = os.path.join(os.path.dirname(targetframe),
-                                       'rev-subtracted-%s%s' %
-                                       (photrefbit,
+                                       'rsub-%s-%s' %
+                                       (outfitshash,
                                         os.path.basename(targetframe)))
 
                 outkernel = os.path.join(os.path.dirname(targetframe),
-                                         '%s%s-kernel' %
-                                         (photrefbit,
+                                         'rsub-%s-%s-kernel' %
+                                         (outfitshash,
                                           os.path.basename(targetframe)))
             else:
                 outfile = os.path.join(os.path.dirname(frametoconvolve),
-                                       'subtracted-%s%s' %
-                                       (photrefbit,
+                                       'nsub-%s-%s' %
+                                       (outfitshash,
                                         os.path.basename(frametoconvolve)))
 
                 outkernel = os.path.join(os.path.dirname(frametoconvolve),
-                                         '%s%s-kernel' %
-                                         (photrefbit,
+                                         'nsub-%s-%s-kernel' %
+                                         (outfitshash,
                                           os.path.basename(frametoconvolve)))
 
         else:
             if reversesubtract:
                 outfile = os.path.join(outdir,
-                                       'rev-subtracted-%s%s' %
-                                       (photrefbit,
+                                       'rsub-%s-%s' %
+                                       (outfitshash,
                                         os.path.basename(targetframe)))
                 outkernel = os.path.join(outdir,
-                                         '%s%s-kernel' %
-                                         (photrefbit,
+                                         'rsub-%s-%s-kernel' %
+                                         (outfitshash,
                                           os.path.basename(targetframe)))
             else:
                 outfile = os.path.join(outdir,
-                                       'subtracted-%s%s' %
-                                       (photrefbit,
+                                       'nsub-%s-%s' %
+                                       (outfitshash,
                                         os.path.basename(frametoconvolve)))
                 outkernel = os.path.join(outdir,
-                                         '%s%s-kernel' %
-                                         (photrefbit,
+                                         'nsub-%s-%s-kernel' %
+                                         (outfitshash,
                                           os.path.basename(frametoconvolve)))
 
         cmdtorun = CONVOLVESUBFRAMESCMD.format(
@@ -1853,6 +1875,7 @@ convolve_and_subtract_frames below.
         print('ERR! %sZ: photref convolution failed for %s, exception %s' %
               (datetime.utcnow().isoformat(), frametoconvolve, e))
         return frametoconvolve, None
+
 
 
 def convolve_and_subtract_frames(fitsdir,
@@ -1912,13 +1935,15 @@ def subframe_photometry_worker(task):
     task[5] -> subtracted frame xysdk file
     task[6] -> output directory
     task[7] -> photrefprefix
+    task[8] -> kernelspec (copy this from input to subtraction)
+    task[9] -> lcapertures (copy this from input to photref photometry)
 
     '''
 
     # get the info out of the task
     (subframe, photrefrawphot, disjointrad,
      subframekernel, subframeitrans, subframexysdk,
-     outdir, photrefprefix) = task
+     outdir, photrefprefix, kernelspec, lcapertures) = task
 
     try:
 
@@ -1956,32 +1981,31 @@ def subframe_photometry_worker(task):
                    subframe))
             return subframe, None
 
-        # set up the photreftype in the output filename
-        if photrefprefix and photrefprefix == 'oneframe':
-            photrefbit = 'oneframeref-'
-        elif photrefprefix and photrefprefix == 'onehour':
-            photrefbit = 'onehourref-'
-        elif photrefprefix and photrefprefix == 'onenight':
-            photrefbit = 'onenightref-'
-        else:
-            photrefbit = ''
-
         # set up the subtraction type in the output filename
-        if (os.path.basename(subframe)).startswith('rev-subtracted'):
-            subtractionbit = 'revsub-'
-        elif (os.path.basename(subframe)).startswith('subtracted'):
-            subtractionbit = 'normsub-'
+        if (os.path.basename(subframe)).startswith('rsub'):
+            subtractionbit = 'rsub'
+            subtracttype = 'reverse'
+        elif (os.path.basename(subframe)).startswith('nsub'):
+            subtractionbit = 'nsub'
+            subtracttype = 'normal'
         else:
             print('%sZ: unknown subtraction type (not reverse/normal) for %s' %
                   (datetime.utcnow().isoformat(),
                    subframe))
             return subframe, None
 
-        frameiphot = '%s%s%s-%s_%s.iphot' % (subtractionbit,
-                                             photrefbit,
-                                             frameinfo[0][0],
-                                             frameinfo[0][1],
-                                             frameinfo[0][2])
+        # calculate the hash
+        outiphothash = get_convsubphot_hash(photrefprefix,
+                                            subtracttype,
+                                            kernelspec,
+                                            lcapertures)
+
+
+        frameiphot = '%s-%s-%s-%s_%s.iphot' % (subtractionbit,
+                                               outiphothash,
+                                               frameinfo[0][0],
+                                               frameinfo[0][1],
+                                               frameinfo[0][2])
 
         if outdir:
             outfile = os.path.join(os.path.abspath(outdir),

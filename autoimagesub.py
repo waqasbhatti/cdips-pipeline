@@ -1672,12 +1672,7 @@ def xtrnsfits_convsubphot_worker(task):
     task[5] = findnewobjects boolean
     task[6] = photdisjointradius
     task[7] = refinfo
-
-    FIXME: we must store the apertures used for photometry
-    FIXME: we must store the kernel used for convolution
-
-    FIXME: consider just using a hash to combine all this info in the output
-           iphots and subtracted *-xtrns.fits files
+    task[8] = lcapertures
 
     TODO: think about combining this with the database import step below.
           - write the iphot to /dev/shm
@@ -1693,7 +1688,7 @@ def xtrnsfits_convsubphot_worker(task):
 
     (frame, photreftype, outdir,
      kernelspec, reversesubtract, findnewobjects, photdisjointradius,
-     refinfo) = task
+     refinfo, lcapertures) = task
 
     try:
 
@@ -1726,15 +1721,24 @@ def xtrnsfits_convsubphot_worker(task):
                   (datetime.utcnow().isoformat(), frame))
             return frame, None
 
-
         # find new objects in the subtracted frame if told to do so
         if findnewobjects:
             pass
 
         # find matching kernel, itrans, and xysdk files for each subtracted
         # frame
+
+        # generate the convsubfits hash
+        convsubhash = get_convsubfits_hash(
+            photreftype,
+            ('reverse' if os.path.basename(convsub).startswith('rsub')
+             else 'normal'),
+            kernelspec
+        )
+
         frameinfo = FRAMEREGEX.findall(os.path.basename(convsub))
-        kernel = '%sref-%s-%s_%s-xtrns.fits-kernel' % (photreftype,
+        kernel = '%s-%s-%s_%s-xtrns.fits-kernel' % (photreftype,
+                                                    convsubhash,
                                                     frameinfo[0][0],
                                                     frameinfo[0][1],
                                                     frameinfo[0][2])
@@ -1751,21 +1755,29 @@ def xtrnsfits_convsubphot_worker(task):
         xysdk = os.path.abspath(os.path.join(os.path.dirname(convsub),xysdk))
 
 
-        # then do photometry on the subtracted frame
+        # write the photometry file to /dev/shm by default
+        if outdir is None:
+            outdir = '/dev/shm'
+
         _, subphot = ism.subframe_photometry_worker(
             (convsub, cphotref_cmrawphot, photdisjointradius,
-             kernel, itrans, xysdk, os.path.dirname(convsub), photreftype)
+             kernel, itrans, xysdk, outdir,
+             photreftype, kernelspec, lcapertures)
         )
 
         if subphot and os.path.exists(subphot):
+
             print('%sZ: CONVSUBPHOT OK: frame %s, '
                   'subtracted frame %s, photometry file %s' %
                   (datetime.utcnow().isoformat(), frame, convsub, subphot))
+
             return frame, (convsub, subphot)
+
         else:
+
             print('%sZ: CONVSUBPHOT FAILED: frame %s' %
                   (datetime.utcnow().isoformat(), frame))
-            return frame, (convsub, subphot)
+            return frame, None
 
     except Exception as e:
 
@@ -1776,13 +1788,13 @@ def xtrnsfits_convsubphot_worker(task):
 
 
 
-
 def xtrnsfits_convsubphot(xtrnsfits,
                           photreftype,
                           outdir=None,
                           refinfo=REFINFO,
                           reversesubtract=True,
                           kernelspec='b/4;i/4;d=4/4',
+                          lcapertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0'
                           photdisjointradius=2,
                           findnewobjects=False,
                           nworkers=16,
@@ -1799,7 +1811,8 @@ def xtrnsfits_convsubphot(xtrnsfits,
     '''
 
     tasks = [(x, photreftype, outdir, kernelspec,
-              reversesubtract, findnewobjects, photdisjointradius, refinfo)
+              reversesubtract, findnewobjects,
+              photdisjointradius, refinfo, lcapertures)
              for x in xtrnsfits if os.path.exists(x)]
 
     print('%sZ: %s files to process' %
@@ -1808,7 +1821,6 @@ def xtrnsfits_convsubphot(xtrnsfits,
     if len(tasks) > 0:
 
         pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
-
 
         # fire up the pool of workers
         results = pool.map(xtrnsfits_convsubphot_worker, tasks)
@@ -1831,20 +1843,124 @@ def xtrnsfits_convsubphot(xtrnsfits,
 ## PHOTOMETRY DATABASE ##
 #########################
 
+def parse_iphot_line(iphotline):
+    '''This parses the iphot line and returns a row of formatted elems.
+
+    These can be then attached to other metadata and written directly to the
+    database.
+
+    '''
+
+    photelemline = iphotline.rstrip(' \n')
+    photelem = photelemline.split()
+
+    if len(photelem) > 0:
+
+        # get the station, framenumber, subframe, and ccd
+        framekeyelems = FRAMESUBREGEX.findall(
+            os.path.basename(iphot)
+        )
+        stf, cfn, cfs, fccd = (
+            framekeyelems[0][0],
+            framekeyelems[0][1],
+            framekeyelems[0][2],
+            framekeyelems[0][3]
+        )
+        net = 'HP' # this will be 'HP' for HATPI
+
+        # these are things we get from the iphot line
+        # hat, xcc, ycc, xic, yic
+        # fsv, fdv, fkv, bgv, bge
+        # ifl1, ife1, irm1, ire1, irq1
+        # ifl2, ife2, irm2, ire2, irq2
+        # ifl2, ife2, irm2, ire2, irq2
+
+        objectid, xcc, ycc, xic, yic = photelem[:5]
+        fsv, fdv, fkv, bgv, bge = photelem[5:10]
+        ifl1, ife1, irm1, ire1, irq1 = photelem[10:15]
+        ifl2, ife2, irm2, ire2, irq2 = photelem[15:20]
+        ifl3, ife3, irm3, ire3, irq3 = photelem[20:]
+
+        # format these as needed
+        xcc = smartcast(xcc, float)
+        ycc = smartcast(ycc, float)
+        xic = smartcast(xic, float)
+        yic = smartcast(yic, float)
+
+        fsv = smartcast(fsv, float)
+        fdv = smartcast(fdv, float)
+        fkv = smartcast(fkv, float)
+        bgv = smartcast(bgv, float)
+        bge = smartcast(bge, float)
+
+        ifl_000 = smartcast(ifl1, float)
+        ife_000 = smartcast(ife1, float)
+        irm_000 = smartcast(irm1, float)
+        ire_000 = smartcast(ire1, float)
+        irq_000 = smartcast(irq1, str)
+
+        ifl_001 = smartcast(ifl2, float)
+        ife_001 = smartcast(ife2, float)
+        irm_001 = smartcast(irm2, float)
+        ire_001 = smartcast(ire2, float)
+        irq_001 = smartcast(irq2, str)
+
+        ifl_002 = smartcast(ifl3, float)
+        ife_002 = smartcast(ife3, float)
+        irm_002 = smartcast(irm3, float)
+        ire_002 = smartcast(ire3, float)
+        irq_002 = smartcast(irq3, str)
+
+        return {'objectid':objectid,
+                'xcc':xcc,
+                'ycc':ycc,
+                'xic':xic,
+                'yic':yic,
+                'fsv':fsv,
+                'fdv':fdv,
+                'fkv':fkv,
+                'bgv':bgv,
+                'bge':bge,
+                'ifl_000':ifl_000,
+                'ife_000':ife_000,
+                'irm_000':irm_000,
+                'ire_000':ire_000,
+                'irq_000':irq_000,
+                'ifl_001':ifl_001,
+                'ife_001':ife_001,
+                'irm_001':irm_001,
+                'ire_001':ire_001,
+                'irq_001':irq_001,
+                'ifl_002':ifl_002,
+                'ife_002':ife_002,
+                'irm_002':irm_002,
+                'ire_002':ire_002,
+                'irq_002':irq_002}
+
+    else:
+
+        return None
+
+
+
+
 def convsub_photometry_to_ismphot_database(convsubfits,
+                                           convsubphot,
+                                           photreftype,
+                                           subtracttype,
+                                           kernelspec,
+                                           lcapertures,
                                            projectid=None,
                                            field=None,
                                            ccd=None,
                                            overwrite=False,
                                            database=None):
+
     '''This inserts the ISM photometry from a single convsub FITS into the DB.
 
     If projectid, field, ccd are not provided, gets them from the FITS
     file. Also gets the photreftype from the filename of the
     convolved-subtracted photometry iphot file.
-
-    TODO: consider using the /dev/shm partition to write the temporary ismphot
-    file to and then immediately copying it into the pg database using \copy.
 
     '''
 
@@ -1878,44 +1994,7 @@ def convsub_photometry_to_ismphot_database(convsubfits,
                                      int(felems[0][2]),
                                      frameelems['projid'])
 
-        # figure out the photreftype
-        if 'oneframeref' in convsubfits:
-            photreftype = 'oneframeref'
-        elif 'onehourref' in convsubfits:
-            photreftype = 'onehourref'
-        elif 'onenightref' in convsubfits:
-            photreftype = 'onenightref'
-        else:
-            print('ERR! %sZ: convsub FITS %s does not '
-                  'have a photreftype, not processing...' %
-                  (datetime.utcnow().isoformat(), convsubfits) )
-            return (convsubfits, False)
-
-
-        # figure out the subtraction type
-        if (os.path.basename(convsubfits)).startswith('rev-subtracted'):
-            subtractionbit = 'revsub'
-            subtractiontype = 'reverse'
-        elif (os.path.basename(convsubfits)).startswith('subtracted'):
-            subtractionbit = 'normsub'
-            subtractiontype = 'normal'
-        else:
-            print('ERR! %sZ: unknown subtraction type '
-                  '(not "reverse"/"normal") for %s, not processing...' %
-                  (datetime.utcnow().isoformat(),
-                   convsubfits))
-            return (convsubfits, False)
-
-
         convsubdir = os.path.abspath(os.path.dirname(convsubfits))
-
-        # find the frame's accompanying iphot file
-        iphotbasename = '%s-%s-%s-%s_%s.iphot' % (subtractionbit,
-                                                  photreftype,
-                                                  felems[0][0],
-                                                  felems[0][1],
-                                                  felems[0][2])
-        iphotpath = os.path.join(convsubdir, iphotbasename)
 
         if not os.path.exists(iphotpath):
             print('ERR! %sZ: expected iphot %s for '
@@ -1941,9 +2020,16 @@ def convsub_photometry_to_ismphot_database(convsubfits,
         # figure out the frame's JD from the original frame's header
         framerjd = get_header_keyword(originalfitspath, 'JD')
 
-        # now open the accompanying iphot file, and note all the HATIDs
-        with open(iphotpath,'rb') as infd:
-            iphotobjects = [x.split()[0] for x in infd]
+        # now open the accompanying iphot file, and stream the photometry to the
+        # database
+        with open(convsubphot,'rb') as infd:
+
+
+            for line in infd:
+
+                parsedline = parse_iphot_line(line)
+
+
 
         # update the iphotfiles table file with all of this info. if there's a
         # uniqueness conflict, i.e. this same combination exists, then overwrite

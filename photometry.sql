@@ -26,8 +26,10 @@ create table objectinfo (
        gaiag real,
        ndet integer not null,
        network text not null,
-       stations text not null
+       stations text not null,
+       primary key (objectid)
 );
+
 
 drop table if exists lcinfo;
 create table lcinfo (
@@ -45,6 +47,7 @@ create table lcinfo (
        primary key (version, datarelease)
 );
 
+
 drop table if exists filters;
 create table filters (
        filterid integer not null,
@@ -52,9 +55,6 @@ create table filters (
        filterdesc text not null,
        primary key(filterid)
 );
-
-
-
 
 
 drop table if exists lightcurve;
