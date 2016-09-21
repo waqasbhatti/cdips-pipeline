@@ -2020,6 +2020,9 @@ def convsub_photometry_to_ismphot_database(convsubfits,
         # figure out the frame's JD from the original frame's header
         framerjd = get_header_keyword(originalfitspath, 'JD')
 
+        # also get some metadata from the frameheader
+
+
         # now open the accompanying iphot file, and stream the photometry to the
         # database
         with open(convsubphot,'rb') as infd:

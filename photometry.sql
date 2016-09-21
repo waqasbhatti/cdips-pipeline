@@ -27,6 +27,9 @@ create table objectinfo (
        ndet integer not null,
        network text not null,
        stations text not null,
+       -- add more columns here, including: current LC projectid, field,
+       -- datarelease, lcversion, LC path, object tags, variable type, external
+       -- tags, external URL, candidate tags, transient tags, comments,
        primary key (objectid)
 );
 
@@ -57,20 +60,88 @@ create table filters (
 );
 
 
-drop table if exists lightcurve;
-create table lightcurve (
-       -- frame metadata
-       net text not null,              -- HAT network
-       stf integer not null,           -- station number
-       prj text not null default '0',  -- project ID of this observation
-       fld text not null,              -- observed field ID
+-- PHOTOMETRY TABLES --
+
+
+-- using timestamp w/o TZ because of partitioning. see:
+-- http://justatheory.com/computers/databases/postgresql/use-timestamptz.html
+drop table if exists ism_photometry;
+create table ism_photometry (
+        -- this MUST be in UTC and will be converted from the JD in FITS headers
+       frameutcdt timestamp without time zone not null,
+       objectid text not null,
+       framekey bigint not null,
+       photkey text not null,
+       -- image subtraction photometry metadata
+       xcc real,                       -- X coordinate on chip
+       ycc real,                       -- Y coordinate on chip
+       xic real,                       -- X coord on CCD after ISM warp
+       yic real,                       -- Y coord on CCD after ISM warp
+       bgv real,                       -- background measurement
+       bge real,                       -- background measurement error
+       fsv real,                       -- source extraction S parameter
+       fdv real,                       -- source extraction D parameter
+       fkv real,                       -- source extraction K parameter
+       -- image subtraction photometry columns
+       ifl_000 real,                   -- aperture 000 flux (ADU)
+       ife_000 real,                   -- aperture 000 flux err (ADU)
+       irm_000 real,                   -- aperture 000 ISM mag (after magfit)
+       ire_000 real,                   -- aperture 000 ISM mag err
+       irq_000 text,                   -- aperture 000 ISM mag flag
+       ifl_001 real,                   -- aperture 001 flux (ADU)
+       ife_001 real,                   -- aperture 001 flux err (ADU)
+       irm_001 real,                   -- aperture 001 ISM mag (after magfit)
+       ire_001 real,                   -- aperture 001 ISM mag err
+       irq_001 text,                   -- aperture 001 ISM mag flag
+       ifl_002 real,                   -- aperture 002 flux (ADU)
+       ife_002 real,                   -- aperture 002 flux err (ADU)
+       irm_002 real,                   -- aperture 002 ISM mag (after magfit)
+       ire_002 real,                   -- aperture 002 ISM mag err
+       irq_002 text,                   -- aperture 002 ISM mag flag
+       iep_000 real,                   -- aperture 000 ISM EPD mag
+       iep_001 real,                   -- aperture 001 ISM EPD mag
+       iep_002 real,                   -- aperture 002 ISM EPD mag
+       itf_000 real,                   -- aperture 000 ISM TFA mag
+       itf_001 real,                   -- aperture 001 ISM TFA mag
+       itf_002 real,                   -- aperture 002 ISM TFA mag
+       primary key (frameutcdt, objectid, framekey, photkey)
+);
+
+
+-- using timestamp w/o TZ because of partitioning. see:
+-- http://justatheory.com/computers/databases/postgresql/use-timestamptz.html
+drop table if exists ap_photometry;
+create table ap_photometry (
+        -- this MUST be in UTC and will be converted from the JD in FITS headers
+       frameutcdt timestamp without time zone not null,
+       objectid text not null,
+       framekey bigint not null,
+       photkey text not null,
+       -- this is the photometry data in JSONB format, so we can add columns
+       -- later if needed
+       photdata jsonb not null,
+       primary key (frameutcdt, objectid, framekey, photkey)
+);
+
+
+drop table if exists frameinfo;
+create table frameinfo (
+       framekey bigserial not null,
+       -- project and observed field info
+       network text not null,
+       projectid text not null,
+       stationid integer not null,
+       obsfield text not null,
+       framerjd double precision not null,
+       -- frame paths
+       fits text not null,
+       fistar text not null,
+       wcs text not null,
+       -- frame info
        cfn integer not null,           -- camera frame serial number
        cfs text not null default '',   -- camera subframe ID
        ccd integer not null,           -- camera CCD position number
-       frt text not null,              -- image frame type (flat, object, etc.)
-       -- time
-       rjd double precision not null   -- reduced Julian date (midexp)
-       bjd double precision,           -- Baryocentric Julian date (midexp)
+       frt text not null,              -- frame type (flat, object, focus, etc.)
        -- filter config
        flt integer,                    -- filter ID used in filters table
        flv integer default 0,          -- filter version used
@@ -94,73 +165,32 @@ create table lightcurve (
        mph real,                       -- moonphase at time exposure taken
        iha real,                       -- hour angle of observation
        izd real,                       -- zenith distance of observation
-       -- aperture photometry metadata
-       xcc real,                       -- X coordinate on chip
-       ycc real,                       -- Y coordinate on chip
-       bgv real,                       -- background measurement
-       bge real,                       -- background measurement error
-       fsv real,                       -- source extraction S parameter
-       fdv real,                       -- source extraction D parameter
-       fkv real,                       -- source extraction K parameter
-       -- image subtraction photometry metadata
-       ist text not null,              -- image subtype ('reverse'/'normal')
-       ipr text not null,              -- ISM photreftype ('one[frame,hour,night]')
-       xic real default null,          -- x coord on CCD after ISM warp
-       yic real default null           -- y coord on CCD after ISM warp
-       -- aperture photometry columns
-       aim_000 real,                   -- aperture 000 instrumental mag
-       aie_000 real,                   -- aperture 000 instrumental mag err
-       aiq_000 text,                   -- aperture 000 instrumental mag flag
-       aim_001 real,                   -- aperture 001 instrumental mag
-       aie_001 real,                   -- aperture 001 instrumental mag err
-       aiq_001 text,                   -- aperture 001 instrumental mag flag
-       aim_002 real,                   -- aperture 002 instrumental mag
-       aie_002 real,                   -- aperture 002 instrumental mag err
-       aiq_002 text,                   -- aperture 002 instrumental mag flag
-       arm_000 real,                   -- aperture 000 reduced mag after magfit
-       arm_001 real,                   -- aperture 001 reduced mag after magfit
-       arm_002 real,                   -- aperture 002 reduced mag after magfit
-       aep_000 real,                   -- aperture 000 reduced mag after magfit
-       aep_001 real,                   -- aperture 001 reduced mag after magfit
-       aep_002 real,                   -- aperture 002 reduced mag after magfit
-       atf_000 real,                   -- aperture 000 reduced mag after magfit
-       atf_001 real,                   -- aperture 001 reduced mag after magfit
-       atf_002 real,                   -- aperture 002 reduced mag after magfit
-       -- image subtraction photometry columns
-       ifl_000 real,                   -- aperture 000 flux (ADU)
-       ife_000 real,                   -- aperture 000 flux err (ADU)
-       irm_000 real,                   -- aperture 000 ISM mag (after magfit)
-       ire_000 real,                   -- aperture 000 ISM mag err
-       irq_000 text,                   -- aperture 000 ISM mag flag
-       ifl_001 real,                   -- aperture 001 flux (ADU)
-       ife_001 real,                   -- aperture 001 flux err (ADU)
-       irm_001 real,                   -- aperture 001 ISM mag (after magfit)
-       ire_001 real,                   -- aperture 001 ISM mag err
-       irq_001 text,                   -- aperture 001 ISM mag flag
-       ifl_002 real,                   -- aperture 002 flux (ADU)
-       ife_002 real,                   -- aperture 002 flux err (ADU)
-       irm_002 real,                   -- aperture 002 ISM mag (after magfit)
-       ire_002 real,                   -- aperture 002 ISM mag err
-       irq_002 text,                   -- aperture 002 ISM mag flag
-       iep_000 real,                   -- aperture 000 ISM EPD mag
-       iep_001 real,                   -- aperture 001 ISM EPD mag
-       iep_002 real,                   -- aperture 002 ISM EPD mag
-       itf_000 real,                   -- aperture 000 ISM TFA mag
-       itf_001 real,                   -- aperture 001 ISM TFA mag
-       itf_002 real,                   -- aperture 002 ISM TFA mag
-       primary key (net, stf, prj, fld, cfn, cfs, ccd, ist, ipr)
+       -- eventually use JSON for broken-out cols above
+       -- these are JSON documents describing the rest of the frame's info
+       -- framedetails jsonb not null,
+       -- filterdetails jsonb not null,
+       -- cameradetails jsonb not null,
+       -- scopedetails jsonb not null,
+       -- environdetails jsonb not null,
+       primary key (framekey)
 );
 
--- for each aperture, alter table lightcurve to add the following columns
--- XXX is the aperture index
---       aim_XXX real,                      -- aperture XXX instrumental mag
---       aie_XXX real,                      -- aperture XXX instrumental mag error
---       aiq_XXX text,                      -- aperture XXX instrument mag flag
---       arm_XXX real,                      -- aperture XXX reduced mag after magfit
---       aep_XXX real,                      -- aperture XXX EPD mag
---       atf_XXX real,                      -- aperture XXX TFA mag
---       irm_XXX real,                      -- aperture XXX instrumental mag
---       ire_XXX real,                      -- aperture XXX instrumental mag error
---       irq_XXX text,                      -- aperture XXX instrument mag flag
---       iep_XXX real,                      -- aperture XXX EPD mag
---       itf_XXX real,                      -- aperture XXX TFA mag
+
+-- FIXME: will need to add more columns for aperturephot
+drop table if exists photometryinfo;
+create table photometryinfo (
+       -- this uniquely identifies each type of photometry carried out
+       -- this is an MD5 hash of all columns below starting at projectid
+       photkey text not null,
+       -- metadata
+       projectid text not null,
+       field text not null,
+       photmethod text not null default 'imagesub',
+       -- ISM info
+       ism_photreftype text not null default 'oneframe',
+       ism_photrefframe text not null,
+       ism_convsubtype text not null default 'reverse',
+       ism_lcapertures text not null,
+       ism_convkernel text not null,
+       primary key (photkey)
+);
