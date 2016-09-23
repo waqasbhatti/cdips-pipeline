@@ -2017,8 +2017,9 @@ def convsub_photometry_to_ismphot_database(convsubfits,
                    originalfitspath, convsubfits))
             return (convsubfits, False)
 
-        # figure out the frame's JD from the original frame's header
-        framerjd = get_header_keyword(originalfitspath, 'JD')
+        # figure out the frame's info from the original frame's header
+        framerjd = get_header_keyword_list(originalfitspath,
+                                           ['JD',''])
 
         # also get some metadata from the frameheader
 
@@ -2026,6 +2027,24 @@ def convsub_photometry_to_ismphot_database(convsubfits,
         # now open the accompanying iphot file, and stream the photometry to the
         # database
         with open(convsubphot,'rb') as infd:
+
+            # prepare the statement
+            query = ("insert into ism_photometry ("
+                     "frameutcdt, objectid, framekey, photkey, "
+                     "xcc, ycc, xic, yic, bgv, bge, fsv, fdv, fkv, "
+                     "ifl_000, ife_000, irm_000, ire_000, irq_000, "
+                     "ifl_001, ife_001, irm_001, ire_001, irq_001, "
+                     "ifl_002, ife_002, irm_002, ire_002, irq_002"
+                     ") values ("
+                     "%s, %s, %s, %s, "
+                     "%s, %s, %s, %s, %s, %s, %s, %s, %s, "
+                     "%s, %s, %s, %s, %s, %s, "
+                     "%s, %s, %s, %s, %s, %s, "
+                     "%s, %s, %s, %s, %s, %s"
+                     ")")
+
+            # prepare the input params
+
 
 
             for line in infd:

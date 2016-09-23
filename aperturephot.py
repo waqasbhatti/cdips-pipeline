@@ -746,6 +746,81 @@ def parallel_extract_sources(fitsdir,
 
 
 
+def parallel_srcextract_list_worker(task):
+    '''
+    This is the worker for the function below.
+
+    task[0] = fits
+    task[1] = {'fistarexec','ccdextent','ccdgain','fluxthreshold',
+               'zeropoint', 'exptime'}
+
+    '''
+
+    try:
+
+        fits, kwargs = task
+
+        if not os.path.exists(fits):
+            return fits, None
+
+        # get the required header keywords from the FITS file
+        header = imageutils.get_header_keyword_list(fits,
+                                                    ['GAIN',
+                                                     'GAIN1',
+                                                     'GAIN2',
+                                                     'EXPTIME'])
+
+        # handle the gain and exptime parameters
+        if not ccdgain:
+
+            # FIXME: is this right? should we use separate gain values for each
+            # side of the CCD? what about stars that straddle the middle?
+            if 'GAIN1' in header and 'GAIN2' in header:
+                ccdgain = (header['GAIN1'] + header['GAIN2'])/2.0
+            elif 'GAIN' in header:
+                ccdgain = header['GAIN']
+            else:
+                ccdgain = None
+
+        if not ccdexptime:
+            ccdexptime = header['EXPTIME'] if 'EXPTIME' in header else None
+
+        if not (ccdgain or ccdexptime):
+            print('%sZ: no GAIN or EXPTIME defined for %s' %
+                  (datetime.utcnow().isoformat(),
+                   fits))
+            return fits, None
+
+        # figure out the outputfile
+        outfile = fits.replace('.fits','.fistar')
+
+        # run fistar
+        fistar = extract_frame_sources(fits,
+                                       outfile,
+                                       **kwargs)
+
+
+def parallel_extract_sources_for_list(fitslist,
+                                      nworkers=16,
+                                      maxworkerstasks=1000,
+                                      fistarexec='fistar',
+                                      ccdextent='0:0,2048:2048',
+                                      ccdgain=2.725,
+                                      fluxthreshold=1000,
+                                      zeropoint=17.11,
+                                      exptime=30.0):
+    '''
+    This runs a parallel fistar operation on all sources in fitslist.
+
+    Puts the results in the same directories as the FITS themselves.
+
+    '''
+
+
+
+
+
+
 def match_fovcatalog_framesources(frame_extracted_sourcelist,
                                   frame_projected_fovcatalog,
                                   outfile,
