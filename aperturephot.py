@@ -790,7 +790,7 @@ def parallel_srcextract_list_worker(task):
         outfile = fits.replace('.fits','.fistar')
 
         # figure out the input kwargs to fistar
-        kwargs['ccdexptime'] = ccdexptime
+        kwargs['exptime'] = ccdexptime
         kwargs['ccdgain'] = ccdgain
 
         # figure out this frame's CCD and therefore zeropoint
