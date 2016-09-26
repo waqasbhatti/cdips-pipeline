@@ -847,14 +847,13 @@ def parallel_extract_sources_for_list(fitslist,
     pool = mp.Pool(nworkers, maxtasksperchild=maxtasksperworker)
 
     tasks = [
-        [(x,
+        (x,
          {'fistarexec':fistarexec,
           'ccdextent':ccdextent,
           'ccdgain':ccdgain,
           'fluxthreshold':fluxthreshold,
           'zeropoint':zeropoint,
-          'exptime':exptime,}]
-        for x in fitslist
+          'exptime':exptime,}) for x in fitslist
         ]
 
     # fire up the pool of workers
