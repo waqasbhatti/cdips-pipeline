@@ -818,7 +818,6 @@ def parallel_srcextract_list_worker(task):
         print('ERR! %sZ: could not extract sources for %s, error: %s' %
               (datetime.utcnow().isoformat(),
                fits, e))
-        raise
 
         return fits, None
 
