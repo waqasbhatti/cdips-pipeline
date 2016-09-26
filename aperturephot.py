@@ -771,19 +771,14 @@ def parallel_srcextract_list_worker(task):
                                                      'EXPTIME'])
 
         # handle the gain and exptime parameters
-        if not ccdgain:
+        if 'GAIN1' in header and 'GAIN2' in header:
+            ccdgain = (header['GAIN1'] + header['GAIN2'])/2.0
+        elif 'GAIN' in header:
+            ccdgain = header['GAIN']
+        else:
+            ccdgain = None
 
-            # FIXME: is this right? should we use separate gain values for each
-            # side of the CCD? what about stars that straddle the middle?
-            if 'GAIN1' in header and 'GAIN2' in header:
-                ccdgain = (header['GAIN1'] + header['GAIN2'])/2.0
-            elif 'GAIN' in header:
-                ccdgain = header['GAIN']
-            else:
-                ccdgain = None
-
-        if not ccdexptime:
-            ccdexptime = header['EXPTIME'] if 'EXPTIME' in header else None
+        ccdexptime = header['EXPTIME'] if 'EXPTIME' in header else None
 
         if not (ccdgain or ccdexptime):
             print('ERR! %sZ: no GAIN or EXPTIME defined for %s' %
@@ -793,7 +788,6 @@ def parallel_srcextract_list_worker(task):
 
         # figure out the outputfile
         outfile = fits.replace('.fits','.fistar')
-
 
         # figure out the input kwargs to fistar
         kwargs['ccdexptime'] = ccdexptime
