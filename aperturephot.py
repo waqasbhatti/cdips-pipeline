@@ -821,9 +821,11 @@ def parallel_srcextract_list_worker(task):
 
     except Exception as e:
 
-        print('ERR! %sZ: could not extract sources for %s' %
+        print('ERR! %sZ: could not extract sources for %s, error: %s' %
               (datetime.utcnow().isoformat(),
-               fits))
+               fits, e))
+        raise
+
         return fits, None
 
 
