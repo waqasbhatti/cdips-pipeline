@@ -786,7 +786,7 @@ def parallel_srcextract_list_worker(task):
             ccdexptime = header['EXPTIME'] if 'EXPTIME' in header else None
 
         if not (ccdgain or ccdexptime):
-            print('%sZ: no GAIN or EXPTIME defined for %s' %
+            print('ERR! %sZ: no GAIN or EXPTIME defined for %s' %
                   (datetime.utcnow().isoformat(),
                    fits))
             return fits, None
@@ -794,10 +794,38 @@ def parallel_srcextract_list_worker(task):
         # figure out the outputfile
         outfile = fits.replace('.fits','.fistar')
 
+
+        # figure out the input kwargs to fistar
+        kwargs['ccdexptime'] = ccdexptime
+        kwargs['ccdgain'] = ccdgain
+
+        # figure out this frame's CCD and therefore zeropoint
+        frameinfo = FRAMEREGEX.findall(fits)
+        if frameinfo:
+            kwargs['zeropoint'] = ZEROPOINTS[int(frameinfo[0][-1])]
+        elif not frameinfo and not kwargs['zeropoint']:
+            print('ERR! %sZ: no zeropoint mag defined for %s' %
+                  (datetime.utcnow().isoformat(),
+                   fits))
+            return fits, None
+
         # run fistar
         fistar = extract_frame_sources(fits,
                                        outfile,
                                        **kwargs)
+
+        if fistar and os.path.exists(fistar):
+            return fits, fistar
+        else:
+            return fits, None
+
+    except Exception as e:
+
+        print('ERR! %sZ: could not extract sources for %s' %
+              (datetime.utcnow().isoformat(),
+               fits))
+        return fits, None
+
 
 
 def parallel_extract_sources_for_list(fitslist,
@@ -816,8 +844,29 @@ def parallel_extract_sources_for_list(fitslist,
 
     '''
 
+    pool = mp.Pool(nworkers, maxtasksperchild=maxtasksperworker)
 
+    tasks = [
+        [(x,
+         {'fistarexec':fistarexec,
+          'ccdextent':ccdextent,
+          'ccdgain':ccdgain,
+          'fluxthreshold':fluxthreshold,
+          'zeropoint':zeropoint,
+          'exptime':exptime,}]
+        for x in fitslist
+        ]
 
+    # fire up the pool of workers
+    results = pool.map(parallel_srcextract_list_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    # this is the return dictionary
+    returndict = {x:y for (x,y) in results}
+    return returndict
 
 
 
