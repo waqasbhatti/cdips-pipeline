@@ -664,7 +664,7 @@ def extract_frame_sources(fits,
     # get results if succeeded, log outcome, and return path of outfile
     if fistarproc.returncode == 0:
 
-        print('%sZ: fistar completed for %s: %s' %
+        print('%sZ: fistar completed for %s -> %s' %
               (datetime.utcnow().isoformat(),fits, outfile))
 
         return outfile
