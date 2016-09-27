@@ -124,8 +124,9 @@ create table ap_photometry (
 );
 
 
-drop table if exists frameinfo;
-create table frameinfo (
+-- this is the table for calibrated frame information
+drop table if exists calibratedframes;
+create table calibratedframes (
        framekey bigserial not null,
        -- project and observed field info
        network text not null,
@@ -133,10 +134,15 @@ create table frameinfo (
        stationid integer not null,
        obsfield text not null,
        framerjd double precision not null,
+       centerra real not null,
+       centerdec real not null,
+       fovdeg real not null,
+       frameisok bool not null,
        -- frame paths
        fits text not null,
        fistar text not null,
-       wcs text not null,
+       fiphot text,
+       wcs text,
        -- frame info
        cfn integer not null,           -- camera frame serial number
        cfs text not null default '',   -- camera subframe ID
@@ -161,8 +167,18 @@ create table frameinfo (
        tmi integer,                    -- telescope mount ID
        tmv integer default 0,          -- telescope mount version
        tgs text default '',            -- telescope guider status
+       -- photometry basics
+       ngo integer,                    -- number of good objects detected
+       mme real,                       -- median instr. mag err (aie_002)
+       mem real,                       -- instr. magnitude MAD (aim_002)
+       mbg real,                       -- median source background (aim_002)
+       sbg real,                       -- stdev of source background (aim_002)
+       mfs real,                       -- median S value of frame
+       mfk real,                       -- median D value of frame
        -- environment
        mph real,                       -- moonphase at time exposure taken
+       mds real,                       -- moon distance from center of frame
+       mel real,                       -- moon elevation at this time
        iha real,                       -- hour angle of observation
        izd real,                       -- zenith distance of observation
        -- eventually use JSON for broken-out cols above
@@ -171,6 +187,7 @@ create table frameinfo (
        -- filterdetails jsonb not null,
        -- cameradetails jsonb not null,
        -- scopedetails jsonb not null,
+       -- photdetails jsonb not null,
        -- environdetails jsonb not null,
        primary key (framekey)
 );

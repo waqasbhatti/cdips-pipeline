@@ -221,7 +221,7 @@ def find_arefshifted_fits_fieldprojectidccd(dirlist,
                                             fglob='?-???????_?-xtrns.fits',
                                             nworkers=8,
                                             maxworkertasks=1000):
-    '''This searches in dirlist for all astromref-shifted FITS files matching the
+    '''This searches for all astromref-shifted FITS files matching the
     specified projectid, field, and ccd combination.
 
     Returns a flat list of matching FITS, and list of all fits + their info.
@@ -248,7 +248,7 @@ def find_subtracted_fits_fieldprojectidccd(
         nworkers=8,
         maxworkertasks=1000
 ):
-    '''This searches in dirlist for all subtracted FITS files matching the specified
+    '''This searches for all subtracted FITS files matching the specified
     projectid, field, and ccd combination.
 
     Returns a flat list of matching FITS, and list of all fits + their info.
@@ -265,6 +265,137 @@ def find_subtracted_fits_fieldprojectidccd(
                                                 nworkers=nworkers,
                                                 maxworkertasks=maxworkertasks)
 
+
+######################################
+## PUTTING FRAMES INTO THE DATABASE ##
+######################################
+
+def calibrated_frame_to_database(fitsfile,
+                                 network='HP',
+                                 overwrite=False,
+                                 badframedir='badframes',
+                                 database=None):
+    '''This puts an original fully calibrated FITS into the database.
+
+    Requires that the frame have gone through the full
+    cron_transfer_calibrate.autocal_fitsdir function process, so that it has an
+    extracted source list (fistar), astrometry attempted on it (wcs), and basic
+    aperture photometry carried out (fiphot).
+
+    Searches the same directory as the FITS for fistar, fiphot, and wcs
+    files. Should be used with a "find {fitsdir} -type f -name '?-*_?.fits'"
+    command to generate the list of the FITS files, so that it can work on bad
+    frames that have been moved to the {badframedir} subdirectory of {fitsdir}
+    and import these into the database as well. Bad frames will be tagged with
+    frameisok = false in the database. If a frame doesn't have an accompanying
+    wcs or fiphot, it will be tagged with frameisok = false in the database as
+    well.
+
+    '''
+    # open a database connection
+    if database:
+        cursor = database.cursor()
+        closedb = False
+    else:
+        database = pg.connect(user=PGUSER,
+                              password=PGPASSWORD,
+                              database=PGDATABASE,
+                              host=PGHOST)
+        cursor = database.cursor()
+        closedb = True
+
+    # start work here
+    try:
+
+        # get the frame filename elements
+        felems = FRAMESUBREGEX.findall(
+            os.path.basename(convsubfits)
+        )
+        if not felems:
+            message = ('failed to get basic frameinfo from %s, skipping...'
+                       % fitsfile)
+            print('ERR! %sZ: %s' %
+                   (datetime.utcnow().isoformat(), message) )
+            return fitsfile, False
+
+        stationid, framenum, subframe, ccdnum = felems[0]
+
+        # get a big list of header keywords
+        headerdata = get_header_keyword_list(
+            fitsfile,
+            ['PROJID','OBJECT','JD','EXPTIME',
+             'STVER','MTID','MTVER',
+             'CMID','CMVER','TELID','TELVER','FOV',
+             'BIASVER','DARKVER','FLATVER','MNTSTATE','PTVER',
+             'FILID','IMAGETYP','RA','DEC',
+             'MOONDIST','MOONELEV','MOONPH',
+             'HA','Z','MGENSTAT','WIND','HUMIDITY','SKYTDIFF','AMBTEMP',
+             'DEWPT','FOCUS'],
+        )
+
+        # get the frame's projectid, stationid, observed field, rjd, centerra,
+        # centerrdec, widthdeg, frameisok values
+        if 'PROJID' in headerdata and headerdata['PROJID']:
+            projectid = headerdata['PROJID']
+        else:
+            projectid = None
+        if 'OBJECT' in headerdata and headerdata['OBJECT']:
+            obsfield = headerdata['OBJECT']
+        else:
+            obsfield = None
+
+        # get the frame's framenum, ccdnum, subframe, frametype
+
+        # get the frame's filter ID and version
+
+        # get the frame's camera config
+
+        # get the frame's telescope config
+
+        # find the frame's fistar, wcs, and fiphot
+
+        # get the frame's photometry info (useful for selecting refs)
+        photinfo = get_frame_info(fitsfile)
+
+        # put together the query and execute it, inserting the object into the
+        # database and overwriting if told to do so
+
+        returnval = (fitsfile, True)
+
+    # catch the overwrite = False scenario
+    except pg.IntegrityError as e:
+
+        database.rollback()
+
+        message = ('failed to insert %s '
+                   'into DB because it exists already '
+                   'and overwrite = False'
+                   % fitsfile)
+        print('EXC! %sZ: %s\n%s' %
+               (datetime.utcnow().isoformat(), message, format_exc()) )
+        returnval = (fitsfile, False)
+
+
+    # if everything goes wrong, exit cleanly
+    except Exception as e:
+
+        database.rollback()
+
+        message = 'failed to insert %s into DB' % fitsfile
+        print('EXC! %sZ: %s\nexception was: %s' %
+               (datetime.utcnow().isoformat(),
+                message, format_exc()) )
+        returnval = (fitsfile, False)
+        raise
+
+
+    finally:
+
+        cursor.close()
+        if closedb:
+            database.close()
+
+    return returnval
 
 
 
