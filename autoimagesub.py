@@ -560,7 +560,7 @@ def calibrated_frame_to_database(fitsfile,
                      "%s, %s, %s, %s, %s, %s, %s, "
                      "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s"
                      ") "
-                     "on conflict on constraint calframes_uindx "
+                     "on conflict (calframes_uindx) "
                      "do update set "
                      "framerjd = %s, centerra = %s, centerdec = %s, "
                      "fovdeg = %s, frameisok = %s, fits = %s, fistar = %s, "
