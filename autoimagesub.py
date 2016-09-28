@@ -385,24 +385,27 @@ def calibrated_frame_to_database(fitsfile,
             (badframetag not in os.path.abspath(fitsfile))):
 
             frameisok = True
-            fistar = prospective_fistar
-            wcs = prospective_wcs
-            fiphot = prospective_fiphot
+            fits = os.path.abspath(fitsfile)
+            fistar = os.path.abspath(prospective_fistar)
+            wcs = os.path.abspath(prospective_wcs)
+            fiphot = os.path.abspath(prospective_fiphot)
 
         else:
 
             frameisok = False
 
+            fits = os.path.abspath(fitsfile)
+
             if os.path.exists(prospective_fistar):
-                fistar = prospective_fistar
+                fistar = os.path.abspath(prospective_fistar)
             else:
                 fistar = None
             if os.path.exists(prospective_wcs):
-                wcs = prospective_wcs
+                wcs = os.path.abspath(prospective_wcs)
             else:
                 wcs = None
             if os.path.exists(prospective_fiphot):
-                fiphot = prospective_fiphot
+                fiphot = os.path.abspath(prospective_fiphot)
             else:
                 fiphot = None
 
@@ -670,6 +673,72 @@ def calibrated_frame_to_database(fitsfile,
             database.close()
 
     return returnval
+
+
+
+def calframe_to_db_worker(task):
+    '''
+    This wraps calibrated_frames_to_databse for the parallel driver below.
+
+    '''
+
+    fitsfile, kwargs = task
+    return calibrated_frames_to_database(fitsfile, **kwargs)
+
+
+
+def parallel_calibrated_frames_to_database(fitsbasedir,
+                                           fitsglob='1-???????_?.fits',
+                                           network='HP',
+                                           overwrite=False,
+                                           badframetag='badframes',
+                                           nworkers=16,
+                                           maxworkertasks=1000):
+    '''
+    This runs a DB ingest on all FITS located in fitsbasedir and subdirs.
+
+    Runs a 'find' subprocess to find all the FITS to process.
+
+    '''
+
+    print('%sZ: finding all FITS frames matching %s starting in %s' %
+          (datetime.utcnow().isoformat(), fitsglob, fitsbasedir))
+
+    # find all the FITS files
+    findcmd = "find {fitsbasedir} -type f -name '{fitsglob}' -print"
+    findcmd = findcmd.format(fitsbasedir=fitsbasedir,
+                             fitsglob=fitsglob)
+    fitslist = subprocess.check_output(findcmd,shell=True)
+    fitslist = fitslist.split('\n')
+    fitslist = sorted(fitslist[:-1])
+
+    # generate the task list
+    tasks = [(x, {'network':network,
+                  'overwrite':overwrite,
+                  'badframetag':badframetag}) for x in fitslist]
+
+    print('%sZ: %s files to process' %
+          (datetime.utcnow().isoformat(), len(tasks)))
+
+    if len(tasks) > 0:
+
+        pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+        # fire up the pool of workers
+        results = pool.map(calframe_to_db_worker, tasks)
+
+        # wait for the processes to complete work
+        pool.close()
+        pool.join()
+
+        return {x:y for (x,y) in results}
+
+    else:
+
+        print('ERR! %sZ: none of the files specified exist, bailing out...' %
+              (datetime.utcnow().isoformat(),))
+        return
+
 
 
 
