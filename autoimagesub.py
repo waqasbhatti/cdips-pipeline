@@ -299,7 +299,8 @@ def get_frame_info(frame):
                 os.path.exists(photpath) and
                 os.path.exists(srclistpath)):
 
-            print('ERR! %sZ: frame %s has missing fiphot/fistar, skipping...' %
+            print('ERR! %sZ: frame %s has missing fiphot/fistar, '
+                  'so no phot info...' %
                   (datetime.utcnow().isoformat(), frame))
             return frame, None
 
@@ -685,17 +686,13 @@ def calibrated_frame_to_database(fitsfile,
         else:
             tid = None
         if 'TELVER' in headerdata and headerdata['TELVER'] is not None:
-            tvn = headerdata['TELID']
+            tvn = headerdata['TELVER']
         else:
-            tvn = None
+            tvn = 0
         if 'FOCUS' in headerdata and headerdata['FOCUS'] is not None:
             tfs = headerdata['FOCUS']
         else:
             tfs = None
-        if 'TELVER' in headerdata and headerdata['TELVER'] is not None:
-            tvn = headerdata['TELID']
-        else:
-            tvn = None
         if 'MNTSTATE' in headerdata and headerdata['MNTSTATE'] is not None:
             tms = headerdata['MNTSTATE']
         else:
