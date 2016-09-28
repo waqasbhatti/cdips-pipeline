@@ -375,8 +375,8 @@ def calibrated_frame_to_database(fitsfile,
 
         # find the frame's fistar, wcs, and fiphot
         prospective_fistar = fitsfile.replace('.fits','.fistar')
-        prospective_wcs = fitsfile.replace('.fits','.fistar')
-        prospective_fiphot = fitsfile.replace('.fits','.fistar')
+        prospective_wcs = fitsfile.replace('.fits','.wcs')
+        prospective_fiphot = fitsfile.replace('.fits','.fiphot')
 
         # check if this is a bad frame and set stuff accordingly
         if (os.path.exists(prospective_fistar) and
