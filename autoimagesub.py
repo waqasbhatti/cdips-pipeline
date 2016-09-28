@@ -823,7 +823,7 @@ def calibrated_frame_to_database(fitsfile,
                      "entryts = current_timestamp")
             params = (network, projectid, stationid, obsfield,
                       framerjd, centerra, centerdec, fovdeg, frameisok,
-                      fitsfile, fistar, fiphot, wcs,
+                      fits, fistar, fiphot, wcs,
                       cfn, cfs, ccd, frt,
                       flt, flv,
                       cid, cvn, cbv, cdv, cfv, exp,
@@ -831,7 +831,7 @@ def calibrated_frame_to_database(fitsfile,
                       ngo, mme, mem, mbg, sbg, mfs, mfd,
                       mph, mds, mel, iha, izd, wis, hum, skt, amt, dew,
                       framerjd, centerra, centerdec, fovdeg, frameisok,
-                      fitsfile, fistar, fiphot, wcs, flt, flv,
+                      fits, fistar, fiphot, wcs, flt, flv,
                       cid, cvn, cbv, cdv, cfv,
                       exp, tid, tvn, tfs, tms,
                       tmi, tmv, tgs, ngo, mme,
@@ -864,7 +864,7 @@ def calibrated_frame_to_database(fitsfile,
                      ") ")
             params = (network, projectid, stationid, obsfield,
                       framerjd, centerra, centerdec, fovdeg, frameisok,
-                      fitsfile, fistar, fiphot, wcs,
+                      fits, fistar, fiphot, wcs,
                       cfn, cfs, ccd, frt,
                       flt, flv,
                       cid, cvn, cbv, cdv, cfv, exp,
@@ -876,10 +876,10 @@ def calibrated_frame_to_database(fitsfile,
         cursor.execute(query, params)
         database.commit()
 
-        message = 'inserted %s into DB OK' % fitsfile
+        message = 'inserted %s into DB OK' % fits
         print('%sZ: %s' %
               (datetime.utcnow().isoformat(), message) )
-        returnval = (fitsfile, True)
+        returnval = (fits, True)
 
     # catch the overwrite = False scenario
     except pg.IntegrityError as e:
@@ -889,10 +889,10 @@ def calibrated_frame_to_database(fitsfile,
         message = ('failed to insert %s '
                    'into DB because it exists already '
                    'and overwrite = False'
-                   % fitsfile)
+                   % fits)
         print('EXC! %sZ: %s\n%s' %
                (datetime.utcnow().isoformat(), message, format_exc()) )
-        returnval = (fitsfile, False)
+        returnval = (fits, False)
 
 
     # if everything goes wrong, exit cleanly
@@ -900,11 +900,11 @@ def calibrated_frame_to_database(fitsfile,
 
         database.rollback()
 
-        message = 'failed to insert %s into DB' % fitsfile
+        message = 'failed to insert %s into DB' % fits
         print('EXC! %sZ: %s\nexception was: %s' %
                (datetime.utcnow().isoformat(),
                 message, format_exc()) )
-        returnval = (fitsfile, False)
+        returnval = (fits, False)
 
         # TEMPORARY
         # raise
