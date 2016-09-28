@@ -265,6 +265,237 @@ def find_subtracted_fits_fieldprojectidccd(
                                                 nworkers=nworkers,
                                                 maxworkertasks=maxworkertasks)
 
+########################
+## GETTING FRAME INFO ##
+########################
+
+def get_frame_info(frame):
+    '''
+    This gets the needed info from a frame for selecting photref candidates.
+
+    '''
+
+    try:
+
+        # find the frame's fistar and fiphot files
+        fitsdir = os.path.dirname(frame)
+        fitsbase = os.path.splitext(os.path.basename(frame))[0]
+
+        # if the xtrns files are passed in, make sure we look at the
+        # right fistar and fiphot files
+        if '-xtrns' in fitsbase:
+            fitsbase = fitsbase.rstrip('-xtrns')
+
+        photpath = os.path.join(
+            fitsdir,
+            fitsbase + '.fiphot'
+            )
+        srclistpath = os.path.join(
+            fitsdir,
+            fitsbase + '.fistar'
+            )
+
+        if not (os.path.exists(frame) and
+                os.path.exists(photpath) and
+                os.path.exists(srclistpath)):
+
+            print('ERR! %sZ: frame %s has missing fiphot/fistar, skipping...' %
+                  (datetime.utcnow().isoformat(), frame))
+            return frame, None
+
+
+
+        # 1. get the data from FITS header
+        headerdata = get_header_keyword_list(
+            frame,
+            ['Z','MOONDIST','MOONELEV','MOONPH','HA']
+        )
+
+        # 2. get the data from the fiphot file
+
+        # decide if the phot file is binary or not. read the first 600
+        # bytes and look for the '--binary-output' text
+        with open(photpath,'rb') as photf:
+            header = photf.read(1000)
+
+        if '--binary-output' in header and HAVEBINPHOT:
+
+            photdata_f = read_fiphot(photpath)
+            photdata = {
+                'mag':np.array(photdata_f['per aperture'][2]['mag']),
+                'err':np.array(photdata_f['per aperture'][2]['mag err']),
+                'flag':np.array(
+                    photdata_f['per aperture'][2]['status flag']
+                    )
+                }
+            del photdata_f
+
+        elif '--binary-output' in header and not HAVEBINPHOT:
+
+            print('WRN! %sZ: %s is a binary phot file, '
+                  'but no binary phot reader is present, skipping...' %
+                  (datetime.utcnow().isoformat(), photpath))
+            return frame, None
+
+        else:
+
+            # read in the phot file
+            photdata = np.genfromtxt(
+                photpath,
+                usecols=(12,13,14),
+                dtype='f8,f8,S5',
+                names=['mag','err','flag']
+                )
+
+        # 3. get the data from the fistar file
+        srcdata = np.genfromtxt(srclistpath,
+                                usecols=(3,5,6),
+                                dtype='f8,f8,f8',
+                                names=['background',
+                                       'svalue',
+                                       'dvalue'])
+
+        # process fiphot data
+        if '--binary-output' in header:
+            goodind = np.where(photdata['flag'] == 0)
+        else:
+            goodind = np.where(photdata['flag'] == 'G')
+
+        median_mag = np.median(photdata['mag'][goodind])
+
+        # these are the quantities we're interested in
+        ngood = len(goodind[0])
+        median_magerr = np.nanmedian(photdata['err'][goodind])
+        medabsdev_mag = np.nanmedian(
+            np.abs(photdata['mag'][goodind] - median_mag)
+            )
+
+
+        # now consolidate all the data
+        frameinfo = {
+            'zenithdist':(headerdata['Z']
+                          if 'Z' in headerdata else np.nan),
+            'moondist':(headerdata['MOONDIST']
+                        if 'MOONDIST' in headerdata else np.nan),
+            'moonelev':(headerdata['MOONELEV']
+                        if 'MOONELEV' in headerdata else np.nan),
+            'moonphase':(headerdata['MOONPH']
+                         if 'MOONPH' in headerdata else np.nan),
+            'hourangle':(headerdata['HA']
+                         if 'HA' in headerdata else np.nan),
+            'ngoodobjects':ngood,
+            'medmagerr':median_magerr,
+            'magerrmad':medabsdev_mag,
+            'medsrcbgv':np.nanmedian(srcdata['background']),
+            'stdsrcbgv':np.nanstd(srcdata['background']),
+            'medsval':np.nanmedian(srcdata['svalue']),
+            'meddval':np.nanmedian(srcdata['dvalue']),
+        }
+
+        return frame, frameinfo
+
+    except Exception as e:
+
+        print('ERR! %sZ: could not get info from frame %s, error was: %s' %
+              (datetime.utcnow().isoformat(), frame, e))
+        return frame, None
+
+
+
+def fitslist_frameinfo(fitslist,
+                       forcecollectinfo=False,
+                       nworkers=8,
+                       maxworkertasks=1000):
+    '''
+    This runs a parallel get_frame_info job.
+
+    '''
+
+    # check if we have it in the frameinfo cache, if so, use it. if not, redo
+    # the info collection, and then write it back to the cache.
+    cachefile = os.path.join(FRAMEINFOCACHEDIR,
+                             ('TM-frameinfo-%s.pkl.gz' %
+                              md5(repr(fitslist)).hexdigest()))
+
+    if os.path.exists(cachefile) and not forcecollectinfo:
+
+        with gzip.open(cachefile,'rb') as infd:
+            frameinfo = pickle.load(infd)
+
+        print('%sZ: frameinfo found in cache file: %s' %
+              (datetime.utcnow().isoformat(), cachefile))
+
+        return frameinfo
+
+    # if the cache doesn't exist, we'll run the frameinfo procedure and write
+    # the results back to the cache
+    else:
+
+        print('%sZ: getting frameinfo for %s frames...' %
+              (datetime.utcnow().isoformat(), len(fitslist)))
+
+        pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+        tasks = fitslist
+
+        # fire up the pool of workers
+        results = pool.map(get_frame_info, tasks)
+
+        # wait for the processes to complete work
+        pool.close()
+        pool.join()
+
+        # now turn everything into ndarrays
+        frames = np.array([x[0] for x in results])
+        zenithdist = np.array([(x[1]['zenithdist']
+                                if x[1] else np.nan) for x in results])
+        moondist = np.array([(x[1]['moondist']
+                                if x[1] else np.nan) for x in results])
+        moonelev = np.array([(x[1]['moonelev']
+                                if x[1] else np.nan) for x in results])
+        moonphase = np.array([(x[1]['moonphase']
+                                if x[1] else np.nan) for x in results])
+        hourangle = np.array([(x[1]['hourangle']
+                                if x[1] else np.nan) for x in results])
+        ngoodobjects = np.array([(x[1]['ngoodobjects']
+                                if x[1] else np.nan) for x in results])
+        medmagerr = np.array([(x[1]['medmagerr']
+                                if x[1] else np.nan) for x in results])
+        magerrmad = np.array([(x[1]['magerrmad']
+                                if x[1] else np.nan) for x in results])
+        medsrcbgv = np.array([(x[1]['medsrcbgv']
+                                if x[1] else np.nan) for x in results])
+        stdsrcbgv = np.array([(x[1]['stdsrcbgv']
+                                if x[1] else np.nan) for x in results])
+        medsval = np.array([(x[1]['medsval']
+                                if x[1] else np.nan) for x in results])
+        meddval = np.array([(x[1]['meddval']
+                                if x[1] else np.nan) for x in results])
+
+
+        outdict = {'frames':frames,
+                   'zenithdist':zenithdist,
+                   'moondist':moondist,
+                   'moonelev':moonelev,
+                   'moonphase':moonphase,
+                   'hourangle':hourangle,
+                   'ngoodobjects':ngoodobjects,
+                   'medmagerr':medmagerr,
+                   'magerrmad':magerrmad,
+                   'medsrcbgv':medsrcbgv,
+                   'stdsrcbgv':stdsrcbgv,
+                   'medsval':medsval,
+                   'meddval':meddval}
+
+        with gzip.open(cachefile,'wb') as outfd:
+            pickle.dump(outdict, outfd, pickle.HIGHEST_PROTOCOL)
+
+        print('%sZ: wrote frameinfo to cache file: %s' %
+              (datetime.utcnow().isoformat(), cachefile))
+
+        return outdict
+
+
 
 ######################################
 ## PUTTING FRAMES INTO THE DATABASE ##
@@ -484,13 +715,26 @@ def calibrated_frame_to_database(fitsfile,
 
         # get the frame's photometry info (useful for selecting refs)
         photfits, photinfo = get_frame_info(fitsfile)
-        ngo = photinfo['ngoodobjects']
-        mme = photinfo['medmagerr']
-        mem = photinfo['magerrmad']
-        mbg = photinfo['medsrcbgv']
-        sbg = photinfo['stdsrcbgv']
-        mfs = photinfo['medsval']
-        mfd = photinfo['meddval']
+
+        # make sure the frame actually has photinfo before inserting
+        if photinfo:
+            ngo = photinfo['ngoodobjects']
+            mme = photinfo['medmagerr']
+            mem = photinfo['magerrmad']
+            mbg = photinfo['medsrcbgv']
+            sbg = photinfo['stdsrcbgv']
+            mfs = photinfo['medsval']
+            mfd = photinfo['meddval']
+        else:
+            ngo = None
+            mme = None
+            mem = None
+            mbg = None
+            sbg = None
+            mfs = None
+            mfd = None
+            frameisok = False
+
 
         # get the frame's environmental info
         if 'MOONPH' in headerdata and headerdata['MOONPH'] is not None:
@@ -1135,234 +1379,6 @@ def framelist_make_xtrnsfits(fitsfiles,
 ##################################
 ## PHOTOMETRIC REFERENCE FRAMES ##
 ##################################
-
-def get_frame_info(frame):
-    '''
-    This gets the needed info from a frame for selecting photref candidates.
-
-    '''
-
-    try:
-
-        # find the frame's fistar and fiphot files
-        fitsdir = os.path.dirname(frame)
-        fitsbase = os.path.splitext(os.path.basename(frame))[0]
-
-        # if the xtrns files are passed in, make sure we look at the
-        # right fistar and fiphot files
-        if '-xtrns' in fitsbase:
-            fitsbase = fitsbase.rstrip('-xtrns')
-
-        photpath = os.path.join(
-            fitsdir,
-            fitsbase + '.fiphot'
-            )
-        srclistpath = os.path.join(
-            fitsdir,
-            fitsbase + '.fistar'
-            )
-
-        if not (os.path.exists(frame) and
-                os.path.exists(photpath) and
-                os.path.exists(srclistpath)):
-
-            print('ERR! %sZ: frame %s has missing fiphot/fistar, skipping...' %
-                  (datetime.utcnow().isoformat(), frame))
-            return frame, None
-
-
-
-        # 1. get the data from FITS header
-        headerdata = get_header_keyword_list(
-            frame,
-            ['Z','MOONDIST','MOONELEV','MOONPH','HA']
-        )
-
-        # 2. get the data from the fiphot file
-
-        # decide if the phot file is binary or not. read the first 600
-        # bytes and look for the '--binary-output' text
-        with open(photpath,'rb') as photf:
-            header = photf.read(1000)
-
-        if '--binary-output' in header and HAVEBINPHOT:
-
-            photdata_f = read_fiphot(photpath)
-            photdata = {
-                'mag':np.array(photdata_f['per aperture'][2]['mag']),
-                'err':np.array(photdata_f['per aperture'][2]['mag err']),
-                'flag':np.array(
-                    photdata_f['per aperture'][2]['status flag']
-                    )
-                }
-            del photdata_f
-
-        elif '--binary-output' in header and not HAVEBINPHOT:
-
-            print('WRN! %sZ: %s is a binary phot file, '
-                  'but no binary phot reader is present, skipping...' %
-                  (datetime.utcnow().isoformat(), photpath))
-            return frame, None
-
-        else:
-
-            # read in the phot file
-            photdata = np.genfromtxt(
-                photpath,
-                usecols=(12,13,14),
-                dtype='f8,f8,S5',
-                names=['mag','err','flag']
-                )
-
-        # 3. get the data from the fistar file
-        srcdata = np.genfromtxt(srclistpath,
-                                usecols=(3,5,6),
-                                dtype='f8,f8,f8',
-                                names=['background',
-                                       'svalue',
-                                       'dvalue'])
-
-        # process fiphot data
-        if '--binary-output' in header:
-            goodind = np.where(photdata['flag'] == 0)
-        else:
-            goodind = np.where(photdata['flag'] == 'G')
-
-        median_mag = np.median(photdata['mag'][goodind])
-
-        # these are the quantities we're interested in
-        ngood = len(goodind[0])
-        median_magerr = np.nanmedian(photdata['err'][goodind])
-        medabsdev_mag = np.nanmedian(
-            np.abs(photdata['mag'][goodind] - median_mag)
-            )
-
-
-        # now consolidate all the data
-        frameinfo = {
-            'zenithdist':(headerdata['Z']
-                          if 'Z' in headerdata else np.nan),
-            'moondist':(headerdata['MOONDIST']
-                        if 'MOONDIST' in headerdata else np.nan),
-            'moonelev':(headerdata['MOONELEV']
-                        if 'MOONELEV' in headerdata else np.nan),
-            'moonphase':(headerdata['MOONPH']
-                         if 'MOONPH' in headerdata else np.nan),
-            'hourangle':(headerdata['HA']
-                         if 'HA' in headerdata else np.nan),
-            'ngoodobjects':ngood,
-            'medmagerr':median_magerr,
-            'magerrmad':medabsdev_mag,
-            'medsrcbgv':np.nanmedian(srcdata['background']),
-            'stdsrcbgv':np.nanstd(srcdata['background']),
-            'medsval':np.nanmedian(srcdata['svalue']),
-            'meddval':np.nanmedian(srcdata['dvalue']),
-        }
-
-        return frame, frameinfo
-
-    except Exception as e:
-
-        print('ERR! %sZ: could not get info from frame %s, error was: %s' %
-              (datetime.utcnow().isoformat(), frame, e))
-        return frame, None
-
-
-
-def fitslist_frameinfo(fitslist,
-                       forcecollectinfo=False,
-                       nworkers=8,
-                       maxworkertasks=1000):
-    '''
-    This runs a parallel get_frame_info job.
-
-    '''
-
-    # check if we have it in the frameinfo cache, if so, use it. if not, redo
-    # the info collection, and then write it back to the cache.
-    cachefile = os.path.join(FRAMEINFOCACHEDIR,
-                             ('TM-frameinfo-%s.pkl.gz' %
-                              md5(repr(fitslist)).hexdigest()))
-
-    if os.path.exists(cachefile) and not forcecollectinfo:
-
-        with gzip.open(cachefile,'rb') as infd:
-            frameinfo = pickle.load(infd)
-
-        print('%sZ: frameinfo found in cache file: %s' %
-              (datetime.utcnow().isoformat(), cachefile))
-
-        return frameinfo
-
-    # if the cache doesn't exist, we'll run the frameinfo procedure and write
-    # the results back to the cache
-    else:
-
-        print('%sZ: getting frameinfo for %s frames...' %
-              (datetime.utcnow().isoformat(), len(fitslist)))
-
-        pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
-
-        tasks = fitslist
-
-        # fire up the pool of workers
-        results = pool.map(get_frame_info, tasks)
-
-        # wait for the processes to complete work
-        pool.close()
-        pool.join()
-
-        # now turn everything into ndarrays
-        frames = np.array([x[0] for x in results])
-        zenithdist = np.array([(x[1]['zenithdist']
-                                if x[1] else np.nan) for x in results])
-        moondist = np.array([(x[1]['moondist']
-                                if x[1] else np.nan) for x in results])
-        moonelev = np.array([(x[1]['moonelev']
-                                if x[1] else np.nan) for x in results])
-        moonphase = np.array([(x[1]['moonphase']
-                                if x[1] else np.nan) for x in results])
-        hourangle = np.array([(x[1]['hourangle']
-                                if x[1] else np.nan) for x in results])
-        ngoodobjects = np.array([(x[1]['ngoodobjects']
-                                if x[1] else np.nan) for x in results])
-        medmagerr = np.array([(x[1]['medmagerr']
-                                if x[1] else np.nan) for x in results])
-        magerrmad = np.array([(x[1]['magerrmad']
-                                if x[1] else np.nan) for x in results])
-        medsrcbgv = np.array([(x[1]['medsrcbgv']
-                                if x[1] else np.nan) for x in results])
-        stdsrcbgv = np.array([(x[1]['stdsrcbgv']
-                                if x[1] else np.nan) for x in results])
-        medsval = np.array([(x[1]['medsval']
-                                if x[1] else np.nan) for x in results])
-        meddval = np.array([(x[1]['meddval']
-                                if x[1] else np.nan) for x in results])
-
-
-        outdict = {'frames':frames,
-                   'zenithdist':zenithdist,
-                   'moondist':moondist,
-                   'moonelev':moonelev,
-                   'moonphase':moonphase,
-                   'hourangle':hourangle,
-                   'ngoodobjects':ngoodobjects,
-                   'medmagerr':medmagerr,
-                   'magerrmad':magerrmad,
-                   'medsrcbgv':medsrcbgv,
-                   'stdsrcbgv':stdsrcbgv,
-                   'medsval':medsval,
-                   'meddval':meddval}
-
-        with gzip.open(cachefile,'wb') as outfd:
-            pickle.dump(outdict, outfd, pickle.HIGHEST_PROTOCOL)
-
-        print('%sZ: wrote frameinfo to cache file: %s' %
-              (datetime.utcnow().isoformat(), cachefile))
-
-        return outdict
-
-
 
 def generate_photref_candidates_from_xtrns(fitsfiles,
                                            minframes=50,
