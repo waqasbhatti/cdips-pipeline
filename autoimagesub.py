@@ -334,7 +334,7 @@ def calibrated_frame_to_database(fitsfile,
 
         # sort out the commentary card
         headercomments = repr(headerdata['COMMENT'])
-        headercomments = headercomment.lower()
+        headercomments = headercomments.lower()
 
         # get the frame's projectid, stationid, observed field, rjd, centerra,
         # centerrdec, widthdeg, frameisok values
