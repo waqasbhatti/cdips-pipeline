@@ -347,9 +347,9 @@ def calibrated_frame_to_database(fitsfile,
         else:
             obsfield = None
         if 'JD' in headerdata and headerdata['JD']:
-            rjd = headerdata['JD']
+            framerjd = headerdata['JD']
         else:
-            rjd = None
+            framerjd = None
 
         # convert the RA [h] to RA (deg)
         if 'RA' in headerdata and headerdata['RA'] is not None:
