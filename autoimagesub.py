@@ -660,7 +660,7 @@ def calibrated_frame_to_database(fitsfile,
         returnval = (fitsfile, False)
 
         # TEMPORARY
-        raise
+        # raise
 
 
     finally:
