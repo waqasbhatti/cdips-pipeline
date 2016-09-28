@@ -128,6 +128,7 @@ create table ap_photometry (
 drop table if exists calibratedframes;
 create table calibratedframes (
        framekey bigserial not null,
+       entryts timestamp with time zone not null default current_timestamp,
        -- project and observed field info
        network text not null,
        projectid text not null,
@@ -162,7 +163,6 @@ create table calibratedframes (
        tid integer,                    -- telescope ID (i.e. which lens?)
        tvn integer default 0,          -- telescope version
        tfs real,                       -- telescope focus setting
-       ttt real,                       -- telescope tube temperature
        tms text,                       -- telescope mount state
        tmi integer,                    -- telescope mount ID
        tmv integer default 0,          -- telescope mount version
@@ -174,13 +174,18 @@ create table calibratedframes (
        mbg real,                       -- median source background (aim_002)
        sbg real,                       -- stdev of source background (aim_002)
        mfs real,                       -- median S value of frame
-       mfk real,                       -- median D value of frame
+       mfd real,                       -- median D value of frame
        -- environment
        mph real,                       -- moonphase at time exposure taken
        mds real,                       -- moon distance from center of frame
        mel real,                       -- moon elevation at this time
        iha real,                       -- hour angle of observation
        izd real,                       -- zenith distance of observation
+       wis real,                       -- wind speed at observation
+       hum real,                       -- relative humidity at observation
+       skt real,                       -- sky temp diff at observation
+       amt real,                       -- ambient temperature at observation
+       dew real,                       -- dewpoint at observation
        -- eventually use JSON for broken-out cols above
        -- these are JSON documents describing the rest of the frame's info
        -- framedetails jsonb not null,
@@ -190,6 +195,10 @@ create table calibratedframes (
        -- photdetails jsonb not null,
        -- environdetails jsonb not null,
        primary key (framekey)
+);
+
+create unique index calframes_uindx on calibratedframes (
+       network, projectid, stationid, obsfield, cfn, cfs, ccd, frt
 );
 
 
