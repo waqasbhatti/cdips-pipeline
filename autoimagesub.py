@@ -273,7 +273,7 @@ def find_subtracted_fits_fieldprojectidccd(
 def calibrated_frame_to_database(fitsfile,
                                  network='HP',
                                  overwrite=False,
-                                 badframedir='badframes',
+                                 badframetag='badframes',
                                  database=None):
     '''This puts an original fully calibrated FITS into the database.
 
@@ -378,9 +378,11 @@ def calibrated_frame_to_database(fitsfile,
         prospective_wcs = fitsfile.replace('.fits','.fistar')
         prospective_fiphot = fitsfile.replace('.fits','.fistar')
 
+        # check if this is a bad frame and set stuff accordingly
         if (os.path.exists(prospective_fistar) and
             os.path.exists(prospective_wcs) and
-            os.path.exists(prospective_fiphot)):
+            os.path.exists(prospective_fiphot) and
+            (badframetag not in os.path.abspath(fitsfile))):
             frameisok = True
             fistar = prospective_fistar
             wcs = prospective_wcs
@@ -556,7 +558,7 @@ def calibrated_frame_to_database(fitsfile,
                      "entryts = current_timestamp")
             params = (network, projectid, stationid, obsfield,
                       framerjd, centerra, centerdec, fovdeg, frameisok,
-                      fits, fistar, fiphot, wcs,
+                      fitsfile, fistar, fiphot, wcs,
                       cfn, cfs, ccd, frt,
                       flt, flv,
                       cid, cvn, cbv, cdv, cfv, exp,
@@ -564,7 +566,7 @@ def calibrated_frame_to_database(fitsfile,
                       ngo, mme, mem, mbg, sbg, mfs, mfd,
                       mph, mds, mel, iha, izd, wis, hum, skt, amt, dew,
                       framerjd, centerra, centerdec, fovdeg, frameisok,
-                      fits, fistar, fiphot, wcs, flt, flv,
+                      fitsfile, fistar, fiphot, wcs, flt, flv,
                       cid, cvn, cbv, cdv, cfv,
                       exp, tid, tvn, tfs, tms,
                       tmi, tmv, tgs, ngo, mme,
@@ -597,7 +599,7 @@ def calibrated_frame_to_database(fitsfile,
                      ") ")
             params = (network, projectid, stationid, obsfield,
                       framerjd, centerra, centerdec, fovdeg, frameisok,
-                      fits, fistar, fiphot, wcs,
+                      fitsfile, fistar, fiphot, wcs,
                       cfn, cfs, ccd, frt,
                       flt, flv,
                       cid, cvn, cbv, cdv, cfv, exp,
@@ -610,6 +612,9 @@ def calibrated_frame_to_database(fitsfile,
         cursor.execute(query, params)
         database.commit()
 
+        message = 'inserted %s into DB OK' % fitsfile
+        print('%sZ: %s\nexception was: %s' %
+              (datetime.utcnow().isoformat(), message) )
         returnval = (fitsfile, True)
 
     # catch the overwrite = False scenario
@@ -636,6 +641,8 @@ def calibrated_frame_to_database(fitsfile,
                (datetime.utcnow().isoformat(),
                 message, format_exc()) )
         returnval = (fitsfile, False)
+
+        # TEMPORARY
         raise
 
 
