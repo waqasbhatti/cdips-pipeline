@@ -607,7 +607,6 @@ def calibrated_frame_to_database(fitsfile,
                       ngo, mme, mem, mbg, sbg, mfs, mfd,
                       mph, mds, mel, iha, izd, wis, hum, skt, amt, dew)
 
-
         # execute the query and commit
         cursor.execute(query, params)
         database.commit()
