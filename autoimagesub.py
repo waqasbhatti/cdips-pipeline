@@ -383,13 +383,29 @@ def calibrated_frame_to_database(fitsfile,
             os.path.exists(prospective_wcs) and
             os.path.exists(prospective_fiphot) and
             (badframetag not in os.path.abspath(fitsfile))):
+
             frameisok = True
             fistar = prospective_fistar
             wcs = prospective_wcs
             fiphot = prospective_fiphot
+
         else:
+
             frameisok = False
-            fistar, wcs, fiphot = None, None, None
+
+            if os.path.exists(prospective_fistar):
+                fistar = prospective_fistar
+            else:
+                fistar = None
+            if os.path.exists(prospective_wcs):
+                wcs = prospective_wcs
+            else:
+                wcs = None
+            if os.path.exists(prospective_fiphot):
+                fiphot = prospective_fiphot
+            else:
+                fiphot = None
+
 
         # get the frame's filter ID and version
         if 'FILID' in headerdata and headerdata['FILID'] is not None:

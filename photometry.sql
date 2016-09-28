@@ -41,7 +41,8 @@ create table lcinfo (
        lightcurvecolumns text not null,
        lightcurvesortcol text not null,
        lightcurveapertures text not null,  -- JSON map of aperturename to pixval
-       lcbestaperture text,                -- best aperture in lightcurveapertures
+       lcbestaperture text,                -- best aperture in
+                                           -- lightcurveapertures
        objectinfocolumns text not null,
        objectinfoidcol text not null,
        unixtime double precision not null,
