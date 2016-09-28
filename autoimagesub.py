@@ -2197,7 +2197,7 @@ def xtrnsfits_convsubphot(xtrnsfits,
                           refinfo=REFINFO,
                           reversesubtract=True,
                           kernelspec='b/4;i/4;d=4/4',
-                          lcapertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0'
+                          lcapertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
                           photdisjointradius=2,
                           findnewobjects=False,
                           nworkers=16,
