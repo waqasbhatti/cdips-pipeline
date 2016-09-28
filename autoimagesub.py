@@ -347,7 +347,7 @@ def calibrated_frame_to_database(fitsfile,
         else:
             obsfield = None
         if 'JD' in headerdata and headerdata['JD']:
-            rjd = headerdata['RJD']
+            rjd = headerdata['JD']
         else:
             rjd = None
 
