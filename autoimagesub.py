@@ -480,7 +480,7 @@ def calibrated_frame_to_database(fitsfile,
             tgs = None
 
         # get the frame's photometry info (useful for selecting refs)
-        photinfo = get_frame_info(fitsfile)
+        photfits, photinfo = get_frame_info(fitsfile)
         ngo = photinfo['ngoodobjects']
         mme = photinfo['medmagerr']
         mem = photinfo['magerrmad']
