@@ -683,7 +683,7 @@ def calframe_to_db_worker(task):
     '''
 
     fitsfile, kwargs = task
-    return calibrated_frames_to_database(fitsfile, **kwargs)
+    return calibrated_frame_to_database(fitsfile, **kwargs)
 
 
 
