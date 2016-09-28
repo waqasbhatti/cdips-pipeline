@@ -628,7 +628,7 @@ def calibrated_frame_to_database(fitsfile,
         database.commit()
 
         message = 'inserted %s into DB OK' % fitsfile
-        print('%sZ: %s\nexception was: %s' %
+        print('%sZ: %s' %
               (datetime.utcnow().isoformat(), message) )
         returnval = (fitsfile, True)
 
