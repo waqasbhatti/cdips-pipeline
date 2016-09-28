@@ -367,7 +367,7 @@ def calibrated_frame_to_database(fitsfile,
             fovdeg = None
 
         # get the frame's framenum, ccdnum, subframe, frametype
-        stationid, framenum, subframe, ccdnum = felems[0]
+        stationid, cfn, cfs, ccd = felems[0]
         if 'IMAGETYP' in headerdata and headerdata['IMAGETYP']:
             frametype = headerdata['IMAGETYP']
         else:
