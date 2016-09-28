@@ -309,7 +309,7 @@ def calibrated_frame_to_database(fitsfile,
 
         # get the frame filename elements
         felems = FRAMESUBREGEX.findall(
-            os.path.basename(convsubfits)
+            os.path.basename(fitsfile)
         )
         if not felems:
             message = ('failed to get basic frameinfo from %s, skipping...'
