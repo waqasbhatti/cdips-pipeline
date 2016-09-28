@@ -369,9 +369,9 @@ def calibrated_frame_to_database(fitsfile,
         # get the frame's framenum, ccdnum, subframe, frametype
         stationid, cfn, cfs, ccd = felems[0]
         if 'IMAGETYP' in headerdata and headerdata['IMAGETYP']:
-            frametype = headerdata['IMAGETYP']
+            frt = headerdata['IMAGETYP']
         else:
-            frametype = None
+            frt = None
 
         # find the frame's fistar, wcs, and fiphot
         prospective_fistar = fitsfile.replace('.fits','.fistar')
