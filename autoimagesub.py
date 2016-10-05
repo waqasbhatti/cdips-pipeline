@@ -946,38 +946,46 @@ def parallel_calibrated_frames_to_database(fitsbasedir,
           (datetime.utcnow().isoformat(), fitsglob, fitsbasedir))
 
     # find all the FITS files
-    findcmd = "find {fitsbasedir} -type f -name '{fitsglob}' -print"
-    findcmd = findcmd.format(fitsbasedir=fitsbasedir,
-                             fitsglob=fitsglob)
-    fitslist = subprocess.check_output(findcmd,shell=True)
-    fitslist = fitslist.split('\n')
-    fitslist = sorted(fitslist[:-1])
+    try:
 
-    # generate the task list
-    tasks = [(x, {'network':network,
-                  'overwrite':overwrite,
-                  'badframetag':badframetag}) for x in fitslist]
+        findcmd = "find {fitsbasedir} -type f -name '{fitsglob}' -print"
+        findcmd = findcmd.format(fitsbasedir=fitsbasedir,
+                                 fitsglob=fitsglob)
+        fitslist = subprocess.check_output(findcmd,shell=True)
+        fitslist = fitslist.split('\n')
+        fitslist = sorted(fitslist[:-1])
 
-    print('%sZ: %s files to process' %
-          (datetime.utcnow().isoformat(), len(tasks)))
+        # generate the task list
+        tasks = [(x, {'network':network,
+                      'overwrite':overwrite,
+                      'badframetag':badframetag}) for x in fitslist]
 
-    if len(tasks) > 0:
+        print('%sZ: %s files to process' %
+              (datetime.utcnow().isoformat(), len(tasks)))
 
-        pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+        if len(tasks) > 0:
 
-        # fire up the pool of workers
-        results = pool.map(calframe_to_db_worker, tasks)
+            pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
-        # wait for the processes to complete work
-        pool.close()
-        pool.join()
+            # fire up the pool of workers
+            results = pool.map(calframe_to_db_worker, tasks)
 
-        return {x:y for (x,y) in results}
+            # wait for the processes to complete work
+            pool.close()
+            pool.join()
 
-    else:
+            return {x:y for (x,y) in results}
 
-        print('ERR! %sZ: none of the files specified exist, bailing out...' %
-              (datetime.utcnow().isoformat(),))
+        else:
+
+            print('ERR! %sZ: none of the files specified exist, bailing out...' %
+                  (datetime.utcnow().isoformat(),))
+            return
+
+    except subprocess.CalledProcessError:
+
+        print('ERR! %sZ: no files in directory %s, bailing out...' %
+              (datetime.utcnow().isoformat(), fitsbasedir))
         return
 
 
