@@ -1259,9 +1259,9 @@ def dbgen_astromref_projectidfieldccd(projectid,
 
                 # copy the frame, jpeg, and fistar to the reference-frames dir
                 shutil.copy(arefinfo['fits'],os.path.join(REFBASEDIR,
-                                                                areftargetfits))
+                                                          areftargetfits))
                 shutil.copy(arefinfo['jpg'],os.path.join(REFBASEDIR,
-                                                                areftargetjpeg))
+                                                         areftargetjpeg))
                 shutil.copy(arefinfo['fistar'],
                             os.path.join(REFBASEDIR, areftargetfistar))
                 shutil.copy(arefinfo['fiphot'],
@@ -1290,13 +1290,19 @@ def dbgen_astromref_projectidfieldccd(projectid,
                     )
                     params = (
                         str(projectid), field, ccd, makeactive,
-                        arefinfo['framekey'], areftargetfits,
-                        areftargetfistar, areftargetfiphot,
-                        areftargetjpeg, arefinfo['sval'], arefinfo['dval'],
+                        arefinfo['framekey'],
+                        os.path.join(REFBASEDIR, areftargetfits),
+                        os.path.join(REFBASEDIR, areftargetfistar),
+                        os.path.join(REFBASEDIR, areftargetfiphot),
+                        os.path.join(REFBASEDIR, areftargetjpeg),
+                        arefinfo['sval'], arefinfo['dval'],
                         arefinfo['bgv'],arefinfo['ndet'], arefinfo['comment'],
-                        arefinfo['framekey'], areftargetfits,
-                        areftargetfistar, areftargetfiphot,
-                        areftargetjpeg, arefinfo['sval'], arefinfo['dval'],
+                        arefinfo['framekey'],
+                        os.path.join(REFBASEDIR, areftargetfits),
+                        os.path.join(REFBASEDIR, areftargetfistar),
+                        os.path.join(REFBASEDIR, areftargetfiphot),
+                        os.path.join(REFBASEDIR, areftargetjpeg),
+                        arefinfo['sval'], arefinfo['dval'],
                         arefinfo['bgv'],arefinfo['ndet'], arefinfo['comment'],
                     )
 
@@ -1317,9 +1323,12 @@ def dbgen_astromref_projectidfieldccd(projectid,
                     )
                     params = (
                         str(projectid), field, ccd, makeactive,
-                        arefinfo['framekey'], areftargetfits,
-                        areftargetfistar, areftargetfiphot,
-                        areftargetjpeg, arefinfo['sval'], arefinfo['dval'],
+                        arefinfo['framekey'],
+                        os.path.join(REFBASEDIR, areftargetfits),
+                        os.path.join(REFBASEDIR, areftargetfistar),
+                        os.path.join(REFBASEDIR, areftargetfiphot),
+                        os.path.join(REFBASEDIR, areftargetjpeg),
+                        arefinfo['sval'], arefinfo['dval'],
                         arefinfo['bgv'],arefinfo['ndet'], arefinfo['comment']
                     )
 
