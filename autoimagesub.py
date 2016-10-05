@@ -1387,8 +1387,6 @@ def dbgen_astromref_projectidfieldccd(projectid,
 
 
 
-
-
 def generate_astromref(fitsfiles,
                        makeactive=True,
                        field=None,
@@ -1547,6 +1545,75 @@ def generate_astromref(fitsfiles,
 
     return returnval
 
+
+
+def dbget_astromref(projectid, field, ccd, database=None):
+    '''
+    This finds the reference frame using the PG database.
+
+    '''
+
+    # open a database connection
+    if database:
+        cursor = database.cursor()
+        closedb = False
+    else:
+        database = pg.connect(user=PGUSER,
+                              password=PGPASSWORD,
+                              database=PGDATABASE,
+                              host=PGHOST)
+        database.autocommit = True
+        cursor = database.cursor()
+        closedb = True
+
+    # start work here
+    try:
+
+        query = (
+            "select projectid, field, ccd, entryts, "
+            "framekey, fits, fistar, fiphot, jpeg, "
+            "mediansval, mediandval, medianbgv, ngoodobj, comment "
+            "from astromrefs where "
+            "projectid = %s and field = %s and ccd = %s and isactive = true"
+        )
+        params = (str(projectid), field, ccd)
+
+        cursor.execute(query, params)
+        row = cursor.fetchone()
+
+        if row and len(row) > 0:
+
+            astromref = {
+                x:y for (x,y) in zip(('projectid','field','ccd','entryts',
+                                      'framekey','fits','fistar','fiphot',
+                                      'jpeg','mediansval','mediandval',
+                                      'medianbgv','ngoodobj','comment'), row)
+            }
+
+            returnval = astromref
+
+    # if everything goes wrong, exit cleanly
+    except Exception as e:
+
+        database.rollback()
+
+        message = 'failed to get astromref for %s, %s, %s from DB' % (projectid,
+                                                                      field,
+                                                                      ccd)
+        print('EXC! %sZ: %s\nexception was: %s' %
+               (datetime.utcnow().isoformat(),
+                message, format_exc()) )
+        returnval = None
+        raise
+
+
+    finally:
+
+        cursor.close()
+        if closedb:
+            database.close()
+
+    return returnval
 
 
 
