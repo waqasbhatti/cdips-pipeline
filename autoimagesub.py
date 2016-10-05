@@ -1057,6 +1057,9 @@ def dbgen_astromref_projectidfieldccd(projectid,
             mbg = np.array([x[6] for x in rows])
             ngo = np.array([x[7] for x in rows])
 
+            print('%sZ: total frames to process: %s' %
+                  (datetime.utcnow().isoformat(), len(fits)))
+
             #
             # now, find the best astrometric reference frame
             #
@@ -1286,14 +1289,14 @@ def dbgen_astromref_projectidfieldccd(projectid,
                         "medianbgv = %s, ngoodobj = %s, comment = %s"
                     )
                     params = (
-                        projectid, field, ccd, makeactive,
-                        arefinfo['framekey'], arefinfo['fits'],
-                        arefinfo['fistar'], arefinfo['fiphot'],
-                        arefinfo['jpg'], arefinfo['sval'], arefinfo['dval'],
+                        str(projectid), field, ccd, makeactive,
+                        arefinfo['framekey'], areftargetfits,
+                        areftargetfistar, areftargetfiphot,
+                        areftargetjpeg, arefinfo['sval'], arefinfo['dval'],
                         arefinfo['bgv'],arefinfo['ndet'], arefinfo['comment'],
-                        arefinfo['framekey'], arefinfo['fits'],
-                        arefinfo['fistar'], arefinfo['fiphot'],
-                        arefinfo['jpg'], arefinfo['sval'], arefinfo['dval'],
+                        arefinfo['framekey'], areftargetfits,
+                        areftargetfistar, areftargetfiphot,
+                        areftargetjpeg, arefinfo['sval'], arefinfo['dval'],
                         arefinfo['bgv'],arefinfo['ndet'], arefinfo['comment'],
                     )
 
@@ -1313,10 +1316,10 @@ def dbgen_astromref_projectidfieldccd(projectid,
                         ")"
                     )
                     params = (
-                        projectid, field, ccd, makeactive,
-                        arefinfo['framekey'], arefinfo['fits'],
-                        arefinfo['fistar'], arefinfo['fiphot'],
-                        arefinfo['jpg'], arefinfo['sval'], arefinfo['dval'],
+                        str(projectid), field, ccd, makeactive,
+                        arefinfo['framekey'], areftargetfits,
+                        areftargetfistar, areftargetfiphot,
+                        areftargetjpeg, arefinfo['sval'], arefinfo['dval'],
                         arefinfo['bgv'],arefinfo['ndet'], arefinfo['comment']
                     )
 
@@ -1340,6 +1343,18 @@ def dbgen_astromref_projectidfieldccd(projectid,
                   ' no frames exist' %
                   (datetime.utcnow().isoformat(), projectid, field, ccd))
             returnval = None
+
+    # catch the overwrite = False scenario
+    except pg.IntegrityError as e:
+
+        database.rollback()
+
+        message = ('failed to insert astromref '
+                   'into DB because it exists already '
+                   'and overwrite = False')
+        print('EXC! %sZ: %s\n%s' %
+               (datetime.utcnow().isoformat(), message, format_exc()) )
+        returnval = None
 
     except Exception as e:
 
