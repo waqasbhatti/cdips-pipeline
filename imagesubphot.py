@@ -412,8 +412,10 @@ def select_astromref_frame(fitsdir,
 
 
     # we only work on goodframes now
-    print('%sZ: selecting an astrometric reference frame...' %
-          (datetime.utcnow().isoformat(),))
+    print('%sZ: selecting an astrometric reference frame '
+          'using %s frames, %s fiphots, %s fistars...' %
+          (datetime.utcnow().isoformat(),
+           len(goodframes), len(goodphots), len(goodsrclists)))
 
     median_sval = []
     median_dval = []

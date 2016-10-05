@@ -157,6 +157,17 @@ def fits_fieldprojectidccd_worker(frame):
 
 
 
+def find_original_fits_in_database(field, projectid, ccd,
+                                   enforceok=True,
+                                   database=None):
+    '''
+    This finds the FITS matching the field-projectid-ccd combo in the DB.
+
+    '''
+
+
+
+
 def find_original_fits_fieldprojectidccd(dirlist,
                                          field,
                                          projectid,
@@ -994,6 +1005,220 @@ def parallel_calibrated_frames_to_database(fitsbasedir,
 ##################################
 ## ASTROMETRIC REFERENCE FRAMES ##
 ##################################
+
+def dbgen_astromref_projectidfieldccd(projectid,
+                                      field,
+                                      ccd,
+                                      makeactive=True,
+                                      overwrite=False,
+                                      refdir=REFBASEDIR,
+                                      database=None):
+    '''
+    This gets all the frame info from the DB and finds a good astromref.
+
+    '''
+    # open a database connection
+    if database:
+        cursor = database.cursor()
+        closedb = False
+    else:
+        database = pg.connect(user=PGUSER,
+                              password=PGPASSWORD,
+                              database=PGDATABASE,
+                              host=PGHOST)
+        database.autocommit = True
+        cursor = database.cursor()
+        closedb = True
+
+    try:
+
+        # get all the frame info for the requested projectid-field-ccd
+        query = ("select fits, fistar, fiphot, mfs, mfd, mbg, ngo from "
+                 "calibratedframes where "
+                 "(projectid = %s) and (obsfield = %s) and (ccd = %s) and "
+                 "frameisok = true")
+        params = (str(projectid), field, ccd)
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+
+        # if we're successful
+        if rows and len(rows) > 0:
+
+            # get the frame info
+
+            fits = np.array([x[0] for x in rows])
+            fistar = np.array([x[1] for x in rows])
+            fiphot = np.array([x[2] for x in rows])
+
+            mfs = np.array([x[3] for x in rows])
+            mfd = np.array([x[4] for x in rows])
+            mbg = np.array([x[5] for x in rows])
+            ngo = np.array([x[6] for x in rows])
+
+            #
+            # now, find the best astrometric reference frame
+            #
+
+            # get the best S --> largest S at the top
+            median_sval_ind = np.argsort(mfs)[::-1]
+
+            # here, we want the values closest to zero to be at the top
+            median_dval_ind = np.argsort(np.fabs(mfd))
+
+            # want the smallest background
+            median_background_ind = np.argsort(mbg)
+
+            # and the most number of detections
+            good_detections_ind = np.argsort(ngo)[::-1]
+
+            # get the top 500 of each index
+            median_sval_ind = median_sval_ind[:500]
+            median_dval_ind = median_dval_ind[:500]
+            median_background_ind = median_background_ind[:500]
+            good_detections_ind = good_detections_ind[:500]
+
+            # now intersect all of these arrays to find the best candidates for the
+            # astrometric reference frame
+
+            sd_ind =  np.intersect1d(median_sval_ind,
+                                     median_dval_ind,
+                                     assume_unique=True)
+
+
+            best_frame_ind = np.intersect1d(
+                sd_ind,
+                np.intersect1d(median_background_ind,
+                               good_detections_ind,
+                               assume_unique=True),
+                assume_unique=True
+                )
+
+            sdndet_ind = np.intersect1d(sd_ind,
+                                        good_detections_ind,
+                                        assume_unique=True)
+
+            # if all selectors produced a result, use that one
+            if len(best_frame_ind) > 0:
+
+                selectedreference = fits[best_frame_ind[0]]
+
+                print('%sZ: selected best astrometric reference frame is %s' %
+                      (datetime.utcnow().isoformat(), selectedreference))
+
+                framejpg = fits_to_full_jpeg(
+                    selectedreference,
+                    out_fname=os.path.join(
+                            os.path.dirname(selectedreference),
+                        ('JPEG-ASTROMREF-%s.jpg' %
+                         os.path.basename(selectedreference).strip('.fits.fz'))
+                    )
+                )
+
+                arefinfo = {
+                    'astromref':selectedreference,
+                    'framejpg':framejpg,
+                    'sval':mfs[best_frame_ind[0]],
+                    'dval':mfd[best_frame_ind[0]],
+                    'bgv':mbg[best_frame_ind[0]],
+                    'ndet':ngo[best_frame_ind[0]],
+                    'comment':'astromref chosen using sval, dval, bgval, ndet'
+                }
+
+            # otherwise, fall back to frames with the best values of S, D, and a
+            # large number of detections
+            elif len(sdndet_ind) > 0:
+
+                selectedreference = goodframes[sdndet_ind[0]]
+
+                print('WRN! %sZ: selected best astrometric reference frame '
+                      '(using S, D, and ndet only) is %s' %
+                      (datetime.utcnow().isoformat(), selectedreference))
+
+
+                framejpg = fits_to_full_jpeg(
+                    selectedreference,
+                    out_fname=os.path.join(
+                            os.path.dirname(selectedreference),
+                        ('JPEG-ASTROMREF-%s.jpg' %
+                         os.path.basename(selectedreference).strip('.fits.fz'))
+                    )
+                )
+
+                arefinfo = {
+                    'astromref':selectedreference,
+                    'framejpg':framejpg,
+                    'sval':mfs[sdndet_ind[0]],
+                    'dval':mfd[sdndet_ind[0]],
+                    'bgv':mbg[sdndet_ind[0]],
+                    'ndet':ngo[sdndet_ind[0]],
+                    'comment':'astromref chosen using sval, dval, ndet'
+                }
+
+            # otherwise, fall back to the frames with best values of S and D
+            elif len(sd_ind) > 0:
+
+
+
+            # if that also fails, fall back to the best S value frame
+            elif len(median_sval_ind) > 0:
+
+
+
+            # if everything fails, do nothing
+            else:
+
+                print('ERR! %sZ: could not select a '
+                      'good astrometric reference frame! all tests failed!' %
+                      (datetime.utcnow().isoformat(), ))
+                arefinfo = None
+
+
+            # update the astromrefs table in the database if we found an
+            # astromref frame, and copy it to the reference-frames directory
+            # with the appropriate filename
+            if arefinfo:
+
+
+
+            # if we failed to find an astromref, do nothing
+            else:
+
+                returnval = None
+
+        # if we didn't find any frames for this projectid-field-ccd combo,
+        # complain and drop out
+        else:
+
+            print('ERR! %sZ: could not select a '
+                  'good astrometric reference frame for %s, %s, %s!'
+                  ' no frames exist' %
+                  (datetime.utcnow().isoformat(), projectid, field, ccd))
+            returnval = None
+
+    except Exception as e:
+
+        database.rollback()
+
+        message = 'failed to get astromref for %s, %s, %s' % (projectid,
+                                                              field,
+                                                              ccd)
+        print('EXC! %sZ: %s\nexception was: %s' %
+               (datetime.utcnow().isoformat(),
+                message, format_exc()) )
+        returnval = None
+
+    finally:
+
+        cursor.close()
+        if closedb:
+            database.close()
+
+    return returnval
+
+
+
+
 
 def generate_astromref(fitsfiles,
                        makeactive=True,
