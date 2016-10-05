@@ -1033,8 +1033,8 @@ def dbgen_astromref_projectidfieldccd(projectid,
     try:
 
         # get all the frame info for the requested projectid-field-ccd
-        query = ("select fits, fistar, fiphot, mfs, mfd, mbg, ngo from "
-                 "calibratedframes where "
+        query = ("select framekey, fits, fistar, fiphot, mfs, mfd, mbg, ngo "
+                 "from calibratedframes where "
                  "(projectid = %s) and (obsfield = %s) and (ccd = %s) and "
                  "frameisok = true")
         params = (str(projectid), field, ccd)
@@ -1047,14 +1047,15 @@ def dbgen_astromref_projectidfieldccd(projectid,
 
             # get the frame info
 
-            fits = np.array([x[0] for x in rows])
-            fistar = np.array([x[1] for x in rows])
-            fiphot = np.array([x[2] for x in rows])
+            framekey = np.array([x[0] for x in rows])
+            fits = np.array([x[1] for x in rows])
+            fistar = np.array([x[2] for x in rows])
+            fiphot = np.array([x[3] for x in rows])
 
-            mfs = np.array([x[3] for x in rows])
-            mfd = np.array([x[4] for x in rows])
-            mbg = np.array([x[5] for x in rows])
-            ngo = np.array([x[6] for x in rows])
+            mfs = np.array([x[4] for x in rows])
+            mfd = np.array([x[5] for x in rows])
+            mbg = np.array([x[6] for x in rows])
+            ngo = np.array([x[7] for x in rows])
 
             #
             # now, find the best astrometric reference frame
@@ -1078,13 +1079,12 @@ def dbgen_astromref_projectidfieldccd(projectid,
             median_background_ind = median_background_ind[:500]
             good_detections_ind = good_detections_ind[:500]
 
-            # now intersect all of these arrays to find the best candidates for the
-            # astrometric reference frame
+            # now intersect all of these arrays to find the best candidates for
+            # the astrometric reference frame
 
             sd_ind =  np.intersect1d(median_sval_ind,
                                      median_dval_ind,
                                      assume_unique=True)
-
 
             best_frame_ind = np.intersect1d(
                 sd_ind,
@@ -1116,8 +1116,11 @@ def dbgen_astromref_projectidfieldccd(projectid,
                 )
 
                 arefinfo = {
-                    'astromref':selectedreference,
-                    'framejpg':framejpg,
+                    'fits':selectedreference,
+                    'jpg':framejpg,
+                    'fistar':fistar[best_frame_ind[0]],
+                    'fiphot':fiphot[best_frame_ind[0]],
+                    'framekey':framekey[best_frame_ind[0]],
                     'sval':mfs[best_frame_ind[0]],
                     'dval':mfd[best_frame_ind[0]],
                     'bgv':mbg[best_frame_ind[0]],
@@ -1129,7 +1132,7 @@ def dbgen_astromref_projectidfieldccd(projectid,
             # large number of detections
             elif len(sdndet_ind) > 0:
 
-                selectedreference = goodframes[sdndet_ind[0]]
+                selectedreference = fits[sdndet_ind[0]]
 
                 print('WRN! %sZ: selected best astrometric reference frame '
                       '(using S, D, and ndet only) is %s' %
@@ -1146,8 +1149,11 @@ def dbgen_astromref_projectidfieldccd(projectid,
                 )
 
                 arefinfo = {
-                    'astromref':selectedreference,
-                    'framejpg':framejpg,
+                    'fits':selectedreference,
+                    'jpg':framejpg,
+                    'fistar':fistar[sdndet_ind[0]],
+                    'fiphot':fiphot[sdndet_ind[0]],
+                    'framekey':framekey[sdndet_ind[0]],
                     'sval':mfs[sdndet_ind[0]],
                     'dval':mfd[sdndet_ind[0]],
                     'bgv':mbg[sdndet_ind[0]],
@@ -1158,12 +1164,64 @@ def dbgen_astromref_projectidfieldccd(projectid,
             # otherwise, fall back to the frames with best values of S and D
             elif len(sd_ind) > 0:
 
+                selectedreference = fits[sd_ind[0]]
 
+                print('WRN! %sZ: selected best astrometric reference frame '
+                      '(using S and D only) is %s' %
+                      (datetime.utcnow().isoformat(), selectedreference))
+
+                framejpg = fits_to_full_jpeg(
+                    selectedreference,
+                    out_fname=os.path.join(
+                            os.path.dirname(selectedreference),
+                        ('JPEG-ASTROMREF-%s.jpg' %
+                         os.path.basename(selectedreference).strip('.fits.fz'))
+                    )
+                )
+
+                arefinfo = {
+                    'fits':selectedreference,
+                    'jpg':framejpg,
+                    'fistar':fistar[sd_ind[0]],
+                    'fiphot':fiphot[sd_ind[0]],
+                    'framekey':framekey[sd_ind[0]],
+                    'sval':mfs[sd_ind[0]],
+                    'dval':mfd[sd_ind[0]],
+                    'bgv':mbg[sd_ind[0]],
+                    'ndet':ngo[sd_ind[0]],
+                    'comment':'astromref chosen using sval, dval'
+                }
 
             # if that also fails, fall back to the best S value frame
             elif len(median_sval_ind) > 0:
 
+                selectedreference = fits[median_sval_ind[0]]
 
+                print('WRN! %sZ: selected best astrometric reference frame '
+                      '(using S only) is %s' %
+                      (datetime.utcnow().isoformat(), selectedreference))
+
+                framejpg = fits_to_full_jpeg(
+                    selectedreference,
+                    out_fname=os.path.join(
+                            os.path.dirname(selectedreference),
+                        ('JPEG-ASTROMREF-%s.jpg' %
+                         os.path.basename(selectedreference).strip('.fits.fz'))
+                    )
+                )
+
+                arefinfo = {
+                    'fits':selectedreference,
+                    'jpg':framejpg,
+                    'fistar':fistar[median_sval_ind[0]],
+                    'fiphot':fiphot[median_sval_ind[0]],
+                    'framekey':framekey[median_sval_ind[0]],
+                    'sval':mfs[median_sval_ind[0]],
+                    'dval':mfd[median_sval_ind[0]],
+                    'bgv':mbg[median_sval_ind[0]],
+                    'ndet':ngo[median_sval_ind[0]],
+                    'comment':'astromref chosen using sval'
+                }
 
             # if everything fails, do nothing
             else:
@@ -1179,7 +1237,94 @@ def dbgen_astromref_projectidfieldccd(projectid,
             # with the appropriate filename
             if arefinfo:
 
+                # now that we have the astromref frame, copy it over to the
+                # system-wide reference-images directory along with its JPEG
+                # snapshot
+                areftargetfits = (
+                    'proj{projectid}-{field}-'
+                    'ccd{ccd}-astromref-{origfname}.fits').format(
+                        projectid=projectid,
+                        field=field,
+                        ccd=ccd,
+                        origfname=os.path.splitext(
+                            os.path.basename(arefinfo['fits'])
+                        )[0]
+                    )
+                areftargetjpeg = areftargetfits.replace('.fits','.jpg')
+                areftargetfistar = areftargetfits.replace('.fits','.fistar')
+                areftargetfiphot = areftargetfits.replace('.fits','.fiphot')
 
+                # copy the frame, jpeg, and fistar to the reference-frames dir
+                shutil.copy(arefinfo['fits'],os.path.join(REFBASEDIR,
+                                                                areftargetfits))
+                shutil.copy(arefinfo['jpg'],os.path.join(REFBASEDIR,
+                                                                areftargetjpeg))
+                shutil.copy(arefinfo['fistar'],
+                            os.path.join(REFBASEDIR, areftargetfistar))
+                shutil.copy(arefinfo['fiphot'],
+                            os.path.join(REFBASEDIR, areftargetfiphot))
+
+                # now, update the astomrefs table in the database
+                if overwrite:
+
+                    query = (
+                        "insert into astromrefs ("
+                        "projectid, field, ccd, isactive, entryts, "
+                        "framekey, fits, fistar, fiphot, jpeg, "
+                        "mediansval, mediandval, medianbgv, ngoodobj, "
+                        "comment"
+                        ") values ("
+                        "%s, %s, %s, %s, current_timestamp, "
+                        "%s, %s, %s, %s, %s, "
+                        "%s, %s, %s, %s, "
+                        "%s"
+                        ") on conflict on constraint astromrefs_pkey "
+                        "do update set "
+                        "entryts = current_timestamp, "
+                        "framekey = %s, fits = %s, fistar = %s, fiphot = %s, "
+                        "jpeg = %s, mediansval = %s, mediandval = %s, "
+                        "medianbgv = %s, ngoodobj = %s, comment = %s"
+                    )
+                    params = (
+                        projectid, field, ccd, makeactive,
+                        arefinfo['framekey'], arefinfo['fits'],
+                        arefinfo['fistar'], arefinfo['fiphot'],
+                        arefinfo['jpg'], arefinfo['sval'], arefinfo['dval'],
+                        arefinfo['bgv'],arefinfo['ndet'], arefinfo['comment'],
+                        arefinfo['framekey'], arefinfo['fits'],
+                        arefinfo['fistar'], arefinfo['fiphot'],
+                        arefinfo['jpg'], arefinfo['sval'], arefinfo['dval'],
+                        arefinfo['bgv'],arefinfo['ndet'], arefinfo['comment'],
+                    )
+
+                else:
+
+                    query = (
+                        "insert into astromrefs ("
+                        "projectid, field, ccd, isactive, entryts, "
+                        "framekey, fits, fistar, fiphot, jpeg, "
+                        "mediansval, mediandval, medianbgv, ngoodobj, "
+                        "comment"
+                        ") values ("
+                        "%s, %s, %s, %s, current_timestamp, "
+                        "%s, %s, %s, %s, %s, "
+                        "%s, %s, %s, %s, "
+                        "%s"
+                        ")"
+                    )
+                    params = (
+                        projectid, field, ccd, makeactive,
+                        arefinfo['framekey'], arefinfo['fits'],
+                        arefinfo['fistar'], arefinfo['fiphot'],
+                        arefinfo['jpg'], arefinfo['sval'], arefinfo['dval'],
+                        arefinfo['bgv'],arefinfo['ndet'], arefinfo['comment']
+                    )
+
+                # execute the query to insert the astromref into the DB
+                cursor.execute(query, params)
+                database.commit()
+
+                returnval = arefinfo
 
             # if we failed to find an astromref, do nothing
             else:
