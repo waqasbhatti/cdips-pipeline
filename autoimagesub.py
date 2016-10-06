@@ -2713,38 +2713,28 @@ def get_combined_photref(projectid,
 
 
 
-##################################
-## IMAGE SUBTRACTION PHOTOMETRY ##
-##################################
+#######################
+## IMAGE SUBTRACTION ##
+#######################
 
-def xtrnsfits_convsubphot_worker(task):
-    '''This is a parallel worker for framelist_convsubphot_photref below.
+def xtrnsfits_convsub_worker(task):
+    '''This is a parallel worker for framelist_convsub_photref below.
 
     task[0] = xtrnsfits file
     task[1] = photreftype to use <"oneframe"|"onehour"|"onenight">
     task[2] = outdir
     task[3] = kernelspec
     task[4] = reversesubtract boolean
-    task[5] = findnewobjects boolean
-    task[6] = photdisjointradius
-    task[7] = refinfo
-    task[8] = lcapertures
+    task[5] = refinfo
 
-    TODO: think about combining this with the database import step below.
-          - write the iphot to /dev/shm
-          - use pg's \copy protocol to quickly import it into the database
-          - once committed, remove the /dev/shm file
-
-    TODO: we're now planning on writing photometry directly to the pg
-    database. we'll use partitioned tables created automatically per week to
-    hold the photometry. the partition key will be the framejd converted to a pg
-    UTC timestamp.
+    This only does convolution and subtraction. Finding new objects is handled
+    by another function in transients.py, and doing photometry on the subtracted
+    frames is handled by convsubfits_photometry_worker below.
 
     '''
 
     (frame, photreftype, outdir,
-     kernelspec, reversesubtract, findnewobjects, photdisjointradius,
-     refinfo, lcapertures) = task
+     kernelspec, reversesubtract, refinfo) = task
 
     try:
 
@@ -2777,9 +2767,69 @@ def xtrnsfits_convsubphot_worker(task):
                   (datetime.utcnow().isoformat(), frame))
             return frame, None
 
-        # find new objects in the subtracted frame if told to do so
-        if findnewobjects:
-            pass
+        else:
+
+            return frame, convsub
+
+    except Exception as e:
+
+        print('ERR! %sZ: could not do convsubphot on frame %s, error was: %s' %
+              (datetime.utcnow().isoformat(), frame, e))
+
+        return frame, None
+
+
+
+def xtrnsfits_convsub(xtrnsfits,
+                      photreftype,
+                      outdir=None,
+                      refinfo=REFINFO,
+                      reversesubtract=True,
+                      kernelspec='b/4;i/4;d=4/4',
+                      nworkers=16,
+                      maxworkertasks=1000):
+    '''This convolves, and subtracts all FITS files in the xtrnsfits list.
+
+    '''
+
+    tasks = [(x, photreftype, outdir, kernelspec,
+              reversesubtract, findnewobjects,
+              photdisjointradius, refinfo, lcapertures)
+             for x in xtrnsfits if os.path.exists(x)]
+
+    print('%sZ: %s files to process' %
+          (datetime.utcnow().isoformat(), len(tasks)))
+
+    if len(tasks) > 0:
+
+        pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+        # fire up the pool of workers
+        results = pool.map(xtrnsfits_convsubphot_worker, tasks)
+
+        # wait for the processes to complete work
+        pool.close()
+        pool.join()
+
+        return {x:y for (x,y) in results}
+
+    else:
+
+        print('ERR! %sZ: none of the files specified exist, bailing out...' %
+              (datetime.utcnow().isoformat(),))
+        return
+
+
+
+#########################################
+## PHOTOMETRY ON THE SUBTRACTED FRAMES ##
+#########################################
+
+def convsubfits_staticphot_worker(task):
+    '''This does subtracted frame photometry on already-known objects from the
+    photref.
+
+    '''
 
         # find matching kernel, itrans, and xysdk files for each subtracted
         # frame
@@ -2835,63 +2885,18 @@ def xtrnsfits_convsubphot_worker(task):
                   (datetime.utcnow().isoformat(), frame))
             return frame, None
 
-    except Exception as e:
-
-        print('ERR! %sZ: could not do convsubphot on frame %s, error was: %s' %
-              (datetime.utcnow().isoformat(), frame, e))
-
-        return frame, None
 
 
-
-def xtrnsfits_convsubphot(xtrnsfits,
-                          photreftype,
-                          outdir=None,
-                          refinfo=REFINFO,
-                          reversesubtract=True,
-                          kernelspec='b/4;i/4;d=4/4',
-                          lcapertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
-                          photdisjointradius=2,
-                          findnewobjects=False,
-                          nworkers=16,
-                          maxworkertasks=1000):
-    '''This convolves, subtracts, and does photometry of known photref sources for
-    all FITS files in the xtrnsfits list of FITS transformed to astromrefs.
-
-    If findnewobjects is True, this will run source extraction on each
-    subtracted frame, remove all known sources from the photref, see if there
-    are any new sources, add them to the source catalog as HAT-999 objects if
-    there are no matches to them within catmatcharcsec arcseconds, regenerate
-    the cmrawphot for the combined photref, and then run aperturephot on them.
+def parallel_convsubfits_staticphot(
+        subfitslist,
+        lcapertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
+        photdisjointradius=2,
+        refinfo=REFINFO,
+):
+    '''This does static object photometry on the all subtracted FITS in
+    subfitslist.
 
     '''
-
-    tasks = [(x, photreftype, outdir, kernelspec,
-              reversesubtract, findnewobjects,
-              photdisjointradius, refinfo, lcapertures)
-             for x in xtrnsfits if os.path.exists(x)]
-
-    print('%sZ: %s files to process' %
-          (datetime.utcnow().isoformat(), len(tasks)))
-
-    if len(tasks) > 0:
-
-        pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
-
-        # fire up the pool of workers
-        results = pool.map(xtrnsfits_convsubphot_worker, tasks)
-
-        # wait for the processes to complete work
-        pool.close()
-        pool.join()
-
-        return {x:y for (x,y) in results}
-
-    else:
-
-        print('ERR! %sZ: none of the files specified exist, bailing out...' %
-              (datetime.utcnow().isoformat(),))
-        return
 
 
 
@@ -2900,6 +2905,7 @@ def xtrnsfits_convsubphot(xtrnsfits,
 #########################
 
 def parse_iphot_line(iphotline):
+
     '''This parses the iphot line and returns a row of formatted elems.
 
     These can be then attached to other metadata and written directly to the
