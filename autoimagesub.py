@@ -951,8 +951,9 @@ def dbupdate_calibratedframe(fitspath,
     # start work here
     try:
 
-        query = ("update calibratedframes set {column} = %s where "
-                 "fits = %s").format(column=column)
+        query = ("update calibratedframes "
+                 "set {column} = %s, entryts = current_timestamp "
+                 "where fits = %s").format(column=column)
         params = (newval, fitspath)
         cursor.execute(query, params)
         database.commit()
