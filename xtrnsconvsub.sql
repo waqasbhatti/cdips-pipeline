@@ -17,7 +17,7 @@ create table arefshiftedframes (
 );
 
 create unique index arefshiftedframes_uindx on arefshiftedframes (
-       framekey, origframekey, astromref, itrans, arefshiftedframe
+       framekey, origframekey, astromref, arefshiftedframe
 );
 
 
@@ -33,6 +33,7 @@ create table subtractedframes (
        photreftype text not null,
        photref text not null,
        kernel text not null,
+       subtracttype text not null,
        subisok bool not null,
        -- subtracted frame info
        convkernelspec text not null,
@@ -40,5 +41,5 @@ create table subtractedframes (
 );
 
 create unique index subtractedframes_uindx on subtractedframes (
-       framekey, origframekey, astromref, itrans, subtractedframe
+       framekey, origframekey, arefshiftedkey, photref, subtractedframe
 );
