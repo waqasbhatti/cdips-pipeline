@@ -927,64 +927,6 @@ def calibrated_frame_to_database(fitsfile,
     return returnval
 
 
-def dbupdate_calibratedframe(fitspath,
-                             column, newval,
-                             database=None):
-    '''
-    This updates a column of the calibratedframes table for a frame.
-
-    '''
-
-    # open a database connection
-    if database:
-        cursor = database.cursor()
-        closedb = False
-    else:
-        database = pg.connect(user=PGUSER,
-                              password=PGPASSWORD,
-                              database=PGDATABASE,
-                              host=PGHOST)
-        database.autocommit = True
-        cursor = database.cursor()
-        closedb = True
-
-    # start work here
-    try:
-
-        query = ("update calibratedframes "
-                 "set {column} = %s, entryts = current_timestamp "
-                 "where fits = %s").format(column=column)
-        params = (newval, fitspath)
-        cursor.execute(query, params)
-        database.commit()
-
-        return (fitspath, {column:newval})
-
-    # if everything goes wrong, exit cleanly
-    except Exception as e:
-
-        database.rollback()
-
-        message = 'failed to update %s in DB' % fitspath
-        print('EXC! %sZ: %s\nexception was: %s' %
-               (datetime.utcnow().isoformat(),
-                message, format_exc()) )
-        returnval = (fitspath, False)
-
-        # TEMPORARY
-        # raise
-
-
-    finally:
-
-        cursor.close()
-        if closedb:
-            database.close()
-
-    return returnval
-
-
-
 def calframe_to_db_worker(task):
     '''
     This wraps calibrated_frames_to_databse for the parallel driver below.
@@ -1058,6 +1000,178 @@ def parallel_calibrated_frames_to_database(fitsbasedir,
 
 
 
+def dbupdate_calibratedframe(fitspath,
+                             column, newval,
+                             database=None):
+    '''
+    This updates a column of the calibratedframes table for a frame.
+
+    '''
+
+    # open a database connection
+    if database:
+        cursor = database.cursor()
+        closedb = False
+    else:
+        database = pg.connect(user=PGUSER,
+                              password=PGPASSWORD,
+                              database=PGDATABASE,
+                              host=PGHOST)
+        database.autocommit = True
+        cursor = database.cursor()
+        closedb = True
+
+    # start work here
+    try:
+
+        query = ("update calibratedframes "
+                 "set {column} = %s, entryts = current_timestamp "
+                 "where fits = %s").format(column=column)
+        params = (newval, fitspath)
+        cursor.execute(query, params)
+        database.commit()
+
+        return (fitspath, {column:newval})
+
+    # if everything goes wrong, exit cleanly
+    except Exception as e:
+
+        database.rollback()
+
+        message = 'failed to update %s in DB' % fitspath
+        print('EXC! %sZ: %s\nexception was: %s' %
+               (datetime.utcnow().isoformat(),
+                message, format_exc()) )
+        returnval = (fitspath, False)
+
+        # TEMPORARY
+        # raise
+
+
+    finally:
+
+        cursor.close()
+        if closedb:
+            database.close()
+
+    return returnval
+
+
+
+def arefshifted_frame_to_database(
+        fitsfile,
+        network='HP',
+        overwrite=False,
+        badframetag='badframes',
+        database=None
+):
+    '''This puts a shifted-to-astromref xtrns FITS into the DB.
+
+    Associates it with the framekey of the original FITS. Adds info on shift
+    success, the shifted-frame's x and y direction gradients calculated, and its
+    full path. Adds info about the itrans file used as well.
+
+    '''
+
+    # open a database connection
+    if database:
+        cursor = database.cursor()
+        closedb = False
+    else:
+        database = pg.connect(user=PGUSER,
+                              password=PGPASSWORD,
+                              database=PGDATABASE,
+                              host=PGHOST)
+        database.autocommit = True
+        cursor = database.cursor()
+        closedb = True
+
+    # start work here
+    try:
+
+
+    # if everything goes wrong, exit cleanly
+    except Exception as e:
+
+        database.rollback()
+
+        message = 'failed to update %s in DB' % fitspath
+        print('EXC! %sZ: %s\nexception was: %s' %
+               (datetime.utcnow().isoformat(),
+                message, format_exc()) )
+        returnval = (fitspath, False)
+
+        # TEMPORARY
+        # raise
+
+
+    finally:
+
+        cursor.close()
+        if closedb:
+            database.close()
+
+    return returnval
+
+
+
+def convsubtracted_frame_to_database(
+        fitsfile,
+        network='HP',
+        overwrite=False,
+        badframetag='badframes',
+        database=None
+):
+    '''This puts a convolved and subtracted FITS into the DB.
+
+    Associates it with the framekey of the original FITS and the framekey of the
+    aref-shifted frame.  Adds info on subtraction success, its full path. Adds
+    info about the kernel, and photref used, and type of photref used for
+    subtraction.
+
+    '''
+
+    # open a database connection
+    if database:
+        cursor = database.cursor()
+        closedb = False
+    else:
+        database = pg.connect(user=PGUSER,
+                              password=PGPASSWORD,
+                              database=PGDATABASE,
+                              host=PGHOST)
+        database.autocommit = True
+        cursor = database.cursor()
+        closedb = True
+
+    # start work here
+    try:
+
+
+    # if everything goes wrong, exit cleanly
+    except Exception as e:
+
+        database.rollback()
+
+        message = 'failed to update %s in DB' % fitspath
+        print('EXC! %sZ: %s\nexception was: %s' %
+               (datetime.utcnow().isoformat(),
+                message, format_exc()) )
+        returnval = (fitspath, False)
+
+        # TEMPORARY
+        # raise
+
+
+    finally:
+
+        cursor.close()
+        if closedb:
+            database.close()
+
+    return returnval
+
+
 
 ##################################
 ## ASTROMETRIC REFERENCE FRAMES ##
@@ -1070,6 +1184,7 @@ def dbgen_astromref_projectidfieldccd(projectid,
                                       overwrite=False,
                                       refdir=REFBASEDIR,
                                       database=None):
+
     '''
     This gets all the frame info from the DB and finds a good astromref.
 
@@ -2763,7 +2878,7 @@ def xtrnsfits_convsub_worker(task):
         )
 
         if not (convsub and os.path.exists(convsub)):
-            print('ERR! %sZ: convulution and subtraction failed on frame %s' %
+            print('ERR! %sZ: convolution and subtraction failed on frame %s' %
                   (datetime.utcnow().isoformat(), frame))
             return frame, None
 
@@ -2793,8 +2908,7 @@ def xtrnsfits_convsub(xtrnsfits,
     '''
 
     tasks = [(x, photreftype, outdir, kernelspec,
-              reversesubtract, findnewobjects,
-              photdisjointradius, refinfo, lcapertures)
+              reversesubtract, refinfo)
              for x in xtrnsfits if os.path.exists(x)]
 
     print('%sZ: %s files to process' %
