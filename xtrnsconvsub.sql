@@ -26,7 +26,7 @@ drop table if exists subtractedframes;
 create table subtractedframes (
        framekey bigserial not null,
        entryts timestamp with time zone not null default current_timestamp,
-       -- original fits, photref, output kernel, output subtraced fits
+       -- original fits, photref, output kernel, output subtracted fits
        subtractedframe text not null,
        origframekey bigint not null,
        arefshiftedkey bigint not null,
