@@ -1827,21 +1827,23 @@ def frames_astromref_worker(task):
                             framefiphot = frame.replace('.fits','.fiphot')
                             framewcs = frame.replace('.fits','.wcs')
                             newfiphot = os.path.abspath(
-                                os.path.join(badframesdir, framefiphot)
+                                os.path.join(badframesdir,
+                                             os.path.basename(framefiphot))
                             )
                             newwcs = os.path.abspath(
-                                os.path.join(badframesdir, framewcs)
+                                os.path.join(badframesdir,
+                                             os.path.basename(framewcs))
                             )
                             newfistar = os.path.abspath(
-                                os.path.join(badframesdir, framefistar)
+                                os.path.join(badframesdir,
+                                             os.path.basename(framefistar))
                             )
                             newfits = os.path.abspath(
-                                os.path.join(badframesdir, frame)
+                                os.path.join(badframesdir,
+                                             os.path.basename(frame))
                             )
 
-                            fitsup = dbupdate_calibratedframe(
-                                os.path.abspath(frame), 'fits', newfits
-                            )
+                            # update the database
                             fistarup = dbupdate_calibratedframe(
                                 os.path.abspath(frame), 'fistar', newfistar
                             )
@@ -1853,6 +1855,11 @@ def frames_astromref_worker(task):
                             )
                             statup = dbupdate_calibratedframe(
                                 os.path.abspath(frame), 'frameisok', False
+                            )
+                            # update the fits path last, since it's the selector
+                            # for everything else
+                            fitsup = dbupdate_calibratedframe(
+                                os.path.abspath(frame), 'fits', newfits
                             )
 
                             print('WRN! %sZ: SHIFT HAS WARPED '
