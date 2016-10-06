@@ -1089,6 +1089,9 @@ def arefshifted_frame_to_database(
     # start work here
     try:
 
+        query = ("")
+        params = ()
+
 
     # if everything goes wrong, exit cleanly
     except Exception as e:
@@ -1147,6 +1150,8 @@ def convsubtracted_frame_to_database(
     # start work here
     try:
 
+        query = ("")
+        params = ()
 
     # if everything goes wrong, exit cleanly
     except Exception as e:
