@@ -927,6 +927,62 @@ def calibrated_frame_to_database(fitsfile,
     return returnval
 
 
+def dbupdate_calibratedframe(fitspath,
+                             column, newval,
+                             database=None):
+    '''
+    This updates a column of the calibratedframes table for a frame.
+
+    '''
+
+    # open a database connection
+    if database:
+        cursor = database.cursor()
+        closedb = False
+    else:
+        database = pg.connect(user=PGUSER,
+                              password=PGPASSWORD,
+                              database=PGDATABASE,
+                              host=PGHOST)
+        database.autocommit = True
+        cursor = database.cursor()
+        closedb = True
+
+    # start work here
+    try:
+
+        query = ("update calibratedframes set {column} = %s where "
+                 "fits = %s").format(column=column)
+        params = (newval, fitspath)
+        cursor.execute(query, params)
+        database.commit()
+
+        return (fitspath, {column:newval})
+
+    # if everything goes wrong, exit cleanly
+    except Exception as e:
+
+        database.rollback()
+
+        message = 'failed to update %s in DB' % fitspath
+        print('EXC! %sZ: %s\nexception was: %s' %
+               (datetime.utcnow().isoformat(),
+                message, format_exc()) )
+        returnval = (fitspath, False)
+
+        # TEMPORARY
+        # raise
+
+
+    finally:
+
+        cursor.close()
+        if closedb:
+            database.close()
+
+    return returnval
+
+
 
 def calframe_to_db_worker(task):
     '''
@@ -1698,11 +1754,10 @@ def frames_astromref_worker(task):
 
 
             # find this frame's associated active astromref
-            framearef = get_astromref(frameinfo['projectid'],
-                                      frameinfo['field'],
-                                      frameinfo['ccd'],
-                                      refinfo=refinfo)
-            areffistar = framearef['framepath'].replace('.fits','.fistar')
+            framearef = dbget_astromref(frameinfo['projectid'],
+                                        frameinfo['field'],
+                                        frameinfo['ccd'])
+            areffistar = framearef['fistar']
 
             # calculate the shift and write the itrans back to the frame's
             # directory
@@ -1763,8 +1818,45 @@ def frames_astromref_worker(task):
                             for x in badframeglob:
                                 shutil.move(x, badframesdir)
 
+                            # update the database with the new locations of the
+                            # fits, fistar, fiphot, and wcs, and set frameisok
+                            # to false
+
+                            # old paths
+                            framefiphot = frame.replace('.fits','.fiphot')
+                            framewcs = frame.replace('.fits','.wcs')
+                            newfiphot = os.path.abspath(
+                                os.path.join(badframesdir, framefiphot)
+                            )
+                            newwcs = os.path.abspath(
+                                os.path.join(badframesdir, framewcs)
+                            )
+                            newfistar = os.path.abspath(
+                                os.path.join(badframesdir, framefistar)
+                            )
+                            newfits = os.path.abspath(
+                                os.path.join(badframesdir, frame)
+                            )
+
+                            fitsup = dbupdate_calibratedframe(
+                                os.path.abspath(frame), 'fits', newfits
+                            )
+                            fistarup = dbupdate_calibratedframe(
+                                os.path.abspath(frame), 'fistar', newfistar
+                            )
+                            fiphotup = dbupdate_calibratedframe(
+                                os.path.abspath(frame), 'fiphot', newfiphot
+                            )
+                            wcsup = dbupdate_calibratedframe(
+                                os.path.abspath(frame), 'wcs', newwcs
+                            )
+                            statup = dbupdate_calibratedframe(
+                                os.path.abspath(frame), 'frameisok', False
+                            )
+
                             print('WRN! %sZ: SHIFT HAS WARPED '
-                                  'IMAGE, moved %s and metadata to %s' %
+                                  'IMAGE, moved %s and '
+                                  'metadata to %s, updated DB' %
                                   (datetime.utcnow().isoformat(),
                                    frame, badframesdir))
 
