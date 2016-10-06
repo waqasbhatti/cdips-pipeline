@@ -2948,36 +2948,63 @@ def convsubfits_staticphot_worker(task):
     '''This does subtracted frame photometry on already-known objects from the
     photref.
 
-    '''
+    task[0] = subframe
+    task[1] = photreftype
+    task[2] = kernelspec
+    task[3] = lcapertures
+    task[4] = outdir
 
-    # find matching kernel, itrans, and xysdk files for each subtracted
-    # frame
+    '''
 
     # generate the convsubfits hash
     convsubhash = get_convsubfits_hash(
         photreftype,
-        ('reverse' if os.path.basename(convsub).startswith('rsub')
+        ('reverse' if os.path.basename(subframe).startswith('rsub')
          else 'normal'),
         kernelspec
     )
 
-    frameinfo = FRAMEREGEX.findall(os.path.basename(convsub))
-    kernel = '%s-%s-%s_%s-xtrns.fits-kernel' % (photreftype,
+    # first, figure out the input frame's projid, field, and ccd
+    frameelems = get_header_keyword_list(subframe,
+                                         ['object',
+                                          'projid'])
+    field, ccd, projectid = (frameelems['object'],
+                             int(frameinfo[0][2]),
+                             frameelems['projid'])
+
+    # next, figure out the stationid, framenum, and ccd
+    frameinfo = FRAMEREGEX.findall(os.path.basename(subframe))
+
+    # then, find the associated combined photref frame, regfile, cmrawphot
+    cphotref = get_combined_photref(projectid, field, ccd, photreftype,
+                                    refinfo=refinfo)
+    cphotref_frame = cphotref['framepath']
+    cphotref_reg = cphotref['convolveregpath']
+    cphotref_cmrawphot = cphotref['cmrawphotpath']
+
+    # find matching kernel, itrans, and xysdk files for each subtracted
+    # frame
+
+    photrefbit = (
+        'rsub' if os.path.basename(subframe).startswith('rsub') else 'nsub'
+    )
+
+    kernel = '%s-%s-%s_%s-xtrns.fits-kernel' % (photrefbit,
                                                 convsubhash,
                                                 frameinfo[0][0],
                                                 frameinfo[0][1],
                                                 frameinfo[0][2])
-    kernel = os.path.abspath(os.path.join(os.path.dirname(convsub),kernel))
+    kernel = os.path.abspath(os.path.join(os.path.dirname(subframe),kernel))
 
     itrans = '%s-%s_%s.itrans' % (frameinfo[0][0],
                                   frameinfo[0][1],
                                   frameinfo[0][2])
-    itrans = os.path.abspath(os.path.join(os.path.dirname(convsub),itrans))
+    itrans = os.path.abspath(os.path.join(os.path.dirname(subframe),itrans))
 
     xysdk = '%s-%s_%s.xysdk' % (frameinfo[0][0],
                                 frameinfo[0][1],
                                 frameinfo[0][2])
-    xysdk = os.path.abspath(os.path.join(os.path.dirname(convsub),xysdk))
+    xysdk = os.path.abspath(os.path.join(os.path.dirname(subframe),xysdk))
 
 
     # write the photometry file to /dev/shm by default
@@ -2985,7 +3012,7 @@ def convsubfits_staticphot_worker(task):
         outdir = '/dev/shm'
 
     _, subphot = ism.subframe_photometry_worker(
-        (convsub, cphotref_cmrawphot, photdisjointradius,
+        (subframe, cphotref_cmrawphot, photdisjointradius,
          kernel, itrans, xysdk, outdir,
          photreftype, kernelspec, lcapertures)
     )
@@ -2996,13 +3023,13 @@ def convsubfits_staticphot_worker(task):
               'subtracted frame %s, photometry file %s' %
               (datetime.utcnow().isoformat(), frame, convsub, subphot))
 
-        return frame, (convsub, subphot)
+        return subframe, subphot
 
     else:
 
         print('%sZ: CONVSUBPHOT FAILED: frame %s' %
               (datetime.utcnow().isoformat(), frame))
-        return frame, None
+        return subframe, None
 
 
 
