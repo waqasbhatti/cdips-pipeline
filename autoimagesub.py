@@ -2924,7 +2924,7 @@ def parallel_xtrnsfits_convsub(xtrnsfits,
         pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
         # fire up the pool of workers
-        results = pool.map(xtrnsfits_convsubphot_worker, tasks)
+        results = pool.map(xtrnsfits_convsub_worker, tasks)
 
         # wait for the processes to complete work
         pool.close()
