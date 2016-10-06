@@ -2900,14 +2900,14 @@ def xtrnsfits_convsub_worker(task):
 
 
 
-def xtrnsfits_convsub(xtrnsfits,
-                      photreftype,
-                      outdir=None,
-                      refinfo=REFINFO,
-                      reversesubtract=True,
-                      kernelspec='b/4;i/4;d=4/4',
-                      nworkers=16,
-                      maxworkertasks=1000):
+def parallel_xtrnsfits_convsub(xtrnsfits,
+                               photreftype,
+                               outdir=None,
+                               refinfo=REFINFO,
+                               reversesubtract=True,
+                               kernelspec='b/4;i/4;d=4/4',
+                               nworkers=16,
+                               maxworkertasks=1000):
     '''This convolves, and subtracts all FITS files in the xtrnsfits list.
 
     '''
