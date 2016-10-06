@@ -2950,59 +2950,59 @@ def convsubfits_staticphot_worker(task):
 
     '''
 
-        # find matching kernel, itrans, and xysdk files for each subtracted
-        # frame
+    # find matching kernel, itrans, and xysdk files for each subtracted
+    # frame
 
-        # generate the convsubfits hash
-        convsubhash = get_convsubfits_hash(
-            photreftype,
-            ('reverse' if os.path.basename(convsub).startswith('rsub')
-             else 'normal'),
-            kernelspec
-        )
+    # generate the convsubfits hash
+    convsubhash = get_convsubfits_hash(
+        photreftype,
+        ('reverse' if os.path.basename(convsub).startswith('rsub')
+         else 'normal'),
+        kernelspec
+    )
 
-        frameinfo = FRAMEREGEX.findall(os.path.basename(convsub))
-        kernel = '%s-%s-%s_%s-xtrns.fits-kernel' % (photreftype,
-                                                    convsubhash,
-                                                    frameinfo[0][0],
-                                                    frameinfo[0][1],
-                                                    frameinfo[0][2])
-        kernel = os.path.abspath(os.path.join(os.path.dirname(convsub),kernel))
+    frameinfo = FRAMEREGEX.findall(os.path.basename(convsub))
+    kernel = '%s-%s-%s_%s-xtrns.fits-kernel' % (photreftype,
+                                                convsubhash,
+                                                frameinfo[0][0],
+                                                frameinfo[0][1],
+                                                frameinfo[0][2])
+    kernel = os.path.abspath(os.path.join(os.path.dirname(convsub),kernel))
 
-        itrans = '%s-%s_%s.itrans' % (frameinfo[0][0],
-                                      frameinfo[0][1],
-                                      frameinfo[0][2])
-        itrans = os.path.abspath(os.path.join(os.path.dirname(convsub),itrans))
+    itrans = '%s-%s_%s.itrans' % (frameinfo[0][0],
+                                  frameinfo[0][1],
+                                  frameinfo[0][2])
+    itrans = os.path.abspath(os.path.join(os.path.dirname(convsub),itrans))
 
-        xysdk = '%s-%s_%s.xysdk' % (frameinfo[0][0],
-                                    frameinfo[0][1],
-                                    frameinfo[0][2])
-        xysdk = os.path.abspath(os.path.join(os.path.dirname(convsub),xysdk))
+    xysdk = '%s-%s_%s.xysdk' % (frameinfo[0][0],
+                                frameinfo[0][1],
+                                frameinfo[0][2])
+    xysdk = os.path.abspath(os.path.join(os.path.dirname(convsub),xysdk))
 
 
-        # write the photometry file to /dev/shm by default
-        if outdir is None:
-            outdir = '/dev/shm'
+    # write the photometry file to /dev/shm by default
+    if outdir is None:
+        outdir = '/dev/shm'
 
-        _, subphot = ism.subframe_photometry_worker(
-            (convsub, cphotref_cmrawphot, photdisjointradius,
-             kernel, itrans, xysdk, outdir,
-             photreftype, kernelspec, lcapertures)
-        )
+    _, subphot = ism.subframe_photometry_worker(
+        (convsub, cphotref_cmrawphot, photdisjointradius,
+         kernel, itrans, xysdk, outdir,
+         photreftype, kernelspec, lcapertures)
+    )
 
-        if subphot and os.path.exists(subphot):
+    if subphot and os.path.exists(subphot):
 
-            print('%sZ: CONVSUBPHOT OK: frame %s, '
-                  'subtracted frame %s, photometry file %s' %
-                  (datetime.utcnow().isoformat(), frame, convsub, subphot))
+        print('%sZ: CONVSUBPHOT OK: frame %s, '
+              'subtracted frame %s, photometry file %s' %
+              (datetime.utcnow().isoformat(), frame, convsub, subphot))
 
-            return frame, (convsub, subphot)
+        return frame, (convsub, subphot)
 
-        else:
+    else:
 
-            print('%sZ: CONVSUBPHOT FAILED: frame %s' %
-                  (datetime.utcnow().isoformat(), frame))
-            return frame, None
+        print('%sZ: CONVSUBPHOT FAILED: frame %s' %
+              (datetime.utcnow().isoformat(), frame))
+        return frame, None
 
 
 
