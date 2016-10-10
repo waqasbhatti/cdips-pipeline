@@ -2369,7 +2369,8 @@ def amend_candidate_photrefs(photrefinfo):
                 photrefinfo['masterphotref']
             )
 
-        elif masterphotref_amendment and not os.path.exists(masterphotref_amendment):
+        elif ((masterphotref_amendment) and
+              (not os.path.exists(masterphotref_amendment))):
 
             masterphotref_prompt = (
                 'masterphotref = %s does not exist\n'
@@ -2956,12 +2957,19 @@ def convsubfits_staticphot_worker(task):
 
     '''
 
+    subframe, photreftype, kernelspec, lcapertures, outdir = task
+
+
     # generate the convsubfits hash
     convsubhash = get_convsubfits_hash(
         photreftype,
         ('reverse' if os.path.basename(subframe).startswith('rsub')
          else 'normal'),
         kernelspec
+    )
+
+    frameinfo = FRAMEREGEX.findall(
+        os.path.basename(subframe)
     )
 
     # first, figure out the input frame's projid, field, and ccd
@@ -2971,9 +2979,6 @@ def convsubfits_staticphot_worker(task):
     field, ccd, projectid = (frameelems['object'],
                              int(frameinfo[0][2]),
                              frameelems['projid'])
-
-    # next, figure out the stationid, framenum, and ccd
-    frameinfo = FRAMEREGEX.findall(os.path.basename(subframe))
 
     # then, find the associated combined photref frame, regfile, cmrawphot
     cphotref = get_combined_photref(projectid, field, ccd, photreftype,
