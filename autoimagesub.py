@@ -3012,21 +3012,21 @@ def convsubfits_staticphot_worker(task):
             'rsub' if os.path.basename(subframe).startswith('rsub') else 'nsub'
         )
 
-        kernelf = '%s-%s-%s_%s-xtrns.fits-kernel' % (photrefbit,
-                                                    convsubhash,
-                                                    frameinfo[0][0],
-                                                    frameinfo[0][1],
-                                                    frameinfo[0][2])
+        kernelf = '%s-%s-%s-%s_%s-xtrns.fits-kernel' % (photrefbit,
+                                                        convsubhash,
+                                                        frameinfo[0][0],
+                                                        frameinfo[0][1],
+                                                        frameinfo[0][2])
         kernel = os.path.abspath(os.path.join(os.path.dirname(subframe),kernelf))
 
         itransf = '%s-%s_%s.itrans' % (frameinfo[0][0],
-                                      frameinfo[0][1],
-                                      frameinfo[0][2])
+                                       frameinfo[0][1],
+                                       frameinfo[0][2])
         itrans = os.path.abspath(os.path.join(os.path.dirname(subframe),itransf))
 
         xysdkf = '%s-%s_%s.xysdk' % (frameinfo[0][0],
-                                    frameinfo[0][1],
-                                    frameinfo[0][2])
+                                     frameinfo[0][1],
+                                     frameinfo[0][2])
         xysdk = os.path.abspath(os.path.join(os.path.dirname(subframe),xysdkf))
 
 
