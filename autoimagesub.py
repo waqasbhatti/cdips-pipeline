@@ -271,7 +271,7 @@ def find_subtracted_fits_fieldprojectidccd(
         'rsub' if subtracttype == 'reverse' else 'nsub'
     )
     # generate the convsubfits hash
-    convsubhash = get_convsubfits_hash(
+    convsubhash = ism.get_convsubfits_hash(
         photreftype,
         subtracttype,
         kernelspec
@@ -2975,7 +2975,7 @@ def convsubfits_staticphot_worker(task):
 
 
     # generate the convsubfits hash
-    convsubhash = get_convsubfits_hash(
+    convsubhash = ism.get_convsubfits_hash(
         photreftype,
         ('reverse' if os.path.basename(subframe).startswith('rsub')
          else 'normal'),
