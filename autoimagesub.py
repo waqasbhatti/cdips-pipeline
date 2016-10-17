@@ -3052,7 +3052,6 @@ def convsubfits_staticphot_worker(task):
 
             print('%sZ: CONVSUBPHOT FAILED: frame %s' %
                   (datetime.utcnow().isoformat(), frame))
-            raise
 
             return subframe, None
 
@@ -3062,6 +3061,8 @@ def convsubfits_staticphot_worker(task):
         message = 'could not do ISMphot for %s, exception follows' % subframe
         print('EXC! %sZ: %s\n%s' %
                (datetime.utcnow().isoformat(), message, format_exc()) )
+        raise
+
         return subframe, None
 
 
