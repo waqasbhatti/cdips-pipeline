@@ -2967,12 +2967,14 @@ def convsubfits_staticphot_worker(task):
     task[3] = lcapertures
     task[4] = disjointradius
     task[5] = outdir
+    task[6] = refinfo
 
     currently produces iphot files. should this write to the database?
 
     '''
 
-    subframe, photreftype, kernelspec, lcapertures, disjrad, outdir = task
+    (subframe, photreftype, kernelspec,
+     lcapertures, disjrad, outdir, refinfo) = task
 
     try:
 
