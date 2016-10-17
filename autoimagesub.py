@@ -3052,6 +3052,8 @@ def convsubfits_staticphot_worker(task):
 
             print('%sZ: CONVSUBPHOT FAILED: frame %s' %
                   (datetime.utcnow().isoformat(), frame))
+            raise
+
             return subframe, None
 
 
