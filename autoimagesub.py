@@ -3042,7 +3042,7 @@ def convsubfits_staticphot_worker(task):
 
         if subphot and os.path.exists(subphot):
 
-            print('%sZ: CONVSUBPHOT OK: '
+            print('%sZ: CONVSUBPHOT (STATIC) OK: '
                   'subtracted frame %s, photometry file %s' %
                   (datetime.utcnow().isoformat(), subframe, subphot))
 
@@ -3050,7 +3050,7 @@ def convsubfits_staticphot_worker(task):
 
         else:
 
-            print('%sZ: CONVSUBPHOT FAILED: subtracted frame %s' %
+            print('%sZ: CONVSUBPHOT (STATIC) FAILED: subtracted frame %s' %
                   (datetime.utcnow().isoformat(), subframe))
 
             return subframe, None
@@ -3058,10 +3058,10 @@ def convsubfits_staticphot_worker(task):
 
     except Exception as e:
 
-        message = 'could not do CONVSUBPHOT for %s, exception follows' % subframe
+        message = ('could not do CONVSUBPHOT (STATIC) for %s, '
+                   'exception follows' % subframe)
         print('EXC! %sZ: %s\n%s' %
                (datetime.utcnow().isoformat(), message, format_exc()) )
-        raise
 
         return subframe, None
 
@@ -3069,14 +3069,42 @@ def convsubfits_staticphot_worker(task):
 
 def parallel_convsubfits_staticphot(
         subfitslist,
+        photreftype='oneframe',
+        kernelspec='b/4;i/4;d=4/4',
         lcapertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
         photdisjointradius=2,
+        outdir=None,
         refinfo=REFINFO,
+        nworkers=16,
+        maxworkertasks=1000,
 ):
     '''This does static object photometry on the all subtracted FITS in
     subfitslist.
 
     '''
+
+    tasks = [(x, photreftype, kernelspec,
+              lcapertures, photdisjointradius,
+              outdir, refinfo) for x in subfitslist if os.path.exists(x)]
+
+    if len(tasks) > 0:
+
+        pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+        # fire up the pool of workers
+        results = pool.map(convsubfits_staticphot_worker, tasks)
+
+        # wait for the processes to complete work
+        pool.close()
+        pool.join()
+
+        return {x:y for (x,y) in results}
+
+    else:
+
+        print('ERR! %sZ: none of the files specified exist, bailing out...' %
+              (datetime.utcnow().isoformat(),))
+        return
 
 
 
