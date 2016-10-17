@@ -3044,14 +3044,14 @@ def convsubfits_staticphot_worker(task):
 
             print('%sZ: CONVSUBPHOT OK: frame %s, '
                   'subtracted frame %s, photometry file %s' %
-                  (datetime.utcnow().isoformat(), frame, convsub, subphot))
+                  (datetime.utcnow().isoformat(), subframe, convsub, subphot))
 
             return subframe, subphot
 
         else:
 
             print('%sZ: CONVSUBPHOT FAILED: frame %s' %
-                  (datetime.utcnow().isoformat(), frame))
+                  (datetime.utcnow().isoformat(), subframe))
 
             return subframe, None
 
