@@ -3042,15 +3042,15 @@ def convsubfits_staticphot_worker(task):
 
         if subphot and os.path.exists(subphot):
 
-            print('%sZ: CONVSUBPHOT OK: frame %s, '
+            print('%sZ: CONVSUBPHOT OK: '
                   'subtracted frame %s, photometry file %s' %
-                  (datetime.utcnow().isoformat(), subframe, convsub, subphot))
+                  (datetime.utcnow().isoformat(), subframe, subphot))
 
             return subframe, subphot
 
         else:
 
-            print('%sZ: CONVSUBPHOT FAILED: frame %s' %
+            print('%sZ: CONVSUBPHOT FAILED: subtracted frame %s' %
                   (datetime.utcnow().isoformat(), subframe))
 
             return subframe, None
