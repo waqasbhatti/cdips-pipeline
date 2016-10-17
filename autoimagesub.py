@@ -3029,8 +3029,8 @@ def convsubfits_staticphot_worker(task):
 
 
         # write the photometry file to /dev/shm by default
-        if outdir is None:
-            outdir = '/dev/shm'
+        # if outdir is None:
+        #     outdir = '/dev/shm'
 
         _, subphot = ism.subframe_photometry_worker(
             (subframe, cphotref_cmrawphot, disjrad,
