@@ -2965,89 +2965,99 @@ def convsubfits_staticphot_worker(task):
     task[1] = photreftype
     task[2] = kernelspec
     task[3] = lcapertures
-    task[4] = outdir
+    task[4] = disjointradius
+    task[5] = outdir
 
     currently produces iphot files. should this write to the database?
 
     '''
 
-    subframe, photreftype, kernelspec, lcapertures, outdir = task
+    subframe, photreftype, kernelspec, lcapertures, disjrad, outdir = task
+
+    try:
+
+        # generate the convsubfits hash
+        convsubhash = ism.get_convsubfits_hash(
+            photreftype,
+            ('reverse' if os.path.basename(subframe).startswith('rsub')
+             else 'normal'),
+            kernelspec
+        )
+
+        frameinfo = FRAMEREGEX.findall(
+            os.path.basename(subframe)
+        )
+
+        # first, figure out the input frame's projid, field, and ccd
+        frameelems = get_header_keyword_list(subframe,
+                                             ['object',
+                                              'projid'])
+        field, ccd, projectid = (frameelems['object'],
+                                 int(frameinfo[0][2]),
+                                 frameelems['projid'])
+
+        # then, find the associated combined photref frame, regfile, cmrawphot
+        cphotref = get_combined_photref(projectid, field, ccd, photreftype,
+                                        refinfo=refinfo)
+        cphotref_frame = cphotref['framepath']
+        cphotref_reg = cphotref['convolveregpath']
+        cphotref_cmrawphot = cphotref['cmrawphotpath']
+
+        # find matching kernel, itrans, and xysdk files for each subtracted
+        # frame
+
+        photrefbit = (
+            'rsub' if os.path.basename(subframe).startswith('rsub') else 'nsub'
+        )
+
+        kernel = '%s-%s-%s_%s-xtrns.fits-kernel' % (photrefbit,
+                                                    convsubhash,
+                                                    frameinfo[0][0],
+                                                    frameinfo[0][1],
+                                                    frameinfo[0][2])
+        kernel = os.path.abspath(os.path.join(os.path.dirname(subframe),kernel))
+
+        itrans = '%s-%s_%s.itrans' % (frameinfo[0][0],
+                                      frameinfo[0][1],
+                                      frameinfo[0][2])
+        itrans = os.path.abspath(os.path.join(os.path.dirname(subframe),itrans))
+
+        xysdk = '%s-%s_%s.xysdk' % (frameinfo[0][0],
+                                    frameinfo[0][1],
+                                    frameinfo[0][2])
+        xysdk = os.path.abspath(os.path.join(os.path.dirname(subframe),xysdk))
 
 
-    # generate the convsubfits hash
-    convsubhash = ism.get_convsubfits_hash(
-        photreftype,
-        ('reverse' if os.path.basename(subframe).startswith('rsub')
-         else 'normal'),
-        kernelspec
-    )
+        # write the photometry file to /dev/shm by default
+        if outdir is None:
+            outdir = '/dev/shm'
 
-    frameinfo = FRAMEREGEX.findall(
-        os.path.basename(subframe)
-    )
+        _, subphot = ism.subframe_photometry_worker(
+            (subframe, cphotref_cmrawphot, disjrad,
+             kernel, itrans, xysdk, outdir,
+             photreftype, kernelspec, lcapertures)
+        )
 
-    # first, figure out the input frame's projid, field, and ccd
-    frameelems = get_header_keyword_list(subframe,
-                                         ['object',
-                                          'projid'])
-    field, ccd, projectid = (frameelems['object'],
-                             int(frameinfo[0][2]),
-                             frameelems['projid'])
+        if subphot and os.path.exists(subphot):
 
-    # then, find the associated combined photref frame, regfile, cmrawphot
-    cphotref = get_combined_photref(projectid, field, ccd, photreftype,
-                                    refinfo=refinfo)
-    cphotref_frame = cphotref['framepath']
-    cphotref_reg = cphotref['convolveregpath']
-    cphotref_cmrawphot = cphotref['cmrawphotpath']
+            print('%sZ: CONVSUBPHOT OK: frame %s, '
+                  'subtracted frame %s, photometry file %s' %
+                  (datetime.utcnow().isoformat(), frame, convsub, subphot))
 
-    # find matching kernel, itrans, and xysdk files for each subtracted
-    # frame
+            return subframe, subphot
 
-    photrefbit = (
-        'rsub' if os.path.basename(subframe).startswith('rsub') else 'nsub'
-    )
+        else:
 
-    kernel = '%s-%s-%s_%s-xtrns.fits-kernel' % (photrefbit,
-                                                convsubhash,
-                                                frameinfo[0][0],
-                                                frameinfo[0][1],
-                                                frameinfo[0][2])
-    kernel = os.path.abspath(os.path.join(os.path.dirname(subframe),kernel))
-
-    itrans = '%s-%s_%s.itrans' % (frameinfo[0][0],
-                                  frameinfo[0][1],
-                                  frameinfo[0][2])
-    itrans = os.path.abspath(os.path.join(os.path.dirname(subframe),itrans))
-
-    xysdk = '%s-%s_%s.xysdk' % (frameinfo[0][0],
-                                frameinfo[0][1],
-                                frameinfo[0][2])
-    xysdk = os.path.abspath(os.path.join(os.path.dirname(subframe),xysdk))
+            print('%sZ: CONVSUBPHOT FAILED: frame %s' %
+                  (datetime.utcnow().isoformat(), frame))
+            return subframe, None
 
 
-    # write the photometry file to /dev/shm by default
-    if outdir is None:
-        outdir = '/dev/shm'
+    except Exception as e:
 
-    _, subphot = ism.subframe_photometry_worker(
-        (subframe, cphotref_cmrawphot, photdisjointradius,
-         kernel, itrans, xysdk, outdir,
-         photreftype, kernelspec, lcapertures)
-    )
-
-    if subphot and os.path.exists(subphot):
-
-        print('%sZ: CONVSUBPHOT OK: frame %s, '
-              'subtracted frame %s, photometry file %s' %
-              (datetime.utcnow().isoformat(), frame, convsub, subphot))
-
-        return subframe, subphot
-
-    else:
-
-        print('%sZ: CONVSUBPHOT FAILED: frame %s' %
-              (datetime.utcnow().isoformat(), frame))
+        message = 'could not do ISMphot for %s, exception follows' % subframe
+        print('EXC! %sZ: %s\n%s' %
+               (datetime.utcnow().isoformat(), message, format_exc()) )
         return subframe, None
 
 
