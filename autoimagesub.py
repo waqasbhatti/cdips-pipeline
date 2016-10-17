@@ -3058,7 +3058,7 @@ def convsubfits_staticphot_worker(task):
 
     except Exception as e:
 
-        message = 'could not do ISMphot for %s, exception follows' % subframe
+        message = 'could not do CONVSUBPHOT for %s, exception follows' % subframe
         print('EXC! %sZ: %s\n%s' %
                (datetime.utcnow().isoformat(), message, format_exc()) )
         raise
