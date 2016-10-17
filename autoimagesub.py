@@ -254,8 +254,9 @@ def find_subtracted_fits_fieldprojectidccd(
         field,
         projectid,
         ccd,
-        subtracttype,
-        photreftype,
+        subtracttype='reverse',
+        photreftype='oneframe',
+        kernelspec='b/4;i/4;d=4/4',
         nworkers=8,
         maxworkertasks=1000
 ):
@@ -266,7 +267,18 @@ def find_subtracted_fits_fieldprojectidccd(
 
     '''
 
-    fglob= '%s-%s-?-???????_?-xtrns.fits' % (subtracttype, photreftype)
+    photrefbit = (
+        'rsub' if subtracttype == 'reverse' else 'nsub'
+    )
+    # generate the convsubfits hash
+    convsubhash = get_convsubfits_hash(
+        photreftype,
+        subtracttype,
+        kernelspec
+    )
+
+
+    fglob= '%s-%s-?-???????_?-xtrns.fits' % (photrefbit, convsubhash)
 
     return find_original_fits_fieldprojectidccd(dirlist,
                                                 field,
