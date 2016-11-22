@@ -761,10 +761,6 @@ def calibrated_frame_to_database(fitsfile,
             mph = headerdata['MOONPH']
         else:
             mph = None
-        if 'MOONPH' in headerdata and headerdata['MOONPH'] is not None:
-            mph = headerdata['MOONPH']
-        else:
-            mph = None
         if 'MOONDIST' in headerdata and headerdata['MOONDIST'] is not None:
             mds = headerdata['MOONDIST']
         else:
@@ -3320,7 +3316,6 @@ def convsub_photometry_to_ismphot_database(convsubfits,
             for line in infd:
 
                 parsedline = parse_iphot_line(line)
-
 
 
         # update the iphotfiles table file with all of this info. if there's a
