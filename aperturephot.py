@@ -268,7 +268,7 @@ DISTINCT_HATIDS_CMD = ('select distinct hatid from hatids')
 
 def reform_fistars(fistardir,
                    fistarglob='1-*_?.fistar',
-                   linestokeep=2500,
+                   linestokeep=500,
                    outpostfix='astrometry'):
     '''
     This truncates all fistars in the directory fistardir to linestokeep
@@ -308,10 +308,12 @@ def anet_solve_frame(srclist,
                      wcsout,
                      ra,
                      dec,
-                     centerfromframe=False,
+                     infofromframe=False,
                      width=13,
                      tweak=6,
-                     radius=4,
+                     radius=13,
+                     xpix=2048,
+                     ypix=2048,
                      cols=(2,3)):
     '''This uses anet to solve frame astrometry.
 
@@ -340,7 +342,7 @@ def anet_solve_frame(srclist,
 
     '''
 
-    if centerfromframe:
+    if infofromframe:
 
         # find the frame
         srcframe = os.path.basename(srclist)
@@ -353,6 +355,9 @@ def anet_solve_frame(srclist,
             ra = get_header_keyword(srcframepath,'rac')
             dec = get_header_keyword(srcframepath,'decc')
             fov = get_header_keyword(srcframepath,'fov')
+            xpix = get_header_keyword(srcframepath,'naxis1')
+            ypix = get_header_keyword(srcframepath,'naxis2')
+
 
             if fov is not None:
                 width = fov
@@ -361,7 +366,7 @@ def anet_solve_frame(srclist,
 
 
     ANETCMDSTR = ("anet -r {ra} -d {dec} -w {width} "
-                  "--tweak {tweak} --radius {radius} "
+                  "--tweak {tweak} --radius {radius} -s {xpix},{ypix} "
                   "--cols {colx},{coly} --wcs {outwcsfile} {sourcelist}")
 
 
@@ -370,6 +375,8 @@ def anet_solve_frame(srclist,
                                 width=width,
                                 tweak=tweak,
                                 radius=radius,
+                                xpix=xpix,
+                                ypix=ypix,
                                 colx=cols[0],
                                 coly=cols[1],
                                 outwcsfile=wcsout,
@@ -432,10 +439,12 @@ def parallel_anet(srclistdir,
                   fistarglob='?-*_?.fistar-astrometry',
                   nworkers=16,
                   maxtasksperworker=1000,
-                  centerfromframe=True,
+                  infofromframe=True,
                   width=13,
                   tweak=6,
-                  radius=4,
+                  radius=13,
+                  xpix=2048,
+                  ypix=2048,
                   cols=(2,3)):
     '''
     This does parallel anet astrometry for all frames in srclistdir and
@@ -470,8 +479,10 @@ def parallel_anet(srclistdir,
          ra, dec, {'width':width,
                    'tweak':tweak,
                    'radius':radius,
+                   'xpix':xpix,
+                   'ypix':ypix,
                    'cols':cols,
-                   'centerfromframe':centerfromframe}]
+                   'infofromframe':infofromframe}]
         for x in fistarlist
         ]
 
