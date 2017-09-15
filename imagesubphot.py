@@ -2228,9 +2228,9 @@ def get_lc_for_object(lcobject,
 
 def make_photometry_indexdb(framedir,
                             outfile,
-                            frameglob='subtracted-*-xtrns.fits',
+                            frameglob='rsub-*-xtrns.fits',
                             photdir=None,
-                            photext='iphot',
+                            photglob='rsub-*-%s.iphot',
                             maxframes=None,
                             overwrite=False):
 
@@ -2288,21 +2288,24 @@ def make_photometry_indexdb(framedir,
         # generate the names of the associated phot and sourcelist files
         frameinfo = FRAMEREGEX.findall(os.path.basename(frame))
 
-        phot = '%s-%s_%s.%s' % (frameinfo[0][0],
-                                frameinfo[0][1],
-                                frameinfo[0][2],
-                                photext)
-        originalframe = '%s-%s_%s.fits' % (frameinfo[0][0],
-                                frameinfo[0][1],
-                                frameinfo[0][2])
+        photsearch = photglob % ('%s-%s_%s' % (frameinfo[0][0],
+                                               frameinfo[0][1],
+                                               frameinfo[0][2]))
 
-        phot = os.path.join(os.path.abspath(photdir), phot)
+        originalframe = '%s-%s_%s.fits' % (frameinfo[0][0],
+                                           frameinfo[0][1],
+                                           frameinfo[0][2])
+
+        photmatch = glob.glob(os.path.join(os.path.abspath(photdir),
+                                           photsearch))
         originalframe = os.path.join(os.path.abspath(framedir),
                                      originalframe)
 
         # check these files exist, and populate the dict if they do
-        if os.path.exists(phot) and os.path.exists(originalframe):
+        if (photmatch and os.path.exists(photmatch[0])
+            and os.path.exists(originalframe)):
 
+            phot = photmatch[0]
 
             # get the JD from the FITS file.
 
