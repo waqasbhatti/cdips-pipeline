@@ -2615,10 +2615,10 @@ def imagesublc_collection_worker(task):
 def parallel_collect_imagesub_lightcurves(
         framedir,
         outdir,
-        frameglob='subtracted-*-xtrns.fits',
         photindexdb=None,
+        frameglob='rsub-*-xtrns.fits',
+        photglob='rsub-*-%s.iphot',
         photdir=None,
-        photext='iphot',
         maxframes=None,
         overwritephotindex=False,
         skipcollectedlcs=True,
@@ -2646,8 +2646,8 @@ def parallel_collect_imagesub_lightcurves(
         photindexdb = make_photometry_indexdb(framedir,
                                               photdbf,
                                               frameglob=frameglob,
+                                              photglob=photglob,
                                               photdir=photdir,
-                                              photext=photext,
                                               maxframes=maxframes,
                                               overwrite=overwritephotindex)
 
