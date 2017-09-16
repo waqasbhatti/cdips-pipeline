@@ -3203,20 +3203,10 @@ def insert_phots_into_database(framedir,
                 # photref frame)
                 framerjd = get_header_keyword(originalframe, 'JD')
 
-                # now insert the file into the database
-                if overwrite:
-                    photquery = PHOTS_OVERWRITE_QUERY
-                    photparams = (os.path.abspath(phot),
-                                  framerjd,
-                                  os.path.abspath(originalframe),
-                                  os.path.abspath(phot),
-                                  framerjd,
-                                  os.path.abspath(originalframe))
-                else:
-                    photquery = PHOTS_INSERT_QUERY
-                    photparams = (os.path.abspath(phot),
-                                  framerjd,
-                                  os.path.abspath(originalframe))
+                photquery = PHOTS_INSERT_QUERY
+                photparams = (os.path.abspath(phot),
+                              framerjd,
+                              os.path.abspath(originalframe))
 
                 # execute the query
                 cursor.execute(photquery, photparams)
@@ -3229,14 +3219,8 @@ def insert_phots_into_database(framedir,
                 # insert a row for each hatid in this phot
                 for ind, hatid in enumerate(phothatids):
 
-                    if overwrite:
-                        hatidquery = HATIDS_OVERWRITE_QUERY
-                        hatidparams = (hatid, os.path.abspath(phot), ind,
-                                       hatid, os.path.abspath(phot), ind)
-                    else:
-                        hatidquery = HATIDS_INSERT_QUERY
-                        hatidparams = (hatid, os.path.abspath(phot), ind)
-
+                    hatidquery = HATIDS_INSERT_QUERY
+                    hatidparams = (hatid, os.path.abspath(phot), ind)
                     cursor.execute(hatidquery, hatidparams)
 
 
