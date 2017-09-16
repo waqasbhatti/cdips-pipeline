@@ -3216,6 +3216,10 @@ def insert_phots_into_database(framedir,
                 phothatids = [x.split()[0] for x in photf]
                 photf.close()
 
+                # drop these indexes for speed
+                cursor.execute('drop index photindex_hatids_hatid_idx')
+                cursor.execute('drop index photindex_hatids_phot_idx')
+
                 # insert a row for each hatid in this phot
                 for ind, hatid in enumerate(phothatids):
 
@@ -3232,6 +3236,12 @@ def insert_phots_into_database(framedir,
                       (datetime.utcnow().isoformat(), frame))
 
         # now we're all done with frame inserts
+
+        # regenerate the indexes
+        print('recreating indexes...')
+        cursor.execute('create index on photindex_hatids(phot)')
+        cursor.execute('create index on photindex_hatids(hatid)')
+
         # commit the transaction
         database.commit()
 
