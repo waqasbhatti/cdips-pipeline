@@ -3109,17 +3109,17 @@ def parallel_convsubfits_staticphot(
 ##########################################
 
 PHOTS_OVERWRITE_QUERY = (
-    "insert into phots values (%s, %s, %s) "
+    "insert into photindex_phots values (%s, %s, %s) "
     "on conflict on constraint photindex_phots_pkey "
     "do update set "
     "phot = %s, rjd = %s, frame = %s"
 )
-PHOTS_INSERT_QUERY = "insert into phots values (%s, %s, %s)"
+PHOTS_INSERT_QUERY = "insert into photindex_phots values (%s, %s, %s)"
 
-HATIDS_OVERWRITE_QUERY = ("insert into hatids values (%s, %s, %s) "
+HATIDS_OVERWRITE_QUERY = ("insert into photindex_hatids values (%s, %s, %s) "
                           "on conflict on constraint photindex_hatids_pkey "
                           "do update set hatid = %s, phot = %s, photline = %s")
-HATIDS_INSERT_QUERY = "insert into hatids values (%s, %s, %s)"
+HATIDS_INSERT_QUERY = "insert into photindex_hatids values (%s, %s, %s)"
 
 
 
