@@ -3231,7 +3231,7 @@ def insert_phots_into_database(framedir,
                 photo.seek(0)
 
                 # do a fast insert using pg's copy protocol
-                pg.copy_from(photo,'photindex_hatids',sep=' ')
+                cursor.copy_from(photo,'photindex_hatids',sep=' ')
                 photo.close()
 
             # if some associated files don't exist for this frame, ignore it
