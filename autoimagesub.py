@@ -36,6 +36,8 @@ from hashlib import md5, sha256
 import gzip
 from traceback import format_exc
 
+from cStringIO import StringIO
+
 import numpy as np
 import psycopg2 as pg
 
@@ -3168,6 +3170,11 @@ def insert_phots_into_database(framedir,
         if maxframes:
             framelist = framelist[:maxframes]
 
+
+        # drop these indexes for speed
+        cursor.execute('drop index photindex_hatids_hatid_idx')
+        cursor.execute('drop index photindex_hatids_phot_idx')
+
         # go through all the frames
         for frame in framelist:
 
@@ -3213,20 +3220,19 @@ def insert_phots_into_database(framedir,
 
                 # now get the phot file and read it
                 photf = open(phot, 'rb')
-                phothatids = [x.split()[0] for x in photf]
+                photo = StringIO()
+
+                for ind, line in enumerate(photf):
+                    hatid = line.split()[0]
+                    photo.write('%s %s %s\n' % (hatid,
+                                                os.path.abspath(phot),
+                                                ind))
                 photf.close()
+                photo.seek(0)
 
-                # drop these indexes for speed
-                cursor.execute('drop index photindex_hatids_hatid_idx')
-                cursor.execute('drop index photindex_hatids_phot_idx')
-
-                # insert a row for each hatid in this phot
-                for ind, hatid in enumerate(phothatids):
-
-                    hatidquery = HATIDS_INSERT_QUERY
-                    hatidparams = (hatid, os.path.abspath(phot), ind)
-                    cursor.execute(hatidquery, hatidparams)
-
+                # do a fast insert using pg's copy protocol
+                pg.copy_from(photo,'photindex_hatids',sep=' ')
+                photo.close()
 
             # if some associated files don't exist for this frame, ignore it
             else:
