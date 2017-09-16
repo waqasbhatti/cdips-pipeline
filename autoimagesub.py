@@ -3171,7 +3171,9 @@ def insert_phots_into_database(framedir,
             framelist = framelist[:maxframes]
 
 
-        # drop these indexes for speed
+        # turn off table logging and drop indexes for speed
+        cursor.execute('alter table photindex_phots set unlogged')
+        cursor.execute('alter table photindex_hatids set unlogged')
         cursor.execute('drop index photindex_hatids_hatid_idx')
         cursor.execute('drop index photindex_hatids_phot_idx')
 
@@ -3243,10 +3245,12 @@ def insert_phots_into_database(framedir,
 
         # now we're all done with frame inserts
 
-        # regenerate the indexes
+        # regenerate the indexes and reset table logging for durability
         print('recreating indexes...')
         cursor.execute('create index on photindex_hatids(phot)')
         cursor.execute('create index on photindex_hatids(hatid)')
+        cursor.execute('alter table photindex_phots set logged')
+        cursor.execute('alter table photindex_hatids set logged')
         cursor.execute('analyze photindex_hatids')
         cursor.execute('analyze photindex_phots')
         
