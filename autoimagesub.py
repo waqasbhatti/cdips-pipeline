@@ -3247,7 +3247,9 @@ def insert_phots_into_database(framedir,
         print('recreating indexes...')
         cursor.execute('create index on photindex_hatids(phot)')
         cursor.execute('create index on photindex_hatids(hatid)')
-
+        cursor.execute('analyze photindex_hatids')
+        cursor.execute('analyze photindex_phots')
+        
         # commit the transaction
         database.commit()
 
