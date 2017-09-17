@@ -3124,6 +3124,11 @@ HATIDS_OVERWRITE_QUERY = ("insert into photindex_hatids values (%s, %s, %s) "
 HATIDS_INSERT_QUERY = "insert into photindex_hatids values (%s, %s, %s)"
 
 
+PHOT_SELECT_QUERY = ("select a.rjd, a.phot. b.photline from "
+                     "photindex_phots a join photindex_hatids on "
+                     "(a.phot = b.phot) where "
+                     "b.hatid = %s order by a.rjd")
+
 
 def insert_phots_into_database(framedir,
                                frameglob='rsub-*-xtrns.fits',
@@ -3172,6 +3177,7 @@ def insert_phots_into_database(framedir,
 
 
         # turn off table logging and drop indexes for speed
+        cursor.execute('set maintenance_work_mem = 16GB')
         cursor.execute('alter table photindex_phots set unlogged')
         cursor.execute('alter table photindex_hatids set unlogged')
         cursor.execute('drop index photindex_hatids_hatid_idx')
@@ -3247,13 +3253,13 @@ def insert_phots_into_database(framedir,
 
         # regenerate the indexes and reset table logging for durability
         print('recreating indexes...')
-        cursor.execute('create index on photindex_hatids(phot)')
-        cursor.execute('create index on photindex_hatids(hatid)')
+        cursor.execute('create index on photindex_hatids(phot) collate "C"')
+        cursor.execute('create index on photindex_hatids(hatid) collate "C"')
         cursor.execute('alter table photindex_phots set logged')
         cursor.execute('alter table photindex_hatids set logged')
         cursor.execute('analyze photindex_hatids')
         cursor.execute('analyze photindex_phots')
-        
+
         # commit the transaction
         database.commit()
 
@@ -3283,7 +3289,6 @@ def insert_phots_into_database(framedir,
                (datetime.utcnow().isoformat(),
                 message, format_exc()) )
         returnval = (framedir, False)
-        raise
 
 
     finally:
@@ -3333,6 +3338,123 @@ def dbphot_collect_imagesubphot_lightcurve(hatid,
     '''This collects an ISM LC using the photindex info in Postgres.
 
     '''
+
+    # open a database connection
+    if database:
+        cursor = database.cursor()
+        closedb = False
+    else:
+        database = pg.connect(user=PGUSER,
+                              password=PGPASSWORD,
+                              database=PGDATABASE,
+                              host=PGHOST)
+        # this is a readonly query so we don't need a transaction
+        database.autcommit()
+        cursor = database.cursor()
+        closedb = True
+
+
+    try:
+
+        # find the photometry in the database for this hatid
+        cursor.execute(PHOT_SELECT_QUERY, (hatid,))
+        rows = cursor.fetchall()
+
+        # make sure we have enough rows to make it worth our while
+        if rows and len(rows) >= mindetections:
+
+            # prepare the output file
+            outfile = os.path.join(os.path.abspath(outdir), '%s.ilc' % hatid)
+
+            # if the file already exists and skipcollected is True, then return
+            # that file instead of processing any further
+            if os.path.exists(outfile) and skipcollected:
+
+                print('WRN! %sZ: object %s LC already exists, '
+                      'not overwriting: %s' %
+                      (datetime.utcnow().isoformat(), hatid, outfile))
+
+                returnval = (hatid, outfile)
+
+            # otherwise, open the file and prepare to write to it
+            else:
+
+                outf = open(outfile, 'wb')
+
+                # go through the phots and sourcelists, picking out the
+                # timeseries information for this hatid
+                for row in rows:
+
+                    # unpack the row to get our values
+                    framerjd, phot, photline = row
+
+                    try:
+
+                        # open the phot
+                        infd = open(os.path.join(photdir, phot),'rb')
+                        for ind, line in enumerate(infd):
+                            if ind == photline:
+                                photelemline = line.rstrip(' \n')
+                                break
+                        infd.close()
+
+                        phot_elem = photelemline.split()
+
+                        if len(phot_elem) > 0:
+
+                            # parse these lines and prepare the output
+                            rstfc_elems = FRAMEREGEX.findall(
+                                os.path.basename(phot)
+                            )
+                            rstfc = '%s-%s_%s' % (rstfc_elems[0])
+                            out_line = '%s %s %s\n' % (framerjd, rstfc,
+                                                       ' '.join(phot_elem))
+                            outf.write(out_line)
+
+                    # if this frame isn't available, ignore it
+                    except Exception as e:
+
+                        print('WRN! %sZ: phot %s isn\'t available (error: %s)'
+                              ', skipping...' %
+                              (datetime.utcnow().isoformat(), phot, e))
+                        continue
+
+                # close the output LC once we're done with it
+                outf.close()
+
+                print('%sZ: object %s -> %s' %
+                      (datetime.utcnow().isoformat(), hatid, outfile))
+
+            # this is the return val
+            returnval = (hatid, outfile)
+
+        # if we don't have enough detections, ignore this light curve
+        else:
+
+            print('ERR! %sZ: object %s: %s dets < %s mindetections,'
+                  ' ignoring...' %
+                  (datetime.utcnow().isoformat(), hatid,
+                   len(rows), mindetections))
+            returnval = (hatid, None)
+
+    # if everything goes wrong, exit cleanly
+    except Exception as e:
+
+        database.rollback()
+
+        message = 'failed to get photometry for %s from DB' % framedir
+        print('EXC! %sZ: %s\nexception was: %s' %
+               (datetime.utcnow().isoformat(),
+                message, format_exc()) )
+        returnval = (hatid, None)
+
+    finally:
+
+        cursor.close()
+        if closedb:
+            database.close()
+
+    return returnval
 
 
 
