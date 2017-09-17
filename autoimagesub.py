@@ -3177,11 +3177,11 @@ def insert_phots_into_database(framedir,
 
 
         # turn off table logging and drop indexes for speed
-        cursor.execute('set maintenance_work_mem = 16GB')
+        cursor.execute('set maintenance_work_mem = 32GB')
         cursor.execute('alter table photindex_phots set unlogged')
         cursor.execute('alter table photindex_hatids set unlogged')
-        cursor.execute('drop index photindex_hatids_hatid_idx')
-        cursor.execute('drop index photindex_hatids_phot_idx')
+        cursor.execute('drop index if exists photindex_hatids_hatid_idx')
+        cursor.execute('drop index if exists photindex_hatids_phot_idx')
 
         # go through all the frames
         for frame in framelist:
