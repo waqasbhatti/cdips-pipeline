@@ -3177,7 +3177,6 @@ def insert_phots_into_database(framedir,
 
 
         # turn off table logging and drop indexes for speed
-        cursor.execute('set maintenance_work_mem = 32GB')
         cursor.execute('alter table photindex_phots set unlogged')
         cursor.execute('alter table photindex_hatids set unlogged')
         cursor.execute('drop index if exists photindex_hatids_hatid_idx')
@@ -3253,8 +3252,8 @@ def insert_phots_into_database(framedir,
 
         # regenerate the indexes and reset table logging for durability
         print('recreating indexes...')
-        cursor.execute('create index on photindex_hatids(phot) collate "C"')
-        cursor.execute('create index on photindex_hatids(hatid) collate "C"')
+        cursor.execute('create index on photindex_hatids(phot)')
+        cursor.execute('create index on photindex_hatids(hatid)')
         cursor.execute('alter table photindex_phots set logged')
         cursor.execute('alter table photindex_hatids set logged')
         cursor.execute('analyze photindex_hatids')
