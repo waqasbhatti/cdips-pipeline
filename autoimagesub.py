@@ -3423,8 +3423,9 @@ def get_hatidlist_from_cmrawphot(projectid, field, ccd, photreftype,
 
         with open(cmrawphot,'rb') as infd:
             for line in infd:
-                hatid = line.split()[0]
-                hatidlist.append(hatid)
+                if not line.startswith('#'):
+                    hatid = line.split()[0]
+                    hatidlist.append(hatid)
 
         print('%sZ: %s objects found in cmrawphot: %s' %
               (datetime.utcnow().isoformat(), len(hatidlist), cmrawphot))
