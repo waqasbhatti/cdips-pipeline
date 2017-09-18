@@ -3110,21 +3110,9 @@ def parallel_convsubfits_staticphot(
 ## SQLITE3 STYLE PHOT INDEX DB IN PGSQL ##
 ##########################################
 
-PHOTS_OVERWRITE_QUERY = (
-    "insert into photindex_phots values (%s, %s, %s) "
-    "on conflict on constraint photindex_phots_pkey "
-    "do update set "
-    "phot = %s, rjd = %s, frame = %s"
-)
 PHOTS_INSERT_QUERY = "insert into photindex_phots values (%s, %s, %s)"
-
-HATIDS_OVERWRITE_QUERY = ("insert into photindex_hatids values (%s, %s, %s) "
-                          "on conflict on constraint photindex_hatids_pkey "
-                          "do update set hatid = %s, phot = %s, photline = %s")
 HATIDS_INSERT_QUERY = "insert into photindex_hatids values (%s, %s, %s)"
-
-
-PHOT_SELECT_QUERY = ("select a.rjd, a.phot. b.photline from "
+PHOT_SELECT_QUERY = ("select a.rjd, a.phot, b.photline from "
                      "photindex_phots a join photindex_hatids b on "
                      "(a.phot = b.phot) where "
                      "b.hatid = %s order by a.rjd")
@@ -3177,8 +3165,7 @@ def insert_phots_into_database(framedir,
 
 
         # turn off table logging and drop indexes for speed
-        cursor.execute('alter table photindex_phots set unlogged')
-        cursor.execute('alter table photindex_hatids set unlogged')
+        cursor.execute('drop index if exists photindex_phots_rjd_idx')
         cursor.execute('drop index if exists photindex_hatids_hatid_idx')
         cursor.execute('drop index if exists photindex_hatids_phot_idx')
 
@@ -3229,16 +3216,16 @@ def insert_phots_into_database(framedir,
                 photf = open(phot, 'rb')
                 photo = StringIO()
 
-                for ind, line in enumerate(photf):
+                for line in photf:
                     hatid = line.split()[0]
-                    photo.write('%s %s %s\n' % (hatid,
+                    photo.write('%s,%s,%s\n' % (hatid,
                                                 os.path.abspath(phot),
-                                                ind))
+                                                line))
                 photf.close()
                 photo.seek(0)
 
                 # do a fast insert using pg's copy protocol
-                cursor.copy_from(photo,'photindex_hatids',sep=' ')
+                cursor.copy_from(photo,'photindex_hatids',sep=',')
                 photo.close()
 
             # if some associated files don't exist for this frame, ignore it
@@ -3251,7 +3238,8 @@ def insert_phots_into_database(framedir,
         # now we're all done with frame inserts
 
         # regenerate the indexes and reset table logging for durability
-        print('recreating indexes...')
+        print('%sZ: recreating indexes' % (datetime.utcnow().isoformat()))
+        cursor.execute('create index on photindex_phots(rjd)')
         cursor.execute('create index on photindex_hatids(phot)')
         cursor.execute('create index on photindex_hatids(hatid)')
         cursor.execute('analyze photindex_hatids')
@@ -3259,6 +3247,7 @@ def insert_phots_into_database(framedir,
 
         # commit the transaction
         database.commit()
+        print('%sZ: done.' % (datetime.utcnow().isoformat()))
 
         returnval = (framedir, True)
 
@@ -3327,7 +3316,6 @@ def get_iphot_line(iphot, linenum, lcobject, iphotlinechars=338):
 
 
 def dbphot_collect_imagesubphot_lightcurve(hatid,
-                                           framedir,
                                            outdir,
                                            skipcollected=True,
                                            iphotlinechars=338,
@@ -3357,6 +3345,7 @@ def dbphot_collect_imagesubphot_lightcurve(hatid,
         # find the photometry in the database for this hatid
         cursor.execute(PHOT_SELECT_QUERY, (hatid,))
         rows = cursor.fetchall()
+        print('lookup complete')
 
         # make sure we have enough rows to make it worth our while
         if rows and len(rows) >= mindetections:
@@ -3389,7 +3378,7 @@ def dbphot_collect_imagesubphot_lightcurve(hatid,
                     try:
 
                         # open the phot
-                        infd = open(os.path.join(photdir, phot),'rb')
+                        infd = open(phot,'rb')
                         for ind, line in enumerate(infd):
                             if ind == photline:
                                 photelemline = line.rstrip(' \n')
