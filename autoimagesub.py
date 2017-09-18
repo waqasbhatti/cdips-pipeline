@@ -4488,6 +4488,28 @@ def parallel_convsubfits_forcedphot(
         return
 
 
+# AFTER THE ABOVE FOR FORCED PHOTOMETRY:
+
+# 1. run the usual collection function: insert_phots_into_database with photdir
+#    set to that of the forcedphot- output iphot directory.
+# 2. then for each 'hatid', run the light curve collection function:
+#    dbphot_collect_imagesubphot_lightcurve, where 'hatid' is usally a special
+#    objectid that we gave to the object we're doing forced photometry for
+
+
+##############################
+## MOVING OBJECT PHOTOMETRY ##
+##############################
+
+# TODO: figure out how to do moving object photometry: one way would be to use
+# the orbital elements or whatever to figure out the ra/dec of the moving object
+# at each center time of each frame in framedir, then generate a forced
+# photometry cmrawphot for each of these positions as separate 'subhatids'. then
+# run parallel_subhot_forcedphot as usual. this should give you iphots with
+# information for each subhatid. then, using a map between subhatid and
+# framenumber, collect the correct light curve and write out to a file.
+
+
 
 #############################
 ## LIGHT CURVE EPD AND TFA ##
