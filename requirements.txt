@@ -10,3 +10,4 @@ numpy>=1.9.1
 paramiko>=1.15.2
 pyfits>=3.3
 scipy>=0.15.0
+astropy

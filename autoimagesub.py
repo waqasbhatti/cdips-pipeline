@@ -35,18 +35,21 @@ import time
 from hashlib import md5, sha256
 import gzip
 from traceback import format_exc
-
 from cStringIO import StringIO
 
+import tempfile
+
 import numpy as np
+from numpy import nan
 import psycopg2 as pg
+
+from astropy import wcs
 
 import aperturephot as ap
 import imagesubphot as ism
 from imageutils import get_header_keyword, get_header_keyword_list, \
     fits_to_full_jpeg, check_frame_warping
 
-from numpy import nan
 
 # get fiphot binary reader
 try:
@@ -4165,6 +4168,324 @@ def collect_lightcurve(objectid,
 # 7. run EPD
 # 8. run TFA (how?)
 
+def forcedphot_generate_cmrawphot(
+        objectid,
+        ra,
+        decl,
+        projectid,
+        field,
+        ccd,
+        photreftype,
+        outfile,
+        apertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
+        ccdgain=None,
+        zeropoint=None,
+        ccdexptime=None,
+        extractsources=True,
+        refinfo=REFINFO):
+    '''This generates a cmrawphot file for objectid on the photref.
+
+    objectid, ra, decl are either scalars or lists for the objects to do forced
+    photometry for.
+
+    '''
+
+    # first, get the photrefinfo
+    cphotref = get_combined_photref(projectid,
+                                    field,
+                                    ccd,
+                                    photreftype,
+                                    refinfo=refinfo)
+
+    # get the path to the photref fits
+    framepath = cphotref['framepath']
+
+    # find the WCS header of the cphotref
+    wcspath = framepath.replace('.fits','.wcs')
+
+    if os.path.exists(wcspath):
+        photrefwcs = wcs.WCS(wcspath)
+    else:
+        print("ERR! %sZ: no WCS header found for %s, can't continue" %
+              (datetime.utcnow().isoformat(), framepath))
+        return None
+
+    # get info from the frame
+    # get the required header keywords from the FITS file
+    header = imageutils.get_header_keyword_list(framepath,
+                                                ['GAIN',
+                                                 'GAIN1',
+                                                 'GAIN2',
+                                                 'EXPTIME',
+                                                 'RAC',
+                                                 'DECC',
+                                                 'FOV'])
+
+    # get the RA and DEC from the frame header for astrometry
+    if 'RAC' in header and 'DECC' in header:
+        frame_ra = header['RAC']*360.0/24.0
+        frame_dec = header['DECC']
+    else:
+        print('ERR! %sZ: no RAC or DECC defined for %s' %
+              (datetime.utcnow().isoformat(),
+               framepath))
+        return None
+
+    # figure out the width of the frame for astrometry
+    if 'FOV' in header:
+        framewidth = header['FOV']
+    elif framewidth is None:
+        print('ERR! %sZ: no frame width defined for %s, '
+              'astrometry not possible' %
+              (datetime.utcnow().isoformat(),
+               framepath))
+        return None
+
+    # handle the gain and exptime parameters
+    if not ccdgain:
+
+        if 'GAIN1' in header and 'GAIN2' in header:
+            ccdgain = (header['GAIN1'] + header['GAIN2'])/2.0
+        elif 'GAIN' in header:
+            ccdgain = header['GAIN']
+        else:
+            ccdgain = None
+
+    if not ccdexptime:
+        ccdexptime = header['EXPTIME'] if 'EXPTIME' in header else None
+
+    if not (ccdgain or ccdexptime):
+        print('ERR! %sZ: no GAIN or EXPTIME defined for %s' %
+              (datetime.utcnow().isoformat(),
+               framepath))
+        return None
+
+    # handle the zeropoints
+    # if the zeropoint isn't provided and if this is a HAT frame, the ccd
+    # number will get us the zeropoint in the ZEROPOINTS dictionary
+    if not zeropoint and ccdnumber in ZEROPOINTS:
+        zeropoint = ZEROPOINTS[ccdnumber]
+    else:
+        print('ERR! %sZ: no zeropoint magnitude defined for %s' %
+              (datetime.utcnow().isoformat(),
+               framepath))
+        return None
+
+
+    ##############################
+    # NOW GENERATE THE CMRAWPHOT #
+    ##############################
+
+    # put the objectid, ra, decl into the correct format
+
+    if not isinstance(objectid, list) or not isinstance(objectid, tuple):
+        objectid = [objectid]
+    if not isinstance(ra, list) or not isinstance(ra, tuple):
+        ra = [ra]
+    if not isinstance(decl, list) or not isinstance(decl, tuple):
+        decl = [decl]
+
+    objectids = np.array(objectid)
+    ras = np.array(ra)
+    decls = np.array(decl)
+    coords = np.column_stack((ras,decls))
+
+    # convert RA/DEC to pixel x/y
+    pixcoords = photrefwcs.all_world2pix(coords,1)
+
+    # generate a sourcelist temp file
+    srclist = tempfile.NamedTemporaryFile(delete=False)
+    srclistf = srclist.name
+    for o, r, d, pc in zip(objectids, ras, decls, pixcoords):
+        srclist.write('%s %.5f %.5f %.3f %.3f\n' % (o, r, d, pc[0], pc[1]))
+    srclist.close()
+
+    # use this srclist as input to the cmrawphot command
+    cmdtorun = ism.COMBINEDPHOTREFCMD.format(
+        photref=framepath,
+        srclist=srclistf,
+        srclist_idcol='1',
+        srclist=xycol='4,5',
+        ccdgain=ccdgain,
+        zeropoint=zeropoint,
+        exptime=ccdexptime,
+        aperturestring=apertures,
+        photrefbase=os.path.splitext(os.path.basename(framepath))[0],
+        outfile=outfile
+    )
+
+    print('fiphot command: %s' % cmdtorun)
+
+    returncode = os.system(cmdtorun)
+
+    # remove the tempfile
+    if os.path.exists(srclistf):
+        os.remove(srclistf)
+    photrefwcs.close()
+
+    if returncode == 0:
+        print('%sZ: forced photometry on photref %s OK -> %s' %
+              (datetime.utcnow().isoformat(), framepath, outfile))
+        return framepath, outfile
+    else:
+        print('ERR! %sZ: forced photometry on photref %s failed!' %
+              (datetime.utcnow().isoformat(), framepath))
+        if os.path.exists(outfile):
+            os.remove(outfile)
+        return framepath, None
+
+
+
+def forcedphot_subphot_worker(task):
+    '''
+    This does subtracted frame photometry on forced-phot objects.
+
+    task[0] = subframe
+    task[1] = photreftype
+    task[2] = kernelspec
+    task[3] = lcapertures
+    task[4] = disjointradius
+    task[5] = outdir
+    task[6] = frcmrawphot
+
+    '''
+
+    (subframe, photreftype, kernelspec,
+     lcapertures, disjrad, outdir, frcmrawphot) = task
+
+    try:
+
+        # generate the convsubfits hash
+        convsubhash = ism.get_convsubfits_hash(
+            photreftype,
+            ('reverse' if os.path.basename(subframe).startswith('rsub')
+             else 'normal'),
+            kernelspec
+        )
+
+        frameinfo = FRAMEREGEX.findall(
+            os.path.basename(subframe)
+        )
+
+        # first, figure out the input frame's projid, field, and ccd
+        frameelems = get_header_keyword_list(subframe,
+                                             ['object',
+                                              'projid'])
+        field, ccd, projectid = (frameelems['object'],
+                                 int(frameinfo[0][2]),
+                                 frameelems['projid'])
+
+        # then, find the associated cmrawphot
+        cphotref_cmrawphot = frcmrawphot
+
+        # find matching kernel, itrans, and xysdk files for each subtracted
+        # frame
+
+        photrefbit = (
+            'rsub' if os.path.basename(subframe).startswith('rsub') else 'nsub'
+        )
+
+        kernelf = '%s-%s-%s-%s_%s-xtrns.fits-kernel' % (photrefbit,
+                                                        convsubhash,
+                                                        frameinfo[0][0],
+                                                        frameinfo[0][1],
+                                                        frameinfo[0][2])
+        kernel = os.path.abspath(os.path.join(os.path.dirname(subframe),kernelf))
+
+        itransf = '%s-%s_%s.itrans' % (frameinfo[0][0],
+                                       frameinfo[0][1],
+                                       frameinfo[0][2])
+        itrans = os.path.abspath(os.path.join(os.path.dirname(subframe),itransf))
+
+        xysdkf = '%s-%s_%s.xysdk' % (frameinfo[0][0],
+                                     frameinfo[0][1],
+                                     frameinfo[0][2])
+        xysdk = os.path.abspath(os.path.join(os.path.dirname(subframe),xysdkf))
+
+
+        # write the photometry file to /dev/shm by default
+        # if outdir is None:
+        #     outdir = '/dev/shm'
+
+        _, subphot = ism.subframe_photometry_worker(
+            (subframe, cphotref_cmrawphot, disjrad,
+             kernel, itrans, xysdk, outdir,
+             photreftype, kernelspec, lcapertures)
+        )
+
+        if subphot and os.path.exists(subphot):
+
+            print('%sZ: CONVSUBPHOT (FORCED) OK: '
+                  'subtracted frame %s, photometry file %s' %
+                  (datetime.utcnow().isoformat(), subframe, subphot))
+
+            return subframe, subphot
+
+        else:
+
+            print('%sZ: CONVSUBPHOT (FORCED) FAILED: subtracted frame %s' %
+                  (datetime.utcnow().isoformat(), subframe))
+
+            return subframe, None
+
+
+    except Exception as e:
+
+        message = ('could not do CONVSUBPHOT (FORCED) for %s, '
+                   'exception follows' % subframe)
+        print('EXC! %sZ: %s\n%s' %
+               (datetime.utcnow().isoformat(), message, format_exc()) )
+
+        return subframe, None
+
+
+
+def parallel_convsubfits_forcedphot(
+        subfitslist,
+        forcedphot_cmrawphot,
+        outdir,
+        photreftype='oneframe',
+        kernelspec='b/4;i/4;d=4/4',
+        lcapertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
+        photdisjointradius=2,
+        nworkers=16,
+        maxworkertasks=1000,
+):
+    '''This does forced object photometry on the all subtracted FITS in
+    subfitslist using the forcedphot_cmrawphot as input.
+
+    Make sure the outdir is NOT the same as the dirname for the usual output
+    iphot files. A good plan is to append forcedphot- in the directory name.
+
+    '''
+
+    tasks = [(x, photreftype, kernelspec,
+              lcapertures, photdisjointradius,
+              outdir, forcedphot_cmrawphot)
+             for x in subfitslist if os.path.exists(x)]
+
+    if len(tasks) > 0:
+
+        # make sure the output directory exists
+        if not os.path.exists(outdir):
+            os.mkdir(outdir)
+
+        pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+        # fire up the pool of workers
+        results = pool.map(forcedphot_subphot_worker, tasks)
+
+        # wait for the processes to complete work
+        pool.close()
+        pool.join()
+
+        return {x:y for (x,y) in results}
+
+    else:
+
+        print('ERR! %sZ: none of the files specified exist, bailing out...' %
+              (datetime.utcnow().isoformat(),))
+        return
 
 
 
