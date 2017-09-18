@@ -45,6 +45,7 @@ import psycopg2 as pg
 
 from astropy import wcs
 
+from framecalib import make_frame_movie
 import aperturephot as ap
 import imagesubphot as ism
 from imageutils import get_header_keyword, get_header_keyword_list, \
@@ -4508,6 +4509,77 @@ def parallel_convsubfits_forcedphot(
 # run parallel_subhot_forcedphot as usual. this should give you iphots with
 # information for each subhatid. then, using a map between subhatid and
 # framenumber, collect the correct light curve and write out to a file.
+
+
+
+###################
+## VISUALIZATION ##
+###################
+
+
+def subtracted_fits_to_jpeg_series(subframedir,
+                                   subframeglob='rsub-*-xtrns.fits',
+                                   origframedir=None,
+                                   outdir=None,
+                                   makemovie=False,
+                                   moviefps=10):
+    '''This generates JPEGs for all subtracted FITS in subframedir.
+
+    origframedir is directory of the original FITS to get JD from.
+
+    '''
+
+    subframes = sorted(glob.glob(os.path.join(subframedir, subframeglob)))
+
+    if origframedir is None:
+        origframedir = subframedir
+
+    if outdir is None:
+        outdir = subframedir
+
+    if subframes:
+
+        nsubframes = len(subframes)
+
+        for ind, frame in enumerate(subframes):
+
+            frameinfo = FRAMEREGEX.findall(os.path.basename(frame))
+            originalframe = '%s-%s_%s.fits' % (frameinfo[0][0],
+                                               frameinfo[0][1],
+                                               frameinfo[0][2])
+            originalframe = os.path.join(origramedir, originalframe)
+            outfname = os.path.join(outdir,
+                                    os.path.basename(frame).replace('.fits',
+                                                                    '.jpg'))
+
+            # generate the JPEG
+            jpeg = fits_to_full_jpeg(frame,
+                                     out_fname=outfname,
+                                     fits_jdsrc=originalframe)
+            print('(%s/%s) subframe: %s -> jpeg: %s OK' %
+                  (ind+1, nsubframes, frame, jpeg))
+
+
+        # make a movie if we're told to do so
+        if makemovie:
+
+            movie_fname = os.path.join(outdir, 'subframe-movie.mp4')
+            jpgglob = subframeglob.replace('.fits','.jpg')
+            moviefile = make_frame_movie(outdir,
+                                         movie_fname,
+                                         framerate=moviefps,
+                                         jpegglob=jpgglob)
+            return outdir, moviefile
+
+        else:
+
+            return outdir, None
+
+    # if no subframes were found in this directory, do nothing
+    else:
+        print('no subtracted frames found in %s' % subframedir)
+        return None, None
+
 
 
 
