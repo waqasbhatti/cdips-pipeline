@@ -4553,7 +4553,7 @@ def subtracted_fits_to_jpeg_series(subframedir,
                                                    frameinfo[0][1],
                                                    frameinfo[0][2])
 
-            originalframe = os.path.join(origramedir, originalframe)
+            originalframe = os.path.join(origframedir, originalframe)
             outfname = os.path.join(outdir,
                                     os.path.basename(frame).replace('.fits',
                                                                     '.jpg'))
