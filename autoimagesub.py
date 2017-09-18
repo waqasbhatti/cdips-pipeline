@@ -4544,9 +4544,15 @@ def subtracted_fits_to_jpeg_series(subframedir,
         for ind, frame in enumerate(subframes):
 
             frameinfo = FRAMEREGEX.findall(os.path.basename(frame))
-            originalframe = '%s-%s_%s.fits' % (frameinfo[0][0],
-                                               frameinfo[0][1],
-                                               frameinfo[0][2])
+            if '.fz' in frame:
+                originalframe = '%s-%s_%s.fits.fz' % (frameinfo[0][0],
+                                                      frameinfo[0][1],
+                                                      frameinfo[0][2])
+            else:
+                originalframe = '%s-%s_%s.fits' % (frameinfo[0][0],
+                                                   frameinfo[0][1],
+                                                   frameinfo[0][2])
+
             originalframe = os.path.join(origramedir, originalframe)
             outfname = os.path.join(outdir,
                                     os.path.basename(frame).replace('.fits',
