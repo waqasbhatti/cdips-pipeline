@@ -59,7 +59,6 @@ from PIL import ImageFont
 
 # get the ImageFont
 fontpath = os.path.join(os.path.dirname(__file__), 'DejaVuSans.ttf')
-if os.path.exists(fontpath):
 
 # load the font
 if os.path.exists(fontpath):
