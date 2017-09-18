@@ -720,6 +720,7 @@ def fits_to_full_jpeg(fits_image,
                       outsizex=800,
                       outsizey=800,
                       annotate=True,
+                      fits_jdsrc=None,
                       scale_func=clipped_linscale_img,
                       scale_func_params={'cap':255.0,
                                          'lomult':2,
@@ -788,6 +789,22 @@ def fits_to_full_jpeg(fits_image,
                   annotation,
                   font=fontnormal,
                   fill=255)
+
+        # now add the time as well
+
+        # if we're supposed to use another file for the JD source, do so
+        # this is useful for subtracted images
+        if fits_jdsrc is not None and os.path.exists(fits_jdsrc):
+            framejd = get_header_keyword(fits_jdsrc, 'JD')
+        else:
+            framejd = hdr['JD'] if 'JD' in hdr else None
+
+            if framejd is not None:
+                timeannotation = '%.5f' % framejd
+                draw.text((10, resized_img.shape[1] - 30),
+                          timeannotation,
+                          font=fontlarge,
+                          fill=255)
 
         del draw
         outimg.save(out_fname)
