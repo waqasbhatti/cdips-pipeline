@@ -4306,7 +4306,7 @@ def forcedphot_generate_cmrawphot(
         photref=framepath,
         srclist=srclistf,
         srclist_idcol='1',
-        srclist=xycol='4,5',
+        srclist_xycol='4,5',
         ccdgain=ccdgain,
         zeropoint=zeropoint,
         exptime=ccdexptime,
