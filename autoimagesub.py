@@ -3218,11 +3218,12 @@ def insert_phots_into_database(framedir,
 
                 for line in photf:
                     hatid = line.split()[0]
-                    photo.write('%s,%s,%s\n' % (hatid,
-                                                os.path.abspath(phot),
-                                                line))
+                    photo.write('%s,%s,%s' % (hatid,
+                                              os.path.abspath(phot),
+                                              line))
                 photf.close()
                 photo.seek(0)
+
 
                 # do a fast insert using pg's copy protocol
                 cursor.copy_from(photo,'photindex_hatids',sep=',')
@@ -3287,38 +3288,9 @@ def insert_phots_into_database(framedir,
 
 
 
-
-def get_iphot_line(iphot, linenum, lcobject, iphotlinechars=338):
-    '''
-    This gets a random iphot line out of the file iphot.
-
-    '''
-
-    iphotf = open(iphot, 'rb')
-    filelinenum = iphotlinechars*linenum
-
-    if filelinenum > 0:
-        iphotf.seek(filelinenum - 100)
-    else:
-        iphotf.seek(filelinenum)
-
-    iphotline = iphotf.read(iphotlinechars + 100)
-
-    linestart = iphotline.index(lcobject)
-    iphotline = iphotline[linestart:]
-    lineend = iphotline.index('\n')
-    iphotline = iphotline[:lineend]
-
-    iphotf.close()
-
-    return iphotline
-
-
-
 def dbphot_collect_imagesubphot_lightcurve(hatid,
                                            outdir,
                                            skipcollected=True,
-                                           iphotlinechars=338,
                                            mindetections=50,
                                            database=None):
     '''This collects an ISM LC using the photindex info in Postgres.
@@ -3372,31 +3344,18 @@ def dbphot_collect_imagesubphot_lightcurve(hatid,
                 # timeseries information for this hatid
                 for row in rows:
 
-                    # unpack the row to get our values
-                    framerjd, phot, photline = row
-
                     try:
 
-                        # open the phot
-                        infd = open(phot,'rb')
-                        for ind, line in enumerate(infd):
-                            if ind == photline:
-                                photelemline = line.rstrip(' \n')
-                                break
-                        infd.close()
+                        # unpack the row to get our values
+                        framerjd, phot, photline = row
 
-                        phot_elem = photelemline.split()
-
-                        if len(phot_elem) > 0:
-
-                            # parse these lines and prepare the output
-                            rstfc_elems = FRAMEREGEX.findall(
-                                os.path.basename(phot)
-                            )
-                            rstfc = '%s-%s_%s' % (rstfc_elems[0])
-                            out_line = '%s %s %s\n' % (framerjd, rstfc,
-                                                       ' '.join(phot_elem))
-                            outf.write(out_line)
+                        # generate the framekey
+                        rstfc_elems = FRAMEREGEX.findall(
+                            os.path.basename(phot)
+                        )
+                        rstfc = '%s-%s_%s' % (rstfc_elems[0])
+                        out_line = '%s %s %s' % (framerjd, rstfc, photline)
+                        outf.write(out_line)
 
                     # if this frame isn't available, ignore it
                     except Exception as e:
