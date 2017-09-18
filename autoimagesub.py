@@ -3988,7 +3988,7 @@ def collect_lightcurve(objectid,
                     bgv = smartcast(bgv)
                     bge = smartcast(bge)
 
-
+                    # TODO: finish this
 
 
     # if everything goes wrong, exit cleanly
@@ -4013,6 +4013,23 @@ def collect_lightcurve(objectid,
             database.close()
 
     return returnval
+
+
+##############################
+## 'FORCED PHOTOMETRY TOOLS ##
+##############################
+
+# 1. convert coords of forced source to x,y on photref
+# 2. generate a fake .cmrawphot using the COMBINEDREFPHOTCMD fiphot
+# 3. once we have the fake cmrawphot, use it as input for SUBFRAMEPHOTCMD
+# 4. this will make iphots for the target
+# 5. insert into the DB in the forcedphot table, assign a HPT-XXX-YYYYYYY name,
+#    insert into the forcedhatids table as well
+# 6. collect the light curve the usual way
+# 7. run EPD
+# 8. run TFA (how?)
+
+
 
 
 #############################
