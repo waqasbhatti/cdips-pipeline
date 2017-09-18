@@ -3346,7 +3346,7 @@ def dbphot_collect_imagesubphot_lightcurve(hatid,
                               database=PGDATABASE,
                               host=PGHOST)
         # this is a readonly query so we don't need a transaction
-        database.autcommit()
+        database.autcommit = True
         cursor = database.cursor()
         closedb = True
 
