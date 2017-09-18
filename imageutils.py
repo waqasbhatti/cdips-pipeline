@@ -787,7 +787,7 @@ def fits_to_full_jpeg(fits_image,
         draw.text((10,10),
                   annotation,
                   font=fontnormal,
-                  fill=(0,0,0,255))
+                  fill=255)
 
         del draw
         outimg.save(out_fname)
