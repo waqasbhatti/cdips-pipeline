@@ -801,7 +801,7 @@ def fits_to_full_jpeg(fits_image,
 
             if framejd is not None:
                 timeannotation = '%.5f' % framejd
-                draw.text((10, resized_img.shape[1] - 30),
+                draw.text((10, resized_img.shape[1] - 40),
                           timeannotation,
                           font=fontlarge,
                           fill=255)
