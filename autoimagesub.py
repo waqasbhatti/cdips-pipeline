@@ -3327,6 +3327,7 @@ def get_iphot_line(iphot, linenum, lcobject, iphotlinechars=338):
 
 
 def dbphot_collect_imagesubphot_lightcurve(hatid,
+                                           framedir,
                                            outdir,
                                            skipcollected=True,
                                            iphotlinechars=338,
