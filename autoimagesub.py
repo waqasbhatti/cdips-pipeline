@@ -3125,7 +3125,7 @@ HATIDS_INSERT_QUERY = "insert into photindex_hatids values (%s, %s, %s)"
 
 
 PHOT_SELECT_QUERY = ("select a.rjd, a.phot. b.photline from "
-                     "photindex_phots a join photindex_hatids on "
+                     "photindex_phots a join photindex_hatids b on "
                      "(a.phot = b.phot) where "
                      "b.hatid = %s order by a.rjd")
 
