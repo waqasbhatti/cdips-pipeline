@@ -3254,8 +3254,6 @@ def insert_phots_into_database(framedir,
         print('recreating indexes...')
         cursor.execute('create index on photindex_hatids(phot)')
         cursor.execute('create index on photindex_hatids(hatid)')
-        cursor.execute('alter table photindex_phots set logged')
-        cursor.execute('alter table photindex_hatids set logged')
         cursor.execute('analyze photindex_hatids')
         cursor.execute('analyze photindex_phots')
 
