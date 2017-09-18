@@ -3354,7 +3354,7 @@ def dbphot_collect_imagesubphot_lightcurve(hatid,
                             os.path.basename(phot)
                         )
                         rstfc = '%s-%s_%s' % (rstfc_elems[0])
-                        out_line = '%s %s %s' % (framerjd, rstfc, photline)
+                        out_line = '%s %s %s\n' % (framerjd, rstfc, photline)
                         outf.write(out_line)
 
                     # if this frame isn't available, ignore it
