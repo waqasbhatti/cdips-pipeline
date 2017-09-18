@@ -4548,15 +4548,20 @@ def subtracted_fits_to_jpeg_series(subframedir,
                 originalframe = '%s-%s_%s.fits.fz' % (frameinfo[0][0],
                                                       frameinfo[0][1],
                                                       frameinfo[0][2])
+                outfname = os.path.join(
+                    outdir,
+                    os.path.basename(frame).replace('.fits.fz',
+                                                    '.jpg')
+                )
             else:
                 originalframe = '%s-%s_%s.fits' % (frameinfo[0][0],
                                                    frameinfo[0][1],
                                                    frameinfo[0][2])
+                outfname = os.path.join(outdir,
+                                        os.path.basename(frame).replace('.fits',
+                                                                        '.jpg'))
 
             originalframe = os.path.join(origframedir, originalframe)
-            outfname = os.path.join(outdir,
-                                    os.path.basename(frame).replace('.fits',
-                                                                    '.jpg'))
 
             # generate the JPEG
             jpeg = fits_to_full_jpeg(frame,
