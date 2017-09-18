@@ -55,6 +55,23 @@ import pyfits
 
 from PIL import Image
 from PIL import ImageDraw
+from PIL import ImageFont
+
+# get the ImageFont
+fontpath = os.path.join(os.path.dirname(__file__), 'DejaVuSans.ttf')
+if os.path.exists(fontpath):
+
+# load the font
+if os.path.exists(fontpath):
+    fontnormal = ImageFont.truetype(fontpath, 20)
+    fontlarge = ImageFont.truetype(fontpath, 28)
+else:
+    LOGWARNING('could not find bundled '
+               'DejaVu Sans font in the astrobase package '
+               'data, using ugly defaults...')
+    fontnormal = ImageFont.load_default()
+    fontlarge = ImageFont.load_default()
+
 
 # setup a logger
 LOGGER = None
@@ -756,6 +773,7 @@ def fits_to_full_jpeg(fits_image,
 
     # annotate the image if told to do so
     if annotate:
+
         outimg = Image.open(out_fname)
         draw = ImageDraw.Draw(outimg)
         annotation = "%s: %s - %s - %s - PR%s - %s" % (
@@ -767,7 +785,11 @@ def fits_to_full_jpeg(fits_image,
             hdr['PROJID'] if 'PROJID' in hdr else 'unknown',
             hdr['OBJECT'] if 'OBJECT' in hdr else 'objectunknown'
         )
-        draw.text((10,10),annotation,fill=255)
+        draw.text((10,10),
+                  annotation,
+                  font=fontnormal,
+                  fill=(0,0,0,255))
+
         del draw
         outimg.save(out_fname)
 
