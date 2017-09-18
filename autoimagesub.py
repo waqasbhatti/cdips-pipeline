@@ -3404,6 +3404,140 @@ def dbphot_collect_imagesubphot_lightcurve(hatid,
 
 
 
+def get_hatidlist_from_cmrawphot(projectid, field, ccd, photreftype,
+                                 refinfo=REFINFO):
+    '''This gets the hatidlist from the cmrawphot of a combined photref.
+
+
+
+    '''
+
+    cphotref = get_combined_photref(projectid, field, ccd, photreftype,
+                                    refinfo=refinfo)
+
+    cmrawphot = cphotref['cmrawphotpath']
+
+    if os.path.exists(cmrawphot):
+
+        hatidlist = []
+
+        with open(cmrawphot,'rb') as infd:
+            for line in infd:
+                hatid = line.split()[0]
+                hatidlist.append(hatid)
+
+        print('%sZ: %s objects found in cmrawphot: %s' %
+              (datetime.utcnow().isoformat(), len(hatidlist), cmrawphot))
+
+    else:
+
+        print('ERR! %sZ: expected cmrawphot does not exist!' %
+              (datetime.utcnow().isoformat(), ))
+
+
+    return hatidlist
+
+
+
+def parallel_dbphot_collect_worker(task):
+    '''
+    This is the parallel worker for the function below.
+
+    task[0] = hatid
+    task[1] = outdir
+    task[2] = skipcollected
+    task[3] = mindetections
+
+    '''
+
+    hatid, outdir, skipcollected, mindetections = task
+    return dbphot_collect_imagesubphot_lightcurve(hatid,
+                                                  outdir,
+                                                  skipcollected=skipcollected,
+                                                  mindetections=mindetections)
+
+
+
+def parallel_dbphot_lightcurves_hatidlist(hatidlist,
+                                          outdir,
+                                          skipcollectedlcs=True,
+                                          mindetections=50,
+                                          nworkers=24,
+                                          maxworkertasks=1000):
+    '''This collects light curves for the provided list of hatids.
+
+    Get hatidlist by reading in the .cmrawphot file for a projectid-ccd
+    combination using get_hatidlist_from_cmrawphot. In the future, we'll add
+    these to the database.
+
+    '''
+
+    # first, check if the output directory exists
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+
+
+    # generate the list of tasks
+    tasks = [(x, outdir, skipcollectedlcs, mindetections) for x in
+             hatidlist]
+
+    # now start up the parallel collection
+    print('%sZ: %s HATIDs to get LCs for, starting...' %
+          (datetime.utcnow().isoformat(), len(hatidlist), ))
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+    # fire up the pool of workers
+    results = pool.map(imagesublc_collection_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    return {x:y for (x,y) in results}
+
+
+
+def parallel_dbphot_lightcurves_project(projectid,
+                                        field,
+                                        ccd,
+                                        photreftype,
+                                        outdir,
+                                        refinfo=REFINFO,
+                                        skipcollectedlcs=True,
+                                        mindetections=50,
+                                        nworkers=24,
+                                        maxworkertasks=1000):
+    '''
+    This collects LCs for specific projectids.
+
+    '''
+
+    hatidlist = get_hatidlist_from_cmrawphot(projectid,
+                                             field,
+                                             ccd,
+                                             photreftype,
+                                             refinfo=refinfo)
+
+    if hatidlist:
+        return parallel_dbphot_lightcurves_hatidlist(
+            hatidlist,
+            outdir,
+            skipcollectedlcs=skipcollectedlcs,
+            mindetections=mindetections,
+            nworkers=nworkers,
+            maxworkertasks=maxworkertasks
+        )
+
+    else:
+        print('ERR! no hatids found for project: %s' % (repr([projectid,
+                                                              field,
+                                                              ccd,
+                                                              photreftype])))
+        return None
+
+
+
+
 #########################
 ## PHOTOMETRY DATABASE ##
 #########################
@@ -3610,7 +3744,7 @@ def convsub_photometry_to_ismphot_database(convsubfits,
                      ")")
 
             # prepare the input params
-
+            # TODO: finish this
 
 
             for line in infd:
@@ -4020,7 +4154,8 @@ def collect_lightcurve(objectid,
 ##############################
 
 # 1. convert coords of forced source to x,y on photref
-# 2. generate a fake .cmrawphot using the COMBINEDREFPHOTCMD fiphot
+# 2. generate a fake .cmrawphot using the COMBINEDREFPHOTCMD fiphot, allow a
+#    custom aperture string
 # 3. once we have the fake cmrawphot, use it as input for SUBFRAMEPHOTCMD
 # 4. this will make iphots for the target
 # 5. insert into the DB in the forcedphot table, assign a HPT-XXX-YYYYYYY name,
