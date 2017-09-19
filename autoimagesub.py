@@ -4651,7 +4651,7 @@ def subtracted_fits_radecbox_to_jpeg_series(subframedir,
             jpeg = frame_radecbox_to_jpeg(frame,
                                           wcsfrom=originalwcs,
                                           radeccenter=radecspec,
-                                          jdsrc=originalframe
+                                          jdsrc=originalframe,
                                           out_fname=outfname)
             )
             print('(%s/%s) subframe: %s -> jpeg: %s OK' %
