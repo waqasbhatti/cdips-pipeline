@@ -3301,7 +3301,21 @@ def dbphot_collect_imagesubphot_lightcurve(hatid,
 
     '''
 
-    # open a database connection
+    # prepare the output file
+    outfile = os.path.join(os.path.abspath(outdir), '%s.ilc' % hatid)
+
+    # if the file already exists and skipcollected is True, then return
+    # that file instead of processing any further
+    if os.path.exists(outfile) and skipcollected:
+
+        print('WRN! %sZ: object %s LC already exists, '
+              'not overwriting: %s' %
+              (datetime.utcnow().isoformat(), hatid, outfile))
+
+        return hatid, outfile
+
+
+    # open a database connection otherwise
     if database:
         cursor = database.cursor()
         closedb = False
@@ -3315,7 +3329,7 @@ def dbphot_collect_imagesubphot_lightcurve(hatid,
         cursor = database.cursor()
         closedb = True
 
-
+    # start the collection process
     try:
 
         # find the photometry in the database for this hatid
@@ -3326,54 +3340,38 @@ def dbphot_collect_imagesubphot_lightcurve(hatid,
         # make sure we have enough rows to make it worth our while
         if rows and len(rows) >= mindetections:
 
-            # prepare the output file
-            outfile = os.path.join(os.path.abspath(outdir), '%s.ilc' % hatid)
+            outf = open(outfile, 'wb')
 
-            # if the file already exists and skipcollected is True, then return
-            # that file instead of processing any further
-            if os.path.exists(outfile) and skipcollected:
+            # go through the phots and sourcelists, picking out the
+            # timeseries information for this hatid
+            for row in rows:
 
-                print('WRN! %sZ: object %s LC already exists, '
-                      'not overwriting: %s' %
-                      (datetime.utcnow().isoformat(), hatid, outfile))
+                try:
 
-                returnval = (hatid, outfile)
+                    # unpack the row to get our values
+                    framerjd, phot, photline = row
 
-            # otherwise, open the file and prepare to write to it
-            else:
+                    # generate the framekey
+                    rstfc_elems = FRAMEREGEX.findall(
+                        os.path.basename(phot)
+                    )
+                    rstfc = '%s-%s_%s' % (rstfc_elems[0])
+                    out_line = '%s %s %s\n' % (framerjd, rstfc, photline)
+                    outf.write(out_line)
 
-                outf = open(outfile, 'wb')
+                # if this frame isn't available, ignore it
+                except Exception as e:
 
-                # go through the phots and sourcelists, picking out the
-                # timeseries information for this hatid
-                for row in rows:
+                    print('WRN! %sZ: phot %s isn\'t available (error: %s)'
+                          ', skipping...' %
+                          (datetime.utcnow().isoformat(), phot, e))
+                    continue
 
-                    try:
+            # close the output LC once we're done with it
+            outf.close()
 
-                        # unpack the row to get our values
-                        framerjd, phot, photline = row
-
-                        # generate the framekey
-                        rstfc_elems = FRAMEREGEX.findall(
-                            os.path.basename(phot)
-                        )
-                        rstfc = '%s-%s_%s' % (rstfc_elems[0])
-                        out_line = '%s %s %s\n' % (framerjd, rstfc, photline)
-                        outf.write(out_line)
-
-                    # if this frame isn't available, ignore it
-                    except Exception as e:
-
-                        print('WRN! %sZ: phot %s isn\'t available (error: %s)'
-                              ', skipping...' %
-                              (datetime.utcnow().isoformat(), phot, e))
-                        continue
-
-                # close the output LC once we're done with it
-                outf.close()
-
-                print('%sZ: object %s -> %s' %
-                      (datetime.utcnow().isoformat(), hatid, outfile))
+            print('%sZ: object %s -> %s' %
+                  (datetime.utcnow().isoformat(), hatid, outfile))
 
             # this is the return val
             returnval = (hatid, outfile)
