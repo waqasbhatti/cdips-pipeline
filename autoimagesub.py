@@ -49,7 +49,7 @@ from framecalib import make_frame_movie
 import aperturephot as ap
 import imagesubphot as ism
 from imageutils import get_header_keyword, get_header_keyword_list, \
-    fits_to_full_jpeg, check_frame_warping
+    fits_to_full_jpeg, check_frame_warping, frame_radecbox_to_jpeg
 
 
 # get fiphot binary reader
