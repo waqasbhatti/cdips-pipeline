@@ -4750,7 +4750,7 @@ def subtracted_fits_pixbox_to_jpeg_series(subframedir,
                                           coordcenter=pixspec,
                                           jdsrc=originalframe,
                                           out_fname=outfname)
-            elif picspectype == 'box':
+            elif pixspectype == 'box':
                 jpeg = fitscoords_to_jpeg(frame,
                                           coordbox=pixspec,
                                           jdsrc=originalframe,

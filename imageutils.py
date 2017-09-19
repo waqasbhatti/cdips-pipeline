@@ -1082,9 +1082,6 @@ def fitscoords_to_jpeg(fits_image,
 
         scaled_img = scaled_img[ymin:ymax, xmin:xmax]
 
-        # no resizing
-        resized_img = scaled_img
-
     if not out_fname:
 
         out_fname = '%s-%s-%s-%s-proj%s-%s.jpg' % (
@@ -1113,9 +1110,9 @@ def fitscoords_to_jpeg(fits_image,
 
     # flip the saved image
     if flip:
-        resized_img = np.flipud(resized_img)
+        scaled_img = np.flipud(scaled_img)
 
-    scipy.misc.imsave(out_fname,resized_img)
+    scipy.misc.imsave(out_fname, scaled_img)
 
     # annotate the image if told to do so
     if annotatejd and jdsrc and os.path.exists(jdsrc):
