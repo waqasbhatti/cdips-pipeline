@@ -3492,7 +3492,7 @@ def parallel_dbphot_lightcurves_hatidlist(hatidlist,
     pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
     # fire up the pool of workers
-    results = pool.map(imagesublc_collection_worker, tasks)
+    results = pool.map(parallel_dbphot_collect_worker, tasks)
 
     # wait for the processes to complete work
     pool.close()
