@@ -4601,7 +4601,6 @@ def subtracted_fits_radecbox_to_jpeg_series(subframedir,
 
     origframedir is directory of the original FITS to get JD from.
 
-
     radecspec is a list with four elements:
 
     [racenter (decimal), declcenter (decimal),
@@ -4616,6 +4615,8 @@ def subtracted_fits_radecbox_to_jpeg_series(subframedir,
 
     if outdir is None:
         outdir = subframedir
+    elif outdir and not os.path.exists(outdir):
+        os.mkdir(outdir)
 
     if subframes:
 
