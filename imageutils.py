@@ -1045,10 +1045,11 @@ def fitscoords_to_jpeg(fits_image,
 
     elif coordcenter and not coordbox:
         # numpy is y,x
-        xmin, xmax = (coordcenter[0] - coordcenter[2]/2.0,
-                      coordcenter[0] + coordcenter[2]/2.0)
-        ymin, ymax = (coordcenter[1] - coordcenter[3]/2.0,
-                      coordcenter[1] + coordcenter[3]/2.0)
+
+        x1, x2 = (coordcenter[0] - coordcenter[2]/2.0,
+                  coordcenter[0] + coordcenter[2]/2.0)
+        y1, y2 = (coordcenter[1] - coordcenter[3]/2.0,
+                  coordcenter[1] + coordcenter[3]/2.0)
 
         # figure out xmin, xmax, ymin, ymax
         if x1 > x2:
