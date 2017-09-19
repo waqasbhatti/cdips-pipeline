@@ -813,6 +813,130 @@ def fits_to_full_jpeg(fits_image,
 
 
 
+def frame_radecbox_to_jpeg(
+        fits_image,
+        wcsfrom=None,
+        radecbox=None,
+        radeccenter=None,
+        out_fname=None,
+        ext=None,
+        resize=False,
+        flip=True,
+        outsizex=800,
+        outsizey=800,
+        annotate=True,
+        fits_jdsrc=None,
+        scale_func=clipped_linscale_img,
+        scale_func_params={'cap':255.0,
+                           'lomult':2,
+                           'himult':2.5}
+):
+    '''This cuts out a box centered at RA/DEC and width from the FITS to JPEG.
+
+    if radecbox and not radeccenter:
+        radecbox = [xmin, xmax, ymin, max] of box to cut out of FITS
+
+    elif radeccenter and not radecbox:
+        radeccenter = [xcenter, ycenter, xwidth, ywidth]
+
+    else:
+        do nothing, since we can't have both at the same time
+
+
+    '''
+    compressed_ext = compressed_fits_ext(fits_image)
+
+    if ext is None and compressed_ext:
+        img, hdr = read_fits(fits_image,
+                             ext=compressed_ext[0])
+    elif (ext is not None):
+        img, hdr = read_fits(fits_image,ext=ext)
+    else:
+        img, hdr = read_fits(fits_image)
+
+    #trimmed_img = trim_image(img, hdr)
+    trimmed_img = img
+    jpegaspect = float(img.shape[1])/float(img.shape[0])
+    scaled_img = scale_func(trimmed_img,**scale_func_params)
+
+    # convert the radecbox into a pixbox
+    if radecbox and not radeccenter:
+
+        pass
+
+    # otherwise, convert the radeccenter into pixcenter
+    elif radeccenter and not radecbox:
+
+        pass
+
+    else:
+        print("can't specify both radeccenter and radecbox at the same time")
+        return None
+
+
+
+    # now do the actual cutting
+    if pixbox and not pixcenter:
+        # numpy is y,x
+        scaled_img = scaled_img[pixbox[2]:pixbox[3],
+                                pixbox[0]:pixbox[1]]
+
+    elif pixcenter and not pixbox:
+        # numpy is y,x
+        xmin, xmax = (pixcenter[0] - pixcenter[2]/2.0,
+                      pixcenter[0] + pixcenter[2]/2.0)
+        ymin, ymax = (pixcenter[1] - pixcenter[3]/2.0,
+                      pixcenter[1] + pixcenter[3]/2.0)
+        scaled_img = scaled_img[ymin:ymax, xmin:xmax]
+
+
+
+
+    if resize:
+        resized_img = scipy.misc.imresize(scaled_img,
+                                          (int(img.shape[1]/2.2),
+                                           int(img.shape[0]/2.2)))
+    else:
+        resized_img = scaled_img
+
+    if not out_fname:
+
+        out_fname = '%s-%s-%s-%s-proj%s-%s.jpg' % (
+            fits_image.rstrip('.fits.fz'),
+            hdr['IMAGETYP'].lower() if 'IMAGETYP' in hdr else 'typeunknown',
+            hdr['EXPTIME'] if 'EXPTIME' in hdr else 'expunknown',
+            (hdr['FILTERS'].replace('+','') if
+             'FILTERS' in hdr else 'filtunknown'),
+            hdr['PROJID'] if 'PROJID' in hdr else 'unknown',
+            hdr['OBJECT'] if 'OBJECT' in hdr else 'objectunknown'
+            )
+
+        if radecbox and not radeccenter:
+            out_fname = '%s-R%sR%s-D%sD%s.jpg' % (
+                out_fname.rstrip('.jpg'),
+                radecbox[0], radecbox[1],
+                radecbox[2], radecbox[3]
+            )
+
+        elif radeccenter and not radecbox:
+            out_fname = '%s-RC%sDC%s-RW%sDW%s.jpg' % (
+                out_fname.rstrip('.jpg'),
+                radeccenter[0], radeccenter[1],
+                radeccenter[2], radeccenter[3]
+            )
+
+
+    scipy.misc.imsave(out_fname,resized_img)
+
+    # flip the saved image
+    if flip:
+        outimg = Image.open(out_fname)
+        outimg = outimg.transpose(Image.FLIP_TOP_BOTTOM)
+        outimg.save(out_fname)
+
+
+
+
 def fitscoords_to_jpeg(fits_image,
                        out_fname=None,
                        ext=None,

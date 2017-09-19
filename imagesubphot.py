@@ -3174,6 +3174,86 @@ def serial_run_epd_imagesub(ilcdir,
 
 
 
+def parallel_epd_worker(task):
+    '''
+    This is the worker for the function below.
+
+    task[0] = ilc
+    task[1] = outdir
+    task[2] = smooth
+    task[3] = sigmaclip
+
+    '''
+
+    try:
+
+        ilc, outdir, smooth, sigmaclip = task
+        ilcext = os.path.splitext(ilc)[-1]
+        outepd = os.path.join(outdir,
+                              os.path.basename(ilc).replace('.ilc','.epdlc'))
+        outf = epd_lightcurve_imagesub(
+            ilc,
+            outfile=outepd,
+            smooth=smooth,
+            sigmaclip=sigmaclip,
+            ilcext=ilcext
+        )
+
+        print('%sZ: %s -> %s EPD OK' %
+              (datetime.utcnow().isoformat(), ilc, outf))
+        return ilc, outf
+
+    except Exception as e:
+
+        print('EXC! %sZ: %s EPD failed because: %s' %
+              (datetime.utcnow().isoformat(), ilc, e))
+
+        return ilc, None
+
+
+
+def parallel_run_epd_imagesub(ilcdir,
+                              ilcglob='*.ilc',
+                              outdir=None,
+                              smooth=21,
+                              sigmaclip=3.0,
+                              nworkers=16,
+                              maxworkertasks=1000):
+    '''
+    This runs EPD in parallel.
+
+    '''
+
+    if not outdir:
+        outdir = ilcdir
+
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+
+    # pick up the list/dir of input light curves
+    if isinstance(ilcdir, list):
+        ilcfiles = ilcdir
+    else:
+        ilcfiles = glob.glob(os.path.join(ilcdir, ilcglob))
+
+    tasks = [(x, outdir, smooth, sigmaclip) for x in ilcfiles]
+
+    print('%sZ: starting...' %
+          (datetime.utcnow().isoformat(), ))
+    pool = mp.Pool(nworkers, maxtasksperchild=maxworkertasks)
+
+    # fire up the pool of workers
+    results = pool.map(parallel_epd_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    return {x:y for (x,y) in results}
+
+
+
+
 ###################
 ## TFA FUNCTIONS ##
 ###################
