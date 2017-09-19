@@ -64,12 +64,14 @@ fontpath = os.path.join(os.path.dirname(__file__), 'DejaVuSans.ttf')
 
 # load the font
 if os.path.exists(fontpath):
+    fontsmall = ImageFont.truetype(fontpath, 12)
     fontnormal = ImageFont.truetype(fontpath, 20)
     fontlarge = ImageFont.truetype(fontpath, 28)
 else:
     LOGWARNING('could not find bundled '
                'DejaVu Sans font in the astrobase package '
                'data, using ugly defaults...')
+    fontsmall = ImageFont.load_default()
     fontnormal = ImageFont.load_default()
     fontlarge = ImageFont.load_default()
 
@@ -862,12 +864,8 @@ def frame_radecbox_to_jpeg(
         # get the WCS header
         if wcsfrom and os.path.exists(wcsfrom):
             w = wcs.WCS(wcsfrom)
-            print('using WCS from external file:')
-            print(w)
         else:
             w = wcs.WCS(fits_image)
-            print('using WCS from frame:')
-            print(w)
     except:
         print('no WCS found!')
         w = None
@@ -932,11 +930,11 @@ def frame_radecbox_to_jpeg(
     # make sure we take care of edges
     if xmin < 0:
         xmin = 0
-    if xmax > img.shape[1]:
+    if xmax >= img.shape[1]:
         xmax = img.shape[1] - 1
     if ymin < 0:
         ymin = 0
-    if ymax > img.shape[0]:
+    if ymax >= img.shape[0]:
         ymax = img.shape[0] - 1
 
     # numpy is y,x so make sure to reverse the order
@@ -987,14 +985,11 @@ def frame_radecbox_to_jpeg(
 
         outimg = Image.open(out_fname)
         draw = ImageDraw.Draw(outimg)
-        annotation = "%.5f" % framejd
-        draw.text((4,2),annotation,fill=255)
-
-        # make a circle at the center of the frame
-        lx, ly = outimg.size[0], outimg.size[1]
-        bx0, bx1 = int(lx/2 - 15), int(lx/2 + 15)
-        by0, by1 = int(ly/2 - 15), int(ly/2 + 15)
-        draw.ellipse([bx0,by0,bx1,by1], outline=255)
+        annotation = "JD %.3f" % framejd
+        draw.text((4,2),
+                  annotation,
+                  fill=255,
+                  font=fontsmall)
 
         del draw
         outimg.save(out_fname)
