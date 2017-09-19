@@ -4679,6 +4679,88 @@ def subtracted_fits_radecbox_to_jpeg_series(subframedir,
         return None, None
 
 
+def subtracted_fits_pixbox_to_jpeg_series(subframedir,
+                                          pixspec,
+                                          subframeglob='rsub-*-xtrns.fits',
+                                          origframedir=None,
+                                          outdir=None,
+                                          makemovie=False,
+                                          moviefps=10):
+    '''This generates JPEGs for all subtracted FITS in subframedir.
+
+    origframedir is directory of the original FITS to get JD from.
+
+    radecspec is a list with four elements:
+
+    [pixcenter (decimal), pixcenter (decimal),
+     pix width (decimal), pix height (decimal)]
+
+    '''
+
+    subframes = sorted(glob.glob(os.path.join(subframedir, subframeglob)))
+
+    if origframedir is None:
+        origframedir = subframedir
+
+    if outdir is None:
+        outdir = subframedir
+    elif outdir and not os.path.exists(outdir):
+        os.mkdir(outdir)
+
+    if subframes:
+
+        nsubframes = len(subframes)
+
+        for ind, frame in enumerate(subframes):
+
+            frameinfo = FRAMEREGEX.findall(os.path.basename(frame))
+            if '.fz' in frame:
+                originalframe = '%s-%s_%s.fits.fz' % (frameinfo[0][0],
+                                                      frameinfo[0][1],
+                                                      frameinfo[0][2])
+                outfname = os.path.join(
+                    outdir,
+                    os.path.basename(frame).replace('.fits.fz',
+                                                    '.jpg')
+                )
+            else:
+                originalframe = '%s-%s_%s.fits' % (frameinfo[0][0],
+                                                   frameinfo[0][1],
+                                                   frameinfo[0][2])
+                outfname = os.path.join(outdir,
+                                        os.path.basename(frame).replace('.fits',
+                                                                        '.jpg'))
+
+            originalframe = os.path.join(origframedir, originalframe)
+
+            # generate the JPEG
+            jpeg = fitscoords_to_jpeg(frame,
+                                      coordcenter=pixspec,
+                                      jdsrc=originalframe,
+                                      out_fname=outfname)
+            print('(%s/%s) subframe: %s -> jpeg: %s OK' %
+                  (ind+1, nsubframes, frame, jpeg))
+
+
+        # make a movie if we're told to do so
+        if makemovie:
+
+            movie_fname = os.path.join(outdir, 'subframe-movie.mp4')
+            jpgglob = subframeglob.replace('.fits','.jpg')
+            moviefile = make_frame_movie(outdir,
+                                         movie_fname,
+                                         framerate=moviefps,
+                                         jpegglob=jpgglob)
+            return outdir, moviefile
+
+        else:
+
+            return outdir, None
+
+    # if no subframes were found in this directory, do nothing
+    else:
+        print('no subtracted frames found in %s' % subframedir)
+        return None, None
 
 
 #############################

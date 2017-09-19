@@ -1087,14 +1087,11 @@ def fitscoords_to_jpeg(fits_image,
                 coordcenter[2], coordcenter[3]
             )
 
-    scipy.misc.imsave(out_fname,resized_img)
-
     # flip the saved image
     if flip:
-        outimg = Image.open(out_fname)
-        outimg = outimg.transpose(Image.FLIP_TOP_BOTTOM)
-        outimg.save(out_fname)
+        resized_img = np.flipud(resized_img)
 
+    scipy.misc.imsave(out_fname,resized_img)
 
     # annotate the image if told to do so
     if annotatejd and jdsrc and os.path.exists(jdsrc):
@@ -1104,14 +1101,8 @@ def fitscoords_to_jpeg(fits_image,
 
         outimg = Image.open(out_fname)
         draw = ImageDraw.Draw(outimg)
-        annotation = "%.5f" % framejd
-        draw.text((4,2),annotation,fill=255)
-
-        # make a circle at the center of the frame
-        lx, ly = outimg.size[0], outimg.size[1]
-        bx0, bx1 = int(lx/2 - 15), int(lx/2 + 15)
-        by0, by1 = int(ly/2 - 15), int(ly/2 + 15)
-        draw.ellipse([bx0,by0,bx1,by1], outline=255)
+        annotation = "JD %.3f" % framejd
+        draw.text((4,2),annotation,fill=255, font=fontsmall)
 
         del draw
         outimg.save(out_fname)
