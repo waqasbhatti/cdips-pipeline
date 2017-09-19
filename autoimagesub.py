@@ -4591,14 +4591,14 @@ def subtracted_fits_to_jpeg_series(subframedir,
         return None, None
 
 
-def subtracted_fits_radecbox_to_jpeg_series(subframedir,
-                                            radecspec,
-                                            astromrefwcs,
-                                            subframeglob='rsub-*-xtrns.fits',
-                                            origframedir=None,
-                                            outdir=None,
-                                            makemovie=False,
-                                            moviefps=10):
+def subtracted_fits_radeccenter_to_jpeg_series(subframedir,
+                                               radecspec,
+                                               astromrefwcs,
+                                               subframeglob='rsub-*-xtrns.fits',
+                                               origframedir=None,
+                                               outdir=None,
+                                               makemovie=False,
+                                               moviefps=10):
     '''This generates JPEGs for all subtracted FITS in subframedir.
 
     origframedir is directory of the original FITS to get JD from.
@@ -4683,6 +4683,7 @@ def subtracted_fits_radecbox_to_jpeg_series(subframedir,
 
 def subtracted_fits_pixbox_to_jpeg_series(subframedir,
                                           pixspec,
+                                          pixspectype='center',
                                           subframeglob='rsub-*-xtrns.fits',
                                           origframedir=None,
                                           outdir=None,
@@ -4692,10 +4693,18 @@ def subtracted_fits_pixbox_to_jpeg_series(subframedir,
 
     origframedir is directory of the original FITS to get JD from.
 
+    if pixspectype = 'center':
+
     radecspec is a list with four elements:
 
     [pixcenter (decimal), pixcenter (decimal),
      pix width (decimal), pix height (decimal)]
+
+    elif pixspectype = 'box':
+
+    radecspec is a list with four elements:
+
+    [xminpix, xmaxpix, yminpx, ymaxpx]
 
     '''
 
@@ -4736,10 +4745,18 @@ def subtracted_fits_pixbox_to_jpeg_series(subframedir,
             originalframe = os.path.join(origframedir, originalframe)
 
             # generate the JPEG
-            jpeg = fitscoords_to_jpeg(frame,
-                                      coordcenter=pixspec,
-                                      jdsrc=originalframe,
-                                      out_fname=outfname)
+            if pixspectype == 'center':
+                jpeg = fitscoords_to_jpeg(frame,
+                                          coordcenter=pixspec,
+                                          jdsrc=originalframe,
+                                          out_fname=outfname)
+            elif picspectype == 'box':
+                jpeg = fitscoords_to_jpeg(frame,
+                                          coordbox=pixspec,
+                                          jdsrc=originalframe,
+                                          out_fname=outfname)
+
+
             print('(%s/%s) subframe: %s -> jpeg: %s OK' %
                   (ind+1, nsubframes, frame, jpeg))
 
