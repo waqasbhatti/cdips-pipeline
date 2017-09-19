@@ -1001,12 +1001,9 @@ def frame_radecbox_to_jpeg(
 def fitscoords_to_jpeg(fits_image,
                        out_fname=None,
                        ext=None,
-                       resize=False,
                        flip=True,
                        coordbox=None,
                        coordcenter=None,
-                       outsizex=770,
-                       outsizey=770,
                        annotatejd=True,
                        jdsrc=None,
                        scale_func=clipped_linscale_img,
@@ -1052,13 +1049,39 @@ def fitscoords_to_jpeg(fits_image,
                       coordcenter[0] + coordcenter[2]/2.0)
         ymin, ymax = (coordcenter[1] - coordcenter[3]/2.0,
                       coordcenter[1] + coordcenter[3]/2.0)
+
+        # figure out xmin, xmax, ymin, ymax
+        if x1 > x2:
+            xmin = x2
+            xmax = x1
+        else:
+            xmin = x1
+            xmax = x2
+
+        if y1 > y2:
+            ymin = y2
+            ymax = y1
+        else:
+            ymin = y1
+            ymax = y2
+
+        # round the pix coords to integers
+        xmin, xmax = int(np.round(xmin)), int(np.round(xmax))
+        ymin, ymax = int(np.round(ymin)), int(np.round(ymax))
+
+        # make sure we take care of edges
+        if xmin < 0:
+            xmin = 0
+        if xmax >= img.shape[1]:
+            xmax = img.shape[1] - 1
+        if ymin < 0:
+            ymin = 0
+        if ymax >= img.shape[0]:
+            ymax = img.shape[0] - 1
+
         scaled_img = scaled_img[ymin:ymax, xmin:xmax]
 
-    if resize:
-        resized_img = scipy.misc.imresize(scaled_img,
-                                          (int(img.shape[1]/2.2),
-                                           int(img.shape[0]/2.2)))
-    else:
+        # no resizing
         resized_img = scaled_img
 
     if not out_fname:
