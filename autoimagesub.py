@@ -4593,6 +4593,7 @@ def subtracted_fits_to_jpeg_series(subframedir,
 
 def subtracted_fits_radecbox_to_jpeg_series(subframedir,
                                             radecspec,
+                                            astromrefwcs,
                                             subframeglob='rsub-*-xtrns.fits',
                                             origframedir=None,
                                             outdir=None,
@@ -4606,6 +4607,9 @@ def subtracted_fits_radecbox_to_jpeg_series(subframedir,
 
     [racenter (decimal), declcenter (decimal),
      ra width (decimal), decl height (decimal)]
+
+    astromrefwcs is the file to get the WCS info from. this must be from the
+    astrometric reference (i.e. the frame all other frames were shifted to).
 
     '''
 
@@ -4644,14 +4648,10 @@ def subtracted_fits_radecbox_to_jpeg_series(subframedir,
                                                                         '.jpg'))
 
             originalframe = os.path.join(origframedir, originalframe)
-            originalwcs = '%s-%s_%s.wcs' % (frameinfo[0][0],
-                                            frameinfo[0][1],
-                                            frameinfo[0][2])
-            originalwcs = os.path.join(origframedir, originalwcs)
 
             # generate the JPEG
             jpeg = frame_radecbox_to_jpeg(frame,
-                                          wcsfrom=originalwcs,
+                                          wcsfrom=astromrefwcs,
                                           radeccenter=radecspec,
                                           jdsrc=originalframe,
                                           out_fname=outfname)
@@ -4678,6 +4678,7 @@ def subtracted_fits_radecbox_to_jpeg_series(subframedir,
     else:
         print('no subtracted frames found in %s' % subframedir)
         return None, None
+
 
 
 def subtracted_fits_pixbox_to_jpeg_series(subframedir,
