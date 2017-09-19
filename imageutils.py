@@ -822,7 +822,8 @@ def frame_radecbox_to_jpeg(
         out_fname=None,
         ext=None,
         flip=True,
-        annotate=True,
+        annotatejd=True,
+        jdsrc=None,
         scale_func=clipped_linscale_img,
         scale_func_params={'cap':255.0,
                            'lomult':2,
@@ -979,13 +980,14 @@ def frame_radecbox_to_jpeg(
     scipy.misc.imsave(out_fname, scaled_img)
 
     # annotate the image if told to do so
-    if annotate:
+    if annotatejd and jdsrc and os.path.exists(jdsrc):
+
+        # get the JD header keyword from jdsrc
+        framejd = get_header_keyword(jdsrc, 'JD')
 
         outimg = Image.open(out_fname)
         draw = ImageDraw.Draw(outimg)
-        annotation = "%s" % (
-            os.path.basename(fits_image).rstrip('.fits.fz'),
-        )
+        annotation = "%.5f" % framejd
         draw.text((4,2),annotation,fill=255)
 
         # make a circle at the center of the frame
@@ -1010,7 +1012,8 @@ def fitscoords_to_jpeg(fits_image,
                        coordcenter=None,
                        outsizex=770,
                        outsizey=770,
-                       annotate=True,
+                       annotatejd=True,
+                       jdsrc=None,
                        scale_func=clipped_linscale_img,
                        scale_func_params={'cap':255.0,
                                           'lomult':2,
@@ -1097,14 +1100,16 @@ def fitscoords_to_jpeg(fits_image,
         outimg = outimg.transpose(Image.FLIP_TOP_BOTTOM)
         outimg.save(out_fname)
 
+
     # annotate the image if told to do so
-    if annotate:
+    if annotatejd and jdsrc and os.path.exists(jdsrc):
+
+        # get the JD header keyword from jdsrc
+        framejd = get_header_keyword(jdsrc, 'JD')
 
         outimg = Image.open(out_fname)
         draw = ImageDraw.Draw(outimg)
-        annotation = "%s" % (
-            os.path.basename(fits_image).rstrip('.fits.fz'),
-        )
+        annotation = "%.5f" % framejd
         draw.text((4,2),annotation,fill=255)
 
         # make a circle at the center of the frame
