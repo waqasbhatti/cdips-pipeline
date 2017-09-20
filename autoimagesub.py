@@ -27,7 +27,7 @@ import shlex
 from datetime import datetime
 import re
 import json
-import shutilq
+import shutil
 import random
 import cPickle as pickle
 import sqlite3
