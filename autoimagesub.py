@@ -27,7 +27,7 @@ import shlex
 from datetime import datetime
 import re
 import json
-import shutil
+import shutilq
 import random
 import cPickle as pickle
 import sqlite3
@@ -4516,12 +4516,12 @@ def parallel_convsubfits_forcedphot(
 ###################
 
 
-def subtracted_fits_to_jpeg_series(subframedir,
-                                   subframeglob='rsub-*-xtrns.fits',
-                                   origframedir=None,
-                                   outdir=None,
-                                   makemovie=False,
-                                   moviefps=10):
+def subfits_to_jpeg_series(subframedir,
+                           subframeglob='rsub-*-xtrns.fits',
+                           origframedir=None,
+                           outdir=None,
+                           makemovie=False,
+                           moviefps=10):
     '''This generates JPEGs for all subtracted FITS in subframedir.
 
     origframedir is directory of the original FITS to get JD from.
@@ -4591,14 +4591,15 @@ def subtracted_fits_to_jpeg_series(subframedir,
         return None, None
 
 
-def subtracted_fits_radeccenter_to_jpeg_series(subframedir,
-                                               radecspec,
-                                               astromrefwcs,
-                                               subframeglob='rsub-*-xtrns.fits',
-                                               origframedir=None,
-                                               outdir=None,
-                                               makemovie=False,
-                                               moviefps=10):
+
+def subfits_radec_to_jpeg_series(subframedir,
+                                 radecspec,
+                                 astromrefwcs,
+                                 subframeglob='rsub-*-xtrns.fits',
+                                 origframedir=None,
+                                 outdir=None,
+                                 makemovie=False,
+                                 moviefps=10):
     '''This generates JPEGs for all subtracted FITS in subframedir.
 
     origframedir is directory of the original FITS to get JD from.
@@ -4609,7 +4610,11 @@ def subtracted_fits_radeccenter_to_jpeg_series(subframedir,
      ra width (decimal), decl height (decimal)]
 
     astromrefwcs is the file to get the WCS info from. this must be from the
-    astrometric reference (i.e. the frame all other frames were shifted to).
+    astrometric reference (i.e. the frame all other frames were shifted
+    to). this is used because the individual WCS corresponding to each
+    subtracted frame are usually the same as the original frame WCS, which may
+    have been shifted around to match the astromref so any RA/DEC -> x/y
+    transform will give the wrong results.
 
     '''
 
@@ -4681,14 +4686,14 @@ def subtracted_fits_radeccenter_to_jpeg_series(subframedir,
 
 
 
-def subtracted_fits_pixbox_to_jpeg_series(subframedir,
-                                          pixspec,
-                                          pixspectype='center',
-                                          subframeglob='rsub-*-xtrns.fits',
-                                          origframedir=None,
-                                          outdir=None,
-                                          makemovie=False,
-                                          moviefps=10):
+def subfits_pixbox_to_jpeg_series(subframedir,
+                                  pixspec,
+                                  pixspectype='center',
+                                  subframeglob='rsub-*-xtrns.fits',
+                                  origframedir=None,
+                                  outdir=None,
+                                  makemovie=False,
+                                  moviefps=10):
     '''This generates JPEGs for all subtracted FITS in subframedir.
 
     origframedir is directory of the original FITS to get JD from.
