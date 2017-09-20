@@ -3501,16 +3501,16 @@ def parallel_dbphot_lightcurves_hatidlist(hatidlist,
 
 
 
-def parallel_dbphot_lightcurves_project(projectid,
-                                        field,
-                                        ccd,
-                                        outdir,
-                                        photreftype='oneframe',
-                                        refinfo=REFINFO,
-                                        skipcollectedlcs=True,
-                                        mindetections=50,
-                                        nworkers=24,
-                                        maxworkertasks=1000):
+def parallel_dbphot_lightcurves_projectid(projectid,
+                                          field,
+                                          ccd,
+                                          outdir,
+                                          photreftype='oneframe',
+                                          refinfo=REFINFO,
+                                          skipcollectedlcs=True,
+                                          mindetections=50,
+                                          nworkers=24,
+                                          maxworkertasks=1000):
     '''
     This collects LCs for specific projectids.
 
