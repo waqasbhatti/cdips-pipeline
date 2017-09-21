@@ -311,7 +311,7 @@ SUBFRAMEPHOTCMD = (
     "grtrans --col-xy 4,5 "
     "--input-transformation {subtractedxysdk} "
     "--col-out 6,7,8 "
-    "--output {outiphot}"
+    "--output - | sort -k 1 > {outiphot}"
 )
 
 
