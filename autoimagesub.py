@@ -3518,25 +3518,10 @@ def cstore_collect_imagesubphot_lightcurve(
             # timeseries information for this hatid
             for row in rows:
 
-                try:
-
-                    # unpack the row to get our values
-                    framerjd, framekey, photline = row
-
-                    # generate the framekey
-                    rstfc_elems = FRAMEREGEX.findall(
-                        os.path.basename(phot)
-                    )
-                    out_line = '%s %s %s\n' % (framerjd, framekey, photline)
-                    outf.write(out_line)
-
-                # if this frame isn't available, ignore it
-                except Exception as e:
-
-                    print('WRN! %sZ: phot %s isn\'t available (error: %s)'
-                          ', skipping...' %
-                          (datetime.utcnow().isoformat(), phot, e))
-                    continue
+                # unpack the row to get our values
+                framerjd, framekey, photline = row
+                out_line = '%s %s %s\n' % (framerjd, framekey, photline)
+                outf.write(out_line)
 
             # close the output LC once we're done with it
             outf.close()
