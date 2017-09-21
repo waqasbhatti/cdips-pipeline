@@ -3434,7 +3434,7 @@ def choose_tfa_template(statsfile,
         print('\naperture %s: total good objects = %s' % (aperture,
                                                         len(objectid)))
 
-        median_ndet = scipy.stats.nanmedian(obj_ndet)
+        median_ndet = np.nanmedian(obj_ndet)
         print('aperture %s: median ndet = %s' % (aperture, median_ndet))
         print('aperture %s: target TFA template size = %s' %
               (aperture, int(median_ndet*TFA_TEMPLATE_FRACTION)))
