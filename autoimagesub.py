@@ -3117,10 +3117,16 @@ def parallel_convsubfits_staticphot(
 
 PHOTS_INSERT_QUERY = "insert into photindex_phots values (%s, %s, %s)"
 HATIDS_INSERT_QUERY = "insert into photindex_hatids values (%s, %s, %s)"
+
+
+
 PHOT_SELECT_QUERY = ("select a.rjd, a.phot, b.photline from "
                      "photindex_phots a join photindex_hatids b on "
                      "(a.phot = b.phot) where "
                      "b.hatid = %s order by a.rjd")
+CSTORE_SELECT_QUERY = ("select rjd, framekey, photline from "
+                       "iphots_cstore where objectid = %s order by rjd")
+
 
 
 def insert_phots_into_database(framedir,
@@ -3255,7 +3261,7 @@ def insert_phots_into_database(framedir,
 
         # commit the transaction
         database.commit()
-        print('%sZ: done, time taken: %.2 minutes' %
+        print('%sZ: done, time taken: %.2f minutes' %
               (datetime.utcnow().isoformat(), (time.time() - starttime)/60.0))
 
         returnval = (framedir, True)
@@ -3414,7 +3420,7 @@ def insert_phots_into_cstore(framedir,
 
         # commit the transaction
         database.commit()
-        print('%sZ: done, time taken: %.2 minutes' %
+        print('%sZ: done, time taken: %.2f minutes' %
               (datetime.utcnow().isoformat(), (time.time() - starttime)/60.0))
 
         returnval = (framedir, True)
@@ -3444,6 +3450,122 @@ def insert_phots_into_cstore(framedir,
                 message, format_exc()) )
         returnval = (framedir, False)
 
+
+    finally:
+
+        cursor.close()
+        if closedb:
+            database.close()
+
+    return returnval
+
+
+
+def cstore_collect_imagesubphot_lightcurve(
+        hatid,
+        outdir,
+        skipcollected=True,
+        mindetections=50,
+        database=None
+):
+    '''This collects an ISM LC using the cstore tables in Postgres.
+
+    '''
+
+    # prepare the output file
+    outfile = os.path.join(os.path.abspath(outdir), '%s.ilc' % hatid)
+
+    # if the file already exists and skipcollected is True, then return
+    # that file instead of processing any further
+    if os.path.exists(outfile) and skipcollected:
+
+        print('WRN! %sZ: object %s LC already exists, '
+              'not overwriting: %s' %
+              (datetime.utcnow().isoformat(), hatid, outfile))
+
+        return hatid, outfile
+
+
+    # open a database connection otherwise
+    if database:
+        cursor = database.cursor()
+        closedb = False
+    else:
+        database = pg.connect(user=PGUSER,
+                              password=PGPASSWORD,
+                              database=PGDATABASE,
+                              host=PGHOST)
+        # this is a readonly query so we don't need a transaction
+        database.autocommit = True
+        cursor = database.cursor()
+        closedb = True
+
+    # start the collection process
+    try:
+
+        # find the photometry in the database for this hatid
+        starttime = time.time()
+        cursor.execute(CSTORE_SELECT_QUERY, (hatid,))
+        rows = cursor.fetchall()
+        print('lookup complete in %.2f seconds' % (time.time() - starttime))
+
+        # make sure we have enough rows to make it worth our while
+        if rows and len(rows) >= mindetections:
+
+            outf = open(outfile, 'wb')
+
+            # go through the phots and sourcelists, picking out the
+            # timeseries information for this hatid
+            for row in rows:
+
+                try:
+
+                    # unpack the row to get our values
+                    framerjd, framekey, photline = row
+
+                    # generate the framekey
+                    rstfc_elems = FRAMEREGEX.findall(
+                        os.path.basename(phot)
+                    )
+                    out_line = '%s %s %s\n' % (framerjd, framekey, photline)
+                    outf.write(out_line)
+
+                # if this frame isn't available, ignore it
+                except Exception as e:
+
+                    print('WRN! %sZ: phot %s isn\'t available (error: %s)'
+                          ', skipping...' %
+                          (datetime.utcnow().isoformat(), phot, e))
+                    continue
+
+            # close the output LC once we're done with it
+            outf.close()
+
+            print('%sZ: object %s -> %s' %
+                  (datetime.utcnow().isoformat(), hatid, outfile))
+
+            # this is the return val
+            returnval = (hatid, outfile)
+
+        # if we don't have enough detections, ignore this light curve
+        else:
+
+            print('ERR! %sZ: object %s: %s dets < %s mindetections,'
+                  ' ignoring...' %
+                  (datetime.utcnow().isoformat(), hatid,
+                   len(rows), mindetections))
+            returnval = (hatid, None)
+
+    # if everything goes wrong, exit cleanly
+    except Exception as e:
+
+        database.rollback()
+
+        message = 'failed to get photometry for %s from DB' % framedir
+        print('EXC! %sZ: %s\nexception was: %s' %
+               (datetime.utcnow().isoformat(),
+                message, format_exc()) )
+        returnval = (hatid, None)
 
     finally:
 
@@ -3496,9 +3618,10 @@ def dbphot_collect_imagesubphot_lightcurve(hatid,
     try:
 
         # find the photometry in the database for this hatid
+        starttime = time.time()
         cursor.execute(PHOT_SELECT_QUERY, (hatid,))
         rows = cursor.fetchall()
-        print('lookup complete')
+        print('lookup complete in %.2f seconds' % (time.time() - starttime))
 
         # make sure we have enough rows to make it worth our while
         if rows and len(rows) >= mindetections:
