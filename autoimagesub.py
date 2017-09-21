@@ -3115,18 +3115,10 @@ def parallel_convsubfits_staticphot(
 ## SQLITE3 STYLE PHOT INDEX DB IN PGSQL ##
 ##########################################
 
-PHOTS_INSERT_QUERY = "insert into photindex_phots values (%s, %s, %s)"
-HATIDS_INSERT_QUERY = "insert into photindex_hatids values (%s, %s, %s)"
-
-
-
-PHOT_SELECT_QUERY = ("select a.rjd, a.phot, b.photline from "
-                     "photindex_phots a join photindex_hatids b on "
-                     "(a.phot = b.phot) where "
-                     "b.hatid = %s order by a.rjd")
+PHOT_SELECT_QUERY = ("select rjd, framekey, photline from "
+                     "photindex_iphots where objectid = %s order by rjd")
 CSTORE_SELECT_QUERY = ("select rjd, framekey, photline from "
                        "iphots_cstore where objectid = %s order by rjd")
-
 
 
 def insert_phots_into_database(framedir,
@@ -3176,9 +3168,8 @@ def insert_phots_into_database(framedir,
 
 
         # turn off table logging and drop indexes for speed
-        cursor.execute('drop index if exists photindex_phots_rjd_idx')
-        cursor.execute('drop index if exists photindex_hatids_hatid_idx')
-        cursor.execute('drop index if exists photindex_hatids_phot_idx')
+        cursor.execute('drop index if exists photindex_iphots_rjd_idx')
+        cursor.execute('drop index if exists photindex_iphots_objectid_idx')
 
         starttime = time.time()
 
@@ -3190,6 +3181,9 @@ def insert_phots_into_database(framedir,
 
             # generate the names of the associated phot and sourcelist files
             frameinfo = FRAMEREGEX.findall(os.path.basename(frame))
+            framekey = '%s-%s_%s' % (frameinfo[0][0],
+                                     frameinfo[0][1],
+                                     frameinfo[0][2])
 
             photsearch = photglob % ('%s-%s_%s' % (frameinfo[0][0],
                                                    frameinfo[0][1],
@@ -3217,29 +3211,22 @@ def insert_phots_into_database(framedir,
                 # photref frame)
                 framerjd = get_header_keyword(originalframe, 'JD')
 
-                photquery = PHOTS_INSERT_QUERY
-                photparams = (os.path.abspath(phot),
-                              framerjd,
-                              os.path.abspath(originalframe))
-
-                # execute the query
-                cursor.execute(photquery, photparams)
-
                 # now get the phot file and read it
                 photf = open(phot, 'rb')
                 photo = StringIO()
 
                 for line in photf:
                     hatid = line.split()[0]
-                    photo.write('%s,%s,%s' % (hatid,
-                                              os.path.abspath(phot),
-                                              line))
+                    photo.write('%.5f,%s,%s,%s' % (framerjd,
+                                                   hatid,
+                                                   framekey,
+                                                   line))
                 photf.close()
                 photo.seek(0)
 
 
                 # do a fast insert using pg's copy protocol
-                cursor.copy_from(photo,'photindex_hatids',sep=',')
+                cursor.copy_from(photo,'photindex_iphots',sep=',')
                 photo.close()
 
             # if some associated files don't exist for this frame, ignore it
@@ -3253,11 +3240,9 @@ def insert_phots_into_database(framedir,
 
         # regenerate the indexes and reset table logging for durability
         print('%sZ: recreating indexes' % (datetime.utcnow().isoformat()))
-        cursor.execute('create index on photindex_phots(rjd)')
-        cursor.execute('create index on photindex_hatids(phot)')
-        cursor.execute('create index on photindex_hatids(hatid)')
-        cursor.execute('analyze photindex_hatids')
-        cursor.execute('analyze photindex_phots')
+        cursor.execute('create index on photindex_iphots(rjd)')
+        cursor.execute('create index on photindex_iphots(objectid)')
+        cursor.execute('analyze photindex_iphots')
 
         # commit the transaction
         database.commit()
