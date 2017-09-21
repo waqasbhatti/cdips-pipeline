@@ -3561,7 +3561,7 @@ def cstore_collect_imagesubphot_lightcurve(
 
         database.rollback()
 
-        message = 'failed to get photometry for %s from DB' % framedir
+        message = 'failed to get photometry for %s from DB' % hatid
         print('EXC! %sZ: %s\nexception was: %s' %
                (datetime.utcnow().isoformat(),
                 message, format_exc()) )
@@ -3676,7 +3676,7 @@ def dbphot_collect_imagesubphot_lightcurve(hatid,
 
         database.rollback()
 
-        message = 'failed to get photometry for %s from DB' % framedir
+        message = 'failed to get photometry for %s from DB' % hatid
         print('EXC! %sZ: %s\nexception was: %s' %
                (datetime.utcnow().isoformat(),
                 message, format_exc()) )
