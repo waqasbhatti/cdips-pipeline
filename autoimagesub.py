@@ -3174,6 +3174,8 @@ def insert_phots_into_database(framedir,
         cursor.execute('drop index if exists photindex_hatids_hatid_idx')
         cursor.execute('drop index if exists photindex_hatids_phot_idx')
 
+        starttime = time.time()
+
         # go through all the frames
         for frame in framelist:
 
@@ -3253,7 +3255,8 @@ def insert_phots_into_database(framedir,
 
         # commit the transaction
         database.commit()
-        print('%sZ: done.' % (datetime.utcnow().isoformat()))
+        print('%sZ: done, time taken: %.2 minutes' %
+              (datetime.utcnow().isoformat(), (time.time() - starttime)/60.0))
 
         returnval = (framedir, True)
 
@@ -3339,6 +3342,8 @@ def insert_phots_into_cstore(framedir,
             framelist = framelist[:maxframes]
 
 
+        starttime = time.time()
+
         # go through all the frames
         for frame in framelist:
 
@@ -3405,10 +3410,12 @@ def insert_phots_into_cstore(framedir,
                       (datetime.utcnow().isoformat(), frame))
 
         # now we're all done with frame inserts
+        cursor.execute('analyze iphots_cstore')
 
         # commit the transaction
         database.commit()
-        print('%sZ: done.' % (datetime.utcnow().isoformat()))
+        print('%sZ: done, time taken: %.2 minutes' %
+              (datetime.utcnow().isoformat(), (time.time() - starttime)/60.0))
 
         returnval = (framedir, True)
 
