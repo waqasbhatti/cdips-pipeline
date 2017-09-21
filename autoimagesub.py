@@ -3293,6 +3293,161 @@ def insert_phots_into_database(framedir,
 
 
 
+def insert_phots_into_cstore(framedir,
+                             frameglob='rsub-*-xtrns.fits',
+                             photdir=None,
+                             photglob='rsub-*-%s.iphot',
+                             maxframes=None,
+                             overwrite=False,
+                             database=None):
+    '''This makes photometry index rows in the postgresql database.
+
+    Intended for use when the sqlite3 databases get out of hand.
+
+    '''
+
+    # open a database connection
+    if database:
+        cursor = database.cursor()
+        closedb = False
+    else:
+        database = pg.connect(user=PGUSER,
+                              password=PGPASSWORD,
+                              database=PGDATABASE,
+                              host=PGHOST)
+        cursor = database.cursor()
+        closedb = True
+
+
+    # first, figure out the directories
+    if not photdir:
+        photdir = framedir
+
+
+    # start work here
+    try:
+
+        if isinstance(framedir, list):
+            framelist = framedir
+        else:
+            # first, find all the frames
+            framelist = glob.glob(os.path.join(os.path.abspath(framedir),
+                                               frameglob))
+
+        # restrict to maxframes max frames
+        if maxframes:
+            framelist = framelist[:maxframes]
+
+
+        # go through all the frames
+        for frame in framelist:
+
+            print('%sZ: working on frame %s' %
+                  (datetime.utcnow().isoformat(), frame))
+
+            # generate the names of the associated phot and sourcelist files
+            frameinfo = FRAMEREGEX.findall(os.path.basename(frame))
+            framekey = '%s-%s_%s' % (frameinfo[0][0],
+                                     frameinfo[0][1],
+                                     frameinfo[0][2])
+
+            photsearch = photglob % ('%s-%s_%s' % (frameinfo[0][0],
+                                                   frameinfo[0][1],
+                                                   frameinfo[0][2]))
+
+            originalframe = '%s-%s_%s.fits' % (frameinfo[0][0],
+                                               frameinfo[0][1],
+                                               frameinfo[0][2])
+
+            photmatch = glob.glob(os.path.join(os.path.abspath(photdir),
+                                               photsearch))
+            originalframe = os.path.join(os.path.abspath(framedir),
+                                         originalframe)
+
+            # check these files exist, and populate the dict if they do
+            if (photmatch and os.path.exists(photmatch[0])
+                and os.path.exists(originalframe)):
+
+                phot = photmatch[0]
+
+                # get the JD from the FITS file.
+
+                # NOTE: this is the ORIGINAL FITS frame, since the subtracted
+                # one contains some weird JD header (probably inherited from the
+                # photref frame)
+                framerjd = get_header_keyword(originalframe, 'JD')
+
+                # now get the phot file and read it
+                photf = open(phot, 'rb')
+                photo = StringIO()
+
+                # write to the output cstringio to generate CSVs in the format
+                # we want
+                for line in photf:
+                    hatid = line.split()[0]
+                    photo.write('%.5f,%s,%s,%s' % (framerjd,
+                                                   hatid,
+                                                   framekey,
+                                                   line))
+                photf.close()
+                photo.seek(0)
+
+
+                # do a fast insert using pg's copy protocol
+                cursor.copy_from(photo,'iphots_cstore',sep=',')
+                photo.close()
+
+            # if some associated files don't exist for this frame, ignore it
+            else:
+
+                print('WRN! %sZ: ignoring frame %s, '
+                      'photometry for this frame is not available!' %
+                      (datetime.utcnow().isoformat(), frame))
+
+        # now we're all done with frame inserts
+
+        # commit the transaction
+        database.commit()
+        print('%sZ: done.' % (datetime.utcnow().isoformat()))
+
+        returnval = (framedir, True)
+
+    # catch the overwrite = False scenario
+    except pg.IntegrityError as e:
+
+        database.rollback()
+
+        message = ('failed to insert photometry from %s '
+                   'into DB because some of it exists already '
+                   'and overwrite = False'
+                   % framedir)
+        print('EXC! %sZ: %s\n%s' %
+               (datetime.utcnow().isoformat(), message, format_exc()) )
+        returnval = (framedir, False)
+
+
+    # if everything goes wrong, exit cleanly
+    except Exception as e:
+
+        database.rollback()
+
+        message = 'failed to insert photometry from %s into DB' % framedir
+        print('EXC! %sZ: %s\nexception was: %s' %
+               (datetime.utcnow().isoformat(),
+                message, format_exc()) )
+        returnval = (framedir, False)
+
+
+    finally:
+
+        cursor.close()
+        if closedb:
+            database.close()
+
+    return returnval
+
+
+
 def dbphot_collect_imagesubphot_lightcurve(hatid,
                                            outdir,
                                            skipcollected=True,
