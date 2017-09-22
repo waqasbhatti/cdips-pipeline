@@ -4787,9 +4787,9 @@ def parallel_lc_statistics(lcdir,
                 ap2_c1, ap2_c2 = correctioncoeffs[1]
                 ap3_c1, ap3_c2 = correctioncoeffs[2]
 
-                corrmag_ap1 = -2.5*log10(stat['median_rf1']/ap1_c1) + ap1_c2
-                corrmag_ap2 = -2.5*log10(stat['median_rf2']/ap2_c1) + ap2_c2
-                corrmag_ap3 = -2.5*log10(stat['median_rf3']/ap3_c1) + ap3_c2
+                corrmag_ap1 = -2.5*np.log10(stat['median_rf1']/ap1_c1) + ap1_c2
+                corrmag_ap2 = -2.5*np.log10(stat['median_rf2']/ap2_c1) + ap2_c2
+                corrmag_ap3 = -2.5*np.log10(stat['median_rf3']/ap3_c1) + ap3_c2
 
             else:
 
