@@ -5641,6 +5641,22 @@ STATS_PLOTS = {
         'ylabel':'TF3 median abs. dev.',
         'binned':True
         },
+    'catalog-r-mag-vs-mad-TF1':{
+        'xcol':'cat_mag',
+        'ycol':'mad_tf1',
+        'title':'FOV catalog SDSS r mag vs. TF1 median abs. dev.',
+        'xlabel':'FOV catalog SDSS r mag',
+        'ylabel':'TF1 median abs. dev.',
+        'binned':True
+        },
+    'catalog-r-mag-vs-mad-TF2':{
+        'xcol':'cat_mag',
+        'ycol':'mad_tf2',
+        'title':'FOV catalog SDSS r mag vs. TF2 median abs. dev.',
+        'xlabel':'FOV catalog SDSS r mag',
+        'ylabel':'TF2 median abs. dev.',
+        'binned':True
+        },
     'catalog-r-mag-vs-mad-TF3':{
         'xcol':'cat_mag',
         'ycol':'mad_tf3',
