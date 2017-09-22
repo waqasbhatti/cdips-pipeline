@@ -4702,9 +4702,6 @@ def parallel_lc_statistics(lcdir,
         '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
         '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
         '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
-        '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
-        '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
-        '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
         '%.3f %.3f %.3f\n'
         )
 
@@ -4800,7 +4797,7 @@ def parallel_lc_statistics(lcdir,
 
             outline = outlineformat % (
                 stat['lcobj'],
-                catmag,
+                np.asscalar(catmag),
 
                 stat['median_rm1'],
                 stat['mad_rm1'],
