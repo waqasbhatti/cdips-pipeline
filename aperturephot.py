@@ -879,7 +879,7 @@ def match_fovcatalog_framesources(frame_extracted_sourcelist,
                                   outfile,
                                   srclist_cols=(0,1,2,5,6,7),
                                   fovcat_cols=(0,1,2,12,13),
-                                  match_pixel_distance=1.0):
+                                  match_pixel_distance=0.5):
     '''Does frame_projected_fovcatalog and frame_extracted_sourcelist matching.
 
     This matches the fovcatalog transformed to pixel coordinates to the
@@ -3901,6 +3901,7 @@ def get_lc_statistics(lcfile,
                       rmcols=[19,20,21],
                       epcols=[22,23,24],
                       tfcols=[25,26,27],
+                      rfcols=None,
                       sigclip=4.0,
                       tfalcrequired=False):
     '''
@@ -3917,6 +3918,8 @@ def get_lc_statistics(lcfile,
 
     IMPORTANT: the lcfile is always the .epdlc file (which contains the rlc, and
     is used to derive the filenames of the tfalcs)
+
+    rfcols are for the flux in aperture 1, 2, 3. used for ISM only
 
 
     '''
@@ -3952,6 +3955,13 @@ def get_lc_statistics(lcfile,
         tf3 = np.genfromtxt(lcfile.replace('.epdlc','.tfalc.TF3'),
                             usecols=(tfcols[0],), unpack=True)
 
+        if rfcols and len(rfcols) == 3:
+            rf1, rf2, rf3 = np.genfromtxt(lcfile,usecols=tuple(rfcols),
+                                          unpack=True)
+        else:
+            rf1, rf2, rf3 = [], [], []
+
+
     # if we don't have TF columns, cut down to RM and EP only
     except Exception as e:
 
@@ -3967,6 +3977,13 @@ def get_lc_statistics(lcfile,
 
             tf1, tf2, tf3 = [], [], []
 
+            if rfcols and len(rfcols) == 3:
+                rf1, rf2, rf3 = np.genfromtxt(lcfile,usecols=tuple(rfcols),
+                                              unpack=True)
+            else:
+                rf1, rf2, rf3 = [], [], []
+
+
         except Exception as e:
 
             print('%sZ: no EPD mags available for %s!' %
@@ -3978,10 +3995,130 @@ def get_lc_statistics(lcfile,
 
             ep1, ep2, ep3, tf1, tf2, tf3 = [], [], [], [], [], []
 
+            if rfcols and len(rfcols) == 3:
+                rf1, rf2, rf3 = np.genfromtxt(lcfile,usecols=tuple(rfcols),
+                                              unpack=True)
+            else:
+                rf1, rf2, rf3 = [], [], []
 
 
     # get statistics for each column
 
+    # fluxes
+    # RF1
+    if len(rf1) > 4:
+
+        finiteind = np.isfinite(rf1)
+        rf1 = rf1[finiteind]
+        median_rf1 = np.median(rf1)
+        mad_rf1 = np.median(np.fabs(rf1 - median_rf1))
+        mean_rf1 = np.mean(rf1)
+        stdev_rf1 = np.std(rf1)
+        ndet_rf1 = len(rf1)
+
+        if sigclip:
+            sigclip_rf1, lo, hi = stats_sigmaclip(rf1,
+                                                  low=sigclip,
+                                                  high=sigclip)
+            median_sigclip_rf1 = np.median(sigclip_rf1)
+            mad_sigclip_rf1 = np.median(np.fabs(sigclip_rf1 -
+                                                median_sigclip_rf1))
+            mean_sigclip_rf1 = np.mean(sigclip_rf1)
+            stdev_sigclip_rf1 = np.std(sigclip_rf1)
+            ndet_sigclip_rf1 = len(sigclip_rf1)
+
+        else:
+            median_sigclip_rf1 = np.nan
+            mad_sigclip_rf1 = np.nan
+            mean_sigclip_rf1 = np.nan
+            stdev_sigclip_rf1 = np.nan
+            ndet_sigclip_rf1 = np.nan
+
+    else:
+
+        median_rf1, mad_rf1, mean_rf1, stdev_rf1 = np.nan, np.nan, np.nan, np.nan
+        ndet_rf1 = np.nan
+        median_sigclip_rf1, mad_sigclip_rf1 = np.nan, np.nan
+        mean_sigclip_rf1, stdev_sigclip_rf1 = np.nan, np.nan
+        ndet_sigclip_rf1 = np.nan
+
+    # RF2
+    if len(rf2) > 4:
+
+        finiteind = np.isfinite(rf2)
+        rf2 = rf2[finiteind]
+        median_rf2 = np.median(rf2)
+        mad_rf2 = np.median(np.fabs(rf2 - median_rf2))
+        mean_rf2 = np.mean(rf2)
+        stdev_rf2 = np.std(rf2)
+        ndet_rf2 = len(rf2)
+
+        if sigclip:
+            sigclip_rf2, lo, hi = stats_sigmaclip(rf2,
+                                                  low=sigclip,
+                                                  high=sigclip)
+            median_sigclip_rf2 = np.median(sigclip_rf2)
+            mad_sigclip_rf2 = np.median(np.fabs(sigclip_rf2 -
+                                                median_sigclip_rf2))
+            mean_sigclip_rf2 = np.mean(sigclip_rf2)
+            stdev_sigclip_rf2 = np.std(sigclip_rf2)
+            ndet_sigclip_rf2 = len(sigclip_rf2)
+
+        else:
+            median_sigclip_rf2 = np.nan
+            mad_sigclip_rf2 = np.nan
+            mean_sigclip_rf2 = np.nan
+            stdev_sigclip_rf2 = np.nan
+            ndet_sigclip_rf2 = np.nan
+
+    else:
+
+        median_rf2, mad_rf2, mean_rf2, stdev_rf2 = np.nan, np.nan, np.nan, np.nan
+        ndet_rf2 = np.nan
+        median_sigclip_rf2, mad_sigclip_rf2 = np.nan, np.nan
+        mean_sigclip_rf2, stdev_sigclip_rf2 = np.nan, np.nan
+        ndet_sigclip_rf2 = np.nan
+
+    # RF3
+    if len(rf3) > 4:
+
+        finiteind = np.isfinite(rf3)
+        rf3 = rf3[finiteind]
+        median_rf3 = np.median(rf3)
+        mad_rf3 = np.median(np.fabs(rf3 - median_rf3))
+        mean_rf3 = np.mean(rf3)
+        stdev_rf3 = np.std(rf3)
+        ndet_rf3 = len(rf3)
+
+        if sigclip:
+            sigclip_rf3, lo, hi = stats_sigmaclip(rf3,
+                                                  low=sigclip,
+                                                  high=sigclip)
+            median_sigclip_rf3 = np.median(sigclip_rf3)
+            mad_sigclip_rf3 = np.median(np.fabs(sigclip_rf3 -
+                                                median_sigclip_rf3))
+            mean_sigclip_rf3 = np.mean(sigclip_rf3)
+            stdev_sigclip_rf3 = np.std(sigclip_rf3)
+            ndet_sigclip_rf3 = len(sigclip_rf3)
+
+        else:
+            median_sigclip_rf3 = np.nan
+            mad_sigclip_rf3 = np.nan
+            mean_sigclip_rf3 = np.nan
+            stdev_sigclip_rf3 = np.nan
+            ndet_sigclip_rf3 = np.nan
+
+    else:
+
+        median_rf3, mad_rf3, mean_rf3, stdev_rf3 = (np.nan, np.nan,
+                                                    np.nan, np.nan)
+        ndet_rf3 = np.nan
+        median_sigclip_rf3, mad_sigclip_rf3 = np.nan, np.nan
+        mean_sigclip_rf3, stdev_sigclip_rf3 = np.nan, np.nan
+        ndet_sigclip_rf3 = np.nan
+
+
+    # mags
     # RM1
     if len(rm1) > 4:
 
@@ -4324,6 +4461,41 @@ def get_lc_statistics(lcfile,
 
     return {'lcfile':lcfile,
             'lcobj':os.path.splitext(os.path.basename(lcfile))[0],
+
+            # reduced mags aperture 1
+            'median_rf1':median_rf1,
+            'mad_rf1':mad_rf1,
+            'mean_rf1':mean_rf1,
+            'stdev_rf1':stdev_rf1,
+            'ndet_rf1':ndet_rf1,
+            'median_sigclip_rf1':median_sigclip_rf1,
+            'mad_sigclip_rf1':mad_sigclip_rf1,
+            'mean_sigclip_rf1':mean_sigclip_rf1,
+            'stdev_sigclip_rf1':stdev_sigclip_rf1,
+            'ndet_sigclip_rf1':ndet_sigclip_rf1,
+            # reduced mags aperture 2
+            'median_rf2':median_rf2,
+            'mad_rf2':mad_rf2,
+            'mean_rf2':mean_rf2,
+            'stdev_rf2':stdev_rf2,
+            'ndet_rf2':ndet_rf2,
+            'median_sigclip_rf2':median_sigclip_rf2,
+            'mad_sigclip_rf2':mad_sigclip_rf2,
+            'mean_sigclip_rf2':mean_sigclip_rf2,
+            'stdev_sigclip_rf2':stdev_sigclip_rf2,
+            'ndet_sigclip_rf2':ndet_sigclip_rf2,
+            # reduced mags aperture 3
+            'median_rf3':median_rf3,
+            'mad_rf3':mad_rf3,
+            'mean_rf3':mean_rf3,
+            'stdev_rf3':stdev_rf3,
+            'ndet_rf3':ndet_rf3,
+            'median_sigclip_rf3':median_sigclip_rf3,
+            'mad_sigclip_rf3':mad_sigclip_rf3,
+            'mean_sigclip_rf3':mean_sigclip_rf3,
+            'stdev_sigclip_rf3':stdev_sigclip_rf3,
+            'ndet_sigclip_rf3':ndet_sigclip_rf3,
+
             # reduced mags aperture 1
             'median_rm1':median_rm1,
             'mad_rm1':mad_rm1,
@@ -4357,6 +4529,7 @@ def get_lc_statistics(lcfile,
             'mean_sigclip_rm3':mean_sigclip_rm3,
             'stdev_sigclip_rm3':stdev_sigclip_rm3,
             'ndet_sigclip_rm3':ndet_sigclip_rm3,
+
             # EPD mags aperture 1
             'median_ep1':median_ep1,
             'mad_ep1':mad_ep1,
@@ -4390,6 +4563,7 @@ def get_lc_statistics(lcfile,
             'mean_sigclip_ep3':mean_sigclip_ep3,
             'stdev_sigclip_ep3':stdev_sigclip_ep3,
             'ndet_sigclip_ep3':ndet_sigclip_ep3,
+
             # TFA mags aperture 1
             'median_tf1':median_tf1,
             'mad_tf1':mad_tf1,
@@ -4452,11 +4626,14 @@ def parallel_lc_statistics(lcdir,
                            rmcols=[19,20,21],
                            epcols=[22,23,24],
                            tfcols=[25,26,27],
+                           rfcols=None,
+                           correctioncoeffs=None,
                            sigclip=4.0):
-    '''
-    This calculates statistics on all lc files in lcdir using lcglob to find the
-    files. Puts the results in text file outfile. Needs the fovcatalog to get
-    the catalog magnitude to use as the canonical magnitude.
+    '''This calculates statistics on all lc files in lcdir.
+
+    Uses lcglob to find the files. Puts the results in text file outfile. Needs
+    the fovcatalog to get the catalog magnitude to use as the canonical
+    magnitude.
 
     outfile contains the following columns:
 
@@ -4473,7 +4650,19 @@ def parallel_lc_statistics(lcdir,
                            rmcols=[14,19,24],
                            epcols=[27,28,29],
                            tfcols=[30,31,32],
+                           rfcols=[12,17,22],
                            sigclip=3.0,outfile='ccd8-tfa-lcstats.txt')
+
+
+    For ISM, consider using correctioncoeffs as well. These are c1, c2 resulting
+    from a fit to the catalogmag-flux relation using the expression:
+
+    catrmag = -2.5 * log10(flux/c1) + c2
+
+    where the fit is done in the bright limit (8.0 < r < 12.0). this corrects
+    for too-faint catalog mags because of crowding and blending.
+
+    correctioncoeffs is like: [[ap1_c1,ap1_c2],[ap2_c1,ap2_c2],[ap3_c1,ap3_c2]]
 
     '''
 
@@ -4482,6 +4671,7 @@ def parallel_lc_statistics(lcdir,
     tasks = [[x, {'rmcols':rmcols,
                   'epcols':epcols,
                   'tfcols':tfcols,
+                  'rfcols':rfcols,
                   'sigclip':sigclip,
                   'tfalcrequired':tfalcrequired}] for x in lcfiles]
 
@@ -4508,7 +4698,14 @@ def parallel_lc_statistics(lcdir,
         '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
         '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
         '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
-        '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s\n'
+        '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
+        '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
+        '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
+        '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
+        '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
+        '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
+        '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
+        '%.3f %.3f %.3f\n'
         )
 
     outheader = '# total objects: %s, sigmaclip used: %s\n' % (len(lcfiles),
@@ -4545,6 +4742,16 @@ def parallel_lc_statistics(lcdir,
         '# 82,83,84,85,86: median TF3, MAD TF3, mean TF3, stdev TF3, ndet TF3\n'
         '# 87,88,89,90,91: sigma-clipped median TF3, MAD TF3, mean TF3, '
         'stdev TF3, ndet TF3\n'
+        '# 92,93,94,95,96: median RF1, MAD RF1, mean RF1, stdev RF1, ndet RF1\n'
+        '# 97,98,99,100,101: sigma-clipped median RF1, MAD RF1, mean RF1, '
+        'stdev RF1, ndet RF1\n'
+        '# 102,103,104,105,106: median RF2, MAD RF2, mean RF2, stdev RF2, ndet RF2\n'
+        '# 107,108,109,110,111: sigma-clipped median RF2, MAD RF2, mean RF2, '
+        'stdev RF2, ndet RF2\n'
+        '# 112,113,114,115,116: median RF3, MAD RF3, mean RF3, stdev RF3, ndet RF3\n'
+        '# 117,118,119,120,121: sigma-clipped median RF3, MAD RF3, mean RF3, '
+        'stdev RF3, ndet RF3\n'
+        'corrected cat mag AP1, corrected cat mag AP1, corrected cat mag AP3\n '
         ) % fovcatmaglabel
     outf.write(outcolumnkey)
 
@@ -4570,6 +4777,26 @@ def parallel_lc_statistics(lcdir,
                 print('no catalog mag for %s, using median TF3 mag' %
                       stat['lcobj'])
                 catmag = stat['median_tf3']
+
+
+            # calculate the corrected mags if present
+            if (correctioncoeffs and len(correctioncoeffs) == 3 and
+                rfcols and len(rfcols) == 3):
+
+                ap1_c1, ap1_c2 = correctioncoeffs[0]
+                ap2_c1, ap2_c2 = correctioncoeffs[1]
+                ap3_c1, ap3_c2 = correctioncoeffs[2]
+
+                corrmag_ap1 = -2.5*log10(stat['median_rf1']/ap1_c1) + ap1_c2
+                corrmag_ap2 = -2.5*log10(stat['median_rf2']/ap2_c1) + ap2_c2
+                corrmag_ap3 = -2.5*log10(stat['median_rf3']/ap3_c1) + ap3_c2
+
+            else:
+
+                corrmag_ap1 = catmag
+                corrmag_ap2 = catmag
+                corrmag_ap3 = catmag
+
 
             outline = outlineformat % (
                 stat['lcobj'],
@@ -4672,7 +4899,45 @@ def parallel_lc_statistics(lcdir,
                 stat['mad_sigclip_tf3'],
                 stat['mean_sigclip_tf3'],
                 stat['stdev_sigclip_tf3'],
-                stat['ndet_sigclip_tf3']
+                stat['ndet_sigclip_tf3'],
+
+                stat['median_rf1'],
+                stat['mad_rf1'],
+                stat['mean_rf1'],
+                stat['stdev_rf1'],
+                stat['ndet_rf1'],
+                stat['median_sigclip_rf1'],
+                stat['mad_sigclip_rf1'],
+                stat['mean_sigclip_rf1'],
+                stat['stdev_sigclip_rf1'],
+                stat['ndet_sigclip_rf1'],
+
+                stat['median_rf2'],
+                stat['mad_rf2'],
+                stat['mean_rf2'],
+                stat['stdev_rf2'],
+                stat['ndet_rf2'],
+                stat['median_sigclip_rf2'],
+                stat['mad_sigclip_rf2'],
+                stat['mean_sigclip_rf2'],
+                stat['stdev_sigclip_rf2'],
+                stat['ndet_sigclip_rf2'],
+
+                stat['median_rf3'],
+                stat['mad_rf3'],
+                stat['mean_rf3'],
+                stat['stdev_rf3'],
+                stat['ndet_rf3'],
+                stat['median_sigclip_rf3'],
+                stat['mad_sigclip_rf3'],
+                stat['mean_sigclip_rf3'],
+                stat['stdev_sigclip_rf3'],
+                stat['ndet_sigclip_rf3'],
+
+                corrmag_ap1,
+                corrmag_ap2,
+                corrmag_ap3,
+
                 )
             outf.write(outline)
 
