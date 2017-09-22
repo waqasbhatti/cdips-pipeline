@@ -4955,45 +4955,63 @@ def read_stats_file(statsfile):
     # open the statfile and read all the columns
     stats = np.genfromtxt(
         statsfile,
-        dtype=('S17,f8,'
-               'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM1
-               'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM2
-               'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM3
-               'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP1
-               'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP2
-               'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP3
-               'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF1
-               'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF2
-               'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8'), # TF3
-        names=['lcobj','cat_mag',
-               'med_rm1','mad_rm1','mean_rm1','stdev_rm1','ndet_rm1',
-               'med_sc_rm1','mad_sc_rm1','mean_sc_rm1','stdev_sc_rm1',
-               'ndet_sc_rm1',
-               'med_rm2','mad_rm2','mean_rm2','stdev_rm2','ndet_rm2',
-               'med_sc_rm2','mad_sc_rm2','mean_sc_rm2','stdev_sc_rm2',
-               'ndet_sc_rm2',
-               'med_rm3','mad_rm3','mean_rm3','stdev_rm3','ndet_rm3',
-               'med_sc_rm3','mad_sc_rm3','mean_sc_rm3','stdev_sc_rm3',
-               'ndet_sc_rm3',
-               'med_ep1','mad_ep1','mean_ep1','stdev_ep1','ndet_ep1',
-               'med_sc_ep1','mad_sc_ep1','mean_sc_ep1','stdev_sc_ep1',
-               'ndet_sc_ep1',
-               'med_ep2','mad_ep2','mean_ep2','stdev_ep2','ndet_ep2',
-               'med_sc_ep2','mad_sc_ep2','mean_sc_ep2','stdev_sc_ep2',
-               'ndet_sc_ep2',
-               'med_ep3','mad_ep3','mean_ep3','stdev_ep3','ndet_ep3',
-               'med_sc_ep3','mad_sc_ep3','mean_sc_ep3','stdev_sc_ep3',
-               'ndet_sc_ep3',
-               'med_tf1','mad_tf1','mean_tf1','stdev_tf1','ndet_tf1',
-               'med_sc_tf1','mad_sc_tf1','mean_sc_tf1','stdev_sc_tf1',
-               'ndet_sc_tf1',
-               'med_tf2','mad_tf2','mean_tf2','stdev_tf2','ndet_tf2',
-               'med_sc_tf2','mad_sc_tf2','mean_sc_tf2','stdev_sc_tf2',
-               'ndet_sc_tf2',
-               'med_tf3','mad_tf3','mean_tf3','stdev_tf3','ndet_tf3',
-               'med_sc_tf3','mad_sc_tf3','mean_sc_tf3','stdev_sc_tf3',
-               'ndet_sc_tf3']
-        )
+        dtype=(
+            'S17,f8,'
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM1
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM2
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM3
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP1
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP2
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP3
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF1
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF2
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF3
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RF1
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RF2
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RF3
+            'f8,f8,f8'                        # corrmags
+        ),
+        names=[
+            'lcobj','cat_mag',
+            'med_rm1','mad_rm1','mean_rm1','stdev_rm1','ndet_rm1',
+            'med_sc_rm1','mad_sc_rm1','mean_sc_rm1','stdev_sc_rm1',
+            'ndet_sc_rm1',
+            'med_rm2','mad_rm2','mean_rm2','stdev_rm2','ndet_rm2',
+            'med_sc_rm2','mad_sc_rm2','mean_sc_rm2','stdev_sc_rm2',
+            'ndet_sc_rm2',
+            'med_rm3','mad_rm3','mean_rm3','stdev_rm3','ndet_rm3',
+            'med_sc_rm3','mad_sc_rm3','mean_sc_rm3','stdev_sc_rm3',
+            'ndet_sc_rm3',
+            'med_ep1','mad_ep1','mean_ep1','stdev_ep1','ndet_ep1',
+            'med_sc_ep1','mad_sc_ep1','mean_sc_ep1','stdev_sc_ep1',
+            'ndet_sc_ep1',
+            'med_ep2','mad_ep2','mean_ep2','stdev_ep2','ndet_ep2',
+            'med_sc_ep2','mad_sc_ep2','mean_sc_ep2','stdev_sc_ep2',
+            'ndet_sc_ep2',
+            'med_ep3','mad_ep3','mean_ep3','stdev_ep3','ndet_ep3',
+            'med_sc_ep3','mad_sc_ep3','mean_sc_ep3','stdev_sc_ep3',
+            'ndet_sc_ep3',
+            'med_tf1','mad_tf1','mean_tf1','stdev_tf1','ndet_tf1',
+            'med_sc_tf1','mad_sc_tf1','mean_sc_tf1','stdev_sc_tf1',
+            'ndet_sc_tf1',
+            'med_tf2','mad_tf2','mean_tf2','stdev_tf2','ndet_tf2',
+            'med_sc_tf2','mad_sc_tf2','mean_sc_tf2','stdev_sc_tf2',
+            'ndet_sc_tf2',
+            'med_tf3','mad_tf3','mean_tf3','stdev_tf3','ndet_tf3',
+            'med_sc_tf3','mad_sc_tf3','mean_sc_tf3','stdev_sc_tf3',
+            'ndet_sc_tf3',
+            'med_rf1','mad_rf1','mean_rf1','stdev_rf1','ndet_rf1',
+            'med_sc_rf1','mad_sc_rf1','mean_sc_rf1','stdev_sc_rf1',
+            'ndet_sc_rf1',
+            'med_rf2','mad_rf2','mean_rf2','stdev_rf2','ndet_rf2',
+            'med_sc_rf2','mad_sc_rf2','mean_sc_rf2','stdev_sc_rf2',
+            'ndet_sc_rf2',
+            'med_rf3','mad_rf3','mean_rf3','stdev_rf3','ndet_rf3',
+            'med_sc_rf3','mad_sc_rf3','mean_sc_rf3','stdev_sc_rf3',
+            'ndet_sc_rf3',
+            'corr_mag_ap1','corr_mag_ap2','corr_mag_ap3',
+        ]
+    )
 
     return stats
 
@@ -5927,14 +5945,14 @@ STATS_PLOTS = {
         'ylabel':'TF3 median abs. dev.',
         'binned':True
         },
-    'catalog-r-mag-vs-mad-TF3-sigclipped':{
-        'xcol':'cat_mag',
-        'ycol':'mad_sc_tf3',
-        'title':'FOV catalog SDSS r mag vs. TF3 median abs. dev. (sigclip LCs)',
+    'corr-r-mag-vs-mad-bestap':{
+        'xcol':'corr_mag_ap1',
+        'ycol':('mad_tf1','mad_tf2','mad_tf3'),
+        'title':'FOV catalog SDSS r mag vs. TFA bestap MAD',
         'xlabel':'FOV catalog SDSS r mag',
-        'ylabel':'TF3 median abs. dev.',
+        'ylabel':'TFA best aperture median abs. dev.',
         'binned':True
-        },
+    }
     'catalog-r-mag-vs-mad-bestap':{
         'xcol':'cat_mag',
         'ycol':('mad_tf1','mad_tf2','mad_tf3'),
