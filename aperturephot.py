@@ -3901,7 +3901,8 @@ def get_lc_statistics(lcfile,
                       rmcols=[19,20,21],
                       epcols=[22,23,24],
                       tfcols=[25,26,27],
-                      sigclip=4.0):
+                      sigclip=4.0,
+                      tfalcrequired=False):
     '''
     This calculates the following statistics for the magnitude columns in the
     given lcfile.
@@ -3920,6 +3921,22 @@ def get_lc_statistics(lcfile,
 
     '''
 
+    tf1lc_check = os.path.exists(lcfile.replace('.epdlc','.tfalc.TF1'))
+    tf2lc_check = os.path.exists(lcfile.replace('.epdlc','.tfalc.TF1'))
+    tf3lc_check = os.path.exists(lcfile.replace('.epdlc','.tfalc.TF1'))
+
+    # check if we need TFALCs to proceed
+    if tfalcrequired and ((not tf1lc_check) or
+                          (not tf2lc_check) or
+                          (not tf3lc_check)):
+
+        print('%sZ: no TFA mags available for %s and '
+              'TFALC is required, skipping...' %
+              (datetime.utcnow().isoformat(), lcfile))
+        return None
+
+
+    # otherwise, proceed with stat collection
     try:
 
         # get the reduced magnitude columns
@@ -4426,6 +4443,7 @@ def lc_statistics_worker(task):
 def parallel_lc_statistics(lcdir,
                            lcglob,
                            fovcatalog,
+                           tfalcrequired=False,
                            fovcatcols=(0,9), # objectid, magcol to use
                            fovcatmaglabel='r',
                            outfile=None,
@@ -4464,7 +4482,8 @@ def parallel_lc_statistics(lcdir,
     tasks = [[x, {'rmcols':rmcols,
                   'epcols':epcols,
                   'tfcols':tfcols,
-                  'sigclip':sigclip}] for x in lcfiles]
+                  'sigclip':sigclip,
+                  'tfalcrequired':tfalcrequired}] for x in lcfiles]
 
     pool = mp.Pool(nworkers,maxtasksperchild=workerntasks)
     results = pool.map(lc_statistics_worker, tasks)
