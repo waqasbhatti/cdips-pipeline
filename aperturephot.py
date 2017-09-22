@@ -5784,7 +5784,7 @@ STATS_PLOTS = {
         'xlabel':'RM1 median magnitude',
         'ylabel':'RM1 median abs. dev.',
         'binned':False
-        },
+    },
     'median-rm1-vs-mad-rm1-sigclipped':{
         'xcol':'med_sc_rm1',
         'ycol':'mad_sc_rm1',
@@ -5792,7 +5792,7 @@ STATS_PLOTS = {
         'xlabel':'RM1 median magnitude',
         'ylabel':'RM1 median abs. dev.',
         'binned':False
-        },
+    },
     'median-rm2-vs-mad-rm2':{
         'xcol':'med_rm2',
         'ycol':'mad_rm2',
@@ -5800,7 +5800,7 @@ STATS_PLOTS = {
         'xlabel':'RM2 median magnitude',
         'ylabel':'RM2 median abs. dev.',
         'binned':False
-        },
+    },
     'median-rm2-vs-mad-rm2-sigclipped':{
         'xcol':'med_sc_rm2',
         'ycol':'mad_sc_rm2',
@@ -5808,7 +5808,7 @@ STATS_PLOTS = {
         'xlabel':'RM2 median magnitude',
         'ylabel':'RM2 median abs. dev.',
         'binned':False
-        },
+    },
     'median-rm3-vs-mad-rm3':{
         'xcol':'med_rm3',
         'ycol':'mad_rm3',
@@ -5816,7 +5816,7 @@ STATS_PLOTS = {
         'xlabel':'RM3 median magnitude',
         'ylabel':'RM3 median abs. dev.',
         'binned':False
-        },
+    },
     'median-rm3-vs-mad-rm3-sigclipped':{
         'xcol':'med_sc_rm3',
         'ycol':'mad_sc_rm3',
@@ -5824,7 +5824,7 @@ STATS_PLOTS = {
         'xlabel':'RM3 median magnitude',
         'ylabel':'RM3 median abs. dev.',
         'binned':False
-        },
+    },
     'median-EP1-vs-mad-EP1':{
         'xcol':'med_ep1',
         'ycol':'mad_ep1',
@@ -5832,7 +5832,7 @@ STATS_PLOTS = {
         'xlabel':'EP1 median magnitude',
         'ylabel':'EP1 median abs. dev.',
         'binned':True
-        },
+    },
     'median-EP1-vs-mad-EP1-sigclipped':{
         'xcol':'med_sc_ep1',
         'ycol':'mad_sc_ep1',
@@ -5840,7 +5840,7 @@ STATS_PLOTS = {
         'xlabel':'EP1 median magnitude',
         'ylabel':'EP1 median abs. dev.',
         'binned':True
-        },
+    },
     'median-EP2-vs-mad-EP2':{
         'xcol':'med_ep2',
         'ycol':'mad_ep2',
@@ -5848,7 +5848,7 @@ STATS_PLOTS = {
         'xlabel':'EP2 median magnitude',
         'ylabel':'EP2 median abs. dev.',
         'binned':True
-        },
+    },
     'median-EP2-vs-mad-EP2-sigclipped':{
         'xcol':'med_sc_ep2',
         'ycol':'mad_sc_ep2',
@@ -5856,7 +5856,7 @@ STATS_PLOTS = {
         'xlabel':'EP2 median magnitude',
         'ylabel':'EP2 median abs. dev.',
         'binned':True
-        },
+    },
     'median-EP3-vs-mad-EP3':{
         'xcol':'med_ep3',
         'ycol':'mad_ep3',
@@ -5864,7 +5864,7 @@ STATS_PLOTS = {
         'xlabel':'EP3 median magnitude',
         'ylabel':'EP3 median abs. dev.',
         'binned':True
-        },
+    },
     'median-EP3-vs-mad-EP3-sigclipped':{
         'xcol':'med_sc_ep3',
         'ycol':'mad_sc_ep3',
@@ -5872,7 +5872,7 @@ STATS_PLOTS = {
         'xlabel':'EP3 median magnitude',
         'ylabel':'EP3 median abs. dev.',
         'binned':True
-        },
+    },
     'median-TF1-vs-mad-TF1':{
         'xcol':'med_tf1',
         'ycol':'mad_tf1',
@@ -5880,7 +5880,7 @@ STATS_PLOTS = {
         'xlabel':'TF1 median magnitude',
         'ylabel':'TF1 median abs. dev.',
         'binned':True
-        },
+    },
     'median-TF1-vs-mad-TF1-sigclipped':{
         'xcol':'med_sc_tf1',
         'ycol':'mad_sc_tf1',
@@ -5888,7 +5888,7 @@ STATS_PLOTS = {
         'xlabel':'TF1 median magnitude',
         'ylabel':'TF1 median abs. dev.',
         'binned':True
-        },
+    },
     'median-TF2-vs-mad-TF2':{
         'xcol':'med_tf2',
         'ycol':'mad_tf2',
@@ -5896,7 +5896,7 @@ STATS_PLOTS = {
         'xlabel':'TF2 median magnitude',
         'ylabel':'TF2 median abs. dev.',
         'binned':True
-        },
+    },
     'median-TF2-vs-mad-TF2-sigclipped':{
         'xcol':'med_sc_tf2',
         'ycol':'mad_sc_tf2',
@@ -5904,7 +5904,7 @@ STATS_PLOTS = {
         'xlabel':'TF2 median magnitude',
         'ylabel':'TF2 median abs. dev.',
         'binned':True
-        },
+    },
     'median-TF3-vs-mad-TF3':{
         'xcol':'med_tf3',
         'ycol':'mad_tf3',
@@ -5912,7 +5912,7 @@ STATS_PLOTS = {
         'xlabel':'TF3 median magnitude',
         'ylabel':'TF3 median abs. dev.',
         'binned':True
-        },
+    },
     'median-TF3-vs-mad-TF3-sigclipped':{
         'xcol':'med_sc_tf3',
         'ycol':'mad_sc_tf3',
@@ -5920,7 +5920,7 @@ STATS_PLOTS = {
         'xlabel':'TF3 median magnitude',
         'ylabel':'TF3 median abs. dev.',
         'binned':True
-        },
+    },
     'catalog-r-mag-vs-mad-TF1':{
         'xcol':'cat_mag',
         'ycol':'mad_tf1',
@@ -5928,7 +5928,7 @@ STATS_PLOTS = {
         'xlabel':'FOV catalog SDSS r mag',
         'ylabel':'TF1 median abs. dev.',
         'binned':True
-        },
+    },
     'catalog-r-mag-vs-mad-TF2':{
         'xcol':'cat_mag',
         'ycol':'mad_tf2',
@@ -5936,7 +5936,7 @@ STATS_PLOTS = {
         'xlabel':'FOV catalog SDSS r mag',
         'ylabel':'TF2 median abs. dev.',
         'binned':True
-        },
+    },
     'catalog-r-mag-vs-mad-TF3':{
         'xcol':'cat_mag',
         'ycol':'mad_tf3',
@@ -5944,7 +5944,7 @@ STATS_PLOTS = {
         'xlabel':'FOV catalog SDSS r mag',
         'ylabel':'TF3 median abs. dev.',
         'binned':True
-        },
+    },
     'corr-r-mag-vs-mad-bestap':{
         'xcol':'corr_mag_ap1',
         'ycol':('mad_tf1','mad_tf2','mad_tf3'),
@@ -5952,7 +5952,7 @@ STATS_PLOTS = {
         'xlabel':'FOV catalog SDSS r mag',
         'ylabel':'TFA best aperture median abs. dev.',
         'binned':True
-    }
+    },
     'catalog-r-mag-vs-mad-bestap':{
         'xcol':'cat_mag',
         'ycol':('mad_tf1','mad_tf2','mad_tf3'),
@@ -5960,8 +5960,8 @@ STATS_PLOTS = {
         'xlabel':'FOV catalog SDSS r mag',
         'ylabel':'TFA best aperture median abs. dev.',
         'binned':True
-        },
-    }
+    },
+}
 
 
 def plot_stats_file(statsfile, outdir, outprefix,
