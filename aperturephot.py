@@ -4751,7 +4751,7 @@ def parallel_lc_statistics(lcdir,
         '# 117,118,119,120,121: sigma-clipped median RF3, MAD RF3, mean RF3, '
         'stdev RF3, ndet RF3\n'
         '# 122, 123, 124: corrected cat mag AP1, corrected cat mag AP1, '
-        'corrected cat mag AP3\n '
+        'corrected cat mag AP3\n'
         ) % fovcatmaglabel
     outf.write(outcolumnkey)
 
