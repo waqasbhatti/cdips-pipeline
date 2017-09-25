@@ -6111,7 +6111,7 @@ def plot_stats_file(statsfile, outdir, outprefix,
 
         except Exception as e:
 
-            print('%sZ: %s plot failed! Error was: %s' %
+            print('%sZ: plot failed! Error was: %s' %
                   (datetime.utcnow().isoformat(), title, e))
 
 
