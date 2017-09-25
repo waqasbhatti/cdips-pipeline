@@ -6014,10 +6014,10 @@ def plot_stats_file(statsfile, outdir, outprefix,
                 xcol = stats[STATS_PLOTS[plot]['xcol']]
 
                 # if we're supposed to correct the magnitudes
-                if corrmagafter and 'corr_mag_ap1' in stats.dtype.names:
+                if correctmagsafter and 'corr_mag_ap1' in stats.dtype.names:
 
                     # replace the bad mags with the corrected mags
-                    tocorrectindex = xcol > corrmagafter
+                    tocorrectindex = xcol > correctmagsafter
                     xcol[tocorrectindex] = stats['corr_mag_ap1'][tocorrectindex]
 
                 ycol1 = stats[STATS_PLOTS[plot]['ycol'][0]]
@@ -6043,10 +6043,10 @@ def plot_stats_file(statsfile, outdir, outprefix,
                               stats[STATS_PLOTS[plot]['ycol']])
 
                 # if we're supposed to correct the magnitudes
-                if corrmagafter and 'corr_mag_ap1' in stats.dtype.names:
+                if correctmagsafter and 'corr_mag_ap1' in stats.dtype.names:
 
                     # replace the bad mags with the corrected mags
-                    tocorrectindex = xcol > corrmagafter
+                    tocorrectindex = xcol > correctmagsafter
                     xcol[tocorrectindex] = stats['corr_mag_ap1'][tocorrectindex]
 
                 xlabel, ylabel = (STATS_PLOTS[plot]['xlabel'],
