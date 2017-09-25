@@ -5968,9 +5968,14 @@ def plot_stats_file(statsfile, outdir, outprefix,
                     binned=False,
                     logy=False,
                     logx=False,
+                    correctmagsafter=12.5,
                     rangex=(5.9,14.1)):
-    '''
-    This makes all the plots for a stats file.
+    '''This makes all the plots for a stats file.
+
+    correctmagsafter will use the corrected mags for all objects with mags >
+    than this value. This is used for crowded fields where the FOV catalog
+    photometry may not be as precise, so will get incorrect mags for fainter
+    stars.
 
     '''
 
@@ -6005,7 +6010,15 @@ def plot_stats_file(statsfile, outdir, outprefix,
             # if this is a bestap plot, then do special processing
             if 'bestap' in plot:
 
+                # get the magnitudes
                 xcol = stats[STATS_PLOTS[plot]['xcol']]
+
+                # if we're supposed to correct the magnitudes
+                if corrmagafter and 'corr_mag_ap1' in stats.dtype.names:
+
+                    # replace the bad mags with the corrected mags
+                    tocorrectindex = xcol > corrmagafter
+                    xcol[tocorrectindex] = stats['corr_mag_ap1'][tocorrectindex]
 
                 ycol1 = stats[STATS_PLOTS[plot]['ycol'][0]]
                 ycol2 = stats[STATS_PLOTS[plot]['ycol'][1]]
@@ -6028,6 +6041,14 @@ def plot_stats_file(statsfile, outdir, outprefix,
 
                 xcol, ycol = (stats[STATS_PLOTS[plot]['xcol']],
                               stats[STATS_PLOTS[plot]['ycol']])
+
+                # if we're supposed to correct the magnitudes
+                if corrmagafter and 'corr_mag_ap1' in stats.dtype.names:
+
+                    # replace the bad mags with the corrected mags
+                    tocorrectindex = xcol > corrmagafter
+                    xcol[tocorrectindex] = stats['corr_mag_ap1'][tocorrectindex]
+
                 xlabel, ylabel = (STATS_PLOTS[plot]['xlabel'],
                                   STATS_PLOTS[plot]['ylabel'])
                 title = '%s - %s - %s' % (outprefix,
