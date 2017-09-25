@@ -4713,8 +4713,8 @@ def parallel_lc_statistics(lcdir,
         '# columns are:\n'
         '# 0,1: object, catalog mag %s\n'
         '# 2,3,4,5,6: median RM1, MAD RM1, mean RM1, stdev RM1, ndet RM1\n'
-        '# 7,8,9,10,11: sigma-clipped median RM1, MAD RM1, mean RM1, stdev RM1, '
-        'ndet RM1\n'
+        '# 7,8,9,10,11: sigma-clipped median RM1, MAD RM1, mean RM1, '
+        'stdev RM1, ndet RM1\n'
         '# 12,13,14,15,16: median RM2, MAD RM2, mean RM2, stdev RM2, ndet RM2\n'
         '# 17,18,19,20,21: sigma-clipped median RM2, MAD RM2, mean RM2, '
         'stdev RM2, ndet RM2\n'
@@ -4742,13 +4742,16 @@ def parallel_lc_statistics(lcdir,
         '# 92,93,94,95,96: median RF1, MAD RF1, mean RF1, stdev RF1, ndet RF1\n'
         '# 97,98,99,100,101: sigma-clipped median RF1, MAD RF1, mean RF1, '
         'stdev RF1, ndet RF1\n'
-        '# 102,103,104,105,106: median RF2, MAD RF2, mean RF2, stdev RF2, ndet RF2\n'
+        '# 102,103,104,105,106: median RF2, MAD RF2, mean RF2, stdev RF2, ndet '
+        'RF2\n'
         '# 107,108,109,110,111: sigma-clipped median RF2, MAD RF2, mean RF2, '
         'stdev RF2, ndet RF2\n'
-        '# 112,113,114,115,116: median RF3, MAD RF3, mean RF3, stdev RF3, ndet RF3\n'
+        '# 112,113,114,115,116: median RF3, MAD RF3, mean RF3, stdev RF3, '
+        'ndet RF3\n'
         '# 117,118,119,120,121: sigma-clipped median RF3, MAD RF3, mean RF3, '
         'stdev RF3, ndet RF3\n'
-        '# corrected cat mag AP1, corrected cat mag AP1, corrected cat mag AP3\n '
+        '# 122, 123, 124: corrected cat mag AP1, corrected cat mag AP1, '
+        'corrected cat mag AP3\n '
         ) % fovcatmaglabel
     outf.write(outcolumnkey)
 
@@ -4765,7 +4768,9 @@ def parallel_lc_statistics(lcdir,
 
             # find the catalog mag for this object
             try:
-                catmag = fovcat['mag'][np.where(fovcat['objid'] == stat['lcobj'])]
+                catmag = fovcat['mag'][
+                    np.where(fovcat['objid'] == stat['lcobj'])
+                ]
                 if not catmag:
                     print('no catalog mag for %s, using median TF3 mag' %
                           stat['lcobj'])
