@@ -6113,6 +6113,7 @@ def plot_stats_file(statsfile, outdir, outprefix,
 
             print('%sZ: plot failed! Error was: %s' %
                   (datetime.utcnow().isoformat(), e))
+            raise
 
 
 def plot_magrms_comparison(reference_stats_file,
