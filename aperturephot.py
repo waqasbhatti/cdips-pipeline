@@ -5929,40 +5929,56 @@ STATS_PLOTS = {
     'catalog-r-mag-vs-mad-TF1':{
         'xcol':'cat_mag',
         'ycol':'mad_tf1',
-        'title':'FOV catalog SDSS r mag vs. TF1 median abs. dev.',
-        'xlabel':'FOV catalog SDSS r mag',
+        'title':'catalog SDSS r mag vs. TF1 median abs. dev.',
+        'xlabel':'catalog SDSS r mag',
         'ylabel':'TF1 median abs. dev.',
         'binned':True
     },
     'catalog-r-mag-vs-mad-TF2':{
         'xcol':'cat_mag',
         'ycol':'mad_tf2',
-        'title':'FOV catalog SDSS r mag vs. TF2 median abs. dev.',
-        'xlabel':'FOV catalog SDSS r mag',
+        'title':'catalog SDSS r mag vs. TF2 median abs. dev.',
+        'xlabel':'catalog SDSS r mag',
         'ylabel':'TF2 median abs. dev.',
         'binned':True
     },
     'catalog-r-mag-vs-mad-TF3':{
         'xcol':'cat_mag',
         'ycol':'mad_tf3',
-        'title':'FOV catalog SDSS r mag vs. TF3 median abs. dev.',
-        'xlabel':'FOV catalog SDSS r mag',
+        'title':'catalog SDSS r mag vs. TF3 median abs. dev.',
+        'xlabel':'catalog SDSS r mag',
         'ylabel':'TF3 median abs. dev.',
         'binned':True
     },
-    'corr-r-mag-vs-mad-bestap':{
+    'corr-r-ap1-mag-vs-mad-bestap':{
         'xcol':'corr_mag_ap1',
         'ycol':('mad_tf1','mad_tf2','mad_tf3'),
-        'title':'FOV catalog SDSS r mag vs. TFA bestap MAD',
-        'xlabel':'FOV catalog SDSS r mag',
+        'title':'catalog SDSS r mag vs. TFA bestap MAD',
+        'xlabel':'catalog SDSS r mag',
+        'ylabel':'TFA best aperture median abs. dev.',
+        'binned':True
+    },
+    'corr-r-ap2-mag-vs-mad-bestap':{
+        'xcol':'corr_mag_ap2',
+        'ycol':('mad_tf1','mad_tf2','mad_tf3'),
+        'title':'catalog SDSS r mag vs. TFA bestap MAD',
+        'xlabel':'catalog SDSS r mag',
+        'ylabel':'TFA best aperture median abs. dev.',
+        'binned':True
+    },
+    'corr-r-ap3-mag-vs-mad-bestap':{
+        'xcol':'corr_mag_ap3',
+        'ycol':('mad_tf1','mad_tf2','mad_tf3'),
+        'title':'catalog SDSS r mag vs. TFA bestap MAD',
+        'xlabel':'catalog SDSS r mag',
         'ylabel':'TFA best aperture median abs. dev.',
         'binned':True
     },
     'catalog-r-mag-vs-mad-bestap':{
         'xcol':'cat_mag',
         'ycol':('mad_tf1','mad_tf2','mad_tf3'),
-        'title':'FOV catalog SDSS r mag vs. TFA bestap MAD',
-        'xlabel':'FOV catalog SDSS r mag',
+        'title':'catalog SDSS r mag vs. TFA bestap MAD',
+        'xlabel':'catalog SDSS r mag',
         'ylabel':'TFA best aperture median abs. dev.',
         'binned':True
     },
@@ -5978,7 +5994,7 @@ def plot_stats_file(statsfile, outdir, outprefix,
     '''This makes all the plots for a stats file.
 
     correctmagsafter will use the corrected mags for all objects with mags >
-    than this value. This is used for crowded fields where the FOV catalog
+    than this value. This is used for crowded fields where the catalog
     photometry may not be as precise, so will get incorrect mags for fainter
     stars.
 
@@ -6217,7 +6233,7 @@ def plot_magrms_comparison(reference_stats_file,
         xcol = (np.array(ref_mag))[nonzero_ind[0]]
         ycol = compcol_ratios[nonzero_ind[0]]
 
-        xlabel = 'FOV catalog SDSS r mag'
+        xlabel = 'catalog SDSS r mag'
         ylabel = 'TFA MAD %s/%s' % (ref_name, comp_name)
 
         title = 'TFA MAD ratio - %s/%s' % (ref_name, comp_name)
