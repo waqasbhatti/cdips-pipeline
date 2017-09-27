@@ -5040,6 +5040,15 @@ def time_bin_lightcurve(lcprefix,
     Needs only the lcprefix; figures out the fnames and cols using the lcexts
     and lcmagcols kwargs.
 
+    For ISM LCs, use:
+
+    lcmagcols=([27,28,29],[30,],[30,],[30,])
+
+    For gzipped TFA LCs, use:
+
+    lcexts = ('epdlc','tfalc.TF1.gz','tfalc.TF2.gz','tfalc.TF3.gz')
+
+
     '''
 
     collected_binned_mags = {}
@@ -5057,9 +5066,16 @@ def time_bin_lightcurve(lcprefix,
         collected_binned_mags[ext] = {x:{} for x in lcmagcols}
 
         # extract the JD and magnitude columns
-        lcdata = np.genfromtxt(lcfname,
+        if lcfname.endswith('.gz'):
+            lcfd = gzip.open(lcfname)
+        else:
+            lcfd = open(lcfname)
+
+        lcdata = np.genfromtxt(lcfd,
                                usecols=tuple([jdcol] + magcolspec),
                                names=['rjd'] + lcmagcols)
+
+        lcfd.close()
 
         if lcdata['rjd'].shape and len(lcdata['rjd']) >= 100:
 
@@ -5186,7 +5202,18 @@ def parallel_bin_lightcurves(lcdir,
                              lcmagcols=([22,23,24],[25,],[25,],[25,]),
                              nworkers=16,
                              workerntasks=1000):
+    '''
+    This bins light curves in time.
 
+    For ISM LCs, use:
+
+    lcmagcols=([27,28,29],[30,],[30,],[30,])
+
+    For gzipped TFA LCs, use:
+
+    lcexts = ('epdlc','tfalc.TF1.gz','tfalc.TF2.gz','tfalc.TF3.gz')
+
+    '''
 
     epdlcfiles = glob.glob(os.path.join(lcdir, epdlc_glob))
 
