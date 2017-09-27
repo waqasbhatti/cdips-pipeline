@@ -174,7 +174,7 @@ FISTARCMD = ("{fistarexec} -i {frame} -o {extractedlist} "
 # the resulting source list as input to fiphot. the parameters are:
 
 # {transformer}:       'anrd2xy' or similar, coord -> pix converter executable
-# {framewcsfile}:      WCS transformation file associated with frame
+# {framewcsfile}:      tWCS transformation file associated with frame
 # {catalogsourcelist}: 2MASS catalog file associated with camera FOV
 # {outfile}:           temporary output file
 TRANSFORMCMD = ("{transformer} -w {framewcsfile} "
@@ -5237,6 +5237,7 @@ def parallel_bin_lightcurves(lcdir,
           (datetime.utcnow().isoformat(), len(epdlcfiles)))
 
 
+
 def read_binned_lc(binnedlc):
     '''
     This reads back the binnedlc pkl file to a dictionary.
@@ -5244,6 +5245,7 @@ def read_binned_lc(binnedlc):
     with open(binnedlc,'rb') as lcf:
         lcdict = pickle.load(lcf)
     return lcdict
+
 
 
 def get_binnedlc_statistics(lcfile,
@@ -5265,9 +5267,16 @@ def get_binnedlc_statistics(lcfile,
     ep3 = binnedlc['epdlc']['AP2']
 
     # then get the TFALC
-    tf1 = binnedlc['tfalc.TF1']['AP0']
-    tf2 = binnedlc['tfalc.TF2']['AP0']
-    tf3 = binnedlc['tfalc.TF3']['AP0']
+    try:
+        tf1 = binnedlc['tfalc.TF1']['AP0']
+        tf2 = binnedlc['tfalc.TF2']['AP0']
+        tf3 = binnedlc['tfalc.TF3']['AP0']
+
+    except Exception as e:
+        tf1 = binnedlc['tfalc.TF1.gz']['AP0']
+        tf2 = binnedlc['tfalc.TF2.gz']['AP0']
+        tf3 = binnedlc['tfalc.TF3.gz']['AP0']
+
 
     # get stats for each column
     # EP1
