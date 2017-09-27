@@ -5595,13 +5595,20 @@ def parallel_binnedlc_statistics(lcdir,
                                  fovcatalog,
                                  fovcatcols=(0,9), # objectid, magcol to use
                                  fovcatmaglabel='r',
+                                 corrmagsource=None,
+                                 corrmag_idcol=0,
+                                 corrmag_magcols=[122,123,124],
                                  outfile=None,
                                  nworkers=16,
                                  workerntasks=500,
                                  sigclip=4.0):
-    '''
-    This calculates statistics on all binned lc files in lcdir using lcglob to
-    find the files. Puts the results in text file outfile.
+    '''This calculates statistics on all binned lc files in lcdir.
+
+    Puts the results in text file outfile.
+
+    If corrmagsource is not None, will add in corrected mag cols using the file
+    specified, corrmag_idcol for the objectid column, and corrmag_magcols for
+    the magnitude columns.
 
     outfile contains the following columns:
 
@@ -5630,6 +5637,24 @@ def parallel_binnedlc_statistics(lcdir,
 
     outf = open(outfile,'wb')
 
+    if corrmagsource and os.path.exists(corrmagsource):
+
+        print('getting corrected mags from %s' % corrmagsource)
+
+        if corrmagsource.endswith('.gz'):
+            corrmags = gzip.open(corrmagsource)
+        else:
+            corrmags = open(corrmagsource)
+
+        corrmaginfo = np.genfromtxt(corrmags,
+                                    usecols=tuple([corrmag_idcol] +
+                                                  corrmag_magcols),
+                                    names=('hatid','ap1','ap2','ap3'),
+                                    dtype='S20,f8,f8,f8')
+
+    else:
+        corrmaginfo = None
+
     outlineformat = (
         '%s %.3f  '
         '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
@@ -5637,12 +5662,9 @@ def parallel_binnedlc_statistics(lcdir,
         '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
         '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
         '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
-        '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s\n'
+        '%.6f %.6f %.6f %.6f %s %.6f %.6f %.6f %.6f %s  '
+        '%.3f %.3f %.3f\n'
         )
-
-    outheader = '# total objects: %s, sigmaclip used: %s\n' % (len(lcfiles),
-                                                               sigclip)
-    outf.write(outheader)
 
     outcolumnkey = (
         '# columns are:\n'
@@ -5650,22 +5672,34 @@ def parallel_binnedlc_statistics(lcdir,
         '# 2,3,4,5,6: median EP1, MAD EP1, mean EP1, stdev EP1, ndet EP1\n'
         '# 7,8,9,10,11: sigma-clipped median EP1, MAD EP1, mean EP1, '
         'stdev EP1, ndet EP1\n'
-        '# 12,13,14,15,16: median EP2, MAD EP2, mean EP2, stdev EP2, ndet EP2\n'
+        '# 12,13,14,15,16: median EP2, MAD EP2, mean EP2, stdev EP2, '
+        'ndet EP2\n'
         '# 17,18,19,20,21: sigma-clipped median EP2, MAD EP2, mean EP2, '
         'stdev EP2, ndet EP2\n'
-        '# 22,23,24,25,26: median EP3, MAD EP3, mean EP3, stdev EP3, ndet EP3\n'
+        '# 22,23,24,25,26: median EP3, MAD EP3, mean EP3, stdev EP3, '
+        'ndet EP3\n'
         '# 27,28,29,30,31: sigma-clipped median EP3, MAD EP3, mean EP3, '
         'stdev EP3, ndet EP3\n'
-        '# 32,33,34,35,36: median TF1, MAD TF1, mean TF1, stdev TF1, ndet TF1\n'
+        '# 32,33,34,35,36: median TF1, MAD TF1, mean TF1, stdev TF1, '
+        'ndet TF1\n'
         '# 37,38,39,40,41: sigma-clipped median TF1, MAD TF1, mean TF1, '
         'stdev TF1, ndet TF1\n'
-        '# 42,43,44,45,46: median TF2, MAD TF2, mean TF2, stdev TF2, ndet TF2\n'
+        '# 42,43,44,45,46: median TF2, MAD TF2, mean TF2, stdev TF2, '
+        'ndet TF2\n'
         '# 47,48,49,50,51: sigma-clipped median TF2, MAD TF2, mean TF2, '
         'stdev TF2, ndet TF2\n'
-        '# 52,53,54,55,56: median TF3, MAD TF3, mean TF3, stdev TF3, ndet TF3\n'
+        '# 52,53,54,55,56: median TF3, MAD TF3, mean TF3, stdev TF3, '
+        'ndet TF3\n'
         '# 57,58,59,60,61: sigma-clipped median TF3, MAD TF3, mean TF3, '
         'stdev TF3, ndet TF3\n'
+        '# 62, 63, 64: corrected catalog mags AP1, AP2, AP3\n'
         ) % fovcatmaglabel
+
+
+    # write the header to the file
+    outheader = '# total objects: %s, sigmaclip used: %s\n' % (len(lcfiles),
+                                                               sigclip)
+    outf.write(outheader)
     outf.write(outcolumnkey)
 
     # open the fovcatalog and read in the column magnitudes and hatids
@@ -5692,7 +5726,48 @@ def parallel_binnedlc_statistics(lcdir,
                       stat['lcobj'])
                 catmag = stat['median_tf3']
 
-            outline = outlineformat % (
+
+            # find the corrected mag for this source if possible
+            if corrmaginfo:
+                try:
+                    corrmag_ap1 = corrmaginfo['ap1'][
+                        np.where(corrmaginfo['hatid'] == stat['lcobj'][:15])
+                    ]
+                    if not corrmag_ap1[0]:
+                        print('no corrected AP1 mag for %s, using med TF1 mag'
+                              % (stat['lcobj']))
+                        corrmag_ap1 = stat['median_tf1']
+
+                    corrmag_ap2 = corrmaginfo['ap2'][
+                        np.where(corrmaginfo['hatid'] == stat['lcobj'][:15])
+                    ]
+                    if not corrmag_ap2[0]:
+                        print('no corrected AP2 mag for %s, using med TF2 mag'
+                              % (stat['lcobj']))
+                        corrmag_ap2 = stat['median_tf2']
+
+                    corrmag_ap3 = corrmaginfo['ap3'][
+                        np.where(corrmaginfo['hatid'] == stat['lcobj'][:15])
+                    ]
+                    if not corrmag_ap3[0]:
+                        print('no corrected AP3 mag for %s, using med TF3 mag'
+                              % (stat['lcobj']))
+                        corrmag_ap3 = stat['median_tf3']
+
+                except Exception as e:
+                    print('no corrected mags for %s, using median TF mags' %
+                          stat['lcobj'])
+                    corrmag_ap1 = stat['median_tf1']
+                    corrmag_ap2 = stat['median_tf2']
+                    corrmag_ap3 = stat['median_tf3']
+
+            else:
+                corrmag_ap1 = catmag
+                corrmag_ap2 = catmag
+                corrmag_ap3 = catmag
+
+
+            outlinelist = [
                 stat['lcobj'],
                 catmag,
 
@@ -5760,8 +5835,15 @@ def parallel_binnedlc_statistics(lcdir,
                 stat['mad_sigclip_tf3'],
                 stat['mean_sigclip_tf3'],
                 stat['stdev_sigclip_tf3'],
-                stat['ndet_sigclip_tf3']
-                )
+                stat['ndet_sigclip_tf3'],
+
+                corrmag_ap1,
+                corrmag_ap2,
+                corrmag_ap3
+            ]
+
+            # write the output line
+            outline = outlineformat % tuple(outlinelist)
             outf.write(outline)
 
     outf.close()
@@ -5770,6 +5852,7 @@ def parallel_binnedlc_statistics(lcdir,
           (datetime.utcnow().isoformat(), outfile))
 
     return results
+
 
 
 def read_binnedlc_stats_file(statsfile):
@@ -5787,7 +5870,8 @@ def read_binnedlc_stats_file(statsfile):
                'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP3
                'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF1
                'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF2
-               'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8'), # TF3
+               'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF3
+               'f8,f8,f8'),                      # corrected mags
         names=['lcobj','cat_mag',
                'med_ep1','mad_ep1','mean_ep1','stdev_ep1','ndet_ep1',
                'med_sc_ep1','mad_sc_ep1','mean_sc_ep1','stdev_sc_ep1',
@@ -5806,7 +5890,8 @@ def read_binnedlc_stats_file(statsfile):
                'ndet_sc_tf2',
                'med_tf3','mad_tf3','mean_tf3','stdev_tf3','ndet_tf3',
                'med_sc_tf3','mad_sc_tf3','mean_sc_tf3','stdev_sc_tf3',
-               'ndet_sc_tf3']
+               'ndet_sc_tf3',
+               'corr_mag_ap1','corr_mag_ap2','corr_mag_ap3']
         )
 
     return stats
