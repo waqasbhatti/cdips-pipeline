@@ -77,6 +77,7 @@ import shutil
 import random
 import cPickle as pickle
 import sqlite3
+import gzip
 
 import numpy as np
 
