@@ -6167,11 +6167,16 @@ def plot_stats_file(statsfile, outdir, outprefix,
                 ycol2 = stats[STATS_PLOTS[plot]['ycol'][1]]
                 ycol3 = stats[STATS_PLOTS[plot]['ycol'][2]]
 
+                # remove any spurious zeros (caused by TFA?)
+                ycol1[ycol1 == 0.0] = np.nan
+                ycol2[ycol2 == 0.0] = np.nan
+                ycol3[ycol3 == 0.0] = np.nan
+
                 # make a column stack of the MAD arrays
                 bestapstack = np.column_stack((ycol1, ycol2, ycol3))
 
                 # get the min of each row of the stack, this is the best MAD
-                ycol = np.amin(bestapstack,axis=1)
+                ycol = np.nanmin(bestapstack,axis=1)
 
                 xlabel, ylabel = (STATS_PLOTS[plot]['xlabel'],
                                   STATS_PLOTS[plot]['ylabel'])
