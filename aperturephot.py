@@ -6111,7 +6111,7 @@ def plot_stats_file(statsfile, outdir, outprefix,
                     binned=False,
                     logy=False,
                     logx=False,
-                    correctmagsafter=12.5,
+                    correctmagsafter=None,
                     rangex=(5.9,14.1)):
     '''This makes all the plots for a stats file.
 
