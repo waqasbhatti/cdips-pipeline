@@ -5728,7 +5728,7 @@ def parallel_binnedlc_statistics(lcdir,
 
 
             # find the corrected mag for this source if possible
-            if corrmaginfo:
+            if corrmaginfo is not None:
                 try:
                     corrmag_ap1 = corrmaginfo['ap1'][
                         np.where(corrmaginfo['hatid'] == stat['lcobj'][:15])
