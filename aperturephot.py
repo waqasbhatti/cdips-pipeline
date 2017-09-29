@@ -3898,6 +3898,8 @@ def parallel_run_tfa(lcdir,
 # 3. ratios of RMS and MAD vs. MAG for CCD 6,7,8 to that of CCD 5
 # 4. binned LC versions of these plots, using 10, 30, and 60 minute binning
 
+# FIXME: get adding median magnitude measurement errors to this as well. This
+# will allow for getting the predicted error relation and scintillation noise.
 def get_lc_statistics(lcfile,
                       rmcols=[19,20,21],
                       epcols=[22,23,24],
