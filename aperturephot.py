@@ -3900,6 +3900,21 @@ def parallel_run_tfa(lcdir,
 
 # FIXME: get adding median magnitude measurement errors to this as well. This
 # will allow for getting the predicted error relation and scintillation noise.
+def get_magnitude_measurement_errs(photfile,
+                                   frame,
+                                   errcols=[],
+                                   airmassheaderkey='X'):
+    '''
+    This gets the median mag errs for the object and the airmass.
+
+    Used to calculate the expected noise curve in an RMS plot.
+
+    predicted total noise = sqrt((median mag err)**2 + (scintillation noise)**2)
+
+    '''
+
+
+
 def get_lc_statistics(lcfile,
                       rmcols=[19,20,21],
                       epcols=[22,23,24],
