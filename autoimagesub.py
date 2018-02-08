@@ -536,6 +536,7 @@ def calibrated_frame_to_database(fitsfile,
                                  network='HP',
                                  overwrite=False,
                                  badframetag='badframes',
+                                 nonwcsframes_are_ok=False,
                                  database=None):
     '''This puts an original fully calibrated FITS into the database.
 
@@ -640,16 +641,30 @@ def calibrated_frame_to_database(fitsfile,
         prospective_wcs = fitsfile.replace('.fits','.wcs')
         prospective_fiphot = fitsfile.replace('.fits','.fiphot')
 
+        if nonwcsframes_are_ok:
+            badframecheck = (
+                os.path.exists(prospective_fistar) and
+                os.path.exists(prospective_fiphot) and
+                (badframetag not in os.path.abspath(fitsfile))
+            )
+        else:
+            badframecheck = (
+                os.path.exists(prospective_fistar) and
+                os.path.exists(prospective_wcs) and
+                os.path.exists(prospective_fiphot) and
+                (badframetag not in os.path.abspath(fitsfile))
+            )
+
         # check if this is a bad frame and set stuff accordingly
-        if (os.path.exists(prospective_fistar) and
-            os.path.exists(prospective_wcs) and
-            os.path.exists(prospective_fiphot) and
-            (badframetag not in os.path.abspath(fitsfile))):
+        if badframecheck:
 
             frameisok = True
             fits = os.path.abspath(fitsfile)
             fistar = os.path.abspath(prospective_fistar)
-            wcs = os.path.abspath(prospective_wcs)
+            if os.path.exists(prospective_wcs):
+                wcs = os.path.abspath(prospective_wcs)
+            else:
+                wcs = None
             fiphot = os.path.abspath(prospective_fiphot)
 
         else:
@@ -958,6 +973,7 @@ def parallel_calibrated_frames_to_database(fitsbasedir,
                                            network='HP',
                                            overwrite=False,
                                            badframetag='badframes',
+                                           nonwcsframes_are_ok=False,
                                            nworkers=16,
                                            maxworkertasks=1000):
     '''
@@ -983,6 +999,7 @@ def parallel_calibrated_frames_to_database(fitsbasedir,
         # generate the task list
         tasks = [(x, {'network':network,
                       'overwrite':overwrite,
+                      'nonwcsframes_are_ok':nonwcsframes_are_ok,
                       'badframetag':badframetag}) for x in fitslist]
 
         print('%sZ: %s files to process' %
