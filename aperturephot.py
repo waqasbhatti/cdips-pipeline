@@ -269,7 +269,7 @@ DISTINCT_HATIDS_CMD = ('select distinct hatid from hatids')
 
 def reform_fistars(fistardir,
                    fistarglob='1-*_?.fistar',
-                   linestokeep=500,
+                   linestokeep=250,
                    outpostfix='astrometry'):
     '''
     This truncates all fistars in the directory fistardir to linestokeep
@@ -347,8 +347,12 @@ def anet_solve_frame(srclist,
 
         # find the frame
         srcframe = os.path.basename(srclist)
+
         srcframe = os.path.splitext(srcframe)[0] + '.fits'
         srcframepath = os.path.join(os.path.dirname(srclist), srcframe)
+
+        srcframefz = os.path.splitext(srcframe)[0] + '.fits.fz'
+        srcframefzpath = os.path.join(os.path.dirname(srclist), srcframefz)
 
         # get the RA, DEC, and FOV header keywords
         if os.path.exists(srcframepath):
@@ -365,11 +369,24 @@ def anet_solve_frame(srclist,
 
             ra = ra*360.0/24.0
 
+        elif os.path.exists(srcframefzpath):
+
+            ra = get_header_keyword(srcframefzpath,'rac')
+            dec = get_header_keyword(srcframefzpath,'decc')
+            fov = get_header_keyword(srcframefzpath,'fov')
+            xpix = get_header_keyword(srcframefzpath,'naxis1')
+            ypix = get_header_keyword(srcframefzpath,'naxis2')
+
+
+            if fov is not None:
+                width = fov
+
+            ra = ra*360.0/24.0
+
 
     ANETCMDSTR = ("anet -r {ra} -d {dec} -w {width} "
                   "--tweak {tweak} --radius {radius} -s {xpix},{ypix} "
                   "--cols {colx},{coly} --wcs {outwcsfile} {sourcelist}")
-
 
     anetcmd = ANETCMDSTR.format(ra=ra,
                                 dec=dec,
@@ -459,6 +476,70 @@ def parallel_anet(srclistdir,
     print('%sZ: found %s fistar files in %s, starting astrometry...' %
           (datetime.utcnow().isoformat(),
            len(fistarlist), srclistdir))
+
+    if outdir and not os.path.exists(outdir):
+
+        print('%sZ: making new output directory %s' %
+              (datetime.utcnow().isoformat(),
+               outdir))
+        os.mkdir(outdir)
+
+    pool = mp.Pool(nworkers, maxtasksperchild=maxtasksperworker)
+
+    inpostfix = os.path.splitext(fistarglob)[-1]
+
+    tasks = [
+        [x, os.path.join(
+                outdir, os.path.basename(
+                    x.replace(inpostfix, '.wcs')
+                    )
+                ),
+         ra, dec, {'width':width,
+                   'tweak':tweak,
+                   'radius':radius,
+                   'xpix':xpix,
+                   'ypix':ypix,
+                   'cols':cols,
+                   'infofromframe':infofromframe}]
+        for x in fistarlist
+        ]
+
+    # fire up the pool of workers
+    results = pool.map(parallel_anet_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    # this is the return dictionary
+    returndict = {x:y for (x,y) in results}
+    return returndict
+
+
+
+def parallel_anet_list(srclistlist,
+                       outdir,
+                       ra, dec,
+                       fistarglob='?-*_?.fistar-astrometry',
+                       nworkers=16,
+                       maxtasksperworker=1000,
+                       infofromframe=True,
+                       width=13,
+                       tweak=6,
+                       radius=13,
+                       xpix=2048,
+                       ypix=2048,
+                       cols=(2,3)):
+    '''
+    This runs anet on a list of frames in parallel.
+
+    '''
+
+    # get a list of all fits files in the directory
+    fistarlist = [x for x in srclistlist if os.path.exists(x)]
+
+    print('%sZ: found %s fistar files, starting astrometry...' %
+          (datetime.utcnow().isoformat(), len(fistarlist)))
 
     if outdir and not os.path.exists(outdir):
 
