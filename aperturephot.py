@@ -1668,6 +1668,7 @@ def parallel_fitslist_photometry(
 
 def collect_image_info(fits, fistar,
                        minsrcbgv=100.0,
+                       minsrcsval=1.5,
                        maxframebgv=2000.0,
                        maxmadbgv=150.0,
                        minnstars=500):
@@ -1710,14 +1711,15 @@ def collect_image_info(fits, fistar,
 
     # get the fistar file columns we need
     framecols = np.genfromtxt(fistar,
-                              usecols=(3,),
-                              names=['bgv'],
-                              dtype='f8')
+                              usecols=(3,5),
+                              names=['bgv','sval'],
+                              dtype='f8,f8',comments='#')
 
     finitesrcbgvs = framecols['bgv'][np.isfinite(framecols['bgv'])]
     nstars = len(finitesrcbgvs)
     mediansrcbgv = np.median(finitesrcbgvs)
     madsrcbgv = np.median(np.abs(finitesrcbgvs - mediansrcbgv))
+    mediansval = np.median(framecols['sval'][np.isfinite(framecols['sval'])]
 
     # check if the frame was aborted in the middle of the exposure
     if 'ABORTED' in hdr and hdr['ABORTED'] and hdr['ABORTED'] == 1:
@@ -1731,6 +1733,7 @@ def collect_image_info(fits, fistar,
                (madsrcbgv < maxmadbgv) and
                (-2*minsrcbgv < framebgv < maxframebgv) and
                (nstars >= minnstars) and
+               (mediansval > minsrcsval) and
                (frameaborted is not True))
 
     frameinfo = {'fits':fits,
@@ -1738,6 +1741,7 @@ def collect_image_info(fits, fistar,
                  'nstars':nstars,
                  'medsrcbgv':mediansrcbgv,
                  'madsrcbgv':madsrcbgv,
+                 'medsrcsval':mediansval,
                  'framebgv':framebgv,
                  'frameok':frameok}
 
@@ -1752,7 +1756,8 @@ def frame_filter_worker(task):
 
     task[0] = fits
     task[1] = fistar
-    task[2] = {'minsrcbgv', 'maxframebgv', 'maxmaxbgv', 'minnstars'}
+    task[2] = {'minsrcbgv', 'maxframebgv', 'maxmaxbgv',
+               'minnstars', 'minsrcsval'}
 
     this returns:
 
@@ -1799,6 +1804,7 @@ def parallel_frame_filter(fitsdir,
                           badframesdir=None,
                           minsrcbgv=100.0,
                           maxmadbgv=200.0,
+                          minsrcsval=1.5,
                           maxframebgv=2000.0,
                           minnstars=500,
                           nworkers=16,
@@ -1823,6 +1829,7 @@ def parallel_frame_filter(fitsdir,
 
         if os.path.exists(fistar):
             tasks.append((fits, fistar, {'minsrcbgv':minsrcbgv,
+                                         'minsrcsval':minsrcsval,
                                          'maxmadbgv':maxmadbgv,
                                          'maxframebgv':maxframebgv,
                                          'minnstars':minnstars}))
