@@ -1,13 +1,10 @@
-# HATpipe requirements
-HATpipepy
-anet
-
-
-# python requirements
-Cython>=0.21.1
-matplotlib>=1.1.1rc2
-numpy>=1.9.1
-paramiko>=1.15.2
-pyfits>=3.3
-scipy>=0.15.0
+numpy
+scipy
+matplotlib
 astropy
+pillow
+paramiko
+Pillow
+psycopg2-binary
+h5py
+subprocess32;python_version<"3.2"

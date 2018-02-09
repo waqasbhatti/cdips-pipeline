@@ -51,8 +51,8 @@ except:
     print('cannot import curve_fit, will use leastsq')
     USE_LEASTSQ=1
 
-import pyfits
 
+import astropy.io.fits as pyfits
 from astropy import wcs
 
 from PIL import Image

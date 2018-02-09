@@ -68,7 +68,12 @@ import os
 import os.path
 import glob
 import multiprocessing as mp
-import subprocess
+
+try:
+    import subprocess32
+except:
+    import subprocess
+
 import shlex
 from datetime import datetime
 import re
@@ -94,7 +99,7 @@ import matplotlib
 matplotlib.use('AGG')
 import matplotlib.pyplot as plt
 
-import pyfits
+import astropy.io.fits as pyfits
 
 import imageutils
 from imageutils import get_header_keyword, read_fits, extract_img_background

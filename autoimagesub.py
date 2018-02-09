@@ -21,8 +21,14 @@ import os
 import os.path
 import glob
 import multiprocessing as mp
-import subprocess
-from subprocess import check_output
+
+try:
+    import subprocess32 as subprocess
+    from subprocess32 import check_output
+except:
+    import subprocess
+    from subprocess import check_output
+
 import shlex
 from datetime import datetime
 import re
@@ -90,7 +96,7 @@ FRAMEINFOCACHEDIR = '/P/HP0/BASE/frameinfo-cache'
 FIELDCAT_DIR = '/P/HP0/BASE/field-catalogs'
 
 # these define the postgres database credentials
-PGPASSFILE = '/home/hatuser/.pgpass'
+PGPASSFILE = os.path.expanduser('~/.pgpass')
 PGUSER = 'hpx'
 PGDATABASE = 'hpx'
 PGHOST = 'localhost'

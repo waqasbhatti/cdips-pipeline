@@ -156,8 +156,14 @@ import os
 import os.path
 import glob
 import multiprocessing as mp
-import subprocess
-from subprocess import check_output
+
+try:
+    import subprocess32 as subprocess
+    from subprocess32 import check_output
+except:
+    import subprocess
+    from subprocess import check_output
+
 import shlex
 from datetime import datetime
 import re
@@ -187,7 +193,7 @@ import matplotlib
 matplotlib.use('AGG')
 import matplotlib.pyplot as plt
 
-import pyfits
+from astropy.io import fits as pyfits
 
 import imageutils
 from imageutils import get_header_keyword, fits_to_full_jpeg
