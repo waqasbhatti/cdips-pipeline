@@ -1719,7 +1719,7 @@ def collect_image_info(fits, fistar,
     nstars = len(finitesrcbgvs)
     mediansrcbgv = np.median(finitesrcbgvs)
     madsrcbgv = np.median(np.abs(finitesrcbgvs - mediansrcbgv))
-    mediansval = np.median(framecols['sval'][np.isfinite(framecols['sval'])]
+    mediansval = np.median(framecols['sval'][np.isfinite(framecols['sval'])])
 
     # check if the frame was aborted in the middle of the exposure
     if 'ABORTED' in hdr and hdr['ABORTED'] and hdr['ABORTED'] == 1:
