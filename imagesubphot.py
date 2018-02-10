@@ -160,9 +160,11 @@ import multiprocessing as mp
 try:
     import subprocess32 as subprocess
     from subprocess32 import check_output
+    import cPickle as pickle
 except:
     import subprocess
     from subprocess import check_output
+    import pickle
 
 import shlex
 from datetime import datetime
@@ -170,7 +172,6 @@ import re
 import json
 import shutil
 import random
-import cPickle as pickle
 from hashlib import md5
 
 # used for fast random access to lines in text files
