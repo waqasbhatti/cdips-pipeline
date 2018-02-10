@@ -68,9 +68,8 @@ if os.path.exists(fontpath):
     fontnormal = ImageFont.truetype(fontpath, 20)
     fontlarge = ImageFont.truetype(fontpath, 28)
 else:
-    LOGWARNING('could not find bundled '
-               'DejaVu Sans font in the astrobase package '
-               'data, using ugly defaults...')
+    print('could not find bundled '
+          'DejaVu Sans font, using ugly defaults...')
     fontsmall = ImageFont.load_default()
     fontnormal = ImageFont.load_default()
     fontlarge = ImageFont.load_default()
