@@ -70,7 +70,7 @@ import glob
 import multiprocessing as mp
 
 try:
-    import subprocess32
+    import subprocess32 as subprocess
 except:
     import subprocess
 
@@ -80,7 +80,11 @@ import re
 import json
 import shutil
 import random
-import cPickle as pickle
+try:
+    import cPickle as pickle
+except:
+    import pickle
+
 import sqlite3
 import gzip
 
@@ -274,7 +278,7 @@ DISTINCT_HATIDS_CMD = ('select distinct hatid from hatids')
 
 def reform_fistars(fistardir,
                    fistarglob='1-*_?.fistar',
-                   linestokeep=250,
+                   linestokeep=300,
                    outpostfix='astrometry'):
     '''
     This truncates all fistars in the directory fistardir to linestokeep
@@ -368,7 +372,6 @@ def anet_solve_frame(srclist,
             xpix = get_header_keyword(srcframepath,'naxis1')
             ypix = get_header_keyword(srcframepath,'naxis2')
 
-
             if fov is not None:
                 width = fov
 
@@ -376,18 +379,17 @@ def anet_solve_frame(srclist,
 
         elif os.path.exists(srcframefzpath):
 
-            ra = get_header_keyword(srcframefzpath,'rac')
-            dec = get_header_keyword(srcframefzpath,'decc')
-            fov = get_header_keyword(srcframefzpath,'fov')
-            xpix = get_header_keyword(srcframefzpath,'naxis1')
-            ypix = get_header_keyword(srcframefzpath,'naxis2')
-
+            # ext 1 is the header for the fpacked image
+            ra = get_header_keyword(srcframefzpath,'rac',ext=1)
+            dec = get_header_keyword(srcframefzpath,'decc',ext=1)
+            fov = get_header_keyword(srcframefzpath,'fov',ext=1)
+            xpix = get_header_keyword(srcframefzpath,'naxis1',ext=1)
+            ypix = get_header_keyword(srcframefzpath,'naxis2',ext=1)
 
             if fov is not None:
                 width = fov
 
             ra = ra*360.0/24.0
-
 
     ANETCMDSTR = ("anet -r {ra} -d {dec} -w {width} "
                   "--tweak {tweak} --radius {radius} -s {xpix},{ypix} "
@@ -591,8 +593,8 @@ def parallel_anet_list(srclistlist,
 ##########################
 
 def make_fov_catalog(ra=None, dec=None, size=None,
-                     brightrmag=6.0,
-                     faintrmag=13.0,
+                     brightrmag=8.0,
+                     faintrmag=16.0,
                      fits=None,
                      outfile=None,
                      catalog='2MASS',
