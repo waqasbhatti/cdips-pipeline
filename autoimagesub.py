@@ -35,7 +35,12 @@ import re
 import json
 import shutil
 import random
-import cPickle as pickle
+
+try:
+    import cPickle as pickle
+except:
+    import pickle
+
 import sqlite3
 import time
 from hashlib import md5, sha256
