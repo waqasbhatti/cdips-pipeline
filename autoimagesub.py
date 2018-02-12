@@ -660,6 +660,8 @@ def calibrated_frame_to_database(fitsfile,
         prospective_fiphot = os.path.join(os.path.dirname(fitsfile),
                                           prospective_fiphot)
 
+        print(prospective_fistar, prospective_wcs, prospective_fiphot)
+
         if nonwcsframes_are_ok:
             badframecheck = (
                 os.path.exists(prospective_fistar) and
