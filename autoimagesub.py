@@ -322,6 +322,10 @@ def get_frame_info(frame):
         fitsdir = os.path.dirname(frame)
         fitsbase = os.path.splitext(os.path.basename(frame))[0]
 
+        # handle gz/fz files
+        if '.fits' in fitsbase:
+            fitsbase = fitsbase.replace('.fits','')
+
         # if the xtrns files are passed in, make sure we look at the
         # right fistar and fiphot files
         if '-xtrns' in fitsbase:
@@ -659,8 +663,6 @@ def calibrated_frame_to_database(fitsfile,
                                        prospective_wcs)
         prospective_fiphot = os.path.join(os.path.dirname(fitsfile),
                                           prospective_fiphot)
-
-        print(prospective_fistar, prospective_wcs, prospective_fiphot)
 
         if nonwcsframes_are_ok:
             badframecheck = (
