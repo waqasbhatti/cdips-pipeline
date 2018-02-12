@@ -938,10 +938,10 @@ def calibrated_frame_to_database(fitsfile,
         message = ('failed to insert %s '
                    'into DB because it exists already '
                    'and overwrite = False'
-                   % fits)
+                   % fitsfile)
         print('EXC! %sZ: %s\n%s' %
                (datetime.utcnow().isoformat(), message, format_exc()) )
-        returnval = (fits, False)
+        returnval = (fitsfile, False)
 
 
     # if everything goes wrong, exit cleanly
@@ -949,11 +949,11 @@ def calibrated_frame_to_database(fitsfile,
 
         database.rollback()
 
-        message = 'failed to insert %s into DB' % fits
+        message = 'failed to insert %s into DB' % fitsfile
         print('EXC! %sZ: %s\nexception was: %s' %
                (datetime.utcnow().isoformat(),
                 message, format_exc()) )
-        returnval = (fits, False)
+        returnval = (fitsfile, False)
 
         # TEMPORARY
         # raise
