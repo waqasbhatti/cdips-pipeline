@@ -647,10 +647,18 @@ def calibrated_frame_to_database(fitsfile,
         else:
             frt = None
 
-        # find the frame's fistar, wcs, and fiphot
-        prospective_fistar = fitsfile.replace('.fits','.fistar')
-        prospective_wcs = fitsfile.replace('.fits','.wcs')
-        prospective_fiphot = fitsfile.replace('.fits','.fiphot')
+        # generate frame's fistar, wcs, and fiphot filenames
+        prospective_fistar = '%s-%s%s_%s.fistar' % (stationid, cfn, cfs, ccd)
+        prospective_wcs = '%s-%s%s_%s.wcs' % (stationid, cfn, cfs, ccd)
+        prospective_fiphot = '%s-%s%s_%s.fiphot' % (stationid, cfn, cfs, ccd)
+
+        # get their paths
+        prospective_fistar = os.path.join(os.path.dirname(fitsfile),
+                                          prospective_fistar)
+        prospective_wcs = os.path.join(os.path.dirname(fitsfile),
+                                       prospective_wcs)
+        prospective_fiphot = os.path.join(os.path.dirname(fitsfile),
+                                          prospective_fiphot)
 
         if nonwcsframes_are_ok:
             badframecheck = (
