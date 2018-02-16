@@ -40,7 +40,7 @@ if __name__ == '__main__':
     in_file, out_file = args
 
     if opts.out_type is None:
-        imageutils.fits_to_jpeg(in_file,out_fname=out_file)
+        imageutils.fits_to_full_jpeg(in_file,out_fname=out_file)
     elif opts.out_type == 'stamp':
         imageutils.fits_to_stamps_jpeg(in_file,out_fname=out_file)
     elif opts.out_type == 'full':
@@ -48,4 +48,3 @@ if __name__ == '__main__':
     else:
         print('unknown output type %s' % opts.out_type)
         sys.exit(1)
-
