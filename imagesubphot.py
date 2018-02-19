@@ -84,7 +84,7 @@ in question
     subtracted frames to produce difference magnitudes for each image. these
     calculated mags are put into .iphot files.
 
-12. use parallel_collect_imagesublcs to collect the .iphot files into .ilc
+12. use parallel_collect_imagesub_lightcurves to collect the .iphot files into .ilc
     lightcurve files containing image subtraction photometric timeseries for
     each star.
 
@@ -2071,7 +2071,10 @@ def photometry_on_subtracted_frames(subframedir,
                                     subframexysdkdir=None,
                                     photdisjointradius=2,
                                     photrefprefix=None,
+                                    hardprefix='',
                                     nworkers=16,
+                                    kernelspec='b/4;i/4;d=4/4',
+                                    lcapertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
                                     maxworkertasks=1000,
                                     outdir=None):
 
@@ -2111,13 +2114,13 @@ def photometry_on_subtracted_frames(subframedir,
     else:
         photrefbit = ''
 
-
     # find matching kernel, itrans, and xysdk files for each subtracted frame
     for subframe in subframelist:
 
 
         frameinfo = FRAMEREGEX.findall(os.path.basename(subframe))
-        kernel = '%s%s-%s_%s-xtrns.fits-kernel' % (photrefbit,
+        kernel = '%s%s%s-%s_%s-xtrns.fits-kernel' % (photrefbit,
+                                                   hardprefix,
                                                    frameinfo[0][0],
                                                    frameinfo[0][1],
                                                    frameinfo[0][2])
@@ -2144,7 +2147,9 @@ def photometry_on_subtracted_frames(subframedir,
                           itrans,
                           xysdk,
                           outdir,
-                          photrefprefix))
+                          photrefprefix,
+                          kernelspec,
+                          lcapertures))
 
     # now start up the parallel photometry
     print('%sZ: %s good frames to run photometry on in %s, starting...' %
