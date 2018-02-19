@@ -6320,7 +6320,7 @@ def plot_stats_file(statsfile, outdir, outprefix,
                 plt.scatter(xcol, ycol,
                             s=1,
                             marker='.')
-                plt.yscale('log',basex=10.0)
+                plt.yscale('log',basey=10.0)
             elif logx:
                 plt.scatter(xcol, ycol,
                             s=1,
@@ -6331,7 +6331,7 @@ def plot_stats_file(statsfile, outdir, outprefix,
                             s=1,
                             marker='.')
                 plt.xscale('log',basex=10.0)
-                plt.yscale('log',basex=10.0)
+                plt.yscale('log',basey=10.0)
             else:
                 plt.scatter(xcol, ycol,
                             s=1,
