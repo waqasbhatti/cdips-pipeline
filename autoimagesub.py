@@ -112,14 +112,18 @@ LCBASEDIR = '/P/LC'
 # this is to recognize a HATID
 HATIDREGEX = re.compile(r'^HAT\-\d{3}\-\d{7}$')
 
-
-with open(PGPASSFILE) as infd:
-    pgpass_contents = infd.readlines()
-    pgpass_contents = [x.split(':') for x in pgpass_contents]
-    PGPASSWORD = [x[-1] for x in pgpass_contents
-                  if (x[0] == PGHOST and x[2] == PGDATABASE and x[3] == PGUSER)]
-    PGPASSWORD = PGPASSWORD[0].strip('\n')
-
+if os.path.exists(PGPASSFILE):
+    with open(PGPASSFILE) as infd:
+        pgpass_contents = infd.readlines()
+        pgpass_contents = [x.split(':') for x in pgpass_contents]
+        PGPASSWORD = [x[-1] for x in pgpass_contents
+                      if (x[0] == PGHOST and
+                          x[2] == PGDATABASE and
+                          x[3] == PGUSER)]
+        PGPASSWORD = PGPASSWORD[0].strip('\n')
+else:
+    print('ERR! %sZ: could not find postgres database credientials at %s' %
+          (datetime.utcnow().isoformat(), PGPASSFILE))
 
 
 ###############
