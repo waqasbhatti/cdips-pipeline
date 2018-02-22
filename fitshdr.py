@@ -14,7 +14,7 @@ import os
 import os.path
 import sys
 
-import pyfits
+import astropy.io.fits as pyfits
 
 
 if __name__ == '__main__':
