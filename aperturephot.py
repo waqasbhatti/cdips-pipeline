@@ -716,7 +716,7 @@ def reform_fov_catalog(incat,
 def extract_frame_sources(fits,
                           outfile,
                           fistarexec='fistar',
-                          ccdextent='0:0,2048:2048',
+                          ccdextent='0:2048,0:2048',
                           ccdgain=2.725,
                           fluxthreshold=1000,
                           zeropoint=17.11,
@@ -797,7 +797,9 @@ def parallel_extract_sources(fitsdir,
                              ccdgain=2.725,
                              fluxthreshold=1000,
                              zeropoint=17.11,
-                             exptime=30.0):
+                             exptime=30.0,
+                             tailstr='.fits.fz',
+                             fnamestr='*_?.fits'):
     '''
     This does parallel source extraction from all FITS in fitsdir, and puts the
     results in outdir.
@@ -805,7 +807,7 @@ def parallel_extract_sources(fitsdir,
     '''
 
     # get a list of all fits files in the directory
-    fitslist = glob.glob(os.path.join(fitsdir,'*_?.fits'))
+    fitslist = glob.glob(os.path.join(fitsdir,fnamestr))
 
     print('%sZ: found %s FITS files in %s, starting source extraction...' %
           (datetime.utcnow().isoformat(),
@@ -822,7 +824,7 @@ def parallel_extract_sources(fitsdir,
 
     tasks = [
         [(x, os.path.join(outdir,
-                          os.path.basename(x.strip('.fits.fz') +
+                          os.path.basename(x.strip(tailstr) +
                                            '.fistar'))),
          {'fistarexec':fistarexec,
           'ccdextent':ccdextent,
