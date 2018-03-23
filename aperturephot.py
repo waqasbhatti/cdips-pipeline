@@ -808,7 +808,6 @@ def parallel_extract_sources(fitsdir,
 
     # get a list of all fits files in the directory
     fitslist = glob.glob(os.path.join(fitsdir,fnamestr))
-
     print('%sZ: found %s FITS files in %s, starting source extraction...' %
           (datetime.utcnow().isoformat(),
            len(fitslist), fitsdir))
@@ -819,6 +818,23 @@ def parallel_extract_sources(fitsdir,
               (datetime.utcnow().isoformat(),
                outdir))
         os.mkdir(outdir)
+
+    # make sure source extraction hasn't already been done
+    outlist = [os.path.join(outdir,
+                            os.path.basename(x.strip(tailstr) + '.fistar')) for
+              x in fitslist]
+    exists = np.array(outlist)[np.array([os.path.exists(f) for f in outlist])]
+    exists = [e.strip('.fistar') for e in exists]
+    wanted = [w.strip('.fits') for w in fitslist]
+    toextract = np.array(fitslist)[~np.in1d(exists, wanted)]
+
+    print('%sZ: found %s FITS files to extract, starting source extraction...' %
+          (datetime.utcnow().isoformat(), len(toextract)))
+
+    if len(toextract) == 0:
+        print('%sZ: escaping source extraction because no new files...' %
+              (datetime.utcnow().isoformat()))
+        return 0
 
     pool = mp.Pool(nworkers, maxtasksperchild=maxtasksperworker)
 
