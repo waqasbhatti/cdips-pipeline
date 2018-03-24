@@ -491,6 +491,15 @@ def parallel_anet(srclistdir,
                outdir))
         os.mkdir(outdir)
 
+    # get the files for which astrometry hasn't already been done
+    fistarlist = check_files(fistarlist,
+                            'astrometry',
+                            outdir,
+                            intailstr='.fistar',
+                            outtailstr='.wcs')
+    if toextract == -1:
+        return -1
+
     pool = mp.Pool(nworkers, maxtasksperchild=maxtasksperworker)
 
     inpostfix = os.path.splitext(fistarglob)[-1]
@@ -787,6 +796,52 @@ def parallel_sourceextract_worker(task):
     return (task[0][0], extract_frame_sources(*task[0],**task[1]))
 
 
+def check_files(fitslist, operationstr, outdir, intailstr='.fits',
+                outtailstr='.fistar',):
+    '''
+    you have a fitslist you think you want to run an operation on.
+
+    however, you do not want to repeat the operation if you have already run
+    it.
+
+    input:
+        fitslist: a list of paths that you want to perform an operation on
+        operationstr: a string for logging, e.g., "source extraction"
+        outdir: path of the directory being written to
+        intailsstr: the tail string of the input files
+        outtailstr: the tail string of the output files
+
+    output:
+        the list of files on which to operate, else 0 if there are none.
+    '''
+
+    # construct list of file names that would be created for the operation to
+    # be performed
+    outlist = [os.path.join(outdir,
+                            os.path.basename(x.strip(intailstr) + outtailstr)) for
+              x in fitslist]
+
+    exists = np.array(outlist)[np.array([os.path.exists(f) for f in outlist])]
+    exists = [e.strip(outtailstr) for e in exists]
+    wanted = [w.strip(intailstr) for w in fitslist]
+
+    if len(exists) > 0:
+        to_operate_on = np.array(fitslist)[~np.in1d(exists, wanted)]
+    else:
+        to_operate_on = np.array(fitslist)
+
+    print('%sZ: found %s FITS files to %s...' %
+          (datetime.utcnow().isoformat(), len(to_operate_on), operationstr))
+
+    if len(to_operate_on) == 0:
+        print('%sZ: escaping %s because no new files...' %
+              (datetime.utcnow().isoformat(), operationstr))
+        return -1
+
+    else:
+        return to_operate_on
+
+
 
 def parallel_extract_sources(fitsdir,
                              outdir,
@@ -819,22 +874,14 @@ def parallel_extract_sources(fitsdir,
                outdir))
         os.mkdir(outdir)
 
-    # make sure source extraction hasn't already been done
-    outlist = [os.path.join(outdir,
-                            os.path.basename(x.strip(tailstr) + '.fistar')) for
-              x in fitslist]
-    exists = np.array(outlist)[np.array([os.path.exists(f) for f in outlist])]
-    exists = [e.strip('.fistar') for e in exists]
-    wanted = [w.strip('.fits') for w in fitslist]
-    toextract = np.array(fitslist)[~np.in1d(exists, wanted)]
-
-    print('%sZ: found %s FITS files to extract, starting source extraction...' %
-          (datetime.utcnow().isoformat(), len(toextract)))
-
-    if len(toextract) == 0:
-        print('%sZ: escaping source extraction because no new files...' %
-              (datetime.utcnow().isoformat()))
-        return 0
+    # get the files for which source extraction hasn't already been done
+    toextract = check_files(fitslist,
+                            'source extraction',
+                            outdir,
+                            intailstr=tailstr,
+                            outtailstr='.fistar')
+    if toextract == -1:
+        return -1
 
     pool = mp.Pool(nworkers, maxtasksperchild=maxtasksperworker)
 
@@ -848,7 +895,7 @@ def parallel_extract_sources(fitsdir,
           'fluxthreshold':fluxthreshold,
           'zeropoint':zeropoint,
           'exptime':exptime,}]
-        for x in fitslist
+        for x in toextract
         ]
 
     # fire up the pool of workers
