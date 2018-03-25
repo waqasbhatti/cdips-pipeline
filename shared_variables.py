@@ -9,12 +9,14 @@ import re, os
 ###############################################################
 
 # LOCAL_IMGBASE and LOCAL_GLOBPATTERN define the local image directories.
-LOCAL_IMGBASE = '/nfs/phtess1/ar1/HATPI/HP0/RAW/'
-LOCAL_GLOBPATTERN = '?-????????'
+LOCAL_IMGBASE = '/nfs/phtess1/ar1/TESS/SIMFFI/'
+LOCAL_GLOBPATTERN = 'tess?????????????-1-1-0016_cal_img.fits'
+
+FITS_TAIL = '.fits' # ".fits.fz" for HAT work.
 
 # FIELDCAT_DIR, _FOV, _BRIGHT, _FAINT, and _BANDS define the field catalog
 # location and properties
-FIELDCAT_DIR = '/nfs/phtess1/ar1/HATPI/HP0/BASE/CAT'
+FIELDCAT_DIR = LOCAL_IMGBASE + 'CAT'
 FIELDCAT_FOV = 14.0
 FIELDCAT_BRIGHT = 0.0
 FIELDCAT_FAINT = 15.5

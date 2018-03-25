@@ -108,6 +108,8 @@ import astropy.io.fits as pyfits
 import imageutils
 from imageutils import get_header_keyword, read_fits, extract_img_background
 
+from shared_variables import FITS_TAIL
+
 # get fiphot binary reader
 try:
     from HATpipepy.Common.BinPhot import read_fiphot
@@ -360,7 +362,7 @@ def anet_solve_frame(srclist,
         srcframe = os.path.splitext(srcframe)[0] + '.fits'
         srcframepath = os.path.join(os.path.dirname(srclist), srcframe)
 
-        srcframefz = os.path.splitext(srcframe)[0] + '.fits.fz'
+        srcframefz = os.path.splitext(srcframe)[0] + FITS_TAIL
         srcframefzpath = os.path.join(os.path.dirname(srclist), srcframefz)
 
         # get the RA, DEC, and FOV header keywords
@@ -606,6 +608,7 @@ def make_fov_catalog(ra=None, dec=None, size=None,
                      faintrmag=16.0,
                      fits=None,
                      outfile=None,
+                     outdir=None,
                      catalog='2MASS',
                      catalogpath=None,
                      columns=None):
@@ -642,6 +645,8 @@ def make_fov_catalog(ra=None, dec=None, size=None,
                                                     catra,
                                                     catdec,
                                                     catbox)
+    if outdir:
+        outfile = outdir + outfile
 
     print('%sZ: making FOV catalog for '
           'center RA, DEC = %.5f, %.5f with size = %.5f deg' %
@@ -743,7 +748,7 @@ def extract_frame_sources(fits,
         return None
 
     if not outfile:
-        outfile = fits.strip('.fits.fz') + '.fistar'
+        outfile = fits.rstrip(FITS_TAIL) + '.fistar'
 
     fistarcmd = FISTARCMD.format(
         fistarexec=fistarexec, # assuming fistar is in the path
@@ -853,7 +858,7 @@ def parallel_extract_sources(fitsdir,
                              fluxthreshold=1000,
                              zeropoint=17.11,
                              exptime=30.0,
-                             tailstr='.fits.fz',
+                             tailstr=FITS_TAIL,
                              fnamestr='*_?.fits'):
     '''
     This does parallel source extraction from all FITS in fitsdir, and puts the
@@ -1081,7 +1086,7 @@ def match_fovcatalog_framesources(frame_extracted_sourcelist,
     # fovcat HAT-ID, fovcat RA, fovcat DEC, fovcat x, fovcat y,
     # srcext id, srcext x, srcext y, srcext S, srcext D, srcext K
     if not outfile:
-        outfile = (frame_extracted_sourcelist.strip('.fits.fz') +
+        outfile = (frame_extracted_sourcelist.rstrip(FITS_TAIL) +
                    '.matched-sources')
 
 
@@ -1145,7 +1150,7 @@ def make_frameprojected_catalog(fits,
     if wcs:
         framewcsfile = wcs
     else:
-        wcspath = fitspath.rstrip('.fits.fz')
+        wcspath = fitspath.rstrip(FITS_TAIL)
         wcspath = wcspath + '.wcs'
         framewcsfile = wcspath
 
@@ -1153,7 +1158,7 @@ def make_frameprojected_catalog(fits,
         outfile = out
         temppath = out + '.projcattemp'
     else:
-        outpath = fitspath.rstrip('.fits.fz')
+        outpath = fitspath.rstrip(FITS_TAIL)
         temppath = outpath + '.projcattemp'
         outpath = outpath + '.projcatalog'
         outfile = outpath
@@ -1290,7 +1295,7 @@ def run_fiphot(fits,
         return None
 
     # figure out the fitsbase from the fits filename
-    fitsbase = os.path.basename(fits).strip('.fits.fz')
+    fitsbase = os.path.basename(fits).rstrip(FITS_TAIL)
 
     # handle the zeropoints
     if not zeropoint:
@@ -1309,11 +1314,11 @@ def run_fiphot(fits,
 
     # figure out the output path
     if not outfile:
-        outfile = os.path.abspath(fits.strip('.fits.fz') + '.fiphot')
+        outfile = os.path.abspath(fits.rstrip(FITS_TAIL) + '.fiphot')
 
     # figure out the sourcelist path
     if not sourcelist:
-        sourcelist = os.path.abspath(fits.strip('.fits.fz') + '.sourcelist')
+        sourcelist = os.path.abspath(fits.rstrip(FITS_TAIL) + '.sourcelist')
         if not os.path.exists(sourcelist):
 
             print("%sZ: can't find a source list for %s" %
@@ -1403,9 +1408,9 @@ def do_photometry(fits,
 
     '''
 
-    outprojcat = os.path.basename(fits).strip('.fits.fz') + '.projcatalog'
-    outsourcelist = os.path.basename(fits).strip('.fits.fz') + '.sourcelist'
-    outfiphot = os.path.basename(fits).strip('.fits.fz') + '.fiphot'
+    outprojcat = os.path.basename(fits).rstrip(FITS_TAIL) + '.projcatalog'
+    outsourcelist = os.path.basename(fits).rstrip(FITS_TAIL) + '.sourcelist'
+    outfiphot = os.path.basename(fits).rstrip(FITS_TAIL) + '.fiphot'
 
     if outdir and os.path.exists(outdir):
 
@@ -1451,7 +1456,7 @@ def do_photometry(fits,
                 fits,
                 os.path.join(
                     outdir,
-                    os.path.basename(fits).strip('.fits.fz') + '.fistar',
+                    os.path.basename(fits).rstrip(FITS_TAIL) + '.fistar',
                     ),
                 fluxthreshold=fluxthreshold
                 )
@@ -1588,7 +1593,7 @@ def parallel_fitsdir_photometry(
     '''
 
     # get a list of all fits files in the directory
-    fitslist = glob.glob(os.path.join(fitsdir,'?-*_?.fits'))
+    fitslist = glob.glob(os.path.join(fitsdir,fitsglob))
 
     print('%sZ: found %s FITS files in %s, starting photometry...' %
           (datetime.utcnow().isoformat(),
