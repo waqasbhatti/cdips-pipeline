@@ -1584,7 +1584,11 @@ def parallel_fitsdir_photometry(
         minsrcbgv=200.0,
         maxmadbgv=150.0,
         maxframebgv=2000.0,
-        minnstars=500
+        minnstars=500,
+        ccdgain=None,
+        ccdexptime=None,
+        zeropoint=None,
+        fitsglob='?-*_?.fits'
         ):
     '''
     This does photometry for all FITS files in a directory using nworkers
@@ -1620,7 +1624,10 @@ def parallel_fitsdir_photometry(
                'minsrcbgv':minsrcbgv,
                'maxmadbgv':maxmadbgv,
                'maxframebgv':maxframebgv,
-               'minnstars':minnstars}, rejectbadframes] for x in fitslist]
+               'minnstars':minnstars,
+               'ccdgain':ccdgain,
+               'ccdexptime':ccdexptime,
+               'zeropoint':zeropoint}, rejectbadframes] for x in fitslist]
 
     # if the badframes directory doesn't exist, make it
     badframesdir = os.path.join(outdir, 'badframes')
@@ -2041,7 +2048,7 @@ def get_magfit_frames(fitsdir,
 
         searchpath = os.path.join(
             photdir,
-            os.path.basename(fits).strip('.fits.fz') + '.fiphot'
+            os.path.basename(fits).rstrip(FITS_TAIL) + '.fiphot'
             )
 
         if os.path.exists(searchpath):
