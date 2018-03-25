@@ -498,8 +498,9 @@ def parallel_anet(srclistdir,
                             'astrometry',
                             outdir,
                             intailstr='.fistar',
-                            outtailstr='.wcs')
-    if toextract == -1:
+                            outtailstr='.wcs',
+                            skipifpartial=True)
+    if fistarlist == -1:
         return -1
 
     pool = mp.Pool(nworkers, maxtasksperchild=maxtasksperworker)
@@ -801,39 +802,54 @@ def parallel_sourceextract_worker(task):
     return (task[0][0], extract_frame_sources(*task[0],**task[1]))
 
 
-def check_files(fitslist, operationstr, outdir, intailstr='.fits',
-                outtailstr='.fistar',):
+def check_files(inlist, operationstr, outdir, intailstr='.fits',
+                outtailstr='.fistar', skipifpartial=False):
     '''
-    you have a fitslist you think you want to run an operation on.
+    You have a list of files you think you want to run an operation on.
 
-    however, you do not want to repeat the operation if you have already run
+    However, you do not want to repeat the operation if you have already run
     it.
 
+    Further, sometimes you want to skip the operation entirely if it failed
+    last time you tried it.
+
     input:
-        fitslist: a list of paths that you want to perform an operation on
+
+        inlist: a list of paths that you want to perform an operation on
+
         operationstr: a string for logging, e.g., "source extraction"
+
         outdir: path of the directory being written to
+
         intailsstr: the tail string of the input files
+
         outtailstr: the tail string of the output files
 
+        skipifpartial: if we find ANY matches between the inlist and outlist,
+            then return -1 and do not perform any operations at all.
+
     output:
-        the list of files on which to operate, else 0 if there are none.
+
+        default: the list of files on which to operate. If there are no files
+        on which to operate, or skipifpartial==True and there are some matches,
+        returns -1.
+
     '''
 
     # construct list of file names that would be created for the operation to
     # be performed
     outlist = [os.path.join(outdir,
                             os.path.basename(x.strip(intailstr) + outtailstr)) for
-              x in fitslist]
+              x in inlist]
 
     exists = np.array(outlist)[np.array([os.path.exists(f) for f in outlist])]
-    exists = [e.strip(outtailstr) for e in exists]
-    wanted = [w.strip(intailstr) for w in fitslist]
+    _exists = [e.strip(outtailstr) for e in exists]
+    _inlist = [w.strip(intailstr) for w in inlist]
 
     if len(exists) > 0:
-        to_operate_on = np.array(fitslist)[~np.in1d(exists, wanted)]
+        to_operate_on = np.array(inlist)[~np.in1d(_inlist, _exists)]
     else:
-        to_operate_on = np.array(fitslist)
+        to_operate_on = np.array(inlist)
 
     print('%sZ: found %s FITS files to %s...' %
           (datetime.utcnow().isoformat(), len(to_operate_on), operationstr))
@@ -843,9 +859,13 @@ def check_files(fitslist, operationstr, outdir, intailstr='.fits',
               (datetime.utcnow().isoformat(), operationstr))
         return -1
 
+    if skipifpartial and (len(to_operate_on) < len(inlist)):
+        print('%sZ: escaping %s because got partial list of files...' %
+              (datetime.utcnow().isoformat(), operationstr))
+        return -1
+
     else:
         return to_operate_on
-
 
 
 def parallel_extract_sources(fitsdir,
