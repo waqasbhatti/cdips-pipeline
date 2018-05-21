@@ -109,6 +109,7 @@ import imageutils
 from imageutils import get_header_keyword, read_fits, extract_img_background
 
 from shared_variables import FITS_TAIL
+import shared_variables as sv
 
 # get fiphot binary reader
 try:
@@ -605,8 +606,8 @@ def parallel_anet_list(srclistlist,
 ##########################
 
 def make_fov_catalog(ra=None, dec=None, size=None,
-                     brightrmag=8.0,
-                     faintrmag=16.0,
+                     brightrmag=sv.FIELDCAT_BRIGHT,
+                     faintrmag=sv.FIELDCAT_FAINT,
                      fits=None,
                      outfile=None,
                      outdir=None,
@@ -633,7 +634,12 @@ def make_fov_catalog(ra=None, dec=None, size=None,
         catra, catdec, catbox = ra, dec, size
 
     elif fits:
-        raise NotImplementedError('not done yet!')
+
+        frame, hdr = read_fits(fits)
+        catra = float(hdr['RACA'])   # RA of midexpo [hr] (averaged field center)
+        catdec = float(hdr['DECCA']) # Dec of midexpo [deg] (averaged field center)
+        catbox = sv.FIELDCAT_FOV
+        import IPython; IPython.embed()
 
     else:
         print('%sZ: need a FITS file to work on, or center coords and size' %
