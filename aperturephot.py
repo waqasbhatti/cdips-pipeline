@@ -158,9 +158,9 @@ UCAC4READCMD = ("ucac4read -r {ra:f} -d {dec:f} -s {boxlen:f} "
 # locations of catalogs
 CATALOGS = {
     '2MASS':{'cmd':TWOMASSREADCMD,
-             'path':'/nfs/lcohpsrv1/ar0/P/HP0/CAT/2MASS/2MASS_JH_AP/data'},
+             'path':sv.TWOMASSPATH},
     'UCAC4':{'cmd':UCAC4READCMD,
-             'path':'/nfs/lcohpsrv1/ar0/P/HP0/CAT/UCAC4'}
+             'path':sv.UCAC4PATH}
     }
 
 # command string to run fistar
@@ -639,7 +639,6 @@ def make_fov_catalog(ra=None, dec=None, size=None,
         catra = float(hdr['RACA'])   # RA of midexpo [hr] (averaged field center)
         catdec = float(hdr['DECCA']) # Dec of midexpo [deg] (averaged field center)
         catbox = sv.FIELDCAT_FOV
-        import IPython; IPython.embed()
 
     else:
         print('%sZ: need a FITS file to work on, or center coords and size' %

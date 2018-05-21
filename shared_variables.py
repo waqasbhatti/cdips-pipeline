@@ -40,7 +40,6 @@ FIELD_CCDS = [5,6,7,8]
 TREXBASE = "/home/lbouma/proj/pipe-trex/" # user must set
 CONFBASE = os.path.expanduser(TREXBASE+"/config-files")
 
-
 # HATPipepy script paths
 HATPIPEPATH = "/home/wbhatti/HATpipebin_R3186/include/HATpipepy/Actions"
 HATPIPEBIAS = os.path.join(HATPIPEPATH, "do_masterbias.py")
@@ -55,6 +54,14 @@ MASTERDARKCONF = os.path.join(CONFBASE, "MasterDarkCfg.cfg")
 
 # CCDS to look out for
 CCDLIST = FIELD_CCDS
+
+############################################
+# The follow are called in aperturephot.py #
+############################################
+# on LCO: "/nfs/lcohpsrv1/ar0/P/HP0/CAT/2MASS/2MASS_JH_AP/data"
+TWOMASSPATH = "/nfs/phn12/ar0/H/CAT/2MASS/2MASS_JH_AP/data"
+# on LCO: "/nfs/lcohpsrv1/ar0/P/HP0/CAT/UCAC4"
+UCAC4PATH = "/nfs/phn12/ar0/H/HP0/CAT/UCAC4"
 
 # FFMPEG path to make movies
 FFMPEG = os.path.expanduser("~/bin/ffmpeg")
