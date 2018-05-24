@@ -1254,6 +1254,10 @@ def dbgen_astromref_projectidfieldccd(projectid,
     '''
     This gets all the frame info from the DB and finds a good astromref.
 
+    example args:
+        projectid = 12
+        field = 'G1830-2230_577'
+        ccd = 8
     '''
     # open a database connection
     if database:

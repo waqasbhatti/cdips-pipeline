@@ -20,6 +20,11 @@ GENERAL ORDER OF THINGS
    sharpest and roundest stars. see select_astromref_frame below to see other
    useful selectors that are applied.
 
+   (if using autoimagesub.py with sqlite3, use generate_astromref for this
+   step.  if instead using PostgreSQL, parallel_calibrated_frames_to_database,
+   then dbgen_astromref_projectidfieldccd does this. The latter is the faster
+   option.)
+
 2. next, use get_smoothed_xysdk_coeffs to generate files that contain the
    smoothed S, D, K coefficients for each source detection list. this is needed
    later when we do photometry on the subtracted frames.

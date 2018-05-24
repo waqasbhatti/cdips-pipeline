@@ -14,7 +14,7 @@ LOCAL_GLOBPATTERN = "tess?????????????-1-1-0016_cal_img.fits"
 
 # main paths
 RAWPATH=LOCAL_IMGBASE+"RAW/"
-REDPATH=LOCAL_IMGBASE+"RED/projid12-G577-ccd8-sdssr/" #FIXME
+REDPATH=LOCAL_IMGBASE+"RED/projid12-G577-ccd8-sdssr/" #FIXME: this form of pathid is ugly
 LCPATH=LOCAL_IMGBASE+"LC/"
 CALPATH=LOCAL_IMGBASE+"BASE/CAL/"
 CATPATH=LOCAL_IMGBASE+"BASE/CAT/"
@@ -23,7 +23,7 @@ TEMPPATH=LOCAL_IMGBASE+"REDTEMP/"
 REFBASEDIR=LOCAL_IMGBASE+"BASE/reference-frames/"
 REFINFO=os.path.join(REFBASEDIR,'refinfo.sqlite') # formerly TM-refinfo.sqlite
 
-FITS_TAIL = ".fits" # occasionally ".fits.fz" for HAT work.
+FITS_TAIL = ".fits" # occasionally ".fits.fz" for HAT work. ??? do fitsh routines work on .fits.fz?
 
 # define the field catalog location and properties
 FIELDCAT_DIR = CATPATH
@@ -71,9 +71,9 @@ UCAC4PATH = "/nfs/phn12/ar0/H/HP0/CAT/UCAC4"
 # Postgres database credential info #
 #####################################
 PGPASSFILE = os.path.expanduser('~/.pgpass')
-PGUSER = 'lbouma' # 'hpx'
-PGDATABASE = 'lbouma' #'hpx'
-PGHOST = 'localhost' #'localhost'
+PGUSER = 'hpx'
+PGDATABASE = 'hpx'
+PGHOST = 'localhost'
 
 # FFMPEG path to make movies
 FFMPEG = os.path.expanduser("~/bin/ffmpeg")
