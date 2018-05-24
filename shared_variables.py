@@ -20,6 +20,9 @@ CALPATH=LOCAL_IMGBASE+"BASE/CAL/"
 CATPATH=LOCAL_IMGBASE+"BASE/CAT/"
 TEMPPATH=LOCAL_IMGBASE+"REDTEMP/"
 
+REFBASEDIR=LOCAL_IMGBASE+"BASE/reference-frames/"
+REFINFO=os.path.join(REFBASEDIR,'refinfo.sqlite') # formerly TM-refinfo.sqlite
+
 FITS_TAIL = ".fits" # occasionally ".fits.fz" for HAT work.
 
 # define the field catalog location and properties
@@ -33,9 +36,13 @@ FIELDCAT_BANDS = ["g,r,i","r,i,z"]
 FIELD_REGEX = re.compile("^G(\d{2})(\d{2})([\+\-]\d{2})(\d{2})_(\w{3})$")
 FIELD_CCDS = [5,6,7,8]
 
-#############################################
-# The following are called in framecalib.py #
-#############################################
+# CCDS to look out for
+CCDLIST = FIELD_CCDS
+
+
+#################################
+# Paths called in framecalib.py #
+#################################
 # config files
 TREXBASE = "/home/lbouma/proj/pipe-trex/" # user must set
 CONFBASE = os.path.expanduser(TREXBASE+"/config-files")

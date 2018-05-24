@@ -29,7 +29,8 @@ At the second level:
 .
 ├── BASE
 │   ├── CAL                 # calibration frames (bias, flat, dark) go here
-│   └── CAT                 # FOV source catalogs for your field go here
+│   ├── CAT                 # FOV source catalogs for your field go here
+│   └── reference-frames    # astrometric reference frames, and their databases
 ├── LC
 │   ├── projid12-G577       # lightcurves specific to particular projectids
 │   ├── projid16-18

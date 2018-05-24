@@ -92,8 +92,8 @@ FIELD_REGEX = re.compile('^G(\d{2})(\d{2})([\+\-]\d{2})(\d{2})_(\w{3})$')
 FIELD_CCDS = [5,6,7,8]
 
 # defines where the reference frames go
-REFBASEDIR = '/P/HP0/BASE/reference-frames'
-REFINFO = os.path.join(REFBASEDIR,'TM-refinfo.sqlite')
+REFBASEDIR = sv.REFBASEDIR
+REFINFO = sv.REFINFO
 
 # define where the frameinfo cache is
 FRAMEINFOCACHEDIR = '/P/HP0/BASE/frameinfo-cache'
