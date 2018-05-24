@@ -3,10 +3,10 @@ This file contains path variables that are set across the pipeline.
 """
 import re, os
 
-###############################################################
-# The following variables are called in autocal_direct.py and #
-# cron_transfer_calibrate                                     #
-###############################################################
+############################################################
+# The following variables are called in autocal_direct.py, #
+# cron_transfer_calibrate, and autoimagesub.py             #
+############################################################
 
 # LOCAL_IMGBASE and LOCAL_GLOBPATTERN define the local image directories.
 LOCAL_IMGBASE = "/nfs/phtess1/ar1/HATPI/HP0/"
@@ -52,16 +52,21 @@ MASTERBIASCONF = os.path.join(CONFBASE, "MasterBiasCfg.cfg")
 MASTERFLATCONF = os.path.join(CONFBASE, "MasterFlatCfg.cfg")
 MASTERDARKCONF = os.path.join(CONFBASE, "MasterDarkCfg.cfg")
 
-# CCDS to look out for
-CCDLIST = FIELD_CCDS
-
-############################################
-# The follow are called in aperturephot.py #
-############################################
+###################################
+# Paths called in aperturephot.py #
+###################################
 # on LCO: "/nfs/lcohpsrv1/ar0/P/HP0/CAT/2MASS/2MASS_JH_AP/data"
 TWOMASSPATH = "/nfs/phn12/ar0/H/CAT/2MASS/2MASS_JH_AP/data"
 # on LCO: "/nfs/lcohpsrv1/ar0/P/HP0/CAT/UCAC4"
 UCAC4PATH = "/nfs/phn12/ar0/H/HP0/CAT/UCAC4"
+
+#####################################
+# Postgres database credential info #
+#####################################
+PGPASSFILE = os.path.expanduser('~/.pgpass')
+PGUSER = 'lbouma' # 'hpx'
+PGDATABASE = 'lbouma' #'hpx'
+PGHOST = 'localhost' #'localhost'
 
 # FFMPEG path to make movies
 FFMPEG = os.path.expanduser("~/bin/ffmpeg")

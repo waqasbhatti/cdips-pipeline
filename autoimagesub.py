@@ -63,6 +63,7 @@ from imageutils import get_header_keyword, get_header_keyword_list, \
     fits_to_full_jpeg, check_frame_warping, frame_radecbox_to_jpeg, \
     fitscoords_to_jpeg
 
+import shared_variables as sv
 
 # get fiphot binary reader
 try:
@@ -100,22 +101,23 @@ FRAMEINFOCACHEDIR = '/P/HP0/BASE/frameinfo-cache'
 # these define the field catalog location and properties
 FIELDCAT_DIR = '/P/HP0/BASE/field-catalogs'
 
-# these define the postgres database credentials
-PGPASSFILE = os.path.expanduser('~/.pgpass')
-PGUSER = 'hpx'
-PGDATABASE = 'hpx'
-PGHOST = 'localhost'
-
 # these define the light curve directory
 LCBASEDIR = '/P/LC'
 
 # this is to recognize a HATID
 HATIDREGEX = re.compile(r'^HAT\-\d{3}\-\d{7}$')
 
+# these define the postgres database credentials
+PGPASSFILE = sv.PGPASSFILE
+PGUSER = sv.PGUSER
+PGDATABASE = sv.PGDATABASE
+PGHOST = sv.PGHOST
+
 if os.path.exists(PGPASSFILE):
     with open(PGPASSFILE) as infd:
         pgpass_contents = infd.readlines()
-        pgpass_contents = [x.split(':') for x in pgpass_contents]
+        pgpass_contents = [x.split(':') for x in pgpass_contents if not
+                           x.startswith('#')]
         PGPASSWORD = [x[-1] for x in pgpass_contents
                       if (x[0] == PGHOST and
                           x[2] == PGDATABASE and
