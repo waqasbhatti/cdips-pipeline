@@ -1631,7 +1631,8 @@ def generate_astromref(fitsfiles,
                        ccd=None,
                        projectid=None,
                        refdir=REFBASEDIR,
-                       refinfo=REFINFO):
+                       refinfo=REFINFO,
+                       overrideref=None):
 
     '''This chooses an astrometry reference frame from the frames in fitfiles.
 
@@ -1646,6 +1647,10 @@ def generate_astromref(fitsfiles,
 
     updates the refinfo database.
 
+    if overrideref is passed (a string path to a manually chosen reference
+    frame), overrides the automated frame selection called in
+    ism.select_astromref_frame.
+
     '''
 
     goodfits = [x for x in fitsfiles if os.path.exists(x)]
@@ -1655,10 +1660,28 @@ def generate_astromref(fitsfiles,
               (datetime.utcnow().isoformat(),))
         return
 
+    # check if database exists. if not, make it.
+    if not os.path.exists(refinfo):
+
+        db = sqlite3.connect(refinfo)
+        cur = db.cursor()
+
+        query = open(sv.TREXBASE + 'imagesub-refinfo.sql', 'r').read()
+
+        cur.executescript(query)
+
+        db.commit()
+        cur.close()
+        db.close()
+
+        print('%sZ: initialized %s database' %
+              (datetime.utcnow().isoformat(), refinfo))
+
     # find the astromref
     astromref = ism.select_astromref_frame(
         fitsfiles,
         '1-*.fits',
+        overrideref=overrideref
     )
 
     # if an astromref was successfully found, then add its info to the DB
@@ -1768,6 +1791,7 @@ def generate_astromref(fitsfiles,
 
                 print('ERR! %sZ: could not update refinfo DB! error was: %s' %
                       (datetime.utcnow().isoformat(), e))
+
                 returnval = None
                 db.rollback()
 

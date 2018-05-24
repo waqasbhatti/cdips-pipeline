@@ -356,7 +356,8 @@ def select_astromref_frame(fitsdir,
                            srclistext='.fistar',
                            photdir=None,
                            photext='.fiphot',
-                           jpeg=True):
+                           jpeg=True,
+                           overrideref=None):
     '''
     This picks an astrometric reference frame.
 
@@ -366,7 +367,6 @@ def select_astromref_frame(fitsdir,
     - median D value closest to zero (roundest stars)
     - lowest median background
     - largest number of sources with good extractions
-
 
     '''
 
@@ -423,6 +423,61 @@ def select_astromref_frame(fitsdir,
           'using %s frames, %s fiphots, %s fistars...' %
           (datetime.utcnow().isoformat(),
            len(goodframes), len(goodphots), len(goodsrclists)))
+
+
+    # manual override of astrometric reference frame selection. good if you
+    # have reason to skip the long serial process below.
+    if overrideref:
+
+        selectedreference = overrideref
+        selectedsrc = selectedreference.strip('.fits')+'.fistar'
+        selectedphot = selectedreference.strip('.fits')+'.fiphot'
+
+        print('%sZ: manually chosen astrometric reference frame is %s' %
+              (datetime.utcnow().isoformat(), selectedreference))
+
+        if jpeg:
+            framejpg = fits_to_full_jpeg(
+                selectedreference,
+                out_fname=os.path.join(
+                    os.path.dirname(selectedreference),
+                    ('JPEG-ASTROMREF-%s.jpg' %
+                     os.path.basename(selectedreference).strip('.fits.fz'))
+                    )
+                )
+        else:
+            framejpg = None
+
+        photdata_f = read_fiphot(selectedphot)
+        if photdata_f:
+            photdata = {
+                'mag':np.array(photdata_f['per aperture'][2]['mag']),
+                'err':np.array(photdata_f['per aperture'][2]['mag err']),
+                'flag':np.array(
+                    photdata_f['per aperture'][2]['status flag']
+                    )
+                }
+            del photdata_f
+        else:
+            raise AssertionError('manually chosen astr ref has bad photometry')
+
+        # number of good detections
+        goodind = np.where(photdata['flag'] == 0)
+        ndet = len(photdata['mag'][goodind])
+
+        srcdata = np.genfromtxt(selectedsrc, usecols=(3,5,6), dtype='f8,f8,f8',
+                                names=['background', 'svalue', 'dvalue'])
+
+
+        return {
+            'astromref':selectedreference,
+            'framejpg':framejpg,
+            'sval':np.nanmedian(srcdata['svalue']),
+            'dval':np.nanmedian(srcdata['dvalue']),
+            'bgv':np.nanmedian(srcdata['background']),
+            'ndet':ndet,
+            'comment':'astromref chosen manually'
+        }
 
     median_sval = []
     median_dval = []
