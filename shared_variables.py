@@ -24,7 +24,6 @@ REFBASEDIR=LOCAL_IMGBASE+"BASE/reference-frames/"
 REFINFO=os.path.join(REFBASEDIR,'refinfo.sqlite') # formerly TM-refinfo.sqlite
 
 FRAMEINFOCACHEDIR=LOCAL_IMGBASE+"BASE/reference-frames/"
-FIELDCAT_DIR=LOCAL_IMGBASE+"BASE/field-catalogs"
 
 FITS_TAIL = ".fits" # occasionally ".fits.fz" for HAT work. ??? do fitsh routines work on .fits.fz?
 

@@ -2491,7 +2491,7 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
     selected_meddvalue = frameinfo['meddval'][selectind]
 
     print('\n%sZ: selected %s frames with acceptable '
-          'HA, Z, moon phase, background, and elevation '
+          'HA, Z, moon phase, background, elevation, and ngoodobjects '
           'for further filtering...\n' %
           (datetime.utcnow().isoformat(), len(selected_frames)))
 
@@ -2499,8 +2499,8 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
     # 1. D closest to 0
     # 2. largest S
 
-    # then we get filter out any images that have background >
-    # maxbackgroundmedian and backgroundstdev > maxbackgroundstdev
+    # then we filter out any images that have background > maxbackgroundmedian
+    # and backgroundstdev > maxbackgroundstdev
 
     # first sort selector
     stage1_sort_ind = (np.argsort(selected_medsvalue))[::-1]
