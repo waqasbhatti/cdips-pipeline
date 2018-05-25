@@ -52,10 +52,14 @@ GENERAL ORDER OF THINGS
    coordinates. not sure what this does exactly, but the file it generates is
    required by the actual convolution steps later.
 
+   (skip if running off autoimagesub)
+
 6. the next thing to do is to select a bunch of frames that can serve as
    photometric reference frames (photrefs). use select_photref_frames for
    this. see the docstring there for the list of selectors used. we'll then
    stack these photrefs into a combined photref later.
+
+   (use ais.generate_photref_candidates_from_xtrns if running off autoimagesub)
 
 7. now that we have photrefs, we have to convolve their PSFs. we convolve their
    PSFs to one of the photrefs in this list. this frame should have round stars,
@@ -1458,6 +1462,8 @@ def genreg(masterphotref_fistar,
 
     - do the convolution of the reference frame to each -xtrns target frame when
       doing the image subtraction
+
+    NOTE: masterphotref_fistar might also be a master *astrometric* reference.
 
     '''
 

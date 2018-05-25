@@ -96,13 +96,13 @@ REFBASEDIR = sv.REFBASEDIR
 REFINFO = sv.REFINFO
 
 # define where the frameinfo cache is
-FRAMEINFOCACHEDIR = '/P/HP0/BASE/frameinfo-cache'
+FRAMEINFOCACHEDIR = sv.FRAMEINFOCACHEDIR
 
 # these define the field catalog location and properties
-FIELDCAT_DIR = '/P/HP0/BASE/field-catalogs'
+FIELDCAT_DIR = sv.FIELDCAT_DIR
 
 # these define the light curve directory
-LCBASEDIR = '/P/LC'
+LCBASEDIR = sv.LCPATH
 
 # this is to recognize a HATID
 HATIDREGEX = re.compile(r'^HAT\-\d{3}\-\d{7}$')
