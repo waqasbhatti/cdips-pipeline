@@ -10,6 +10,7 @@ create table arefshiftedframes (
        itrans text not null,
        shiftisok bool not null,
        -- arefshifted frame info
+       didwarpcheck bool not null default false,
        warpcheckmargin real,
        warpcheckthresh real,
        warpinfopickle bytea,
@@ -17,7 +18,7 @@ create table arefshiftedframes (
 );
 
 create unique index arefshiftedframes_uindx on arefshiftedframes (
-       framekey, origframekey, astromref, arefshiftedframe
+       framekey, origframekey, astromrefs, arefshiftedframe
 );
 
 
@@ -41,5 +42,5 @@ create table subtractedframes (
 );
 
 create unique index subtractedframes_uindx on subtractedframes (
-       framekey, origframekey, arefshiftedkey, photref, subtractedframe
+       framekey, origframekey, arefshiftedkey, photrefs, subtractedframes
 );
