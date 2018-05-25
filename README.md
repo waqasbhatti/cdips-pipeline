@@ -63,24 +63,32 @@ The schema for this database are in the `*.sql` files, and it includes the
 following tables and sequences:
 
 ```
- Schema |             Name              |   Type   | Owner 
---------+-------------------------------+----------+-------
- public | ap_photometry                 | table    | hpx
- public | astromrefs                    | table    | hpx
- public | calibratedframes              | table    | hpx
- public | calibratedframes_framekey_seq | sequence | hpx
- public | filters                       | table    | hpx
- public | frameinfo                     | table    | hpx
- public | frameinfo_framekey_seq        | sequence | hpx
- public | iphotfiles                    | table    | hpx
- public | iphotobjects                  | table    | hpx
- public | ism_photometry                | table    | hpx
- public | lcinfo                        | table    | hpx
- public | objectinfo                    | table    | hpx
- public | photindex_iphots              | table    | hpx
- public | photometryinfo                | table    | hpx
- public | photrefs                      | table    | hpx
+                     List of relations
+ Schema |              Name              |   Type   | Owner 
+--------+--------------------------------+----------+-------
+ public | ap_photometry                  | table    | hpx
+ public | arefshiftedframes              | table    | hpx
+ public | arefshiftedframes_framekey_seq | sequence | hpx
+ public | astromrefs                     | table    | hpx
+ public | calibratedframes               | table    | hpx
+ public | calibratedframes_framekey_seq  | sequence | hpx
+ public | filters                        | table    | hpx
+ public | frameinfo                      | table    | hpx
+ public | frameinfo_framekey_seq         | sequence | hpx
+ public | iphotfiles                     | table    | hpx
+ public | iphotobjects                   | table    | hpx
+ public | ism_photometry                 | table    | hpx
+ public | lcinfo                         | table    | hpx
+ public | objectinfo                     | table    | hpx
+ public | photindex_iphots               | table    | hpx
+ public | photometryinfo                 | table    | hpx
+ public | photrefs                       | table    | hpx
+ public | subtractedframes               | table    | hpx
+ public | subtractedframes_framekey_seq  | sequence | hpx
 ```
+
+To create the database: `psql -U hpx hpx` launches the PostgreSQL client.
+Then `\i filename.sql` runs the sql file to create the approriate table.
 
 
 * `shared_variables.py`: contains path variables that are set across the
