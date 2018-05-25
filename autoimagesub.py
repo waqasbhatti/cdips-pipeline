@@ -2334,8 +2334,9 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
                                            maxmoonphase=25.0,
                                            maxmoonelev=0.0,
                                            maxzenithdist=30.0,
-                                           maxbackgroundstdev=10.0,
-                                           maxbackgroundmedian=1000.0,
+                                           maxbackgroundstdevpctile=100.,
+                                           maxbackgroundmedianpctile=10.,
+                                           minngoodobjectpctile=90.,
                                            forcecollectinfo=False,
                                            nworkers=8,
                                            maxworkertasks=1000):
@@ -2346,6 +2347,37 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
     the astromref, and are all from a single projectid, ccd, field combination
     for this operation to make sense.
 
+    Args:
+        minframes: minimum number of candidate frames needed to construct
+        photometric reference
+
+        maxhourangle:
+
+        maxmoonphase:
+
+        maxmoonelev:
+
+        maxzenithdist:
+
+        maxbackgroundstdevpctile: percentile (given in %) from array of
+        background standard deviations from each frame. I don't understand why
+        this would be a good selector. Set as `100.` to not do anything for
+        this. ???
+
+        maxbackgroundmedianpctile: percentile (given in %) from array of
+        background medians from each frame. For example, `10.0` would give the
+        top 10% of frames with small background medians (good for few clouds).
+
+        minngoodobjectpctile: if ndetpercentile=90, will select frames from the
+        top 90% of "ngoodobjects". If there are clouds, there won't be many
+        well-detected objects.
+
+        forcecollectinfo:
+
+    Returns:
+
+        photrefinfo, a dictionary with information about chosen photometric
+        reference frames.
     '''
 
     # first, get all the info from these fits files.
@@ -2355,14 +2387,15 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
                                    maxworkertasks=maxworkertasks)
 
     # this is the cachekey used to store the photref selection info
-    cachekey = '%s-%i-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f' % (repr(fitsfiles),
-                                                        minframes,
-                                                        maxhourangle,
-                                                        maxmoonphase,
-                                                        maxmoonelev,
-                                                        maxzenithdist,
-                                                        maxbackgroundstdev,
-                                                        maxbackgroundmedian)
+    cachekey = '%s-%i-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f-%.1f' % (repr(fitsfiles),
+                                                             minframes,
+                                                             maxhourangle,
+                                                             maxmoonphase,
+                                                             maxmoonelev,
+                                                             maxzenithdist,
+                                                             maxbackgroundstdevpctile,
+                                                             maxbackgroundmedianpctile,
+                                                             minngoodobjectpctile)
     cachekey = md5(cachekey).hexdigest()
     cachedir = os.path.join(FRAMEINFOCACHEDIR,'TM-photref-%s' % cachekey)
     cacheinfofile = os.path.join(cachedir, 'selection-info.pkl.gz')
@@ -2410,6 +2443,8 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
 
     # get nights with background stdev < max_bgv_stdev (to possibly remove
     # cloudy nights)
+    maxbackgroundstdev = np.nanpercentile(frameinfo['stdsrcbgv'],
+                                          maxbackgroundstdevpctile)
     backgroundstdevind = frameinfo['stdsrcbgv'] < maxbackgroundstdev
     print('%sZ: %s frames with background stdev < %s' %
           (datetime.utcnow().isoformat(),
@@ -2418,15 +2453,30 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
 
     # get nights with background median < maxbackgroundmedian (to possibly
     # remove cloudy nights)
+    maxbackgroundmedian = np.nanpercentile(frameinfo['medsrcbgv'],
+                                           maxbackgroundmedianpctile)
     backgroundmedind = frameinfo['medsrcbgv'] < maxbackgroundmedian
+
     print('%sZ: %s frames with background median < %s' %
           (datetime.utcnow().isoformat(),
            len(np.where(backgroundmedind)[0]),
            maxbackgroundmedian))
 
+    # get nights with ngoodobjects > minngoodobjects (to possibly
+    # remove cloudy nights)
+    minngoodobjects = np.nanpercentile(frameinfo['ngoodobjects'],
+                                       minngoodobjectpctile)
+    ngoodobjectind = frameinfo['ngoodobjects'] > minngoodobjects
+
+    print('%sZ: %s frames with ngoodobjects > %s' %
+          (datetime.utcnow().isoformat(),
+           len(np.where(ngoodobjectind)[0]),
+           minngoodobjects))
+
+
     # this is the final operating set of frames that will be sorted for the
     # following tests
-    selectind = haind & moonind & zenithind & backgroundstdevind
+    selectind = haind & moonind & zenithind & backgroundstdevind & ngoodobjectind
 
     selected_frames = frameinfo['frames'][selectind]
     selected_ngoodobj = frameinfo['ngoodobjects'][selectind]

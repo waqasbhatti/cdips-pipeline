@@ -1453,7 +1453,8 @@ def generate_masterphotref_registration_info(masterphotref_fistar,
 def genreg(masterphotref_fistar,
            outfile,
            xycols=(1,2)):
-    '''This generates a registration information file using the master
+    '''
+    This generates a registration information file using the master
     photometric reference frame. This file is then used by the convolution step
     somehow to figure out the convolution kernel? In any case, it's needed for:
 
