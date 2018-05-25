@@ -282,8 +282,7 @@ def find_subtracted_fits_fieldprojectidccd(
         photreftype='oneframe',
         kernelspec='b/4;i/4;d=4/4',
         nworkers=8,
-        maxworkertasks=1000
-):
+        maxworkertasks=1000):
     '''This searches for all subtracted FITS files matching the specified
     projectid, field, and ccd combination.
 
@@ -973,9 +972,220 @@ def calibrated_frame_to_database(fitsfile,
                 message, format_exc()) )
         returnval = (fitsfile, False)
 
-        # TEMPORARY
-        # raise
+    finally:
 
+        cursor.close()
+        if closedb:
+            database.close()
+
+    return returnval
+
+
+
+def calframe_to_db_worker(task):
+    '''
+    This wraps calibrated_frames_to_database for the parallel driver below.
+
+    '''
+
+    fitsfile, kwargs = task
+    return calibrated_frame_to_database(fitsfile, **kwargs)
+
+
+
+def arefshifted_frame_to_database(
+        fitsfile,
+        network='HP',
+        overwrite=False,
+        badframetag='badframes',
+        nonwcsframes_are_ok=False,
+        database=None):
+    '''
+    This puts a shifted-to-astromref xtrns FITS into the DB.
+
+    fitsfile: of the shifted image, for example:
+
+        /nfs/phtess1/ar1/HATPI/HP0/RED/projid12-G577-ccd8-sdssr/1-439340f_8-xtrns.fits
+
+    Associates it with the framekey of the original FITS. Adds info on shift
+    success, (optionally) the shifted-frame's x and y direction gradients
+    calculated, and its full path. Adds info about the itrans file used as
+    well.
+
+    DONE:
+        * given a fitsfile, will put it into arefshiftedframes
+
+    TODO:
+        * include "warp check" flagging
+        * include "badframe" tagging
+
+    '''
+
+    if nonwcsframes_are_ok:
+        raise NotImplementedError
+
+    # open a database connection
+    if database:
+        cursor = database.cursor()
+        closedb = False
+    else:
+        database = pg.connect(user=PGUSER,
+                              password=PGPASSWORD,
+                              database=PGDATABASE,
+                              host=PGHOST)
+        database.autocommit = True
+        cursor = database.cursor()
+        closedb = True
+
+    # get the values: arefshiftedframe, astomref, origframekey, itrans,
+    # shiftisok, didwarpcheck
+    arefshiftedframe = fitsfile
+
+    frameelems = get_header_keyword_list(arefshiftedframe, ['object',
+                                                            'projid'])
+
+    felems = FRAMEREGEX.findall(os.path.basename(arefshiftedframe))
+
+    if felems and felems[0]:
+
+        ccd = felems[0][2]
+        frameinfo = {'field':frameelems['object'],
+                     'ccd':ccd,
+                     'projectid':frameelems['projid']}
+
+        # find this frame's associated active astromref
+        astromref = dbget_astromref(frameinfo['projectid'], frameinfo['field'],
+                                    frameinfo['ccd'])
+
+        areffistar = astromref['fistar']
+
+    # get frame key for the original (calibrated) fits frame:
+    originalfits = arefshiftedframe.strip('-xtrns.fits')+'.fits'
+    query = "select framekey from calibratedframes where fits = '{:s}'".format(
+            originalfits)
+
+    cursor.execute(query)
+    row = cursor.fetchone()
+
+    origframekey = row[0] # keeps long type
+
+    if cursor.fetchone():
+        raise Exception('there should be only a single entry for each unique fits')
+
+    itrans = fitsfile.strip('-xtrns.fits')+'.itrans'
+    shiftisok = True if os.path.exists(fitsfile) else False
+    didwarpcheck = False # NOTE: may need to change if warp check is necessary
+
+    if didwarpcheck:
+        raise NotImplementedError
+        warpcheckmargin = _
+        warpcheckthresh = _
+        warpinfopickle = _
+
+    # start work here
+    try:
+
+        # put together the query and execute it, inserting the object into the
+        # database and overwriting if told to do so
+        if overwrite:
+
+            raise NotImplementedError
+
+        else:
+
+            if didwarpcheck:
+
+                query = ("insert into arefshiftedframes ("
+                         "arefshiftedframe, "
+                         "origframekey, "
+                         "astomref, "
+                         "itrans, "
+                         "shiftisok, "
+                         "didwarpcheck, "
+                         "warpcheckmargin, "
+                         "warpcheckthresh, "
+                         "warpinfopickle "
+                         ") values ("
+                         "%s, "
+                         "%s, "
+                         "%s, "
+                         "%s, "
+                         "%s, "
+                         "%s, "
+                         "%s, "
+                         "%s, "
+                         "%s "
+                         ") ")
+                params = (arefshiftedframe,
+                          origframekey,
+                          astromref['fits'],
+                          itrans,
+                          shiftisok,
+                          didwarpcheck,
+                          warpcheckmargin,
+                          warpcheckthresh,
+                          warpinfopickle
+                         )
+
+            else:
+
+                query = ("insert into arefshiftedframes ("
+                         "arefshiftedframe, "
+                         "origframekey, "
+                         "astomref, "
+                         "itrans, "
+                         "shiftisok, "
+                         "didwarpcheck "
+                         ") values ("
+                         "%s, "
+                         "%s, "
+                         "%s, "
+                         "%s, "
+                         "%s, "
+                         "%s "
+                         ") ")
+                params = (arefshiftedframe,
+                          origframekey,
+                          astromref['fits'],
+                          itrans,
+                          shiftisok,
+                          didwarpcheck
+                         )
+
+        # execute the query and commit
+        cursor.execute(query, params)
+        database.commit()
+
+        message = 'inserted %s into DB' % arefshiftedframe
+        print('%sZ: %s' %
+              (datetime.utcnow().isoformat(), message) )
+
+        returnval = (fitsfile, True)
+
+    # catch the overwrite = False scenario
+    except pg.IntegrityError as e:
+
+        database.rollback()
+
+        message = ('failed to insert %s '
+                   'into DB because it exists already '
+                   'and overwrite = False'
+                   % fitsfile)
+        print('EXC! %sZ: %s\n%s' %
+               (datetime.utcnow().isoformat(), message, format_exc()) )
+        returnval = (fitsfile, False)
+
+
+    # if everything goes wrong, exit cleanly
+    except Exception as e:
+
+        database.rollback()
+
+        message = 'failed to insert %s into DB' % fitsfile
+        print('EXC! %sZ: %s\nexception was: %s' %
+               (datetime.utcnow().isoformat(),
+                message, format_exc()) )
+        returnval = (fitsfile, False)
 
     finally:
 
@@ -986,37 +1196,57 @@ def calibrated_frame_to_database(fitsfile,
     return returnval
 
 
-def calframe_to_db_worker(task):
+
+def arefshifted_frame_to_db_worker(task):
     '''
-    This wraps calibrated_frames_to_databse for the parallel driver below.
+    This wraps arefshifted_frame_to_database for the parallel driver below.
 
     '''
 
     fitsfile, kwargs = task
-    return calibrated_frame_to_database(fitsfile, **kwargs)
+    return arefshifted_frame_to_database(fitsfile, **kwargs)
 
 
 
-def parallel_calibrated_frames_to_database(fitsbasedir,
-                                           fitsglob='1-???????_?.fits',
-                                           network='HP',
-                                           overwrite=False,
-                                           badframetag='badframes',
-                                           nonwcsframes_are_ok=False,
-                                           nworkers=16,
-                                           maxworkertasks=1000):
+def parallel_frames_to_database(fitsbasedir,
+                                frametype,
+                                fitsglob='1-???????_?.fits',
+                                network='HP',
+                                overwrite=False,
+                                badframetag='badframes',
+                                nonwcsframes_are_ok=False,
+                                nworkers=16,
+                                maxworkertasks=1000):
     '''
     This runs a DB ingest on all FITS located in fitsbasedir and subdirs.
 
     Runs a 'find' subprocess to find all the FITS to process.
 
+    Args:
+        fitsbasedir: base directory with fits files. For example,
+            `/nfs/phtess1/ar1/HATPI/HP0/RED/projid12-G577-ccd8-sdssr/`
+
+        frametype: 'calframes' and 'arefshifted_frames' are the currently
+            implemented options, corresponding to putting calibrated frames,
+            and astrometrically shifted frames, into the database.
+
+        fitsglob: if arefshifted frames, it's actually '1-???????_?-xtrns.fits'
+
     '''
 
-    print('%sZ: finding all FITS frames matching %s starting in %s' %
-          (datetime.utcnow().isoformat(), fitsglob, fitsbasedir))
+    # choose the frame to database worker
+    if not (frametype == 'calframes' or frametype == 'arefshifted_frames'):
+        raise NotImplementedError
+    if frametype == 'calframes':
+        frame_to_db_worker = calframe_to_db_worker
+    elif frametype == 'arefshifted_frames':
+        frame_to_db_worker = arefshifted_frame_to_db_worker
 
     # find all the FITS files
     try:
+
+        print('%sZ: finding all FITS frames matching %s starting in %s' %
+              (datetime.utcnow().isoformat(), fitsglob, fitsbasedir))
 
         findcmd = "find {fitsbasedir} -type f -name '{fitsglob}' -print"
         findcmd = findcmd.format(fitsbasedir=fitsbasedir,
@@ -1039,7 +1269,7 @@ def parallel_calibrated_frames_to_database(fitsbasedir,
             pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
             # fire up the pool of workers
-            results = pool.map(calframe_to_db_worker, tasks)
+            results = pool.map(frame_to_db_worker, tasks)
 
             # wait for the processes to complete work
             pool.close()
@@ -1119,73 +1349,13 @@ def dbupdate_calibratedframe(fitspath,
 
 
 
-def arefshifted_frame_to_database(
-        fitsfile,
-        network='HP',
-        overwrite=False,
-        badframetag='badframes',
-        database=None
-):
-    '''This puts a shifted-to-astromref xtrns FITS into the DB.
-
-    Associates it with the framekey of the original FITS. Adds info on shift
-    success, the shifted-frame's x and y direction gradients calculated, and its
-    full path. Adds info about the itrans file used as well.
-
-    '''
-
-    # open a database connection
-    if database:
-        cursor = database.cursor()
-        closedb = False
-    else:
-        database = pg.connect(user=PGUSER,
-                              password=PGPASSWORD,
-                              database=PGDATABASE,
-                              host=PGHOST)
-        database.autocommit = True
-        cursor = database.cursor()
-        closedb = True
-
-    # start work here
-    try:
-
-        query = ("")
-        params = ()
-
-
-    # if everything goes wrong, exit cleanly
-    except Exception as e:
-
-        database.rollback()
-
-        message = 'failed to update %s in DB' % fitspath
-        print('EXC! %sZ: %s\nexception was: %s' %
-               (datetime.utcnow().isoformat(),
-                message, format_exc()) )
-        returnval = (fitspath, False)
-
-        # TEMPORARY
-        # raise
-
-
-    finally:
-
-        cursor.close()
-        if closedb:
-            database.close()
-
-    return returnval
-
-
 
 def convsubtracted_frame_to_database(
         fitsfile,
         network='HP',
         overwrite=False,
         badframetag='badframes',
-        database=None
-):
+        database=None):
     '''This puts a convolved and subtracted FITS into the DB.
 
     Associates it with the framekey of the original FITS and the framekey of the
@@ -2120,8 +2290,8 @@ def frames_astromref_worker(task):
 def framelist_make_xtrnsfits(fitsfiles,
                              outdir=None,
                              refinfo=REFINFO,
-                             warpcheck=True,
-                             warpthreshold=2000.0,
+                             warpcheck=False,
+                             warpthreshold=15000.0,
                              warpmargins=100,
                              nworkers=16,
                              maxworkertasks=1000):
@@ -2129,6 +2299,9 @@ def framelist_make_xtrnsfits(fitsfiles,
     astromref for the projectid, field and CCD, then shifts each frame to the
     astromref's coordinate system, generating -xtrns.fits files.
 
+    Per the docstring of imageutils.check_frame_warping, "warpcheck" by default
+    is set OFF, because it depends on a detailed (manual) empirical calibration
+    step.
     '''
 
     print('%sZ: %s files to process' %
@@ -2507,8 +2680,7 @@ def generate_combined_photref(
         framewidth=None,
         searchradius=8.0,
         nworkers=8,
-        maxworkertasks=1000
-):
+        maxworkertasks=1000):
     '''This generates a combined photref from photref target and candidates and
     updates the TM-refinfo.sqlite database.
 
@@ -3153,8 +3325,7 @@ def parallel_convsubfits_staticphot(
         outdir=None,
         refinfo=REFINFO,
         nworkers=16,
-        maxworkertasks=1000,
-):
+        maxworkertasks=1000,):
     '''This does static object photometry on the all subtracted FITS in
     subfitslist.
 
@@ -3525,8 +3696,7 @@ def cstore_collect_imagesubphot_lightcurve(
         outdir,
         skipcollected=True,
         mindetections=50,
-        database=None
-):
+        database=None):
     '''This collects an ISM LC using the cstore tables in Postgres.
 
     '''
@@ -4778,8 +4948,7 @@ def parallel_convsubfits_forcedphot(
         lcapertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
         photdisjointradius=2,
         nworkers=16,
-        maxworkertasks=1000,
-):
+        maxworkertasks=1000,):
     '''This does forced object photometry on the all subtracted FITS in
     subfitslist using the forcedphot_cmrawphot as input.
 
