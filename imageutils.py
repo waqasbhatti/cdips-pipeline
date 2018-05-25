@@ -1169,7 +1169,14 @@ def check_frame_warping(frame,
     specified threshold, returns False as the image is likely to be
     warped. Otherwise, returns True.
 
-    Copied from astrobase/imageutils.py
+    WARNING: the "threshold" for this to work depends very strongly on the
+    image.  Particularly near the galactic plane, you should expect images to
+    have some linear trend (i.e. brighter at lower galactic latitude).
+
+    In such cases, a "high threshold" of ~20,000 might be appropriate. In other
+    cases further from the galactic plane a "low threshold" of ~15,000 might be
+    better. This is obviously heuristic empirical things, and a better method
+    should be implemented.
 
     '''
 
@@ -1205,6 +1212,28 @@ def check_frame_warping(frame,
                 'yfit':yfit,
                 'xfit_redchisq':xfit_redchisq,
                 'yfit_redchisq':yfit_redchisq}
+
+    if showplot:
+
+        import matplotlib.pyplot as plt
+        from datetime import datetime
+        plt.close('all')
+        f, ax = plt.subplots()
+
+        ax.plot(imagecoordnum, medx, 'k-')
+        ax.plot(imagecoordnum, xfit, 'k-', alpha=0.5)
+        ax.plot(imagecoordnum, medy, 'b-')
+        ax.plot(imagecoordnum, yfit, 'b-', alpha=0.5)
+
+        ax.set_xlabel('img coord number')
+        ax.set_ylabel('x and y medians, and linear fits')
+
+        savename = os.path.basename(frame).strip('.fits')+'_diagnostic.png'
+        f.savefig(savename, bbox_inches='tight', dpi=250)
+
+        print('%sZ: wrote diagnostic warp check plot to %s' %
+              (datetime.utcnow().isoformat(), savename))
+
 
     if (xfit_redchisq > threshold) or (yfit_redchisq > threshold):
         return False, warpinfo
