@@ -21,8 +21,9 @@ GENERAL ORDER OF THINGS
    useful selectors that are applied.
 
    (if using autoimagesub.py with sqlite3, use generate_astromref for this
-   step.  if instead using PostgreSQL, parallel_calibrated_frames_to_database,
-   then dbgen_astromref_projectidfieldccd does this. The latter is the faster
+   step.  if instead using PostgreSQL, parallel_frames_to_database with the
+   "calibrated frames" arg in the appropriate place, then
+   dbgen_astromref_projectidfieldccd does this. The latter is the faster
    option.)
 
 2. next, use get_smoothed_xysdk_coeffs to generate files that contain the
@@ -34,10 +35,17 @@ GENERAL ORDER OF THINGS
    used to shift these other frames to the coordinate system of the astromref,
    which is required to subtract these frames cleanly.
 
+   (if using autoimagesub.py with PostgreSQL database, use
+   framelist_make_xtrnsfits. Then put the shifted aref-transformed frames into
+   the database with parallel_frames_to_database, frametype set to be
+   'arefshifted_frames')
+
 4. use transform_frames_to_astromref to do the actual shifting of all frames to
    the coordinate system of the astromref. this produces new FITS files with the
    '-xtrns.fits' postfix in their filenames. these are the files we'll use from
    now on.
+
+   (if you ran framelist_make_xtrnsfits, this step was already done)
 
 5. use generate_astromref_registration_info to generate a file that grids up the
    astromref source detections into a 30 x 30 grid based on their x and y
