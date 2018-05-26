@@ -636,9 +636,17 @@ def make_fov_catalog(ra=None, dec=None, size=None,
     elif fits:
 
         frame, hdr = read_fits(fits)
-        catra = float(hdr['RACA'])   # RA of midexpo [hr] (averaged field center)
-        catdec = float(hdr['DECCA']) # Dec of midexpo [deg] (averaged field center)
         catbox = sv.FIELDCAT_FOV
+        catra = float(hdr['RACA'])   # RA [DECIMAL hr] (averaged field center)
+        catdec = float(hdr['DECCA']) # Dec [decimal deg] (averaged field center)
+
+        print('WRN! %sZ: converting decimal hour RA to decimal degree' %
+              (datetime.utcnow().isoformat()))
+
+        from astropy.coordinates import Angle
+        import astropy.units as units
+        tempra = Angle(str(catra)+'h')
+        catra = tempra.to(units.degree).value
 
     else:
         print('%sZ: need a FITS file to work on, or center coords and size' %
@@ -1206,6 +1214,8 @@ def make_frameprojected_catalog(fits,
         transformproc = subprocess.Popen(shlex.split(transformcmd),
                                          stdout=subprocess.PIPE,
                                          stderr=subprocess.PIPE)
+
+        print('%sZ: %s' % (datetime.utcnow().isoformat(), transformcmd))
 
         # get results
         transform_stdout, transform_stderr = transformproc.communicate()
