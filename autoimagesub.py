@@ -2340,7 +2340,8 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
                                            forcecollectinfo=False,
                                            nworkers=8,
                                            maxworkertasks=1000):
-    '''This uses ism.select_photref_frames run on fitsfiles to get photref
+    '''
+    This uses ism.select_photref_frames run on fitsfiles to get photref
     candidates.
 
     fitsfiles must be a list of frames, which have been already transformed to
@@ -2606,11 +2607,18 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
 
 
 def amend_candidate_photrefs(photrefinfo):
-    '''This is an interactive way to update masterphotref, photrefs, and
+    '''
+    This is an interactive way to update masterphotref, photrefs, and
     photrefjpegs after reviewing them.
 
     This will automatically update the photrefinfo cache.
 
+    Args:
+        photrefinfo: dictionary returned by
+        generate_photref_candidates_from_xtrns
+
+    Returns:
+        photrefinfo: updated version of same dictionary
     '''
 
     cachekey = photrefinfo['cachekey']
@@ -2731,7 +2739,8 @@ def generate_combined_photref(
         searchradius=8.0,
         nworkers=8,
         maxworkertasks=1000):
-    '''This generates a combined photref from photref target and candidates and
+    '''
+    This generates a combined photref from photref target and candidates and
     updates the TM-refinfo.sqlite database.
 
     Use this after reviewing the results from
@@ -2740,32 +2749,38 @@ def generate_combined_photref(
     photrefinfo['photrefjpegs'] arrays as needed using the
     amend_candidate_photrefs function above.
 
-    photreftype is the type of the combined photref produced. it must be one of
-    the following strings:
+    Args:
 
-    'oneframe' -> single HATPI frame
-    'onehour' -> up to 120 HATPI frames
-    'onenight' -> up to 960 HATPI frames
+        photreftype is the type of the combined photref produced. it must be
+        one of the following strings:
 
-    updates photrefinfo with the following dict and keys:
+            'oneframe' -> single HATPI frame
+            'onehour' -> up to 120 HATPI frames
+            'onenight' -> up to 960 HATPI frames
 
-    'combinedphotref':{'frame': -> combined photref frame path
-                       'jpeg' -> combined photref jpeg path
-                       'cmrawphot' -> cmrawphot file path
-                       'regfile' -> convolution registration file path
-                       'combinemethod'- > combine type
-                       'reftype' -> combined photref type
-                       'phottype' -> either 're-extracted' or 'cat-projected'
-                       'photaps' -> photometry apertures for combined photref
-                       'fovcat' -> fovcat file used for photometry
-                       'kernelspec' -> convolution kernel specs}
+        searchradius: astrometry.net solver search radius (in degrees)
 
-    and updates the cached selection-info pickle file as well.
+    Returns:
 
-    the output combined photref frame, jpeg, cmrawphot (and byproducts) go to
-    the REFBASEDIR, using the following prototype for the filename:
+        updates photrefinfo with the following dict and keys:
 
-    {REFBASEDIR}/proj{projid}-{field}-ccd{ccd}-combinedphotref-{photreftype}.XXX
+        'combinedphotref':{'frame': -> combined photref frame path
+                           'jpeg' -> combined photref jpeg path
+                           'cmrawphot' -> cmrawphot file path
+                           'regfile' -> convolution registration file path
+                           'combinemethod'- > combine type
+                           'reftype' -> combined photref type
+                           'phottype' -> either 're-extracted' or 'cat-projected'
+                           'photaps' -> photometry apertures for combined photref
+                           'fovcat' -> fovcat file used for photometry
+                           'kernelspec' -> convolution kernel specs}
+
+        updates the cached selection-info pickle file as well.
+
+        the output combined photref frame, jpeg, cmrawphot (and byproducts) go to
+        the REFBASEDIR, using the following prototype for the filename:
+
+        {REFBASEDIR}/proj{projid}-{field}-ccd{ccd}-combinedphotref-{photreftype}.XXX
 
     '''
 

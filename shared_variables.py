@@ -23,7 +23,7 @@ TEMPPATH=LOCAL_IMGBASE+"REDTEMP/"
 REFBASEDIR=LOCAL_IMGBASE+"BASE/reference-frames/"
 REFINFO=os.path.join(REFBASEDIR,'refinfo.sqlite') # formerly TM-refinfo.sqlite
 
-FRAMEINFOCACHEDIR=LOCAL_IMGBASE+"BASE/reference-frames/"
+FRAMEINFOCACHEDIR=LOCAL_IMGBASE+"BASE/frameinfo-cache/"
 
 FITS_TAIL = ".fits" # occasionally ".fits.fz" for HAT work. ??? do fitsh routines work on .fits.fz?
 

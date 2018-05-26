@@ -76,6 +76,9 @@ GENERAL ORDER OF THINGS
    single high quality photometric reference frame that we'll subtract from all
    other frames to produce difference images.
 
+   (use combination of amend_candidate_photrefs and generate_combined_photref
+   if running via autoimagesub. This also handles step 9 below.)
+
 9. get raw photometry on this combined photref by using
    photometry_on_combined_photref. this produces the base photometry values that
    we'll be diffing from those found in the difference images to get difference
@@ -228,6 +231,7 @@ except:
 # get useful things from aperturephot
 from aperturephot import extract_frame_sources, anet_solve_frame, do_photometry
 
+import shared_variables as sv
 
 #################
 ## DEFINITIONS ##
@@ -1477,7 +1481,7 @@ def genreg(masterphotref_fistar,
     # set up the grid (this weirdness is transcribed directly from Chelsea's
     # regslct.py) TODO: figure out WTF this does
 
-    BX = 30.; BY = 30.
+    BX = 30; BY = 30
     mx = np.zeros(BX*BY)-1
     my = np.zeros(BX*BY)-1
     ma = np.zeros(BX*BY)
