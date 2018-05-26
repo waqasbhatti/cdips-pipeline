@@ -2720,6 +2720,7 @@ def amend_candidate_photrefs(photrefinfo):
 def generate_combined_photref(
         photrefinfo,
         photreftype,
+        dbtype,
         makeactive=True,
         field=None,
         ccd=None,
@@ -2751,12 +2752,16 @@ def generate_combined_photref(
 
     Args:
 
+        photrefinfo is the output of generate_photref_candidates_from_xtrns
+
         photreftype is the type of the combined photref produced. it must be
         one of the following strings:
 
             'oneframe' -> single HATPI frame
             'onehour' -> up to 120 HATPI frames
             'onenight' -> up to 960 HATPI frames
+
+        dbtype is either 'sqlite' or 'postgres'.
 
         searchradius: astrometry.net solver search radius (in degrees)
 
@@ -2783,6 +2788,8 @@ def generate_combined_photref(
         {REFBASEDIR}/proj{projid}-{field}-ccd{ccd}-combinedphotref-{photreftype}.XXX
 
     '''
+
+    assert (dbtype == 'postgres') or (dbtype == 'sqlite')
 
     # get the field, ccd, projectid first (from the convolvetarget =
     # masterphotref)
@@ -2987,8 +2994,8 @@ def generate_combined_photref(
         pickle.dump(photrefinfo, outfd, pickle.HIGHEST_PROTOCOL)
 
 
-    # update the TM-refinfo.sqlite database
-    # FIXME no, update the psql database...
+    # update the TM-refinfo.sqlite database, or the psql database, as the user
+    # decided.
 
     # first, get the frame info from the combinedphotref
     _, photref_frameinfo = get_frame_info(combinedphotref)
@@ -2998,24 +3005,56 @@ def generate_combined_photref(
               (datetime.utcnow().isoformat(), combinedphotref))
         return
 
+    if dbtype == 'sqlite':
+        db = sqlite3.connect(
+            refinfo,
+            detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES
+        )
+        query = ("insert into photrefs ("
+                 "field, projectid, ccd, photreftype, isactive, unixtime, "
+                 "framepath, jpegpath, "
+                 "convolvetarget, convolveregpath, cmrawphotpath, "
+                 "target_zenithdist, target_moondist, target_moonelev, "
+                 "target_moonphase, target_hourangle, target_ndet, "
+                 "target_medmagerr, target_magerrmad, target_medsrcbgv, "
+                 "target_stdsrcbgv, target_medsval, target_meddval, "
+                 "photrefinfo"
+                 ") values ("
+                 "?, ?, ?, ?, ?, ?, "
+                 "?, ?, "
+                 "?, ?, ?, "
+                 "?, ?, ?, "
+                 "?, ?, ?, "
+                 "?, ?, ?, "
+                 "?, ?, ?, "
+                 "?"
+                 ")")
 
-    query = ("insert into photrefs "
-             "(field, projectid, ccd, photreftype, isactive, unixtime, "
-             "framepath, jpegpath, "
-             "convolvetarget, convolveregpath, cmrawphotpath, "
-             "target_zenithdist, target_moondist, target_moonelev, "
-             "target_moonphase, target_hourangle, target_ndet, "
-             "target_medmagerr, target_magerrmad, target_medsrcbgv, "
-             "target_stdsrcbgv, target_medsval, target_meddval, "
-             "photrefinfo) values "
-             "(?, ?, ?, ?, ?, ?, "
-             "?, ?, "
-             "?, ?, ?, "
-             "?, ?, ?, "
-             "?, ?, ?, "
-             "?, ?, ?, "
-             "?, ?, ?, "
-             "?)")
+    elif dbtype == 'postgres':
+        db = pg.connect(user=PGUSER,
+                        password=PGPASSWORD,
+                        database=PGDATABASE,
+                        host=PGHOST)
+        query = ("insert into photrefs ("
+                 "field, projectid, ccd, photreftype, isactive, unixtime, "
+                 "framepath, jpegpath, "
+                 "convolvetarget, convolveregpath, cmrawphotpath, "
+                 "target_zenithdist, target_moondist, target_moonelev, "
+                 "target_moonphase, target_hourangle, target_ndet, "
+                 "target_medmagerr, target_magerrmad, target_medsrcbgv, "
+                 "target_stdsrcbgv, target_medsval, target_meddval, "
+                 "photrefinfo"
+                 ") values ("
+                 "%s, %s, %s, %s, %s, %s, "
+                 "%s, %s, "
+                 "%s, %s, %s, "
+                 "%s, %s, %s, "
+                 "%s, %s, %s, "
+                 "%s, %s, %s, "
+                 "%s, %s, %s, "
+                 "%s"
+                 ")")
+
     params = (
         masterphotrefinfo['field'],
         masterphotrefinfo['projectid'],
@@ -3050,14 +3089,10 @@ def generate_combined_photref(
         json.dumps(photrefinfo['combinedphotref'],ensure_ascii=True)
     )
 
-    db = sqlite3.connect(
-        refinfo,
-        detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES
-    )
-    cur = db.cursor()
 
     try:
 
+        cur = db.cursor()
         cur.execute(query, params)
         db.commit()
 
