@@ -1060,7 +1060,7 @@ def arefshifted_frame_to_database(
         areffistar = astromref['fistar']
 
     # get frame key for the original (calibrated) fits frame:
-    originalfits = arefshiftedframe.strip('-xtrns.fits')+'.fits'
+    originalfits = re.sub('-xtrns.fits', '.fits', arefshiftedframe)
     query = "select framekey from calibratedframes where fits = '{:s}'".format(
             originalfits)
 
@@ -1072,7 +1072,7 @@ def arefshifted_frame_to_database(
     if cursor.fetchone():
         raise Exception('there should be only a single entry for each unique fits')
 
-    itrans = fitsfile.strip('-xtrns.fits')+'.itrans'
+    itrans = re.sub('-xtrns.fits', '.itrans', fitsfile)
     shiftisok = True if os.path.exists(fitsfile) else False
     didwarpcheck = False # NOTE: may need to change if warp check is necessary
 
@@ -1526,7 +1526,7 @@ def dbgen_astromref_projectidfieldccd(projectid,
                     out_fname=os.path.join(
                             os.path.dirname(selectedreference),
                         ('JPEG-ASTROMREF-%s.jpg' %
-                         os.path.basename(selectedreference).strip('.fits.fz'))
+                         os.path.basename(re.sub(sv.FITS_TAIL,'',selectedreference)))
                     )
                 )
 
@@ -1559,7 +1559,7 @@ def dbgen_astromref_projectidfieldccd(projectid,
                     out_fname=os.path.join(
                             os.path.dirname(selectedreference),
                         ('JPEG-ASTROMREF-%s.jpg' %
-                         os.path.basename(selectedreference).strip('.fits.fz'))
+                         os.path.basename(re.sub(sv.FITS_TAIL,'',selectedreference)))
                     )
                 )
 
@@ -1590,7 +1590,7 @@ def dbgen_astromref_projectidfieldccd(projectid,
                     out_fname=os.path.join(
                             os.path.dirname(selectedreference),
                         ('JPEG-ASTROMREF-%s.jpg' %
-                         os.path.basename(selectedreference).strip('.fits.fz'))
+                         os.path.basename(re.sub(sv.FITS_TAIL,'',selectedreference)))
                     )
                 )
 
@@ -1621,7 +1621,7 @@ def dbgen_astromref_projectidfieldccd(projectid,
                     out_fname=os.path.join(
                             os.path.dirname(selectedreference),
                         ('JPEG-ASTROMREF-%s.jpg' %
-                         os.path.basename(selectedreference).strip('.fits.fz'))
+                         os.path.basename(re.sub(sv.FITS_TAIL,'',selectedreference)))
                     )
                 )
 
@@ -2988,6 +2988,7 @@ def generate_combined_photref(
 
 
     # update the TM-refinfo.sqlite database
+    # FIXME no, update the psql database...
 
     # first, get the frame info from the combinedphotref
     _, photref_frameinfo = get_frame_info(combinedphotref)

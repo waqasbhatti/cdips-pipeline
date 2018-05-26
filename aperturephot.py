@@ -762,7 +762,7 @@ def extract_frame_sources(fits,
         return None
 
     if not outfile:
-        outfile = fits.rstrip(FITS_TAIL) + '.fistar'
+        outfile = re.sub(sv.FITS_TAIL, '.fistar', fits)
 
     fistarcmd = FISTARCMD.format(
         fistarexec=fistarexec, # assuming fistar is in the path
@@ -852,12 +852,12 @@ def check_files(inlist, operationstr, outdir, intailstr='.fits',
     # construct list of file names that would be created for the operation to
     # be performed
     outlist = [os.path.join(outdir,
-                            os.path.basename(x.strip(intailstr) + outtailstr)) for
+                            os.path.basename(re.sub(intailstr, outtailstr, x))) for
               x in inlist]
 
     exists = np.array(outlist)[np.array([os.path.exists(f) for f in outlist])]
-    _exists = [e.strip(outtailstr) for e in exists]
-    _inlist = [w.strip(intailstr) for w in inlist]
+    _exists = [re.sub(outtailstr,'',e) for e in exists]
+    _inlist = [re.sub(intailstr,'',w) for w in inlist]
 
     if len(exists) > 0:
         to_operate_on = np.array(inlist)[~np.in1d(_inlist, _exists)]
@@ -925,8 +925,7 @@ def parallel_extract_sources(fitsdir,
 
     tasks = [
         [(x, os.path.join(outdir,
-                          os.path.basename(x.strip(tailstr) +
-                                           '.fistar'))),
+                          os.path.basename(re.sub(tailstr,'.fistar',x)))),
          {'fistarexec':fistarexec,
           'ccdextent':ccdextent,
           'ccdgain':ccdgain,
@@ -1119,8 +1118,8 @@ def match_fovcatalog_framesources(frame_extracted_sourcelist,
     # fovcat HAT-ID, fovcat RA, fovcat DEC, fovcat x, fovcat y,
     # srcext id, srcext x, srcext y, srcext S, srcext D, srcext K
     if not outfile:
-        outfile = (frame_extracted_sourcelist.rstrip(FITS_TAIL) +
-                   '.matched-sources')
+        outfile = (re.sub(sv.FITS_TAIL, '.matched-sources',
+                          frame_extracted_sourcelist))
 
 
     outf = open(outfile,'wb')
@@ -1183,7 +1182,7 @@ def make_frameprojected_catalog(fits,
     if wcs:
         framewcsfile = wcs
     else:
-        wcspath = fitspath.rstrip(FITS_TAIL)
+        wcspath = re.sub(sv.FITS_TAIL,'',fitspath)
         wcspath = wcspath + '.wcs'
         framewcsfile = wcspath
 
@@ -1191,7 +1190,7 @@ def make_frameprojected_catalog(fits,
         outfile = out
         temppath = out + '.projcattemp'
     else:
-        outpath = fitspath.rstrip(FITS_TAIL)
+        outpath = re.sub(sv.FITS_TAIL,'',fitspath)
         temppath = outpath + '.projcattemp'
         outpath = outpath + '.projcatalog'
         outfile = outpath
@@ -1330,7 +1329,7 @@ def run_fiphot(fits,
         return None
 
     # figure out the fitsbase from the fits filename
-    fitsbase = os.path.basename(fits).rstrip(FITS_TAIL)
+    fitsbase = re.sub(sv.FITS_TAIL,'',os.path.basename(fits))
 
     # handle the zeropoints
     if not zeropoint:
@@ -1349,11 +1348,11 @@ def run_fiphot(fits,
 
     # figure out the output path
     if not outfile:
-        outfile = os.path.abspath(fits.rstrip(FITS_TAIL) + '.fiphot')
+        outfile = os.path.abspath(re.sub(sv.FITS_TAIL,'.fiphot',fits))
 
     # figure out the sourcelist path
     if not sourcelist:
-        sourcelist = os.path.abspath(fits.rstrip(FITS_TAIL) + '.sourcelist')
+        sourcelist = os.path.abspath(re.sub(sv.FITS_TAIL,'.sourcelist',fits))
         if not os.path.exists(sourcelist):
 
             print("%sZ: can't find a source list for %s" %
@@ -1443,9 +1442,9 @@ def do_photometry(fits,
 
     '''
 
-    outprojcat = os.path.basename(fits).rstrip(FITS_TAIL) + '.projcatalog'
-    outsourcelist = os.path.basename(fits).rstrip(FITS_TAIL) + '.sourcelist'
-    outfiphot = os.path.basename(fits).rstrip(FITS_TAIL) + '.fiphot'
+    outprojcat = re.sub(sv.FITS_TAIL,'.projcatalog',os.path.basename(fits))
+    outsourcelist = re.sub(sv.FITS_TAIL,'.sourcelist',os.path.basename(fits))
+    outfiphot = re.sub(sv.FITS_TAIL,'.fiphot',os.path.basename(fits))
 
     if outdir and os.path.exists(outdir):
 
@@ -1491,7 +1490,7 @@ def do_photometry(fits,
                 fits,
                 os.path.join(
                     outdir,
-                    os.path.basename(fits).rstrip(FITS_TAIL) + '.fistar',
+                    re.sub(sv.FITS_TAIL,'.fistar',os.path.basename(fits))
                     ),
                 fluxthreshold=fluxthreshold
                 )
@@ -2083,7 +2082,7 @@ def get_magfit_frames(fitsdir,
 
         searchpath = os.path.join(
             photdir,
-            os.path.basename(fits).rstrip(FITS_TAIL) + '.fiphot'
+            re.sub(sv.FITS_TAIL,'.fiphot',os.path.basename(fits))
             )
 
         if os.path.exists(searchpath):
@@ -3474,7 +3473,7 @@ def epd_lightcurve(rlcfile,
 
         # now write the EPD LCs out to the outfile
         if not outfile:
-            outfile = '%s.epdlc' % rlcfile.strip('.%s' % rlcext)
+            outfile = '%s.epdlc' % re.sub('.%s' % rlcext, '', rlcfile)
 
         inf = open(rlcfile,'rb')
         inflines = inf.readlines()

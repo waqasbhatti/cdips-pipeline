@@ -418,7 +418,7 @@ def select_astromref_frame(fitsdir,
 
         srclistpath = os.path.join(
             srclistdir,
-            os.path.basename(fits).strip('.fits.fz') + srclistext
+            re.sub(sv.FITS_TAIL, srclistext, os.path.basename(fits))
             )
 
         # find the fiphot file
@@ -429,7 +429,7 @@ def select_astromref_frame(fitsdir,
 
         photpath = os.path.join(
             photdir,
-            os.path.basename(fits).strip('.fits.fz') + photext
+            re.sub(sv.FITS_TAIL, photext, os.path.basename(fits))
             )
 
         # check if they both exist and add to list of good fits
@@ -451,8 +451,8 @@ def select_astromref_frame(fitsdir,
     if overrideref:
 
         selectedreference = overrideref
-        selectedsrc = selectedreference.strip('.fits')+'.fistar'
-        selectedphot = selectedreference.strip('.fits')+'.fiphot'
+        selectsrc = re.sub(sv.FITS_TAIL, '.fistar', selectedreference)
+        selectphot = re.sub(sv.FITS_TAIL, '.fiphot', selectedreference)
 
         print('%sZ: manually chosen astrometric reference frame is %s' %
               (datetime.utcnow().isoformat(), selectedreference))
@@ -463,7 +463,8 @@ def select_astromref_frame(fitsdir,
                 out_fname=os.path.join(
                     os.path.dirname(selectedreference),
                     ('JPEG-ASTROMREF-%s.jpg' %
-                     os.path.basename(selectedreference).strip('.fits.fz'))
+                     re.sub(sv.FITS_TAIL, '',
+                            os.path.basename(selectedreference)))
                     )
                 )
         else:
@@ -636,7 +637,8 @@ def select_astromref_frame(fitsdir,
                 out_fname=os.path.join(
                     os.path.dirname(selectedreference),
                     ('JPEG-ASTROMREF-%s.jpg' %
-                     os.path.basename(selectedreference).strip('.fits.fz'))
+                     os.path.basename(re.sub(sv.FITS_TAIL, '',
+                                             selectedreference)))
                     )
                 )
         else:
@@ -669,7 +671,8 @@ def select_astromref_frame(fitsdir,
                 out_fname=os.path.join(
                     os.path.dirname(selectedreference),
                     ('JPEG-ASTROMREF-%s.jpg' %
-                     os.path.basename(selectedreference).strip('.fits.fz'))
+                     os.path.basename(re.sub(sv.FITS_TAIL, '',
+                                             selectedreference)))
                     )
                 )
         else:
@@ -700,8 +703,8 @@ def select_astromref_frame(fitsdir,
                 selectedreference,
                 out_fname=os.path.join(
                     os.path.dirname(selectedreference),
-                    ('JPEG-ASTROMREF-%s.jpg' %
-                     os.path.basename(selectedreference).strip('.fits.fz'))
+                    ('JPEG-ASTROMREF-%s.jpg' % os.path.basename(
+                        re.sub(sv.FITS_TAIL, '', selectedreference)))
                     )
                 )
 
@@ -734,7 +737,8 @@ def select_astromref_frame(fitsdir,
                 out_fname=os.path.join(
                     os.path.dirname(selectedreference),
                     ('JPEG-ASTROMREF-%s.jpg' %
-                     os.path.basename(selectedreference).strip('.fits.fz'))
+                     os.path.basename(re.sub(sv.FITS_TAIL, '',
+                                             selectedreference)))
                     )
                 )
         else:
@@ -956,7 +960,7 @@ def frame_to_astromref_worker(task):
             out_fname=os.path.join(
                 os.path.dirname(outtransframe),
                 ('JPEG-XTRNS-%s.jpg' %
-                 os.path.basename(outtransframe).strip('.fits.fz'))
+                 os.path.basename(re.sub(sv.FITS_TAIL, '', outtransframe)))
                 )
             )
 
@@ -1397,7 +1401,7 @@ def select_photref_frames(fitsdir,
             out_fname=os.path.join(
                 os.path.dirname(final_frame),
                 ('JPEG-PHOTREF-%s.jpg' %
-                 os.path.basename(final_frame).strip('.fits.fz'))
+                 os.path.basename(re.sub(sv.FITS_TAIL, '', final_frame)))
                 )
             )
 
@@ -1549,7 +1553,7 @@ def photref_convolution_worker(task):
                 out_fname=os.path.join(
                     os.path.dirname(outfile),
                     ('JPEG-CONVPHOTREF-%s.jpg' %
-                     os.path.basename(outfile).strip('.fits.fz'))
+                     os.path.basename(re.sub(sv.FITS_TAIL, '', outfile)))
                     )
                 )
 
@@ -1646,7 +1650,7 @@ def combine_frames(framelist,
             out_fname=os.path.join(
                 os.path.dirname(outfile),
                 ('JPEG-COMBINED-%s.jpg' %
-                 os.path.basename(outfile).strip('.fits.fz'))
+                 os.path.basename(re.sub(sv.FITS_TAIL, '', outfile)))
                 )
             )
 
@@ -1746,15 +1750,14 @@ def photometry_on_combined_photref(
 
     # figure out the output path
     if not outfile:
-        outfile = os.path.abspath(photref_frame.strip('.fits.fz') +
-                                  '.cmrawphot')
-
+        outfile = os.path.abspath(re.sub(sv.FITS_TAIL, '.cmrawphot',
+                                         photref_frame))
 
     # FIRST: add source extraction
     print('%sZ: extracting sources for astrometry from %s...' %
           (datetime.utcnow().isoformat(), photref_frame))
-    astromfistarf = os.path.abspath(photref_frame.strip('.fits.fz') +
-                                      '.fistar-astrometry')
+    astromfistarf = os.path.abspath(re.sub(sv.FITS_TAIL, '.fistar-astrometry',
+                                           photref_frame))
     astromfistar = extract_frame_sources(
         photref_frame,
         astromfistarf,
@@ -1764,8 +1767,7 @@ def photometry_on_combined_photref(
     # SECOND: add WCS
     print('%sZ: running astrometry solution for %s...' %
           (datetime.utcnow().isoformat(), photref_frame))
-    wcsf = os.path.abspath(photref_frame.strip('.fits.fz') +
-                                      '.wcs')
+    wcsf = os.path.abspath(re.sub(sv.FITS_TAIL, '.wcs', photref_frame))
     wcsfile = anet_solve_frame(astromfistar,
                                wcsf,
                                frame_ra,
@@ -1783,12 +1785,14 @@ def photometry_on_combined_photref(
     )
 
     if extractsources:
-        photref_sourcelist = os.path.abspath(photref_frame.strip('.fits.fz') +
-                                             '.sourcelist')
+        photref_sourcelist = os.path.abspath(re.sub(sv.FITS_TAIL,
+                                                    '.sourcelist',
+                                                    photref_frame))
         srclist_xy = '7,8'
     else:
-        photref_sourcelist = os.path.abspath(photref_frame.strip('.fits.fz') +
-                                             '.projcatalog')
+        photref_sourcelist = os.path.abspath(re.sub(sv.FITS_TAIL,
+                                                    '.projcatalog',
+                                                    photref_frame))
         srclist_xy = '13,14'
 
     # FINALLY, run the cmrawphot command using the locations and IDs from the
@@ -1946,7 +1950,7 @@ convolve_and_subtract_frames below.
                 out_fname=os.path.join(
                     os.path.dirname(outfile),
                     ('JPEG-SUBTRACTEDCONV-%s.jpg' %
-                     os.path.basename(outfile).strip('.fits.fz'))
+                     os.path.basename(re.sub(sv.FITS_TAIL, '', outfile)))
                     )
                 )
 
