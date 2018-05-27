@@ -2290,6 +2290,7 @@ def frames_astromref_worker(task):
 def framelist_make_xtrnsfits(fitsfiles,
                              outdir=None,
                              refinfo=REFINFO,
+                             overwrite=False,
                              warpcheck=False,
                              warpthreshold=15000.0,
                              warpmargins=100,
@@ -2304,7 +2305,29 @@ def framelist_make_xtrnsfits(fitsfiles,
     step.
     '''
 
-    print('%sZ: %s files to process' %
+    # check if astrometric translation was already done.
+    existing = glob.glob(sv.REDPATH+'1-???????_?-xtrns.fits')
+
+    if len(existing) > 0 and not overwrite:
+
+        requested = list(map(os.path.basename, fitsfiles))
+        alreadyexists = list(map(os.path.basename, existing))
+
+        # substitute out the hash string
+        alreadyexists = [ae.replace('-xtrns.fits','') for ae in alreadyexists]
+        requested = [r.replace('.fits','') for r in requested]
+
+        setdiff = np.setdiff1d(requested, alreadyexists)
+
+        if len(setdiff) == 0:
+            print('WRN! %sZ: astrometric shift already done on requested frames.' %
+                  (datetime.utcnow().isoformat(),))
+            return
+
+        else:
+            fitsfiles = [sv.REDPATH+sd+'-xtrns.fits' for sd in setdiff]
+
+    print('%sZ: %s files to astrometrically shift' %
           (datetime.utcnow().isoformat(), len(fitsfiles)))
 
     pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
@@ -3308,7 +3331,7 @@ def parallel_xtrnsfits_convsub(xtrnsfits,
     existingcsframes = glob.glob(
         sv.REDPATH+'rsub-????????-?-???????_?-xtrns.fits')
 
-    if len(existingcsframes) > 0:
+    if len(existingcsframes) > 0 and not overwrite:
 
         requested = list(map(os.path.basename, xtrnsfits))
         alreadyexists = list(map(os.path.basename, existingcsframes))
@@ -3320,19 +3343,21 @@ def parallel_xtrnsfits_convsub(xtrnsfits,
 
         if len(setdiff) == 0:
 
-            print('ERR! %sZ: every requested frame already found to exist' %
+            print('WRN! %sZ: every requested frame already found to exist.' %
+                  (datetime.utcnow().isoformat(),))
+            print('WRN! %sZ: skipping convolution & subtraction step.' %
                   (datetime.utcnow().isoformat(),))
             return
 
         else:
 
-            xtrnsfits = [os.path.join(sv.REDPATH+sd) for sd in setdiff]
+            xtrnsfits = [sv.REDPATH+sd for sd in setdiff]
 
     tasks = [(x, photreftype, outdir, kernelspec,
               reversesubtract, refinfo)
              for x in xtrnsfits if os.path.exists(x)]
 
-    print('%sZ: %s files to process' %
+    print('%sZ: %s files convolve and subtract' %
           (datetime.utcnow().isoformat(), len(tasks)))
 
     if len(tasks) > 0:
@@ -3372,7 +3397,9 @@ def convsubfits_staticphot_worker(task):
     task[5] = outdir
     task[6] = refinfo
 
-    currently produces iphot files. should this write to the database?
+    currently produces iphot files.
+
+    TODO: should this write to the database?
 
     '''
 
@@ -3479,11 +3506,37 @@ def parallel_convsubfits_staticphot(
         outdir=None,
         refinfo=REFINFO,
         nworkers=16,
-        maxworkertasks=1000,):
-    '''This does static object photometry on the all subtracted FITS in
-    subfitslist.
-
+        maxworkertasks=1000,
+        overwrite=False):
     '''
+    This does static object photometry on the all subtracted FITS in
+    subfitslist.
+    '''
+
+    # check if the convolved, subtracted frames already have photometry. if so,
+    # and overwrite == False, then do not re-run photometry.
+
+    existingiphot = glob.glob(sv.REDPATH+'rsub-????????-?-???????_?.iphot')
+
+    if len(existingiphot) > 0 and not overwrite:
+
+        requested = list(map(os.path.basename, subfitslist))
+        alreadyexists = list(map(os.path.basename, existingiphot))
+
+        # substitute out the hash string
+        alreadyexists = [re.sub('rsub-.*?-','',ae).replace('.iphot','') for ae in
+                         alreadyexists]
+        requested = [r.replace('-xtrns.fits','') for r in requested]
+
+        setdiff = np.setdiff1d(requested, alreadyexists)
+
+        if len(setdiff) == 0:
+            print('WRN! %sZ: photometry already done on requested frames.' %
+                  (datetime.utcnow().isoformat(),))
+            return
+
+        else:
+            subfitslist = [sv.REDPATH+sd+'.iphot' for sd in setdiff]
 
     tasks = [(x, photreftype, kernelspec,
               lcapertures, photdisjointradius,
@@ -3574,7 +3627,7 @@ def insert_phots_into_database(framedir,
         # go through all the frames
         for frame in framelist:
 
-            print('%sZ: working on frame %s' %
+            print('%sZ: inserting frame %s into pg database' %
                   (datetime.utcnow().isoformat(), frame))
 
             # generate the names of the associated phot and sourcelist files
@@ -3736,7 +3789,7 @@ def insert_phots_into_cstore(framedir,
         # go through all the frames
         for frame in framelist:
 
-            print('%sZ: inserting frame %s into pg database' %
+            print('%sZ: working on frame %s' %
                   (datetime.utcnow().isoformat(), frame))
 
             # generate the names of the associated phot and sourcelist files
