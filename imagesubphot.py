@@ -2951,10 +2951,32 @@ def epd_diffmags_imagesub(coeff, fsv, fdv, fkv, xcc, ycc, mag):
 def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
                            smooth=21, sigmaclip=3.0):
     '''
-    Detrends a magnitude series given in mag using accompanying values of S in
-    fsv, D in fdv, K in fkv, x coords in xcc, y coords in ycc. smooth is used to
-    set a smoothing parameter for the fit function. Does EPD voodoo.
+    Detrends a magnitude series with EPD voodoo. The external parameters are
+    treated as specific to each star (while for TFA, we use information from
+    neighboring stars).
 
+    References:
+        Bakos et al 2010, Appendix of HAT-P-11b paper.
+        Zhang, Bakos et al 2016, Section 5.7.
+
+    TODO:
+        hour angle and zenith distance can also be important parameters? Worth
+        including?
+
+    Args:
+        fsv: S value (PSF width)
+        fdv: D value (elongation of PSF)
+        fkv: K value (elongation of PSF)
+        xcc: x coordinate
+        ycc: y coordinate
+        smooth: number of cadences used when passing a median filter over the
+            magnitude time series. If 21 with HATPI, means a ~10 minute median
+            filter.
+        sigmaclip: number of sigma away from median from which to ignore
+        values.
+
+    Returns:
+        array of EPD differential mags, if the solution succeeds
     '''
 
     # find all the finite values of the magnitude
@@ -2980,7 +3002,19 @@ def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
     # smooth the signal
     smoothedmag = medfilt(final_mag, smooth)
 
-    # make the linear equation matrix
+    # make the linear equation matrix. for each star, we are fitting the
+    # function
+    # \begin{equation}
+    # mag =
+    # a_s S + a_s2 S^2 + a_d D + a_d2 D^2 + a_k K + a_k2 K^2 +
+    # const +
+    # a_sd S * D + a_sk S * K + a_dk D * K +
+    # a_x \sin(2\pi x) + b_x \cos(2\pi x) +
+    # a_y \sin(2\pi y) + b_y \cos(2\pi y) +
+    # a_2x \sin(4\pi x) + b_2x \cos(4\pi x) +
+    # a_2y \sin(4\pi y) + b_2y \cos(4\pi y) +
+    # \end{equation}
+    # through linear least squares.
     epdmatrix = np.c_[fsv[finalind]**2.0,
                       fsv[finalind],
                       fdv[finalind]**2.0,
@@ -3031,7 +3065,7 @@ def epd_lightcurve_imagesub(ilcfile,
                             minndet=200):
     '''
     Runs the EPD process on ilcfile, using columns specified to get the required
-    parameters. If outfile is None, the .epdlc will be placeed in the same
+    parameters. If outfile is None, the .epdlc will be placed in the same
     directory as ilcfile.
 
     00 rjd    Reduced Julian Date (RJD = JD - 2400000.0)
