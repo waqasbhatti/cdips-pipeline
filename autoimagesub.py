@@ -3121,36 +3121,60 @@ def get_combined_photref(projectid,
                          field,
                          ccd,
                          photreftype,
+                         dbtype='postgres',
                          refinfo=REFINFO):
-    '''This gets the combined photref for the given combo of projid, field, ccd.
+    '''
+    This gets the combined photref for the given combo of projid, field, ccd.
 
     Used for the convsubphot functions below.
 
+    dbtype: 'postgres' or 'sqlite'. By default, 'postgres'.
     '''
 
-    db = sqlite3.connect(
-        refinfo,
-        detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES
-    )
-    cur = db.cursor()
+    assert (dbtype == 'postgres') or (dbtype == 'sqlite')
 
-    query = (
-        'select field,projectid,ccd,photreftype,unixtime,'
-        'framepath,jpegpath,convolvetarget,convolveregpath,'
-        'cmrawphotpath,target_zenithdist,target_moondist,'
-        'target_moonelev,target_moonphase,target_hourangle,'
-        'target_ndet,target_medmagerr,target_magerrmad,'
-        'target_medsrcbgv,target_stdsrcbgv,target_medsval,'
-        'target_meddval,photrefinfo from photrefs where '
-        '(isactive = 1) and '
-        '(projectid = ?) and '
-        '(ccd = ?) and '
-        '(field = ?) and '
-        '(photreftype = ?)'
-    )
+    if dbtype == 'sqlite':
+        db = sqlite3.connect(
+            refinfo,
+            detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES
+        )
+        query = (
+            'select field,projectid,ccd,photreftype,unixtime,'
+            'framepath,jpegpath,convolvetarget,convolveregpath,'
+            'cmrawphotpath,target_zenithdist,target_moondist,'
+            'target_moonelev,target_moonphase,target_hourangle,'
+            'target_ndet,target_medmagerr,target_magerrmad,'
+            'target_medsrcbgv,target_stdsrcbgv,target_medsval,'
+            'target_meddval,photrefinfo from photrefs where '
+            '(isactive = 1) and '
+            '(projectid = ?) and '
+            '(ccd = ?) and '
+            '(field = ?) and '
+            '(photreftype = ?)'
+        )
+
+    elif dbtype == 'postgres':
+        db = pg.connect(user=PGUSER,
+                        password=PGPASSWORD,
+                        database=PGDATABASE,
+                        host=PGHOST)
+        query = (
+            'select field,projectid,ccd,photreftype,unixtime,'
+            'framepath,jpegpath,convolvetarget,convolveregpath,'
+            'cmrawphotpath,target_zenithdist,target_moondist,'
+            'target_moonelev,target_moonphase,target_hourangle,'
+            'target_ndet,target_medmagerr,target_magerrmad,'
+            'target_medsrcbgv,target_stdsrcbgv,target_medsval,'
+            'target_meddval,photrefinfo from photrefs where '
+            '(isactive = 1) and '
+            '(projectid = %s) and '
+            '(ccd = %s) and '
+            '(field = %s) and '
+            '(photreftype = %s)'
+        )
+
     params = (projectid, ccd, field, photreftype)
-
-    cur.execute(query, params)
+    cur = db.cursor()
 
     try:
 
@@ -3176,8 +3200,10 @@ def get_combined_photref(projectid,
                                           'target_meddval',
                                           'photrefinfo'),rows)}
 
-        # load the JSON string for photrefinfo
-        cphotref['photrefinfo'] = json.loads(cphotref['photrefinfo'])
+        if not type(cphotref['photrefinfo']) == dict:
+            # load the JSON string for photrefinfo. NB postgres does this
+            # automatically.
+            cphotref['photrefinfo'] = json.loads(cphotref['photrefinfo'])
 
         returnval = cphotref
 
@@ -3279,7 +3305,8 @@ def parallel_xtrnsfits_convsub(xtrnsfits,
     # first, check if the convolved, subtracted frames already exist. if so,
     # and overwrite == False, then do not run them.
 
-    existingcsframes = glob(sv.REDPATH+'rsub-????????-?-???????_?-xtrns.fits')
+    existingcsframes = glob.glob(
+        sv.REDPATH+'rsub-????????-?-???????_?-xtrns.fits')
 
     if len(existingcsframes) > 0:
 
@@ -3299,7 +3326,7 @@ def parallel_xtrnsfits_convsub(xtrnsfits,
 
         else:
 
-            xtrnsfits = setdiff
+            xtrnsfits = [os.path.join(sv.REDPATH+sd) for sd in setdiff]
 
     tasks = [(x, photreftype, outdir, kernelspec,
               reversesubtract, refinfo)
