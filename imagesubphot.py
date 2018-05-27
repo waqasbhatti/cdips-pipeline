@@ -91,15 +91,6 @@ GENERAL ORDER OF THINGS
     combined photref, and generate difference images. the produced images will
     have a subtracted- prefix in their filenames.
 
-Note that all of the tasks above produce JPEGs that can be examined to see how
-everything is going. Use the following command (if you have ffmpeg installed and
-libx264 installed) to make a movie of these frames:
-
-ffmpeg -framerate 60 -pattern_type glob -i '*.jpg' -c:v libx264 -preset fast out.mp4
-
-replace the *.jpg above with the appropriate glob pattern to use for the files
-in question
-
 11. finally, use photometry_on_subtracted_frames to do photometry on the
     subtracted frames to produce difference magnitudes for each image. these
     calculated mags are put into .iphot files.

@@ -94,6 +94,18 @@ Then `\i filename.sql` runs the sql file to create the approriate table.
 * `shared_variables.py`: contains path variables that are set across the
   pipeline.
 
+# Useful things
+
+Most of the tasks above produce JPEGs that can be examined to see how
+everything is going. Use the following command (if you have ffmpeg installed
+and libx264 installed) to make a movie of these frames:
+
+`ffmpeg -framerate 60 -pattern_type glob -i '*.jpg' -c:v libx264 -preset fast out.mp4`
+
+replace the \*.jpg above with the appropriate glob pattern to use for the files
+in question
+
+
 # Authors
 
 Waqas Bhatti

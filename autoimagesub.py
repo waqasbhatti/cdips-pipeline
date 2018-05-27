@@ -3527,10 +3527,9 @@ def insert_phots_into_database(framedir,
                                maxframes=None,
                                overwrite=False,
                                database=None):
-    '''This makes photometry index rows in the postgresql database.
-
-    Intended for use when the sqlite3 databases get out of hand.
-
+    '''
+    This makes photometry index rows in the postgresql database.  Intended for
+    use when the sqlite3 databases get out of hand.
     '''
 
     # open a database connection
@@ -3693,10 +3692,10 @@ def insert_phots_into_cstore(framedir,
                              maxframes=None,
                              overwrite=False,
                              database=None):
-    '''This makes photometry index rows in the postgresql database.
-
-    Intended for use when the sqlite3 databases get out of hand.
-
+    '''
+    This makes photometry index rows in the postgresql database. This was an
+    attempt to use the postgres column store extension to speed up ingestion of
+    iphots. It did not speed it up.
     '''
 
     # open a database connection
@@ -3737,7 +3736,7 @@ def insert_phots_into_cstore(framedir,
         # go through all the frames
         for frame in framelist:
 
-            print('%sZ: working on frame %s' %
+            print('%sZ: inserting frame %s into pg database' %
                   (datetime.utcnow().isoformat(), frame))
 
             # generate the names of the associated phot and sourcelist files
@@ -3852,7 +3851,9 @@ def cstore_collect_imagesubphot_lightcurve(
         mindetections=50,
         database=None):
     '''This collects an ISM LC using the cstore tables in Postgres.
-
+    This makes photometry index rows in the postgresql database. This was an
+    attempt to use the postgres column store extension to speed up ingestion of
+    iphots. It did not speed it up.
     '''
 
     # prepare the output file
@@ -3950,8 +3951,8 @@ def dbphot_collect_imagesubphot_lightcurve(hatid,
                                            skipcollected=True,
                                            mindetections=50,
                                            database=None):
-    '''This collects an ISM LC using the photindex info in Postgres.
-
+    '''
+    This collects an ISM LC using the photindex info in Postgres.
     '''
 
     # prepare the output file
@@ -4062,10 +4063,8 @@ def dbphot_collect_imagesubphot_lightcurve(hatid,
 
 def get_hatidlist_from_cmrawphot(projectid, field, ccd, photreftype,
                                  refinfo=REFINFO):
-    '''This gets the hatidlist from the cmrawphot of a combined photref.
-
-
-
+    '''
+    This gets the hatidlist from the cmrawphot of a combined photref.
     '''
 
     cphotref = get_combined_photref(projectid, field, ccd, photreftype,

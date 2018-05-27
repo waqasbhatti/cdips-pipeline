@@ -3574,7 +3574,10 @@ def choose_tfa_template(statsfile,
                         max_sigma_above_rmscurve=4.0,
                         outprefix=None,
                         tfastage1=True):
-    '''This chooses suitable stars for TFA template purposes.
+    '''
+    This chooses suitable stars for TFA template purposes. This "template set"
+    is a subsample of the stars, and is supposed to represent all the types of
+    systematics across the dataset. Kovacs et al (2005) give details.
 
     statsfile = the file to use to get LC statistics from
 
