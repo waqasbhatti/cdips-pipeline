@@ -3265,15 +3265,41 @@ def xtrnsfits_convsub_worker(task):
 
 def parallel_xtrnsfits_convsub(xtrnsfits,
                                photreftype,
+                               overwrite=False,
                                outdir=None,
                                refinfo=REFINFO,
                                reversesubtract=True,
                                kernelspec='b/4;i/4;d=4/4',
                                nworkers=16,
                                maxworkertasks=1000):
-    '''This convolves, and subtracts all FITS files in the xtrnsfits list.
-
     '''
+    This convolves, and subtracts all FITS files in the xtrnsfits list.
+    '''
+
+    # first, check if the convolved, subtracted frames already exist. if so,
+    # and overwrite == False, then do not run them.
+
+    existingcsframes = glob(sv.REDPATH+'rsub-????????-?-???????_?-xtrns.fits')
+
+    if len(existingcsframes) > 0:
+
+        requested = list(map(os.path.basename, xtrnsfits))
+        alreadyexists = list(map(os.path.basename, existingcsframes))
+
+        # use lazy matching to substitute out the hash string
+        alreadyexists = [re.sub('rsub-.*?-','',ae) for ae in alreadyexists]
+
+        setdiff = np.setdiff1d(requested, alreadyexists)
+
+        if len(setdiff) == 0:
+
+            print('ERR! %sZ: every requested frame already found to exist' %
+                  (datetime.utcnow().isoformat(),))
+            return
+
+        else:
+
+            xtrnsfits = setdiff
 
     tasks = [(x, photreftype, outdir, kernelspec,
               reversesubtract, refinfo)
