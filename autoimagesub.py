@@ -3526,7 +3526,7 @@ def parallel_convsubfits_staticphot(
         # substitute out the hash string
         alreadyexists = [re.sub('rsub-.*?-','',ae).replace('.iphot','') for ae in
                          alreadyexists]
-        requested = [r.replace('-xtrns.fits','') for r in requested]
+        requested = [re.sub('rsub-.*?-','',r).replace('-xtrns.fits','') for r in requested]
 
         setdiff = np.setdiff1d(requested, alreadyexists)
 
@@ -3557,8 +3557,9 @@ def parallel_convsubfits_staticphot(
 
     else:
 
-        print('ERR! %sZ: none of the files specified exist, bailing out...' %
-              (datetime.utcnow().isoformat(),))
+        print('ERR! {:s}Z:'.format(datetime.utcnow().isoformat()) + ' the '+
+              'files that reached convsubfits_staticphot_worker do not exist.'+
+              ' bailing out...' )
         return
 
 
@@ -3625,10 +3626,10 @@ def insert_phots_into_database(framedir,
         starttime = time.time()
 
         # go through all the frames
-        for frame in framelist:
+        for ix, frame in enumerate(framelist):
 
-            print('%sZ: inserting frame %s into pg database' %
-                  (datetime.utcnow().isoformat(), frame))
+            print('%sZ: inserting %d frame %s into pg database' %
+                  (datetime.utcnow().isoformat(), ix, frame))
 
             # generate the names of the associated phot and sourcelist files
             frameinfo = FRAMEREGEX.findall(os.path.basename(frame))
