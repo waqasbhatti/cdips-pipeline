@@ -333,6 +333,11 @@ SUBFRAMEPHOTCMD = (
     "--output - | sort -k 1 > {outiphot}"
 )
 
+GRCOLLECTCMD = ('grcollect {fiphotfile} --col-base 1 '
+                '--prefix {lcdir} --extension {lcextension} '
+                '--max-memory {maxmemory}'
+               )
+
 
 ####################
 ## SQLITE SCHEMAS ##
@@ -2311,6 +2316,84 @@ def get_lc_for_object(lcobject,
 ## LIGHTCURVE COLLECTION ##
 ###########################
 
+def dump_lightcurves_with_grcollect(photfiles, lcdir, maxmemory,
+                                    lcextension='grcollectilc'):
+    '''
+    Given a list of photometry files (text files at various times output by
+    fiphot with rows that are objects), make lightcurve files (text files for
+    various objects whose rows are times).
+
+    This routine uses the `fitsh` routine `grcollect` to do the dumping. This
+    is comparably fast to the postgresql indexing approach without heavy
+    optimization (dumps ~1 photometry file per second).
+
+    ASSUMES the objectid is in the first column of the *.iphot photometry
+    output files that `fiphot` makes.
+
+    TODO a quick dumb way to parallelize involves splitting up the photfiles
+    list before the call. However `grcollect` does voodoo in memory allocation
+    so be careful.
+
+    Args:
+
+        photfiles (list): list of full paths to photometry files
+
+        lcdir (str): directory where lightcurves get dumped
+
+        maxmemory (str): e.g., "2g", "100m" for 2gb, or 100mb. Maximum amount
+        of memory for `grcollect`. See https://fitsh.net/wiki/man/grcollect for
+        terse details.
+
+    Keyword args:
+
+        lcextension (str): e.g., "grcollectilc" for the extension you want your
+        dumped lightcurves to have. Also common is "ilc" for "image-subtracted
+        lightcurve".
+
+
+    Returns:
+
+        diddly-squat.
+    '''
+
+    totphot = len(photfiles)
+    print('%sZ: called dump lightcurves for %d photfiles' % totphot)
+
+    starttime = time.time()
+
+    for ix, photfile in enumerate(photfiles):
+
+        # make sure the photometry file exists before we proceed
+        if not os.path.exists(photfile):
+            print('ERR! %sZ: failed to find %s, continuing' %
+                  (datetime.utcnow().isoformat(), frametoshift))
+            continue
+
+        cmdtorun = GRCOLLECTCMD.format(fiphotfile=photfile,
+                                       lcdir=lcdir,
+                                       lcextension=lcextension,
+                                       maxmemory=maxmemory)
+
+        # execute the grcollect shell command
+        grcollectproc = subprocess.Popen(shlex.split(cmdtorun),
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
+
+        _, stderr = grcollectproc.communicate()
+
+        if grcollectproc.returncode == 0:
+            print('%sZ: grcollect %d/%d: %s was dumped' %
+                  (datetime.utcnow().isoformat(), ix, totphot, photfile))
+
+        else:
+            print('ERR! %sZ: grcollect failed for %s' %
+                  (datetime.utcnow().isoformat(), photfile))
+            print('error was %s' % stderr )
+
+    print('%sZ: done, time taken: %.2f minutes' %
+          (datetime.utcnow().isoformat(), (time.time() - starttime)/60.0))
+
+
 
 def make_photometry_indexdb(framedir,
                             outfile,
@@ -2713,7 +2796,7 @@ def parallel_collect_imagesub_lightcurves(
         mindetections=50,
         nworkers=16,
         maxworkertasks=1000
-):
+    ):
     '''
     This collects all .iphot files into lightcurves.
 
@@ -3078,25 +3161,21 @@ def epd_lightcurve_imagesub(ilcfile,
     15 ire1   Instrumental magnitude error for aperture 1
     16 irq1   Instrumental magnitude quality flag for aperture 1 (0/G OK, X bad)
 
-    17 ifl1   Flux in aperture 2 (ADU)
-    18 ife1   Flux error in aperture 2 (ADU)
-    19 irm1   Instrumental magnitude in aperture 2
-    20 ire1   Instrumental magnitude error for aperture 2
-    21 irq1   Instrumental magnitude quality flag for aperture 2 (0/G OK, X bad)
+    17 ifl2   Flux in aperture 2 (ADU)
+    18 ife2   Flux error in aperture 2 (ADU)
+    19 irm2   Instrumental magnitude in aperture 2
+    20 ire2   Instrumental magnitude error for aperture 2
+    21 irq2   Instrumental magnitude quality flag for aperture 2 (0/G OK, X bad)
 
-    22 ifl1   Flux in aperture 3 (ADU)
-    23 ife1   Flux error in aperture 3 (ADU)
-    24 irm1   Instrumental magnitude in aperture 3
-    25 ire1   Instrumental magnitude error for aperture 3
-    26 irq1   Instrumental magnitude quality flag for aperture 3 (0/G OK, X bad)
+    22 ifl3   Flux in aperture 3 (ADU)
+    23 ife3   Flux error in aperture 3 (ADU)
+    24 irm3   Instrumental magnitude in aperture 3
+    25 ire3   Instrumental magnitude error for aperture 3
+    26 irq3   Instrumental magnitude quality flag for aperture 3 (0/G OK, X bad)
 
     27 ep1    EPD magnitude for aperture 1
     28 ep2    EPD magnitude for aperture 2
     29 ep3    EPD magnitude for aperture 3
-
-    30 ep1    EPD magnitude for aperture 1
-    31 ep2    EPD magnitude for aperture 2
-    32 ep3    EPD magnitude for aperture 3
 
     '''
 

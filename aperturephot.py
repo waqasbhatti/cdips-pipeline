@@ -5363,7 +5363,7 @@ def time_bin_lightcurve(lcprefix,
 
     # write everything to a file. This is a pickled file because we might have
     # different row numbers for each column and I don't feel like handling this
-    # right now.
+    # right now. (FIXME)
     if not outfile:
 
         outfile = lcprefix + '.binned-%ssec-lc.pkl' % binsize

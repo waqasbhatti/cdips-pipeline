@@ -163,11 +163,18 @@ results = ais.parallel_convsubfits_staticphot(subfitslist,
                                               outdir=None, nworkers=30,
                                               maxworkertasks=1000)
 
-#    # Step 9 + 10: add the .iphot files to postgres database. Collect LCs from
-#    # postgres, and then make difference image lightcurve (*.ilc) files in
+# # Step 9 + 10 : dump lightcurves.
+# 
+# photfiles = glob(sv.REDPATH+'rsub-????????-?-???????_?.iphot')[:10]
+# ism.dump_lightcurves_with_grcollect(photfiles, lcdirectory,
+#                                     '4g',
+#                                     lcextension='grcollectilc')
+
+#    # Alternative Step 9 + 10: add the .iphot files to postgres database. Collect
+#    # LCs from postgres, and then make difference image lightcurve (*.ilc) files in
 #    # lcdirectory. AKA "light curve dump", or "the transposition problem".
-#    # Surprisingly computationally expensive.  FIXME: possibly faster with fitsh's
-#    # `grcollect`. This would skip the database insert step as well.
+#    # Surprisingly computationally expensive.  An alternative approach is
+#    # fitsh's `grcollect`, which skips the database architecture entirely.
 #    
 #    print('beginning insert_phots_into_database')
 #    ais.insert_phots_into_database(sv.REDPATH, frameglob='rsub-*-xtrns.fits',
