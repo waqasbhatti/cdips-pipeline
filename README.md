@@ -9,6 +9,8 @@ Timeseries photometry pipeline for the HATPI prototype
 
 # Getting Started
 
+Some direct usage examples are given in the `examples/` directory.
+
 ## Directory and database structure
 
 As Thom Yorke understood, everything must be in its right place for your
