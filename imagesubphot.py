@@ -3338,6 +3338,7 @@ def parallel_run_epd_imagesub(ilcdir,
                               smooth=21,
                               sigmaclip=3.0,
                               nworkers=16,
+                              overwrite=False,
                               maxworkertasks=1000):
     '''
     This runs EPD in parallel.
@@ -3355,6 +3356,28 @@ def parallel_run_epd_imagesub(ilcdir,
         ilcfiles = ilcdir
     else:
         ilcfiles = glob.glob(os.path.join(ilcdir, ilcglob))
+
+    # if overwrite is false, only run EPD on LCs that don't have it
+    existingepd = glob.glob(outdir+'HAT-???-???????.epdlc')
+
+    if len(existingepd) > 0 and not overwrite:
+
+        requested = list(map(os.path.basename, glob.glob(ilcdir+ilcglob)))
+        alreadyexists = list(map(os.path.basename, existingepd))
+
+        # substitute out the hash string
+        alreadyexists = [ae.replace('.epdlc','') for ae in alreadyexists]
+        requested = [r.replace('.ilc','') for r in requested]
+
+        setdiff = np.setdiff1d(requested, alreadyexists)
+
+        if len(setdiff) == 0:
+            print('WRN! %sZ: EPD already run on selected lighcurves.' %
+                  (datetime.utcnow().isoformat(),))
+            return
+
+        else:
+            ilcfiles = [os.path.join(ilcdir,sd+'.ilc') for sd in setdiff]
 
     tasks = [(x, outdir, smooth, sigmaclip) for x in ilcfiles]
 
