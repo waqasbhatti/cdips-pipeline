@@ -3612,6 +3612,7 @@ def parallel_run_tfa(lcdir,
                      template_sigclip=5.0,
                      epdlc_sigclip=5.0,
                      nworkers=16,
+                     overwrite=False,
                      workerntasks=1000):
     '''
     This runs TFA on the EPD lightcurves.
@@ -3623,6 +3624,34 @@ def parallel_run_tfa(lcdir,
         epdlcfiles = lcdir
     else:
         epdlcfiles = glob.glob(os.path.join(lcdir, epdlc_glob))
+
+    # only run TFA on lightcurves that need it
+    existing = glob.glob(lcdir+'HAT-???-???????.tfalc*')
+
+    if len(existing) > 0 and not overwrite:
+
+        requested = list(map(os.path.basename, epdlcfiles))
+        alreadyexists = list(map(os.path.basename, existing))
+
+        # substitute out the appropriate strings
+        requested = np.sort(np.array([r.replace('.epdlc','') for r in
+                                      requested]))
+
+        # works for TFA output naming convention either HAT-528-0000017.tfalc
+        # or HAT-528-0000017.tfalc.TF1
+        alreadyexists = np.sort(np.unique(
+                        [re.sub('\.TF[1-3]','',ae).replace('.tfalc','') for ae
+                         in alreadyexists]))
+
+        setdiff = np.setdiff1d(requested, alreadyexists)
+
+        if len(setdiff) == 0:
+            print('WRN! %sZ: TFA already done on all lightcurves.' %
+                  (datetime.utcnow().isoformat(),))
+            return
+
+        else:
+            epdlcfiles = [lcdir+sd+'.epdlc' for sd in setdiff]
 
     tasks = [(x, templatefiles, {'epdlc_jdcol':epdlc_jdcol,
                                  'epdlc_magcol':epdlc_magcol,
