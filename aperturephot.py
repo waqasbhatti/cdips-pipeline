@@ -4152,8 +4152,8 @@ def get_lc_statistics(lcfile,
     '''
 
     tf1lc_check = os.path.exists(lcfile.replace('.epdlc','.tfalc.TF1'))
-    tf2lc_check = os.path.exists(lcfile.replace('.epdlc','.tfalc.TF1'))
-    tf3lc_check = os.path.exists(lcfile.replace('.epdlc','.tfalc.TF1'))
+    tf2lc_check = os.path.exists(lcfile.replace('.epdlc','.tfalc.TF2'))
+    tf3lc_check = os.path.exists(lcfile.replace('.epdlc','.tfalc.TF3'))
 
     # check if we need TFALCs to proceed
     if tfalcrequired and ((not tf1lc_check) or
@@ -4175,12 +4175,13 @@ def get_lc_statistics(lcfile,
                                         usecols=tuple(rmcols + epcols),
                                         unpack=True)
 
+        #FIXME this would be less clunky if we had .tfalc
         tf1 = np.genfromtxt(lcfile.replace('.epdlc','.tfalc.TF1'),
                             usecols=(tfcols[0],), unpack=True)
         tf2 = np.genfromtxt(lcfile.replace('.epdlc','.tfalc.TF2'),
-                            usecols=(tfcols[0],), unpack=True)
+                            usecols=(tfcols[1],), unpack=True)
         tf3 = np.genfromtxt(lcfile.replace('.epdlc','.tfalc.TF3'),
-                            usecols=(tfcols[0],), unpack=True)
+                            usecols=(tfcols[2],), unpack=True)
 
         if rfcols and len(rfcols) == 3:
             rf1, rf2, rf3 = np.genfromtxt(lcfile,usecols=tuple(rfcols),
@@ -4856,7 +4857,8 @@ def parallel_lc_statistics(lcdir,
                            rfcols=None,
                            correctioncoeffs=None,
                            sigclip=4.0):
-    '''This calculates statistics on all lc files in lcdir.
+    '''
+    This calculates statistics on all lc files in lcdir.
 
     Uses lcglob to find the files. Puts the results in text file outfile. Needs
     the fovcatalog to get the catalog magnitude to use as the canonical
@@ -4880,6 +4882,8 @@ def parallel_lc_statistics(lcdir,
                            rfcols=[12,17,22],
                            sigclip=3.0,outfile='ccd8-tfa-lcstats.txt')
 
+    IMPORTANT: the lcfile is always the .epdlc file (which contains the rlc, and
+    is used to derive the filenames of the tfalcs)
 
     For ISM, consider using correctioncoeffs as well. These are c1, c2 resulting
     from a fit to the catalogmag-flux relation using the expression:

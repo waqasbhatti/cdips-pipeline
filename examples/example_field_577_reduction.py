@@ -26,7 +26,7 @@ import os
 
 fitsbasedir = sv.REDPATH
 
-fovcatalog = sv.CATPATH + 'G1830-2230_577-gri-20.0.catalog' #NOTE could do better
+fovcatalog = sv.CATPATH + 'G1830-2230_577-gri-20.0.catalog' #NOTE generalize naming
 
 projectid = 12
 field = 'G1830-2230_577'
@@ -200,11 +200,12 @@ if not os.path.exists(epdstatfile):
                               workerntasks=500, rmcols=[14,19,24],
                               epcols=[27,28,29], tfcols=[30,31,32], rfcols=None,
                               correctioncoeffs=None, sigclip=5.0)
-else:
-    print('already made EPD LC stats')
+    ap.plot_stats_file(epdstatfile, statspath, field, binned=False, logy=True,
+                       logx=False, correctmagsafter=None, rangex=(5.9,13.1))
 
-ap.plot_stats_file(epdstatfile, statspath, field, binned=False, logy=True,
-                   logx=False, correctmagsafter=None, rangex=(5.9,13.1))
+else:
+    print('already made EPD LC stats and plots')
+
 
 # Step 12: do TFA on all the LCs. First, choose TFA template stars using the
 # .epdlc stats. Then run TFA, to get .tfalc.TF{1,2,3} files. Turn them into
@@ -226,11 +227,8 @@ ism.parallel_run_tfa(lcdirectory, templatefiles, epdlc_glob='*.epdlc',
                     template_sigclip=5.0, epdlc_sigclip=5.0, nworkers=20,
                     workerntasks=1000)
 
-#FIXME need to turn tfalc.TF1, .TF2, etc files to .tfalc
-assert 0
-
 if not os.path.exists(tfastatfile):
-    ap.parallel_lc_statistics(lcdirectory, tfalcglob, fovcatalog,
+    ap.parallel_lc_statistics(lcdirectory, '*.epdlc', fovcatalog,
                               tfalcrequired=True,
                               fovcatcols=(0,9), # objectid, magcol from fovcat
                               fovcatmaglabel='r',
@@ -239,18 +237,19 @@ if not os.path.exists(tfastatfile):
                               workerntasks=500,
                               rmcols=[14,19,24],
                               epcols=[27,28,29],
-                              tfcols=[30,31,32],
+                              tfcols=[30,30,30], #NOTE weird call b/c .TF[1-3]
                               rfcols=None,
                               correctioncoeffs=None,
                               sigclip=5.0)
+    ap.plot_stats_file(tfastatfile, statspath, field, binned=False, logy=True,
+                       logx=False, correctmagsafter=None, rangex=(5.9,13.1))
 
 else:
-    print('already made TFA LC stats')
+    print('already made TFA LC stats and plots')
 
-ap.plot_stats_file(tfastatfile, statspath, field, binned=False, logy=True,
-                   logx=False, correctmagsafter=None, rangex=(5.9,13.1))
 
 #FIXME: still need to collect into single .tfalc files for all apertures
+assert 0
 
 # Step 13: bin LCs to 10 minutes.
 ap.parallel_bin_lightcurves(lcdirectory,
