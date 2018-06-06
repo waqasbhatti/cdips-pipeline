@@ -1022,7 +1022,7 @@ def parallel_frames_to_database(fitsbasedir,
         fitsbasedir: base directory with fits files. For example,
             `/nfs/phtess1/ar1/HATPI/HP0/RED/projid12-G577-ccd8-sdssr/`
 
-        frametype: 'calframes' and 'arefshifted_frames' are the currently
+        frametype: 'calibratedframes' and 'arefshifted_frames' are the currently
             implemented options, corresponding to putting calibrated frames,
             and astrometrically shifted frames, into the database.
 
@@ -1031,9 +1031,9 @@ def parallel_frames_to_database(fitsbasedir,
     '''
 
     # choose the frame to database worker
-    if not (frametype == 'calframes' or frametype == 'arefshifted_frames'):
+    if not (frametype=='calibratedframes' or frametype=='arefshifted_frames'):
         raise NotImplementedError
-    if frametype == 'calframes':
+    if frametype == 'calibratedframes':
         frame_to_db_worker = calframe_to_db_worker
     elif frametype == 'arefshifted_frames':
         frame_to_db_worker = arefshifted_frame_to_db_worker
@@ -1241,7 +1241,6 @@ def dbgen_astromref_projectidfieldccd(projectid,
 
     try:
 
-        #FIXME
         # get all the frame info for the requested projectid-field-ccd
         if observatory == 'hatpi':
 
@@ -1260,15 +1259,13 @@ def dbgen_astromref_projectidfieldccd(projectid,
             #NOTE: this approach to ccd number extraction is also silly. Why is
             #it not already in the fits header?
 
-            params = (str(projectid), field, str(ccd))
+            params = (str(projectid), field.replace('-',''), str(ccd))
 
         elif observatory == 'tess':
             raise NotImplementedError
 
         else:
             raise ValueError('observatory must be tess or hatpi')
-        #FIXME
-
 
         cursor.execute(query, params)
         rows = cursor.fetchall()
