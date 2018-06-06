@@ -1,21 +1,6 @@
 '''
-Starting from calibrated frames, this script does image subtraction, and
-detrends the resulting lightcurves.
-
-Commented-out "steps" must be run; they are simply commented out because
-this script is not yet runnable as a "push this button, and it will do
-everything for you" utility.
-
-The current usage involves running
-
-$ python example_field_577_reduction.py
-
-or something analogous, with whatever steps you _want_ to do commented in, and
-the others commented out.
-
-TODO: make it so that one could hypothetically push this button, and have a
-script like this spit out good lightcurves.
-
+Starting from calibrated frames, do image subtraction and detrend the resulting
+lightcurves. Manage the whole thing with airflow.
 '''
 
 from glob import glob
