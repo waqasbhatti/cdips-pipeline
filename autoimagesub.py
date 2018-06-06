@@ -53,6 +53,7 @@ import tempfile
 import numpy as np
 from numpy import nan
 import psycopg2 as pg
+from psycopg2.extras import Json
 
 from astropy import wcs
 
@@ -553,12 +554,13 @@ def fitslist_frameinfo(fitslist,
 ######################################
 
 def calibrated_frame_to_database(fitsfile,
-                                 network='HP',
+                                 observatory='hatpi',
                                  overwrite=False,
                                  badframetag='badframes',
                                  nonwcsframes_are_ok=False,
                                  database=None):
-    '''This puts an original fully calibrated FITS into the database.
+    '''
+    This puts a fully calibrated FITS into the database.
 
     Requires that the frame have gone through the full
     cron_transfer_calibrate.autocal_fitsdir function process, so that it has an
@@ -568,14 +570,29 @@ def calibrated_frame_to_database(fitsfile,
     Searches the same directory as the FITS for fistar, fiphot, and wcs
     files. Should be used with a "find {fitsdir} -type f -name '?-*_?.fits'"
     command to generate the list of the FITS files, so that it can work on bad
-    frames that have been moved to the {badframedir} subdirectory of {fitsdir}
-    and import these into the database as well. Bad frames will be tagged with
-    frameisok = false in the database. If a frame doesn't have an accompanying
-    wcs or fiphot, it will be tagged with frameisok = false in the database as
-    well.
+    frames that have been moved to the {badframedir} subdirectory of {fitsdir}.
 
+    Args:
+
+        fitsfile (str): path to fits file
+
+    Kwargs:
+
+        observatory (str): hatpi or tess
+
+        overwrite (bool): whether to overwrite sql rows
+
+        badframetag (str): string for subdirectory where the badframes are
+
+        nonwcsframes_are_ok (bool): if False, then frames without wcs will be
+        marked as badframes.  If a frame doesn't have an accompanying wcs or
+        fiphot, it will be tagged with frameisok = false in the database as
+        well.
+
+        database: if passing pg.connect() instance
     '''
-    # open a database connection
+
+    # open database connection
     if database:
         cursor = database.cursor()
         closedb = False
@@ -587,94 +604,44 @@ def calibrated_frame_to_database(fitsfile,
         cursor = database.cursor()
         closedb = True
 
-    # start work here
     try:
 
-        # get the frame filename elements
-        felems = FRAMESUBREGEX.findall(
-            os.path.basename(fitsfile)
-        )
-        if not felems:
-            message = ('failed to get basic frameinfo from %s, skipping...'
-                       % fitsfile)
-            print('ERR! %sZ: %s' %
-                   (datetime.utcnow().isoformat(), message) )
-            return fitsfile, False
+        # get paths to frame's fistar, wcs, and fiphot files
+        fits = os.path.abspath(fitsfile)
+        prospective_fistar = fits.replace('.fits','.fistar')
+        prospective_fiphot = fits.replace('.fits','.fiphot')
+        prospective_wcs = fits.replace('.fits','.wcs')
 
+        if observatory == 'hatpi':
+            header_list = ['PROJID','OBJECT','JD','EXPTIME',
+                           'STVER','MTID','MTVER',
+                           'CMID','CMVER','TELID','TELVER','FOV',
+                           'BIASVER','DARKVER','FLATVER','MNTSTATE','PTVER',
+                           'FILID','IMAGETYP','RA','DEC',
+                           'MOONDIST','MOONELEV','MOONPH',
+                           'HA','Z','MGENSTAT','WIND','HUMIDITY','SKYTDIFF','AMBTEMP',
+                           'DEWPT','FOCUS', 'COMMENT']
 
-        # get a big list of header keywords
-        headerdata = get_header_keyword_list(
-            fitsfile,
-            ['PROJID','OBJECT','JD','EXPTIME',
-             'STVER','MTID','MTVER',
-             'CMID','CMVER','TELID','TELVER','FOV',
-             'BIASVER','DARKVER','FLATVER','MNTSTATE','PTVER',
-             'FILID','IMAGETYP','RA','DEC',
-             'MOONDIST','MOONELEV','MOONPH',
-             'HA','Z','MGENSTAT','WIND','HUMIDITY','SKYTDIFF','AMBTEMP',
-             'DEWPT','FOCUS', 'COMMENT'],
-        )
+        elif observatory == 'tess':
+            raise NotImplementedError
 
-        # sort out the commentary card
-        headercomments = repr(headerdata['COMMENT'])
-        headercomments = headercomments.lower()
-
-        # get the frame's projectid, stationid, observed field, rjd, centerra,
-        # centerrdec, widthdeg, frameisok values
-        if 'PROJID' in headerdata and headerdata['PROJID']:
-            projectid = headerdata['PROJID']
         else:
-            projectid = None
-        if 'OBJECT' in headerdata and headerdata['OBJECT']:
-            obsfield = headerdata['OBJECT']
-        else:
-            obsfield = None
-        if 'JD' in headerdata and headerdata['JD']:
-            framerjd = headerdata['JD']
-        else:
-            framerjd = None
+            raise ValueError('observatory must be tess or hatpi')
 
-        # convert the RA [h] to RA (deg)
-        if 'RA' in headerdata and headerdata['RA'] is not None:
-            centerra = (headerdata['RA']/24.0)*360.0
-        else:
-            centerra = None
-        if 'DEC' in headerdata and headerdata['DEC'] is not None:
-            centerdec = headerdata['DEC']
-        else:
-            centerdec = None
+        # get header keywords from header_list
+        headerdata = get_header_keyword_list(fitsfile, header_list)
 
-        if 'FOV' in headerdata and headerdata['FOV']:
-            fovdeg = headerdata['FOV']
-        else:
-            fovdeg = None
+        # get the frame's photometry info (useful for selecting refs)
+        photfits, photinfo = get_frame_info(fitsfile)
 
-        # get the frame's framenum, ccdnum, subframe, frametype
-        stationid, cfn, cfs, ccd = felems[0]
-        if 'IMAGETYP' in headerdata and headerdata['IMAGETYP']:
-            frt = headerdata['IMAGETYP']
-        else:
-            frt = None
-
-        # generate frame's fistar, wcs, and fiphot filenames
-        prospective_fistar = '%s-%s%s_%s.fistar' % (stationid, cfn, cfs, ccd)
-        prospective_wcs = '%s-%s%s_%s.wcs' % (stationid, cfn, cfs, ccd)
-        prospective_fiphot = '%s-%s%s_%s.fiphot' % (stationid, cfn, cfs, ccd)
-
-        # get their paths
-        prospective_fistar = os.path.join(os.path.dirname(fitsfile),
-                                          prospective_fistar)
-        prospective_wcs = os.path.join(os.path.dirname(fitsfile),
-                                       prospective_wcs)
-        prospective_fiphot = os.path.join(os.path.dirname(fitsfile),
-                                          prospective_fiphot)
-
+        # check if frames are bad
         if nonwcsframes_are_ok:
             badframecheck = (
                 os.path.exists(prospective_fistar) and
                 os.path.exists(prospective_fiphot) and
                 (badframetag not in os.path.abspath(fitsfile))
             )
+
         else:
             badframecheck = (
                 os.path.exists(prospective_fistar) and
@@ -683,9 +650,8 @@ def calibrated_frame_to_database(fitsfile,
                 (badframetag not in os.path.abspath(fitsfile))
             )
 
-        # check if this is a bad frame and set stuff accordingly
+        # if this is a bad frame set stuff accordingly
         if badframecheck:
-
             frameisok = True
             fits = os.path.abspath(fitsfile)
             fistar = os.path.abspath(prospective_fistar)
@@ -696,11 +662,8 @@ def calibrated_frame_to_database(fitsfile,
             fiphot = os.path.abspath(prospective_fiphot)
 
         else:
-
             frameisok = False
-
             fits = os.path.abspath(fitsfile)
-
             if os.path.exists(prospective_fistar):
                 fistar = os.path.abspath(prospective_fistar)
             else:
@@ -714,229 +677,62 @@ def calibrated_frame_to_database(fitsfile,
             else:
                 fiphot = None
 
+        # Convert fits COMMENT (many lines!) to a dictionary that merges all the
+        # comments. The mega-comment string will be
+        # formatted like this:
+        # "'Weather.WTextern=0'|'Weather.WTweb=0'|'Weather.WTparan=3'|"
+        # For HATPI, these COMMENTS include info on camera groups, dome status,
+        # mount status, filter, observe info, station IDs, weather, bias, flats
+        # and darks applied.
 
-        # get the frame's filter ID and version
-        if 'FILID' in headerdata and headerdata['FILID'] is not None:
-            flt = headerdata['FILID']
-        else:
-            flt = None
-        if 'filters.flver' in headercomments:
-            flvind = headercomments.find('filters.flver')
-            flv = headercomments[flvind:flvind+16]
-            flv = int(flv.split('=')[-1].rstrip("'\""))
-        else:
-            flv = 0
+        fitsheader = headerdata
 
-        # get the frame's camera config
-        if 'CMID' in headerdata and headerdata['CMID'] is not None:
-            cid = headerdata['CMID']
-        else:
-            cid = None
-        if 'CMVER' in headerdata and headerdata['CMVER'] is not None:
-            cvn = headerdata['CMVER']
-        else:
-            cvn = 0
-        if 'BIASVER' in headerdata and headerdata['BIASVER'] is not None:
-            cbv = headerdata['BIASVER']
-        else:
-            cbv = 0
-        if 'DARKVER' in headerdata and headerdata['DARKVER'] is not None:
-            cdv = headerdata['DARKVER']
-        else:
-            cdv = 0
-        if 'FLATVER' in headerdata and headerdata['FLATVER'] is not None:
-            cfv = headerdata['FLATVER']
-        else:
-            cfv = 0
-        if 'EXPTIME' in headerdata and headerdata['EXPTIME'] is not None:
-            exp = headerdata['EXPTIME']
-        else:
-            exp = None
+        if headerdata['COMMENT'] and observatory=='hatpi':
 
-        # get the frame's telescope config
-        if 'TELID' in headerdata and headerdata['TELID'] is not None:
-            tid = headerdata['TELID']
-        else:
-            tid = None
-        if 'TELVER' in headerdata and headerdata['TELVER'] is not None:
-            tvn = headerdata['TELVER']
-        else:
-            tvn = 0
-        if 'FOCUS' in headerdata and headerdata['FOCUS'] is not None:
-            tfs = headerdata['FOCUS']
-        else:
-            tfs = None
-        if 'MNTSTATE' in headerdata and headerdata['MNTSTATE'] is not None:
-            tms = headerdata['MNTSTATE']
-        else:
-            tms = None
-        if 'MTID' in headerdata and headerdata['MTID'] is not None:
-            tmi = headerdata['MTID']
-        else:
-            tmi = None
-        if 'MTVER' in headerdata and headerdata['MTVER'] is not None:
-            tmv = headerdata['MTVER']
-        else:
-            tmv = 0
-        if 'MGENSTAT' in headerdata and headerdata['MGENSTAT'] is not None:
-            tgs = headerdata['MGENSTAT']
-        else:
-            tgs = None
+            # replace whitespace by underscores because json binary does not
+            # respect whitespace.
+            bigstr = re.sub('\\n=\ ','|',
+                            repr(headerdata['COMMENT'])).replace(' ','_')
 
-        # get the frame's photometry info (useful for selecting refs)
-        photfits, photinfo = get_frame_info(fitsfile)
+            # make the dict that parses the comment lines
+            # keep only the comment lines in the format "*=*"
+            commentdict = {}
+            for commentline in bigstr.split("'|'"):
+                if len(commentline.split('='))==2:
+                    commentdict[commentline.split('=')[0]] = commentline.split('=')[1]
 
-        # make sure the frame actually has photinfo before inserting
+            fitsheader['COMMENT'] = commentdict
+
+
+        elif headerdata['COMMENT'] and observatory=='tess':
+            raise NotImplementedError
+
+        fitsheaderjson = Json(fitsheader)
+
         if photinfo:
-            ngo = photinfo['ngoodobjects']
-            mme = photinfo['medmagerr']
-            mem = photinfo['magerrmad']
-            mbg = photinfo['medsrcbgv']
-            sbg = photinfo['stdsrcbgv']
-            mfs = photinfo['medsval']
-            mfd = photinfo['meddval']
+            photinfojson = Json(photinfo)
         else:
-            ngo = None
-            mme = None
-            mem = None
-            mbg = None
-            sbg = None
-            mfs = None
-            mfd = None
-            frameisok = False
+            photinfojson = None
 
-
-        # get the frame's environmental info
-        if 'MOONPH' in headerdata and headerdata['MOONPH'] is not None:
-            mph = headerdata['MOONPH']
-        else:
-            mph = None
-        if 'MOONDIST' in headerdata and headerdata['MOONDIST'] is not None:
-            mds = headerdata['MOONDIST']
-        else:
-            mds = None
-        if 'MOONELEV' in headerdata and headerdata['MOONELEV'] is not None:
-            mel = headerdata['MOONELEV']
-        else:
-            mel = None
-        if 'HA' in headerdata and headerdata['HA'] is not None:
-            iha = headerdata['HA']
-        else:
-            iha = None
-        if 'Z' in headerdata and headerdata['Z'] is not None:
-            izd = headerdata['Z']
-        else:
-            izd = None
-        if 'WIND' in headerdata and headerdata['WIND'] is not None:
-            wis = headerdata['WIND']
-        else:
-            wis = None
-        if 'HUMIDITY' in headerdata and headerdata['HUMIDITY'] is not None:
-            hum = headerdata['HUMIDITY']
-        else:
-            hum = None
-        if 'SKYTDIFF' in headerdata and headerdata['SKYTDIFF'] is not None:
-            skt = headerdata['SKYTDIFF']
-        else:
-            skt = None
-        if 'AMBTEMP' in headerdata and headerdata['AMBTEMP'] is not None:
-            amt = headerdata['AMBTEMP']
-        else:
-            amt = None
-        if 'DEWPT' in headerdata and headerdata['DEWPT'] is not None:
-            dew = headerdata['DEWPT']
-        else:
-            dew = None
-
-        # put together the query and execute it, inserting the object into the
-        # database and overwriting if told to do so
         if overwrite:
-
             query = ("insert into calibratedframes ("
-                     "network, projectid, stationid, obsfield, "
-                     "framerjd, centerra, centerdec, fovdeg, frameisok, "
-                     "fits, fistar, fiphot, wcs, "
-                     "cfn, cfs, ccd, frt, "
-                     "flt, flv, "
-                     "cid, cvn, cbv, cdv, cfv, exp, "
-                     "tid, tvn, tfs, tms, tmi, tmv, tgs, "
-                     "ngo, mme, mem, mbg, sbg, mfs, mfd, "
-                     "mph, mds, mel, iha, izd, wis, hum, skt, amt, dew"
-                     ") values ("
-                     "%s, %s, %s, %s, "
-                     "%s, %s, %s, %s, %s, "
-                     "%s, %s, %s, %s, "
-                     "%s, %s, %s, %s, "
-                     "%s, %s, "
+                     "fits, fistar, fiphot, wcs, fitsheader, photinfo, "
+                     "frameisok) values ("
                      "%s, %s, %s, %s, %s, %s, "
-                     "%s, %s, %s, %s, %s, %s, %s, "
-                     "%s, %s, %s, %s, %s, %s, %s, "
-                     "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s"
-                     ") "
-                     "on conflict "
-                     "(network, projectid, stationid, obsfield, "
-                     "cfn, cfs, ccd, frt) "
-                     "do update set "
-                     "framerjd = %s, centerra = %s, centerdec = %s, "
-                     "fovdeg = %s, frameisok = %s, fits = %s, fistar = %s, "
-                     "fiphot = %s, wcs = %s, flt = %s, flv = %s, "
-                     "cid = %s, cvn = %s, cbv = %s, cdv = %s, cfv = %s, "
-                     "exp = %s, tid = %s, tvn = %s, tfs = %s, tms = %s, "
-                     "tmi = %s, tmv = %s, tgs = %s, ngo = %s, mme = %s, "
-                     "mem = %s, mbg = %s, sbg = %s, mfs = %s, mfd = %s, "
-                     "mph = %s, mds = %s, mel = %s, iha = %s, izd = %s, "
-                     "wis = %s, hum = %s, skt = %s, amt = %s, dew = %s, "
-                     "entryts = current_timestamp")
-            params = (network, projectid, stationid, obsfield,
-                      framerjd, centerra, centerdec, fovdeg, frameisok,
-                      fits, fistar, fiphot, wcs,
-                      cfn, cfs, ccd, frt,
-                      flt, flv,
-                      cid, cvn, cbv, cdv, cfv, exp,
-                      tid, tvn, tfs, tms, tmi, tmv, tgs,
-                      ngo, mme, mem, mbg, sbg, mfs, mfd,
-                      mph, mds, mel, iha, izd, wis, hum, skt, amt, dew,
-                      framerjd, centerra, centerdec, fovdeg, frameisok,
-                      fits, fistar, fiphot, wcs, flt, flv,
-                      cid, cvn, cbv, cdv, cfv,
-                      exp, tid, tvn, tfs, tms,
-                      tmi, tmv, tgs, ngo, mme,
-                      mem, mbg, sbg, mfs, mfd,
-                      mph, mds, mel, iha, izd,
-                      wis, hum, skt, amt, dew)
-
+                     "%s) on conflict "
+                     "(fits, fistar, fiphot, wcs) do update "
+                     "set fitsheader = %s,"
+                     "photinfo = %s, entryts = current_timestamp")
+            params = (fits, fistar, fiphot, wcs, fitsheaderjson, photinfojson,
+                     frameisok, fitsheaderjson, photinfojson)
         else:
-
             query = ("insert into calibratedframes ("
-                     "network, projectid, stationid, obsfield, "
-                     "framerjd, centerra, centerdec, fovdeg, frameisok, "
-                     "fits, fistar, fiphot, wcs, "
-                     "cfn, cfs, ccd, frt, "
-                     "flt, flv, "
-                     "cid, cvn, cbv, cdv, cfv, exp, "
-                     "tid, tvn, tfs, tms, tmi, tmv, tgs, "
-                     "ngo, mme, mem, mbg, sbg, mfs, mfd, "
-                     "mph, mds, mel, iha, izd, wis, hum, skt, amt, dew"
-                     ") values ("
-                     "%s, %s, %s, %s, "
-                     "%s, %s, %s, %s, %s, "
-                     "%s, %s, %s, %s, "
-                     "%s, %s, %s, %s, "
-                     "%s, %s, "
+                     "fits, fistar, fiphot, wcs, fitsheader, photinfo, "
+                     "frameisok) values ("
                      "%s, %s, %s, %s, %s, %s, "
-                     "%s, %s, %s, %s, %s, %s, %s, "
-                     "%s, %s, %s, %s, %s, %s, %s, "
-                     "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s"
-                     ") ")
-            params = (network, projectid, stationid, obsfield,
-                      framerjd, centerra, centerdec, fovdeg, frameisok,
-                      fits, fistar, fiphot, wcs,
-                      cfn, cfs, ccd, frt,
-                      flt, flv,
-                      cid, cvn, cbv, cdv, cfv, exp,
-                      tid, tvn, tfs, tms, tmi, tmv, tgs,
-                      ngo, mme, mem, mbg, sbg, mfs, mfd,
-                      mph, mds, mel, iha, izd, wis, hum, skt, amt, dew)
+                     "%s) " )
+            params = (fits, fistar, fiphot, wcs, fitsheaderjson, photinfojson,
+                     frameisok)
 
         # execute the query and commit
         cursor.execute(query, params)
@@ -1416,6 +1212,7 @@ def convsubtracted_frame_to_database(
 def dbgen_astromref_projectidfieldccd(projectid,
                                       field,
                                       ccd,
+                                      observatory='hatpi',
                                       makeactive=True,
                                       overwrite=False,
                                       refdir=REFBASEDIR,
@@ -1444,12 +1241,34 @@ def dbgen_astromref_projectidfieldccd(projectid,
 
     try:
 
+        #FIXME
         # get all the frame info for the requested projectid-field-ccd
-        query = ("select framekey, fits, fistar, fiphot, mfs, mfd, mbg, ngo "
-                 "from calibratedframes where "
-                 "(projectid = %s) and (obsfield = %s) and (ccd = %s) and "
-                 "frameisok = true")
-        params = (str(projectid), field, ccd)
+        if observatory == 'hatpi':
+
+            query = ("select framekey, fits, fistar, fiphot, "
+                     "photinfo->'medsval', "
+                     "photinfo->'meddval', photinfo->'medsrcbgv', "
+                     "photinfo->'ngoodobjects' "
+                     "from calibratedframes where "
+                     "(fitsheader->'PROJID' = %s) and "
+                     "(replace(fitsheader->'OBJECT'#>>'{}','-','') = %s) and "
+                     "(fitsheader->'COMMENT'->>'CamGroups.CGncam' = %s) and "
+                     "(frameisok = true)")
+
+            #NOTE: the replace line is needed because of insane json rules that
+            #say you are not allowed "-" characters. Best I could come up with.
+            #NOTE: this approach to ccd number extraction is also silly. Why is
+            #it not already in the fits header?
+
+            params = (str(projectid), field, str(ccd))
+
+        elif observatory == 'tess':
+            raise NotImplementedError
+
+        else:
+            raise ValueError('observatory must be tess or hatpi')
+        #FIXME
+
 
         cursor.execute(query, params)
         rows = cursor.fetchall()

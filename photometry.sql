@@ -130,78 +130,20 @@ drop table if exists calibratedframes;
 create table calibratedframes (
        framekey bigserial not null,
        entryts timestamp with time zone not null default current_timestamp,
-       -- project and observed field info
-       network text not null,
-       projectid text not null,
-       stationid integer not null,
-       obsfield text not null,
-       framerjd double precision not null,
-       centerra real not null,
-       centerdec real not null,
-       fovdeg real not null,
        frameisok bool not null,
        -- frame paths
        fits text not null,
        fistar text not null,
        fiphot text,
        wcs text,
-       -- frame info
-       cfn integer not null,           -- camera frame serial number
-       cfs text not null default '',   -- camera subframe ID
-       ccd integer not null,           -- camera CCD position number
-       frt text not null,              -- frame type (flat, object, focus, etc.)
-       -- filter config
-       flt integer,                    -- filter ID used in filters table
-       flv integer default 0,          -- filter version used
-       -- camera config
-       cid integer,                    -- camera ID (which camera model?)
-       cvn integer default 0,          -- camera version
-       cbv integer default 0,          -- camera bias version
-       cdv integer default 0,          -- camera dark version
-       cfv integer default 0,          -- camera flat version
-       exp real,                       -- exposure time in seconds
-       -- telescope config
-       tid integer,                    -- telescope ID (i.e. which lens?)
-       tvn integer default 0,          -- telescope version
-       tfs real,                       -- telescope focus setting
-       tms text,                       -- telescope mount state
-       tmi integer,                    -- telescope mount ID
-       tmv integer default 0,          -- telescope mount version
-       tgs text default '',            -- telescope guider status
-       -- photometry basics
-       ngo integer,                    -- number of good objects detected
-       mme real,                       -- median instr. mag err (aie_002)
-       mem real,                       -- instr. magnitude MAD (aim_002)
-       mbg real,                       -- median source background (aim_002)
-       sbg real,                       -- stdev of source background (aim_002)
-       mfs real,                       -- median S value of frame
-       mfd real,                       -- median D value of frame
-       -- environment
-       mph real,                       -- moonphase at time exposure taken
-       mds real,                       -- moon distance from center of frame
-       mel real,                       -- moon elevation at this time
-       iha real,                       -- hour angle of observation
-       izd real,                       -- zenith distance of observation
-       wis real,                       -- wind speed at observation
-       hum real,                       -- relative humidity at observation
-       skt real,                       -- sky temp diff at observation
-       amt real,                       -- ambient temperature at observation
-       dew real,                       -- dewpoint at observation
-       -- eventually use JSON for broken-out cols above
-       -- these are JSON documents describing the rest of the frame's info
-       -- framedetails jsonb not null,
-       -- filterdetails jsonb not null,
-       -- cameradetails jsonb not null,
-       -- scopedetails jsonb not null,
-       -- photdetails jsonb not null,
-       -- environdetails jsonb not null,
+       fitsheader jsonb not null, -- metadata about the image. frame, filter, camera, scope, photometry, environment...
+       photinfo jsonb,   -- metadata about preliminary photometry on the image.
        primary key (framekey)
 );
 
 create unique index calframes_uindx on calibratedframes (
-       network, projectid, stationid, obsfield, cfn, cfs, ccd, frt
+       framekey, fits
 );
-
 
 -- FIXME: will need to add more columns for aperturephot
 drop table if exists photometryinfo;
