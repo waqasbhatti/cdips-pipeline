@@ -110,6 +110,18 @@ $ createdb -U hpx hpx
 and add the appropriate password and info to your `~/.pgpass` file.
   
 
+__Making pipe-trex accessible within virtual environment__
+For the moment, go into the venv's `usr/lib/python2.7/site-packages` directory
+and create a `.pth` file, e.g.  `pipe-trex.pth` with the location of the local
+git cloned repository in it: `/path/to/where/you/cloned/pipe-trex`.
+
+Then activate the virtualenv, and see if you can import a module:
+
+```
+py> import imagesubphot as ism
+```
+
+
 # Getting Started
 
 Congratulations on installing things.
