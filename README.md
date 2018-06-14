@@ -2,16 +2,111 @@
 Timeseries photometry pipeline used for HATPI prototype, and TESS simulated
 data.
 
-**this readme is currently under construction**
+# Install
 
-# Prerequisites
-many.
+TODO FOR INSTALL INSTRUCTIONS:
+* figure out `anet` substitute (can it be replaced by just using
+  astrometry.net?)
+* check this actually works.
+
+
+__Environment basics__
+
+First, clone this repo into a working directory, that we will call $TREX.
+
+```
+git clone https://github.com/waqasbhatti/pipe-trex
+```
+
+Make a virtual environment in some local directory, for instance `~/local`. We
+will call the environment trex\_27:
+
+```
+pip install virtualenv; virtualenv --python=/usr/bin/python2.7 trex_27
+```
+
+Make sure your $PATH and $PYTHON\_PATH environmental variables do not have any
+python-related things that will break your venv.
+
+Active the empty python 2.7 environment: 
+
+```
+source trex_27/bin/activate
+```
+
+Change directories to $TREX, and install everything pip can find:
+
+```
+(trex_27) pip install -r requirements.txt
+```
+
+This will take some time.  Then, ensure pyeebls and astrobase are installed
+(they are commented out by default because they require a number of
+dependencies):
+
+```
+(trex_27) pip install pyeebls
+(trex_27) pip install astrobase
+```
+
+__fitsh (and HATpipe) dependencies__
+
+This code inherits a large amount from the
+[`fitsh`](https://fitsh.net/wiki/Main_Page) project, developed mostly by Andras
+Pal. Much of `fitsh` was inherited by `HATpipe` circa 2010, when it forked.
+`HATpipe` now has top-secret special-sauce added, that you are not allowed to
+reuse without express written permission.
+
+If you had access to the top-secret HATpipe svn repo, you would do something
+like this:
+```
+cd ~/local
+svn checkout --username lbouma https://hat.astro.princeton.edu/svn/HATreduc/HATpipe
+cd HATpipe
+svn up -r3186   # we froze dependencies for pipe-trex
+cd ../ ; cp -r HATpipe HATpipe_R3186
+```
+
+Compiling the HATpipe source on a mac is challenging, because many of the
+libraries are linux-specific.
+
+------------------------------
+
+The utilities we want working on our path include: `anet`, `ficalib`, `fistar`,
+`fiphot`, `grmatch`, `grtrans`, `ficonv`, `fitrans`, and `ficombine`.
+
+Most of these are `fitsh` tasks. We will proceed using only free software
+unless absolutely necessary, which means using Andras' public version.
+The `fitsh` installation instructions are
+[here](https://fitsh.net/wiki/Installation), and they are simple:
+
+```
+cd ~/local
+wget http://fitsh.net/download/fitsh/fitsh-0.9.2.tar.gz
+tar xvzf fitsh-0.9.2.tar.gz
+cd fitsh-0.9.2
+./configure
+make
+make install
+```
+
+
+
+__PostgreSQL installation__
+For macs, see [here](https://www.postgresql.org/download/macosx/).
+For linux boxes, see
+[here](https://wiki.postgresql.org/wiki/Detailed_installation_guides#MacOS).
+
+  
 
 # Getting Started
 
+Congratulations on installing things.
+
 Some usage examples are given in the `examples/` directory.
 
-## Directory and database structure
+
+## Concepts: Directory and database structure
 
   As Thom Yorke understood, everything must be in its right place for your
   photometry to Just Work. The assumed directory structure at its first level
