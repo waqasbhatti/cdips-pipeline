@@ -125,7 +125,7 @@ except:
 ########################
 
 # set this to show extra info
-DEBUG = False
+DEBUG = True
 
 # CCD minimum and maximum X,Y pixel coordinates
 # used to strip things outside FOV from output of make_frame_sourcelist
@@ -210,13 +210,14 @@ TRANSFORMCMD = ("{transformer} -w {framewcsfile} "
 #                 e.g. for 1-377741e_5.fits, this is 1-377741e_5
 #                 (used for later collection of fiphot files into an LC)
 # {outfile}:      name of the output .phot file (binary format)
+# {format}:       for text output, e.g.,'ISXY,BbMms', see fiphot manpage
 FIPHOTCMD = ("fiphot --input {fits} --input-list {sourcelist} "
              "--col-id 1 --col-xy {xycols} --gain {ccdgain:f} "
              "--mag-flux {zeropoint:f},{ccdexptime:f} "
              "--apertures {aperturelist} "
              "--sky-fit 'mode,sigma=3,iterations=2' --disjoint-radius 2 "
              "--serial {fitsbase} "
-             "--format 'ISXY,BbMms' --nan-string 'NaN' "
+             "--format {formatstr} --nan-string 'NaN' "
              "--aperture-mask-ignore 'saturated' --comment '--comment' "
              "--single-background 3 {binaryout} --output {outfile} -k")
 
@@ -646,7 +647,7 @@ def make_fov_catalog(ra=None, dec=None, size=None,
         from astropy.coordinates import Angle
         import astropy.units as units
         tempra = Angle(str(catra)+'h')
-        catra = tempra.to(units.degree).value
+        catra = tempra.to(units.degree).value #FIXME this is probably hatpi specific?
 
     else:
         print('%sZ: need a FITS file to work on, or center coords and size' %
@@ -680,6 +681,13 @@ def make_fov_catalog(ra=None, dec=None, size=None,
 
     if DEBUG:
         print(catalogcmd)
+
+    if os.path.exists(outfile):
+
+        print('%sZ: found FOV catalog %s, continuing... ' %
+              (datetime.utcnow().isoformat(), os.path.abspath(outfile)))
+
+        return os.path.abspath(outfile)
 
     # execute the cataloger shell command
     catalogproc = subprocess.Popen(shlex.split(catalogcmd),
@@ -1287,6 +1295,7 @@ def run_fiphot(fits,
                zeropoint=None,
                ccdexptime=None,
                aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
+               formatstr='ISXY,BbMms',
                outfile=None,
                removesourcelist=False,
                binaryoutput=True):
@@ -1376,6 +1385,7 @@ def run_fiphot(fits,
                                  ccdexptime=ccdexptime,
                                  aperturelist=aperturelist,
                                  fitsbase=fitsbase,
+                                 formatstr=formatstr,
                                  binaryout=binaryout,
                                  outfile=outfile)
 
@@ -1426,6 +1436,7 @@ def do_photometry(fits,
                   removesourcetemp=True,
                   pixborders=0.0,
                   aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
+                  formatstr='ISXY,BbMms',
                   removesourcelist=False,
                   binaryoutput=True,
                   minsrcbgv=100.0,
@@ -1525,6 +1536,7 @@ def do_photometry(fits,
                                 xycols=fiphot_xycols,
                                 ccdgain=ccdgain,
                                 zeropoint=zeropoint,
+                                formatstr=formatstr,
                                 ccdexptime=ccdexptime,
                                 removesourcelist=removesourcelist,
                                 binaryoutput=binaryoutput)
@@ -1619,6 +1631,7 @@ def parallel_fitsdir_photometry(
         maxmadbgv=150.0,
         maxframebgv=2000.0,
         minnstars=500,
+        formatstr='ISXY,BbMms',
         ccdgain=None,
         ccdexptime=None,
         zeropoint=None,
@@ -1659,6 +1672,7 @@ def parallel_fitsdir_photometry(
                'maxmadbgv':maxmadbgv,
                'maxframebgv':maxframebgv,
                'minnstars':minnstars,
+               'formatstr':formatstr,
                'ccdgain':ccdgain,
                'ccdexptime':ccdexptime,
                'zeropoint':zeropoint}, rejectbadframes] for x in fitslist]
@@ -1704,6 +1718,7 @@ def parallel_fitslist_photometry(
         maxtasksperworker=1000,
         saveresults=True,
         rejectbadframes=True,
+        formatstr='ISXY,BbMms',
         minsrcbgv=200.0,
         maxmadbgv=150.0,
         maxframebgv=2000.0,
@@ -1750,6 +1765,7 @@ def parallel_fitslist_photometry(
                'fluxthreshold':fluxthreshold,
                'binaryoutput':binaryoutput,
                'minsrcbgv':minsrcbgv,
+               'formatstr':formatstr,
                'maxmadbgv':maxmadbgv,
                'maxframebgv':maxframebgv,
                'minnstars':minnstars}, rejectbadframes] for x in goodlist]
