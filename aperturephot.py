@@ -328,7 +328,9 @@ def anet_solve_frame(srclist,
                      radius=13,
                      xpix=2048,
                      ypix=2048,
-                     cols=(2,3)):
+                     cols=(2,3),
+                     scale=None,
+                     usescalenotwidth=False):
     '''This uses anet to solve frame astrometry.
 
     Uses the frame extracted sources (.fistar file) and returns a .wcs file
@@ -350,6 +352,10 @@ def anet_solve_frame(srclist,
     indexpath = /P/HP0/CAT/ANET_INDEX/ucac4_2014/   # path to the indexes
 
     otherwise, we'll need to provide these as kwargs to the anet executable.
+
+    If usescalenotwidth, instead executes
+
+    anet --ra 60. --dec -22 --radius 12 --scale 21.1 -s 2048,2048 --tweak 6 --cols 2,3 foo.fistar --wcs foo.wcs
 
     The input sourcelist can come from fistar, with a fluxthreshold set to 10000
     to just get the bright stars. This makes anet way faster.
@@ -395,21 +401,41 @@ def anet_solve_frame(srclist,
 
             ra = ra*360.0/24.0
 
-    ANETCMDSTR = ("anet -r {ra} -d {dec} -w {width} "
-                  "--tweak {tweak} --radius {radius} -s {xpix},{ypix} "
-                  "--cols {colx},{coly} --wcs {outwcsfile} {sourcelist}")
+    if usescalenotwidth:
 
-    anetcmd = ANETCMDSTR.format(ra=ra,
-                                dec=dec,
-                                width=width,
-                                tweak=tweak,
-                                radius=radius,
-                                xpix=xpix,
-                                ypix=ypix,
-                                colx=cols[0],
-                                coly=cols[1],
-                                outwcsfile=wcsout,
-                                sourcelist=srclist)
+        ANETCMDSTR = ("anet -r {ra} -d {dec} --scale {scale} "
+                      "--tweak {tweak} --radius {radius} -s {xpix},{ypix} "
+                      "--cols {colx},{coly} --wcs {outwcsfile} {sourcelist}")
+
+        anetcmd = ANETCMDSTR.format(ra=ra,
+                                    dec=dec,
+                                    scale=scale,
+                                    tweak=tweak,
+                                    radius=radius,
+                                    xpix=xpix,
+                                    ypix=ypix,
+                                    colx=cols[0],
+                                    coly=cols[1],
+                                    outwcsfile=wcsout,
+                                    sourcelist=srclist)
+
+    else:
+
+        ANETCMDSTR = ("anet -r {ra} -d {dec} -w {width} "
+                      "--tweak {tweak} --radius {radius} -s {xpix},{ypix} "
+                      "--cols {colx},{coly} --wcs {outwcsfile} {sourcelist}")
+
+        anetcmd = ANETCMDSTR.format(ra=ra,
+                                    dec=dec,
+                                    width=width,
+                                    tweak=tweak,
+                                    radius=radius,
+                                    xpix=xpix,
+                                    ypix=ypix,
+                                    colx=cols[0],
+                                    coly=cols[1],
+                                    outwcsfile=wcsout,
+                                    sourcelist=srclist)
 
     if DEBUG:
         print(anetcmd)
@@ -1070,7 +1096,6 @@ def parallel_extract_sources_for_list(fitslist,
     # this is the return dictionary
     returndict = {x:y for (x,y) in results}
     return returndict
-
 
 
 def match_fovcatalog_framesources(frame_extracted_sourcelist,
