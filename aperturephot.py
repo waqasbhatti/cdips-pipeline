@@ -6411,7 +6411,8 @@ def plot_stats_file(statsfile, outdir, outprefix,
                     logy=False,
                     logx=False,
                     correctmagsafter=None,
-                    rangex=(5.9,14.1)):
+                    rangex=(5.9,14.1),
+                    observatory='hatpi'):
     '''This makes all the plots for a stats file.
 
     correctmagsafter will use the corrected mags for all objects with mags >
@@ -6531,15 +6532,39 @@ def plot_stats_file(statsfile, outdir, outprefix,
             plt.xlim(rangex)
 
             if binned:
-                plt.ylim((0.0001,1.0))
+                if observatory=='hatpi':
+                    plt.ylim((0.0001,1.0))
+                elif observatory=='tess':
+                    plt.ylim((0.00001,1.0))
                 plt.hlines([0.001,0.002,0.003],
                            xmin=rangex[0],xmax=rangex[1],colors='b')
                 plt.hlines([0.0005],
                            xmin=rangex[0],xmax=rangex[1],colors='r')
 
             else:
+                if observatory=='hatpi':
+                    plt.ylim((0.0009,1.0))
+                elif observatory=='tess':
+                    plt.ylim((0.00009,1.0))
+
+                    # overplot tess noise model
+                    Tmag = np.linspace(6, 13, num=200)
+                    lnA = 3.29685004771
+                    B = 0.8500214657
+                    C = -0.2850416324
+                    D = 0.039590832137
+                    E = -0.00223080159
+                    F = 4.73508403525e-5
+                    ln_sigma_1hr = lnA + B*Tmag + C*Tmag**2 + D*Tmag**3 + \
+                                   E*Tmag**4 + F*Tmag**5
+                    sigma_1hr = np.exp(ln_sigma_1hr)
+                    sigma_30min = sigma_1hr * np.sqrt(2)
+
+                    print('DOING THE TESS NOISE OVERLINE') #FIXME
+                    plt.plot(Tmag, sigma_30min/1e6, 'k-', zorder=3, lw=2)
+
+
                 # make the horizontal lines for 10, 5, 1 mmag
-                plt.ylim((0.0009,1.0))
                 plt.hlines([0.001, 0.002, 0.003, 0.004, 0.005],
                            xmin=rangex[0],xmax=rangex[1],colors='b')
 
