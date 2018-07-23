@@ -1104,7 +1104,16 @@ def match_fovcatalog_framesources(frame_extracted_sourcelist,
                                   srclist_cols=(0,1,2,5,6,7),
                                   fovcat_cols=(0,1,2,12,13),
                                   match_pixel_distance=0.5):
-    '''Does frame_projected_fovcatalog and frame_extracted_sourcelist matching.
+    '''
+    Does frame_projected_fovcatalog and frame_extracted_sourcelist matching.
+
+        frame_extracted_sourcelist: *.fistar file
+        frame_projected_fovcatalog: *.projcatalog file
+        outfile: *.sourcelist file to be created by this function. Each line
+        looks like:
+
+     ID              RA       DEC     x          y         phot_id   x       y          s,d,k
+    HAT-381-0000008 249.39070 5.27754 1261.64440 517.39870 4620 1261.75400 517.42700 1.39400 0.24400 -0.17900
 
     This matches the fovcatalog transformed to pixel coordinates to the
     extracted source list pixel coordinates and gets the IDs of the sources to
@@ -1323,7 +1332,8 @@ def run_fiphot(fits,
                formatstr='ISXY,BbMms',
                outfile=None,
                removesourcelist=False,
-               binaryoutput=True):
+               binaryoutput=True,
+               observatory='hatpi'):
     '''
     Thus runs fiphot for a single frame. Only the fits filename is required. If
     other parameters are not provided, they will be obtained from the image
@@ -1331,15 +1341,16 @@ def run_fiphot(fits,
 
     Returns the path of the .fiphot file produced if successful, otherwise
     returns None.
-
     '''
 
     # get the required header keywords from the FITS file
-    header = imageutils.get_header_keyword_list(fits,
-                                                ['GAIN',
-                                                 'GAIN1',
-                                                 'GAIN2',
-                                                 'EXPTIME'])
+    if observatory=='hatpi':
+        headerlist = ['GAIN', 'GAIN1', 'GAIN2', 'EXPTIME', 'RAC', 'DECC',
+                      'FOV']
+    elif observatory=='tess':
+        headerlist = ['GAINA', 'TELAPSE', 'CRVAL1', 'CRVAL2']
+
+    header = imageutils.get_header_keyword_list(fits, headerlist)
 
     # handle the gain and exptime parameters
     if not ccdgain:
@@ -1448,10 +1459,11 @@ def run_fiphot(fits,
 
 
 def do_photometry(fits,
-                  fovcatalog,
+                  reformedfovcatalog,
                   extractsources=True,
                   fluxthreshold=500.0,
                   fovcat_xycols=(12,13),
+                  projcat_xycols=(24,25),
                   fiphot_xycols='7,8', # set for matched source list
                   outdir=None,
                   ccdextent=None,
@@ -1467,14 +1479,15 @@ def do_photometry(fits,
                   minsrcbgv=100.0,
                   maxmadbgv=20.0,
                   maxframebgv=2000.0,
-                  minnstars=500):
+                  minnstars=500,
+                  observatory='hatpi'):
     '''This rolls up the sourcelist and fiphot functions above.
 
     Runs both stages on fits, and puts the output in outdir if it exists. If it
     doesn't or is None, then puts the output in the same directory as fits.
 
-    fovcatalog is the path to the 2MASS/UCAC4 catalog for all sources in the
-    observed field.
+    reformedfovcatalog is the path to the 2MASS/UCAC4 catalog for all sources in the
+    observed field. (12 columns!)
 
     '''
 
@@ -1507,14 +1520,13 @@ def do_photometry(fits,
         print('output source list will be %s' % outsourcelist)
         print('output fiphot will be %s' % outfiphot)
 
-    # get the frame project catalog
+    # make the .projcatalog files (projects catalog onto the frame)
     projcatfile = make_frameprojected_catalog(fits,
-                                              fovcatalog,
+                                              reformedfovcatalog,
                                               ccdextent=ccdextent,
                                               out=outprojcat,
                                               removetemp=removesourcetemp,
                                               pixborders=pixborders)
-
     if projcatfile:
 
         # if we're supposed to extract sources and run photometry on them
@@ -1522,22 +1534,37 @@ def do_photometry(fits,
         if extractsources:
 
             # extract sources
-            framesources = extract_frame_sources(
-                fits,
-                os.path.join(
-                    outdir,
-                    re.sub(sv.FITS_TAIL,'.fistar',os.path.basename(fits))
-                    ),
-                fluxthreshold=fluxthreshold
+            if observatory=='hatpi':
+                framesources = extract_frame_sources(
+                    fits,
+                    os.path.join(
+                        outdir,
+                        re.sub(sv.FITS_TAIL,'.fistar',os.path.basename(fits))
+                        ),
+                    fluxthreshold=fluxthreshold
+                )
+
+            elif observatory=='tess':
+                framesources = extract_frame_sources(
+                    fits,
+                    os.path.join(
+                        outdir,
+                        re.sub(sv.FITS_TAIL,'.fistar',os.path.basename(fits))
+                        ),
+                    fluxthreshold=fluxthreshold,
+                    ccdgain=ccdgain,
+                    zeropoint=zeropoint,
+                    exptime=ccdexptime
                 )
 
             if framesources:
 
-                # match these to the projected fovcatalog
+                # match extracted frame sources to the projected fovcatalog.
+                # this makes a .sourcelist file, named "outsourcelist". 
                 matchedsources = match_fovcatalog_framesources(
-                    framesources,
-                    projcatfile,
-                    outsourcelist
+                    framesources, # *.fistar file
+                    projcatfile,  # *.projcatalog file
+                    outsourcelist # *.sourcelist file, created by this function
                     )
 
                 fiphot_xycols = '7,8'
@@ -1564,7 +1591,8 @@ def do_photometry(fits,
                                 formatstr=formatstr,
                                 ccdexptime=ccdexptime,
                                 removesourcelist=removesourcelist,
-                                binaryoutput=binaryoutput)
+                                binaryoutput=binaryoutput,
+                                observatory=observatory)
 
         if fiphotfile:
 
