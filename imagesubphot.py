@@ -333,7 +333,7 @@ SUBFRAMEPHOTCMD = (
     "--output - | sort -k 1 > {outiphot}"
 )
 
-GRCOLLECTCMD = ('grcollect {fiphotfile} --col-base 1 '
+GRCOLLECTCMD = ('grcollect {fiphotfileglob} --col-base {objectidcol} '
                 '--prefix {lcdir} --extension {lcextension} '
                 '--max-memory {maxmemory}'
                )
@@ -2368,8 +2368,10 @@ def get_lc_for_object(lcobject,
 ## LIGHTCURVE COLLECTION ##
 ###########################
 
-def dump_lightcurves_with_grcollect(photfiles, lcdir, maxmemory,
-                                    lcextension='grcollectilc'):
+def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
+                                    objectidcol=3,
+                                    lcextension='grcollectilc',
+                                    observatory='tess'):
     '''
     Given a list of photometry files (text files at various times output by
     fiphot with rows that are objects), make lightcurve files (text files for
@@ -2379,16 +2381,28 @@ def dump_lightcurves_with_grcollect(photfiles, lcdir, maxmemory,
     is comparably fast to the postgresql indexing approach without heavy
     optimization (dumps ~1 photometry file per second).
 
-    ASSUMES the objectid is in the first column of the *.iphot photometry
-    output files that `fiphot` makes.
+    An important intermediate step, implemented here, is prepending times and
+    filenames to *.iphot lightcurve files, to make *.iphottemp files.
 
-    TODO a quick dumb way to parallelize involves splitting up the photfiles
-    list before the call. However `grcollect` does voodoo in memory allocation
-    so be careful.
+    *.iphot photometry files look like:
+
+        HAT-381-0000004     1482.093      521.080   1482.10899   521.079941
+        1.86192159    -0.217043415    -0.152707564         0.35         0.41
+        583942.10       334.31      5.54226      0.00062            G
+        605285.46       340.12      5.50328      0.00061            G
+        619455.38       344.29      5.47816      0.00060            G
 
     Args:
 
-        photfiles (list): list of full paths to photometry files
+        photfileglob (str): bash glob to pass to grcollect, e.g., the first
+        input line below
+
+            grcollect /home/mypath/rsub-3f62ef9f-tess201913112*.iphot \
+            --col-base 1 --prefix /nfs/phtess1/ar1/TESS/SIMFFI/LC/ISP_1-1/ \
+            --extension grcollectilc --max-memory 4g
+
+        objectidcol (int): column of object id in *.iphottemp files (default:
+            3)
 
         lcdir (str): directory where lightcurves get dumped
 
@@ -2408,39 +2422,89 @@ def dump_lightcurves_with_grcollect(photfiles, lcdir, maxmemory,
         diddly-squat.
     '''
 
-    totphot = len(photfiles)
-    print('%sZ: called dump lightcurves for %d photfiles' % totphot)
-
     starttime = time.time()
 
-    for ix, photfile in enumerate(photfiles):
+    photpaths = glob.glob(photfileglob)
 
-        # make sure the photometry file exists before we proceed
-        if not os.path.exists(photfile):
-            print('ERR! %sZ: failed to find %s, continuing' %
-                  (datetime.utcnow().isoformat(), frametoshift))
-            continue
+    print('%sZ: called dump lightcurves for %d photfiles' %
+          (datetime.utcnow().isoformat(), len(photpaths)))
 
-        cmdtorun = GRCOLLECTCMD.format(fiphotfile=photfile,
-                                       lcdir=lcdir,
-                                       lcextension=lcextension,
-                                       maxmemory=maxmemory)
+    if len(photpaths)==0:
+        print('ERR! %sZ: failed to find %s, continuing' %
+              (datetime.utcnow().isoformat(), frametoshift))
+        return 0
 
-        # execute the grcollect shell command
-        grcollectproc = subprocess.Popen(shlex.split(cmdtorun),
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
+    # *.iphot files need to have timestamp and filenames prepended on each
+    # line, otherwise lightcurves will have no times. make the correctly
+    # formatted ".iphottemp" files here.
+    for ix, photpath in enumerate(photpaths):
 
-        _, stderr = grcollectproc.communicate()
-
-        if grcollectproc.returncode == 0:
-            print('%sZ: grcollect %d/%d: %s was dumped' %
-                  (datetime.utcnow().isoformat(), ix, totphot, photfile))
-
+        if observatory=='tess':
+            framekey = re.findall('tess20.*?-0016_cal_img', photpath)
+            assert len(framekey) == 1, 'TESS ETE6 specific regex!'
+            originalframe = os.path.join(os.path.dirname(photpath),
+                                         framekey[0]+'.fits')
         else:
-            print('ERR! %sZ: grcollect failed for %s' %
-                  (datetime.utcnow().isoformat(), photfile))
-            print('error was %s' % stderr )
+            raise NotImplementedError
+
+        # check these files exist, and populate the dict if they do
+        if os.path.exists(originalframe):
+
+            tempphotpath = photpath.replace('.iphot','.iphottemp')
+
+            if os.path.exists(tempphotpath):
+                print('%sZ: skipping %d/%d frame, found .iphottemp file %s' %
+                      (datetime.utcnow().isoformat(), ix, len(photpaths),
+                       tempphotpath))
+                continue
+
+            print('%sZ: writing %d/%d frame, %s to .iphottemp file %s' %
+                  (datetime.utcnow().isoformat(), ix, len(photpaths), photpath,
+                   tempphotpath))
+
+            # this is the ORIGINAL FITS frame, since the subtracted one
+            # contains some weird JD header (probably inherited from the
+            # photref frame)
+            if observatory=='tess':
+                frametime = get_header_keyword(originalframe, 'TSTART')
+            else:
+                raise NotImplementedError
+
+            # now open the phot file, read it, and write to the tempphot file.
+            output = StringIO()
+            with open(photpath, 'rb') as photfile:
+
+                for line in photfile:
+                    output.write('%.6f\t%s\t%s' % (frametime, framekey[0], line))
+
+            with open(tempphotpath, 'w') as tempphotfile:
+                output.seek(0)
+                shutil.copyfileobj(output, tempphotfile)
+
+            output.close()
+
+    grcollectglob = photfileglob.replace('.iphot', '.iphottemp')
+    cmdtorun = GRCOLLECTCMD.format(fiphotfileglob=grcollectglob,
+                                   lcdir=lcdir,
+                                   objectidcol=objectidcol,
+                                   lcextension=lcextension,
+                                   maxmemory=maxmemory)
+    if DEBUG:
+        print(cmdtorun)
+
+    # execute the grcollect shell command. NB we execute through a shell
+    # interpreter to get correct wildcards applied.
+    grcollectproc = subprocess.Popen(cmdtorun, shell=True,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+
+    _, stderr = grcollectproc.communicate()
+
+    if grcollectproc.returncode == 0:
+        print('%sZ: grcollect dump succeeded' % datetime.utcnow().isoformat())
+    else:
+        print('ERR! %sZ: grcollect failed' % datetime.utcnow().isoformat())
+        print('error was %s' % stderr )
 
     print('%sZ: done, time taken: %.2f minutes' %
           (datetime.utcnow().isoformat(), (time.time() - starttime)/60.0))
