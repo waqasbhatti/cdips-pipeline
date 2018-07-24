@@ -2184,7 +2184,7 @@ def framelist_make_xtrnsfits(fitsfiles,
             return
 
         else:
-            fitsfiles = [sv.REDPATH+sd+'-xtrns.fits' for sd in setdiff]
+            fitsfiles = [sv.REDPATH+sd+'.fits' for sd in setdiff]
 
     print('%sZ: %s files to astrometrically shift' %
           (datetime.utcnow().isoformat(), len(fitsfiles)))
@@ -2202,6 +2202,15 @@ def framelist_make_xtrnsfits(fitsfiles,
     # wait for the processes to complete work
     pool.close()
     pool.join()
+
+    print('%sZ: done with astrometric shifting' %
+          (datetime.utcnow().isoformat()))
+
+    existing = glob.glob(sv.REDPATH+
+                         sv.LOCAL_GLOBPATTERN.replace('.fits','-xtrns.fits'))
+
+    if len(existing) != len(requested) + len(alreadyexists):
+        raise AssertionError, 'something wrong in astrometric shift'
 
     return {x:y for (x,y) in results}
 
@@ -3456,7 +3465,6 @@ def parallel_convsubfits_staticphot(
         pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
         # fire up the pool of workers
-        import IPython; IPython.embed() # FIXME
         results = pool.map(convsubfits_staticphot_worker, tasks)
 
         # wait for the processes to complete work

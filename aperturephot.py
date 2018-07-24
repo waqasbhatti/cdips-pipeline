@@ -640,7 +640,8 @@ def make_fov_catalog(ra=None, dec=None, size=None,
                      outdir=None,
                      catalog='2MASS',
                      catalogpath=None,
-                     columns=None):
+                     columns=None,
+                     observatory='hatpi'):
     '''
     This function gets all the sources in the field of view of the frame, given
     its central pointing coordinates and plate-scale from either 2MASS or
@@ -664,16 +665,18 @@ def make_fov_catalog(ra=None, dec=None, size=None,
 
         frame, hdr = read_fits(fits)
         catbox = sv.FIELDCAT_FOV
-        catra = float(hdr['RACA'])   # RA [DECIMAL hr] (averaged field center)
-        catdec = float(hdr['DECCA']) # Dec [decimal deg] (averaged field center)
 
-        print('WRN! %sZ: converting decimal hour RA to decimal degree' %
-              (datetime.utcnow().isoformat()))
-
-        from astropy.coordinates import Angle
-        import astropy.units as units
-        tempra = Angle(str(catra)+'h')
-        catra = tempra.to(units.degree).value #FIXME this is probably hatpi specific?
+        if observatory=='hatpi':
+            catra = float(hdr['RACA'])   # RA [DECIMAL hr] (averaged field center)
+            catdec = float(hdr['DECCA']) # Dec [decimal deg] (averaged field center)
+            print('WRN! %sZ: converting decimal hour RA to decimal degree' %
+                  (datetime.utcnow().isoformat()))
+            from astropy.coordinates import Angle
+            import astropy.units as units
+            tempra = Angle(str(catra)+'h')
+            catra = tempra.to(units.degree).value
+        else:
+            raise NotImplementedError
 
     else:
         print('%sZ: need a FITS file to work on, or center coords and size' %
@@ -3648,14 +3651,13 @@ def choose_tfa_template(statsfile,
     is a subsample of the stars, and is supposed to represent all the types of
     systematics across the dataset. Kovacs et al (2005) give details.
 
-    statsfile = the file to use to get LC statistics from
+    statsfile = the file with LC statistics made when running EPD
 
     fovcatalog = the fovcatalog file, this must have xi and eta coordinates,
                  ras, decs, and magnitudes
 
     Returns a dict with lists of stars chosen, their stats, and filenames of
     where each star list was written.
-
     '''
 
     # read in the stats file
@@ -4929,41 +4931,39 @@ def parallel_lc_statistics(lcdir,
     '''
     This calculates statistics on all lc files in lcdir.
 
-    Uses lcglob to find the files. Puts the results in text file outfile. Needs
-    the fovcatalog to get the catalog magnitude to use as the canonical
-    magnitude.
+    Args:
+        lcdir (str): directory containing lightcurves
 
-    outfile contains the following columns:
+        lcglob (str): glob to epd lcs, inside lcdir. E.g., '*.epdlc'. These
+        contain the rlc, and are used to derive the filenames of the tfalcs.
 
-    object, ndet,
-    median RM[1-3], MAD RM[1-3], mean RM[1-3], stdev RM[1-3],
-    median EP[1-3], MAD EP[1-3], mean EP[1-3], stdev EP[1-3],
-    median TF[1-3], MAD TF[1-3], mean TF[1-3], stdev TF[1-3]
+        fovcatalog (str): path to the REFORMED fov catalog, which gets the
+        catalog magnitude corresponding to canonical magnitude for any star.
 
-    if a value is missing, it will be np.nan.
+    Output:
 
-    For ISM (LC format as of 2015/11/01):
+        Puts the results in text file outfile.
+        outfile contains the following columns:
 
-    parallel_lc_statistics('ccd8-LC','*.epdlc','../G545-riz.catalog',
-                           rmcols=[14,19,24],
-                           epcols=[27,28,29],
-                           tfcols=[30,31,32],
-                           rfcols=[12,17,22],
-                           sigclip=3.0,outfile='ccd8-tfa-lcstats.txt')
+            object, ndet,
+            median RM[1-3], MAD RM[1-3], mean RM[1-3], stdev RM[1-3],
+            median EP[1-3], MAD EP[1-3], mean EP[1-3], stdev EP[1-3],
+            median TF[1-3], MAD TF[1-3], mean TF[1-3], stdev TF[1-3]
 
-    IMPORTANT: the lcfile is always the .epdlc file (which contains the rlc, and
-    is used to derive the filenames of the tfalcs)
+        if a value is missing, it will be np.nan.
 
-    For ISM, consider using correctioncoeffs as well. These are c1, c2 resulting
-    from a fit to the catalogmag-flux relation using the expression:
+    Notes:
+        For ISM, consider using correctioncoeffs as well. These are c1, c2
+        resulting from a fit to the catalogmag-flux relation using the
+        expression:
 
-    catrmag = -2.5 * log10(flux/c1) + c2
+        catrmag = -2.5 * log10(flux/c1) + c2
 
-    where the fit is done in the bright limit (8.0 < r < 12.0). this corrects
-    for too-faint catalog mags because of crowding and blending.
+        where the fit is done in the bright limit (8.0 < r < 12.0). this
+        corrects for too-faint catalog mags because of crowding and blending.
 
-    correctioncoeffs is like: [[ap1_c1,ap1_c2],[ap2_c1,ap2_c2],[ap3_c1,ap3_c2]]
-
+        correctioncoeffs is like:
+            [[ap1_c1,ap1_c2],[ap2_c1,ap2_c2],[ap3_c1,ap3_c2]]
     '''
 
     lcfiles = glob.glob(os.path.join(lcdir, lcglob))
@@ -6560,7 +6560,6 @@ def plot_stats_file(statsfile, outdir, outprefix,
                     sigma_1hr = np.exp(ln_sigma_1hr)
                     sigma_30min = sigma_1hr * np.sqrt(2)
 
-                    print('DOING THE TESS NOISE OVERLINE') #FIXME
                     plt.plot(Tmag, sigma_30min/1e6, 'k-', zorder=3, lw=2)
 
 
