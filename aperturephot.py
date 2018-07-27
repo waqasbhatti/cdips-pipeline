@@ -528,8 +528,9 @@ def parallel_anet(srclistdir,
                             intailstr='.fistar',
                             outtailstr='.wcs',
                             skipifpartial=True)
-    if fistarlist == -1:
-        return -1
+    if type(fistarlist) == int:
+        if fistarlist == -1:
+            return -1
 
     pool = mp.Pool(nworkers, maxtasksperchild=maxtasksperworker)
 
@@ -955,8 +956,9 @@ def parallel_extract_sources(fitsdir,
                             outdir,
                             intailstr=tailstr,
                             outtailstr='.fistar')
-    if toextract == -1:
-        return -1
+    if type(toextract) == int:
+        if toextract == -1:
+            return -1
 
     pool = mp.Pool(nworkers, maxtasksperchild=maxtasksperworker)
 
@@ -2085,7 +2087,8 @@ def get_magfit_frames(fitsdir,
                       selectreference=True,
                       framestats=False,
                       linkfiles=True,
-                      outlistfile=None):
+                      outlistfile=None,
+                      observatory='hatpi'):
     '''
     fitsdir = directory where the FITS object frames are
     fitsglob = glob to select a subset of the FITS object frames
@@ -2251,18 +2254,20 @@ def get_magfit_frames(fitsdir,
     if selectreference:
 
         print('%sZ: selecting a reference frame...' %
-              (datetime.utcnow().isoformat(),))
+              (datetime.utcnow().isoformat()))
 
-        zenithdist, moondist, moonelev = [], [], []
+        if observatory=='hatpi':
+            zenithdist, moondist, moonelev = [], [], []
+        elif observatory=='tess':
+            pass
         ngoodobjects, medmagerr, magerrmad = [], [], []
 
         # for each FITS and fiphot combo, collect stats
         for fits, fiphot in zip(workfitslist, workphotlist):
 
-            headerdata = imageutils.get_header_keyword_list(
-                fits,
-                ['Z','MOONDIST','MOONELEV']
-                )
+            if observatory=='hatpi':
+                headerdata = imageutils.get_header_keyword_list(
+                                            fits, ['Z','MOONDIST','MOONELEV'])
 
             # decide if the fiphot file is binary or not. read the first 600
             # bytes and look for the '--binary-output' text
@@ -2324,42 +2329,49 @@ def get_magfit_frames(fitsdir,
             # append to result lists
             goodframes.append(fits)
             goodphots.append(fiphot)
-            zenithdist.append(headerdata['Z'])
-            moondist.append(headerdata['MOONDIST'])
-            moonelev.append(headerdata['MOONELEV'])
             ngoodobjects.append(ngood)
             medmagerr.append(median_magerr)
             magerrmad.append(medabsdev_mag)
+            if observatory=='hatpi':
+                zenithdist.append(headerdata['Z'])
+                moondist.append(headerdata['MOONDIST'])
+                moonelev.append(headerdata['MOONELEV'])
 
             if DEBUG:
-                print('frame = %s, phot = %s, Z = %s, MOONDIST = %s, '
-                      'MOONELEV = %s, ngood = %s, medmagerr = %.5f, '
-                      'magerrmad = %.5f' %
-                      (fits, fiphot,
-                       headerdata['Z'],
-                       headerdata['MOONDIST'],
-                       headerdata['MOONELEV'],
-                       ngood, median_magerr, medabsdev_mag))
+                if observatory=='hatpi':
+                    print('frame = %s, phot = %s, Z = %s, MOONDIST = %s, '
+                          'MOONELEV = %s, ngood = %s, medmagerr = %.5f, '
+                          'magerrmad = %.5f' %
+                          (fits, fiphot, headerdata['Z'],
+                           headerdata['MOONDIST'], headerdata['MOONELEV'],
+                           ngood, median_magerr, medabsdev_mag))
+
+                elif observatory=='tess':
+                    print('frame = %s, phot = %s, '
+                          'ngood = %s, medmagerr = %.5f, '
+                          'magerrmad = %.5f' %
+                          (fits, fiphot, ngood, median_magerr, medabsdev_mag))
 
         # now that we're done collecting data, sort them in orders we want
         goodframes = np.array(goodframes)
         goodphots = np.array(goodphots)
-        zenithdist_ind = np.argsort(zenithdist)
-        moondist_ind = np.argsort(moondist)[::-1]
-        moonelev_ind = np.argsort(moonelev)
         ngood_ind = np.argsort(ngoodobjects)[::-1]
         mederr_ind = np.argsort(medmagerr)
         magmad_ind = np.argsort(magerrmad)
+        if observatory=='hatpi':
+            zenithdist_ind = np.argsort(zenithdist)
+            moondist_ind = np.argsort(moondist)[::-1]
+            moonelev_ind = np.argsort(moonelev)
 
         # get the first 200 of these or all 200 if n < 200
         if len(goodframes) > 200:
-            zenithdist_ind = zenithdist_ind[:500]
-            moondist_ind = moondist_ind[:500]
-            moonelev_ind = moonelev_ind[:500]
-
             ngood_ind = ngood_ind[:500]
             mederr_ind = mederr_ind[:500]
             magmad_ind = magmad_ind[:500]
+            if observatory=='hatpi':
+                zenithdist_ind = zenithdist_ind[:500]
+                moondist_ind = moondist_ind[:500]
+                moonelev_ind = moonelev_ind[:500]
 
         # intersect all arrays to find a set of common indices that belong to
         # the likely reference frames
@@ -2369,13 +2381,18 @@ def get_magfit_frames(fitsdir,
                                                      assume_unique=True),
                                       mederr_ind,assume_unique=True)
 
-        headergood_ind =  np.intersect1d(np.intersect1d(moondist_ind,
-                                                        moonelev_ind,
-                                                        assume_unique=True),
-                                         zenithdist_ind,assume_unique=True)
+        if observatory=='hatpi':
+            headergood_ind =  np.intersect1d(np.intersect1d(moondist_ind,
+                                                            moonelev_ind,
+                                                            assume_unique=True),
+                                             zenithdist_ind,assume_unique=True)
 
-        allgood_ind = np.intersect1d(photgood_ind, headergood_ind,
-                                     assume_unique=True)
+            allgood_ind = np.intersect1d(photgood_ind, headergood_ind,
+                                         assume_unique=True)
+        elif observatory=='tess':
+            allgood_ind = photgood_ind
+        else:
+            raise NotImplementedError
 
         # if the headers and photometry produce a good reference frame, use
         # that. if they don't, use the photometry to choose a good reference
@@ -2401,11 +2418,17 @@ def get_magfit_frames(fitsdir,
         # update the returndict with reference frame and stats
         returndict['referenceframe'] = selectedreference
         returndict['referencephot'] = goodphots[selectedind]
-        if selectedreference:
+        if selectedreference and observatory=='hatpi':
             returndict['referencestats'] = {
                 'zenithdist':zenithdist[selectedind],
                 'moondist':moondist[selectedind],
                 'moonelev':moonelev[selectedind],
+                'ngood':ngoodobjects[selectedind],
+                'magmad':magerrmad[selectedind],
+                'mederr':medmagerr[selectedind],
+                }
+        elif selectedreference and observatory=='tess':
+            returndict['referencestats'] = {
                 'ngood':ngoodobjects[selectedind],
                 'magmad':magerrmad[selectedind],
                 'mederr':medmagerr[selectedind],
@@ -2415,6 +2438,8 @@ def get_magfit_frames(fitsdir,
 
         # add all frame stats to the returndict
         if framestats:
+            if observatory=='tess':
+                raise NotImplementedError
             returndict['framestats'] = {'frame':goodframes,
                                         'phot':goodphots,
                                         'zenithdist':zenithdist,
