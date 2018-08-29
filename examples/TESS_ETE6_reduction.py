@@ -13,6 +13,8 @@ TODO:
 SOMEDAY:
 * manage the whole thing with airflow
 
+====================
+
 USAGE:
 
 from within `examples/` subdir, in the "trex_27" environment,
@@ -30,6 +32,7 @@ because smart overwriting has not yet been implemented.
 If you want to convert tess to fitsh frames, set
     convert_to_fitsh_compatible = True
 
+====================
 '''
 
 import os
@@ -97,16 +100,16 @@ if __name__ == '__main__':
     if convert_to_fitsh_compatible:
         tu.from_ete6_to_fitsh_compatible(ete6_list, outdir)
 
-    ########################################################################
-    # get .fistar, .fiphot, and .wcs files needed before image subtraction #
-    ########################################################################
-    # 1. run parallel_extract_sources on all frames with threshold ~ 10000 to get
-    #    bright stars for astrometry.
-    # 2. run parallel_anet to get precise WCS headers for all frames.
-    # 3. run make_fov_catalog to get a FOV source catalog for the field.
-    # 4. run reform_fov_catalog to cut this down to the columns needed for magfit
-    #    only.
-    # 5. run parallel_fitsdir_photometry for photometry on all frames
+    ### ########################################################################
+    ### # get .fistar, .fiphot, and .wcs files needed before image subtraction #
+    ### ########################################################################
+    ### # 1. run parallel_extract_sources on all frames with threshold ~ 10000 to get
+    ### #    bright stars for astrometry.
+    ### # 2. run parallel_anet to get precise WCS headers for all frames.
+    ### # 3. run make_fov_catalog to get a FOV source catalog for the field.
+    ### # 4. run reform_fov_catalog to cut this down to the columns needed for magfit
+    ### #    only.
+    ### # 5. run parallel_fitsdir_photometry for photometry on all frames
 
     ### ap.parallel_extract_sources(fitsdir, outdir, ccdextent=ccdextent,
     ###                             ccdgain=ccdgain, fluxthreshold=10000,
@@ -151,11 +154,12 @@ if __name__ == '__main__':
     ###                                ccdexptime=exptime, zeropoint=zeropoint)
 
 
-    ####  ##########################################################
-    ####  # run image subtraction convolution, then the photometry #
-    ####  ##########################################################
-
+    ##########################################################
+    # run image subtraction convolution, then the photometry #
+    ##########################################################
     fovcatalog = catalog_file
+
+    lcdirectory = sv.LCPATH + "ISP_1-1/"
 
     fieldinfo = {}
     fieldinfo['camera'] = camera
@@ -169,8 +173,6 @@ if __name__ == '__main__':
     photreftype = 'onenight'
     dbtype = 'postgres'
 
-    lcdirectory = sv.LCPATH + "ISP_1-1/"
-
     epdlcglob = '*.epdlc'
     tfalcglob = '*.tfalc'
     statspath = sv.LCPATH + 'stats_files/'
@@ -181,7 +183,7 @@ if __name__ == '__main__':
     iphotpattern = sv.REDPATH+'rsub-????????-'+sv.LOCAL_GLOBPATTERN.replace('.fits','.iphot')
 
     ### # FIXME: commented if done, but overwrites have not been fixed to work
-    ### # Step 0.
+    ### # Step ISP0.
     ### _ = ais.parallel_frames_to_database(fitsdir, 'calibratedframes',
     ###                                     observatory='tess', fitsglob=fitsglob,
     ###                                     overwrite=False,
@@ -189,16 +191,16 @@ if __name__ == '__main__':
     ###                                     nonwcsframes_are_ok=False,
     ###                                     nworkers=nworkers, maxworkertasks=1000)
 
-    ### # Step 1.
+    ### # Step ISP1.
     ### _ = ais.dbgen_get_astromref(fieldinfo, makeactive=True, observatory='tess',
     ###                             overwrite=False, refdir=sv.REFBASEDIR,
     ###                             database=None)
 
-    ### # Step 2. Takes ~1 sec per 20-30 frames.
+    ### # Step ISP2. Takes ~1 sec per 20-30 frames.
     ### _ = ism.get_smoothed_xysdk_coeffs(fitsdir, fistarglob='*.fistar',
     ###                                   nworkers=nworkers, maxworkertasks=1000)
 
-    ### # Step 3. ~600 in 5 minutes --> 2 frames per second, running over 20 workers.
+    ### # Step ISP3. ~600 in 5 minutes --> 2 frames per second, running over 20 workers.
     ### # If called with warpcheck=True and warpthreshold=2000, many things will be
     ### # moved to badframes that are not in fact badframes. The warpthreshold is a bad
     ### # empirical thing that should be avoided.
@@ -208,7 +210,7 @@ if __name__ == '__main__':
     ###                                  observatory='tess', maxworkertasks=1000,
     ###                                  fieldinfo=fieldinfo)
 
-    ### # # Optional Step 3.5: parallelized move of astrometry ref shifted frames to database
+    ### # # Optional Step ISP3.5: parallelized move of astrometry ref shifted frames to database
     ### # out = ais.parallel_frames_to_database(fitsdir, 'arefshifted_frames',
     ### #                                       fitsglob='1-???????_?-xtrns.fits',
     ### #                                       network='HP', overwrite=False,
@@ -217,7 +219,7 @@ if __name__ == '__main__':
     ### #                                       maxworkertasks=1000)
     ### # 
 
-    ### # Step 4: the next thing to do is to select a bunch of frames that can serve
+    ### # Step ISP4: the next thing to do is to select a bunch of frames that can serve
     ### # as photometric reference frames (photrefs).
 
     ### xtrnsfiles = glob(fitsdir+xtrnsglob)
@@ -231,10 +233,10 @@ if __name__ == '__main__':
     ###                                                          nworkers=nworkers,
     ###                                                          maxworkertasks=1000)
 
-    ### # Optional Step 5: amend the list, if needed.
+    ### # Optional Step ISP5: amend the list, if needed.
     ### # photrefinfo = ais.amend_candidate_photrefs(photrefinfo)
 
-    ### # Step 6: make a photometric reference frame
+    ### # Step ISP6: make a photometric reference frame
     ### _ = ais.generate_combined_photref(photrefinfo, photreftype, dbtype,
     ###                                   photref_reformedfovcat=reformed_cat_file,
     ###                                   makeactive=True, field=None, ccd=None,
@@ -248,7 +250,7 @@ if __name__ == '__main__':
     ###                                   nworkers=nworkers, maxworkertasks=1000,
     ###                                   observatory='tess', fieldinfo=fieldinfo)
 
-    ### # Step 7: convolve and subtract all FITS files in the xtrnsfits list from the
+    ### # Step ISP7: convolve and subtract all FITS files in the xtrnsfits list from the
     ### # photometric reference.  With 30 workers, at best process ~few frames per
     ### # second.
 
@@ -258,7 +260,7 @@ if __name__ == '__main__':
     ###                                    kernelspec='b/4;i/4;d=4/4',
     ###                                    nworkers=nworkers, maxworkertasks=1000)
 
-    ### # Step 8: do photometry on your subtracted frames to produce .iphot files.
+    ### # Step ISP8: do photometry on your subtracted frames to produce .iphot files.
     ### # With 30 workers, at best process ~few frames per second.
 
     ### subfitslist = glob(sv.REDPATH+'rsub-????????-'+
@@ -273,7 +275,7 @@ if __name__ == '__main__':
     ###                                         maxworkertasks=1000,
     ###                                         photparams=photparams)
 
-    ### # Step 9 + 10 : dump lightcurves.
+    ### # Step ISP9 + 10 : dump lightcurves.
     ### ism.dump_lightcurves_with_grcollect(iphotpattern, lcdirectory, '4g',
     ###                                     lcextension='grcollectilc',
     ###                                     objectidcol=3,
@@ -296,31 +298,28 @@ if __name__ == '__main__':
     ### # ais.parallel_dbphot_lightcurves_hatidlist(hatidlist, lcdirectory)
 
 
-    # Step 11: do EPD on all the LCs, and collect stats on the results.
-    # for ISM LCs, use lcmagcols=([27,28,29],[30,],[30,],[30,])
+    # Step ISP11: do EPD on all the LCs, and collect stats on the results.
+    # for ISP LCs, use lcmagcols=([27,28,29],[30,],[30,],[30,])
     if not os.path.exists(epdstatfile):
         _ = ism.parallel_run_epd_imagesub(lcdirectory,
                                           ilcglob='*.grcollectilc',
                                           outdir=None, smooth=21,
                                           sigmaclip=5.0, nworkers=nworkers,
                                           maxworkertasks=1000, minndet=100)
-
         ap.parallel_lc_statistics(lcdirectory, epdlcglob, reformed_cat_file, tfalcrequired=False,
                                   fovcatcols=(0,9), # objectid, magcol to use
                                   fovcatmaglabel='r', outfile=epdstatfile, nworkers=nworkers,
                                   workerntasks=500, rmcols=[14,19,24],
                                   epcols=[27,28,29], tfcols=[30,31,32], rfcols=None,
                                   correctioncoeffs=None, sigclip=5.0)
-
         ap.plot_stats_file(epdstatfile, statspath, field, binned=False,
                            logy=True, logx=False, correctmagsafter=None,
                            rangex=(5.9,13.1), observatory='tess')
-
     else:
         print('already made EPD LC stats and plots')
 
 
-    # Step 12: do TFA on all the LCs. First, choose TFA template stars using the
+    # Step ISP12: do TFA on all the LCs. First, choose TFA template stars using the
     # .epdlc stats. Then run TFA, to get .tfalc.TF{1,2,3} files. Turn them into
     # single .tfalc files. Then collect statistics.
     if not os.path.exists(lcdirectory+'aperture-1-tfa-template.list'):
@@ -332,14 +331,12 @@ if __name__ == '__main__':
                                    brightest_mag=8.5, faintest_mag=12.0,
                                    max_rms=0.1, max_sigma_above_rmscurve=5.0,
                                    outprefix=None, tfastage1=True)
-
-    templatefiles = glob(lcdirectory+'aperture-?-tfa-template.list')
-    ism.parallel_run_tfa(lcdirectory, templatefiles, epdlc_glob='*.epdlc',
-                        epdlc_jdcol=0, epdlc_magcol=(27,28,29),
-                        template_sigclip=5.0, epdlc_sigclip=5.0, nworkers=nworkers,
-                        workerntasks=1000)
-
     if not os.path.exists(tfastatfile):
+        templatefiles = glob(lcdirectory+'aperture-?-tfa-template.list')
+        ism.parallel_run_tfa(lcdirectory, templatefiles, epdlc_glob='*.epdlc',
+                            epdlc_jdcol=0, epdlc_magcol=(27,28,29),
+                            template_sigclip=5.0, epdlc_sigclip=5.0, nworkers=nworkers,
+                            workerntasks=1000)
         ap.parallel_lc_statistics(lcdirectory, '*.epdlc', reformed_cat_file,
                                   tfalcrequired=True,
                                   fovcatcols=(0,9), # objectid, magcol from fovcat
@@ -353,41 +350,75 @@ if __name__ == '__main__':
                                   rfcols=None,
                                   correctioncoeffs=None,
                                   sigclip=5.0)
-
         ap.plot_stats_file(tfastatfile, statspath, field, binned=False,
                            logy=True, logx=False, correctmagsafter=None,
                            rangex=(5.9,13.1), observatory='tess')
+    else:
+        print('already made TFA LC stats and plots')
 
-    ### else:
-    ###     print('already made TFA LC stats and plots')
+    #####################################################################
+    # run detrending on raw photometry, to compare vs. image subtracted #
+    #####################################################################
+    # Steps [1-5] of raw photometry (source extraction, astrometry, creation of
+    # a source catalog, reforming the source catalog, and raw photometry) have
+    # been performed.  To detrend, we first "magnitude fit" (see Sec 5.5 of
+    # Zhang, Bakos et al 2016).  This procedure empirically fits magnitude
+    # differences (vs. a reference) for each star in each frame, using
+    # on-camera position, catalog magnitude, catalog color, and subpixel
+    # position. Then we run EPD and TFA. Procedurally:
+    # 6. run get_magfit_frames to select a single magfit photometry reference
+    #    and set up per-CCD work directories, symlinks, etc. for the next 
+    #    steps.
+    # 7. run make_magfit_config to generate magfit config files for
+    #    MagnitudeFitting.py
+    # 8. run make_fiphot_list to make lists of fiphot files for each CCD.
+    # 9. run MagnitudeFitting.py in single reference mode.
+    # 10. run do_masterphotref.py to get the master mag fit reference.
+    # 11. run MagnitudeFitting.py in master reference mode.
+    # 12. run parallel_collect_lightcurves to collect all lightcurves into .rlc
+    #     files.
+    # 13. run serial_run_epd or parallel_run_epd to do EPD on all LCs.
+    # 14. run parallel_lc_statistics to collect stats on .epdlc files.
+    # 15. run choose_tfa_template to choose TFA template stars using the .epdlc
+    #     stats.
+    # 16. run parallel_run_tfa for TFA to get .tfalc.TF{1,2,3} files (FIXME: still
+    #     need to collect into single .tfalc files for all apertures)
+    # 17. run parallel_lc_statistics to collect stats on .tfalc files.
+    # 20. run plot_stats_file to make RMS vs. mag plots for all unbinned and binned
+    #     LCs.
 
+    ### fitsdir = '/home/lbouma/proj/ete6/data/RED_1-1_SAP'
+    ### lcdirectory = sv.LCPATH + "SAP_1-1/"
 
-    ####  ###   #FIXME: still need to collect into single .tfalc files for all apertures
-    ####  ###   assert 0
+    ### mfdict = ap.get_magfit_frames(fitsdir, sv.LOCAL_GLOBPATTERN, fitsdir,
+    ###                               selectreference=True, linkfiles=False,
+    ###                               framestats=False, observatory='tess')
 
-    ####  ###   # Step 13: bin LCs to 10 minutes.
-    ####  ###   ap.parallel_bin_lightcurves(lcdirectory,
-    ####  ###                               epdlc_glob=epdlcglob,
-    ####  ###                               binsizes=[600,3600],
-    ####  ###                               lcexts=('epdlc',
-    ####  ###                                       'tfalc.TF1','tfalc.TF2','tfalc.TF3'),
-    ####  ###                               jdcol=0,
-    ####  ###                               lcmagcols=([27,28,29],[30,],[30,],[30,]),
-    ####  ###                               nworkers=nworkers,
-    ####  ###                               workerntasks=1000)
+    ### #FIXME from here.
+    ### # Joel notes: magnitude fitting is probably not needed for space data
+    ### ap.make_magfit_config()
 
-    ####  ###   # # Step 14: run plot_stats_file to make RMS vs. mag plots for all unbinned and
-    ####  ###   # # binned LCs.
-    ####  ###   # 
-    ####  ###   # ap.plot_stats_file(tfastatfile, statspath, field, binned=False, logy=True,
-    ####  ###   #                    logx=False, correctmagsafter=None, rangex=(5.9,13.1))
+    ### # ap.make_fiphot_list()
 
+    ### # ap.run_magfit()
 
-    ####  ###   # run parallel_binnedlc_statistics to collect stats for the binned LCs.
-    ####  ###   assert 0 #what is appropriate glob for binned LCs?
+    ### # ap.get_master_photref()
 
-    ####  ###   ap.parallel_binnedlc_statistics(lcdirectory, lcglob, fovcatalog,
-    ####  ###                                   fovcatcols=(0,9), fovcatmaglabel='r',
-    ####  ###                                   corrmagsource=None, corrmag_idcol=0,
-    ####  ###                                   corrmag_magcols=[122,123,124], outfile=None,
-    ####  ###                                   nworkers=nworkers, workerntasks=500, sigclip=5.0)
+    ### # ap.run_magfit()
+
+    ### ap.parallel_collect_aperturephot_lightcurves(fitsdir, lcdirectory,
+    ###                                              photext='fiphot',
+    ###                                              skipcollectedlcs=False,
+    ###                                              nworkers=nworkers)
+
+    ### # ap.parallel_run_epd()
+
+    ### # ap.parallel_lc_statistics()
+
+    ### # ap.choose_tfa_template()
+
+    ### # ap.parallel_run_tfa()
+
+    ### # ap.parallel_lc_statistics()
+
+    ### # ap.plot_stats_file()
