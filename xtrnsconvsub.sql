@@ -6,7 +6,7 @@ create table arefshiftedframes (
        -- original fits, astromref, itrans used, output xtrns fits
        arefshiftedframe text not null,
        origframekey bigint not null,
-       astomref text not null,
+       astromref text not null,
        itrans text not null,
        shiftisok bool not null,
        -- arefshifted frame info
@@ -18,7 +18,7 @@ create table arefshiftedframes (
 );
 
 create unique index arefshiftedframes_uindx on arefshiftedframes (
-       framekey, origframekey, astromrefs, arefshiftedframe
+       framekey, origframekey, astromref, arefshiftedframe
 );
 
 
@@ -42,5 +42,5 @@ create table subtractedframes (
 );
 
 create unique index subtractedframes_uindx on subtractedframes (
-       framekey, origframekey, arefshiftedkey, photrefs, subtractedframes
+       framekey, origframekey, arefshiftedkey, photref, subtractedframe
 );

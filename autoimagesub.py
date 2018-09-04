@@ -53,6 +53,7 @@ import tempfile
 import numpy as np
 from numpy import nan
 import psycopg2 as pg
+from psycopg2.extras import Json
 
 from astropy import wcs
 
@@ -83,29 +84,23 @@ DEBUG = False
 
 # used to get the station ID, frame number, and CCD number from a FITS filename
 FRAMEREGEX = re.compile(r'(\d{1})\-(\d{6}\w{0,1})_(\d{1})')
-
 # used to get the station ID, frame number, subframe, and CCD number
 FRAMESUBREGEX = re.compile(r'(\d{1})\-(\d{6})(\w{0,1})_(\d{1})')
-
 # this defines the field string and CCDs
 FIELD_REGEX = re.compile('^G(\d{2})(\d{2})([\+\-]\d{2})(\d{2})_(\w{3})$')
 FIELD_CCDS = [5,6,7,8]
+# this is to recognize a HATID
+HATIDREGEX = re.compile(r'^HAT\-\d{3}\-\d{7}$')
 
 # defines where the reference frames go
 REFBASEDIR = sv.REFBASEDIR
 REFINFO = sv.REFINFO
-
 # define where the frameinfo cache is
 FRAMEINFOCACHEDIR = sv.FRAMEINFOCACHEDIR
-
 # these define the field catalog location and properties
 FIELDCAT_DIR = sv.FIELDCAT_DIR
-
 # these define the light curve directory
 LCBASEDIR = sv.LCPATH
-
-# this is to recognize a HATID
-HATIDREGEX = re.compile(r'^HAT\-\d{3}\-\d{7}$')
 
 # these define the postgres database credentials
 PGPASSFILE = sv.PGPASSFILE
@@ -553,12 +548,13 @@ def fitslist_frameinfo(fitslist,
 ######################################
 
 def calibrated_frame_to_database(fitsfile,
-                                 network='HP',
+                                 observatory='hatpi',
                                  overwrite=False,
                                  badframetag='badframes',
                                  nonwcsframes_are_ok=False,
                                  database=None):
-    '''This puts an original fully calibrated FITS into the database.
+    '''
+    This puts a fully calibrated FITS into the database.
 
     Requires that the frame have gone through the full
     cron_transfer_calibrate.autocal_fitsdir function process, so that it has an
@@ -568,14 +564,29 @@ def calibrated_frame_to_database(fitsfile,
     Searches the same directory as the FITS for fistar, fiphot, and wcs
     files. Should be used with a "find {fitsdir} -type f -name '?-*_?.fits'"
     command to generate the list of the FITS files, so that it can work on bad
-    frames that have been moved to the {badframedir} subdirectory of {fitsdir}
-    and import these into the database as well. Bad frames will be tagged with
-    frameisok = false in the database. If a frame doesn't have an accompanying
-    wcs or fiphot, it will be tagged with frameisok = false in the database as
-    well.
+    frames that have been moved to the {badframedir} subdirectory of {fitsdir}.
 
+    Args:
+
+        fitsfile (str): path to fits file
+
+    Kwargs:
+
+        observatory (str): hatpi or tess
+
+        overwrite (bool): whether to overwrite sql rows
+
+        badframetag (str): string for subdirectory where the badframes are
+
+        nonwcsframes_are_ok (bool): if False, then frames without wcs will be
+        marked as badframes.  If a frame doesn't have an accompanying wcs or
+        fiphot, it will be tagged with frameisok = false in the database as
+        well.
+
+        database: if passing pg.connect() instance
     '''
-    # open a database connection
+
+    # open database connection
     if database:
         cursor = database.cursor()
         closedb = False
@@ -587,94 +598,45 @@ def calibrated_frame_to_database(fitsfile,
         cursor = database.cursor()
         closedb = True
 
-    # start work here
     try:
 
-        # get the frame filename elements
-        felems = FRAMESUBREGEX.findall(
-            os.path.basename(fitsfile)
-        )
-        if not felems:
-            message = ('failed to get basic frameinfo from %s, skipping...'
-                       % fitsfile)
-            print('ERR! %sZ: %s' %
-                   (datetime.utcnow().isoformat(), message) )
-            return fitsfile, False
+        # get paths to frame's fistar, wcs, and fiphot files
+        fits = os.path.abspath(fitsfile)
+        prospective_fistar = fits.replace('.fits','.fistar')
+        prospective_fiphot = fits.replace('.fits','.fiphot')
+        prospective_wcs = fits.replace('.fits','.wcs')
 
+        if observatory == 'hatpi':
+            header_list = ['PROJID','OBJECT','JD','EXPTIME',
+                           'STVER','MTID','MTVER',
+                           'CMID','CMVER','TELID','TELVER','FOV',
+                           'BIASVER','DARKVER','FLATVER','MNTSTATE','PTVER',
+                           'FILID','IMAGETYP','RA','DEC',
+                           'MOONDIST','MOONELEV','MOONPH',
+                           'HA','Z','MGENSTAT','WIND','HUMIDITY','SKYTDIFF','AMBTEMP',
+                           'DEWPT','FOCUS', 'COMMENT']
 
-        # get a big list of header keywords
-        headerdata = get_header_keyword_list(
-            fitsfile,
-            ['PROJID','OBJECT','JD','EXPTIME',
-             'STVER','MTID','MTVER',
-             'CMID','CMVER','TELID','TELVER','FOV',
-             'BIASVER','DARKVER','FLATVER','MNTSTATE','PTVER',
-             'FILID','IMAGETYP','RA','DEC',
-             'MOONDIST','MOONELEV','MOONPH',
-             'HA','Z','MGENSTAT','WIND','HUMIDITY','SKYTDIFF','AMBTEMP',
-             'DEWPT','FOCUS', 'COMMENT'],
-        )
+        elif observatory == 'tess':
+            header_list = ['CAMERA', 'CCD', 'TSTART', 'TSTOP', 'CRVAL1',
+                           'CRVAL2', 'RA_NOM', 'DEC_NOM', 'ROLL_NOM']
 
-        # sort out the commentary card
-        headercomments = repr(headerdata['COMMENT'])
-        headercomments = headercomments.lower()
-
-        # get the frame's projectid, stationid, observed field, rjd, centerra,
-        # centerrdec, widthdeg, frameisok values
-        if 'PROJID' in headerdata and headerdata['PROJID']:
-            projectid = headerdata['PROJID']
         else:
-            projectid = None
-        if 'OBJECT' in headerdata and headerdata['OBJECT']:
-            obsfield = headerdata['OBJECT']
-        else:
-            obsfield = None
-        if 'JD' in headerdata and headerdata['JD']:
-            framerjd = headerdata['JD']
-        else:
-            framerjd = None
+            raise ValueError('observatory must be tess or hatpi')
 
-        # convert the RA [h] to RA (deg)
-        if 'RA' in headerdata and headerdata['RA'] is not None:
-            centerra = (headerdata['RA']/24.0)*360.0
-        else:
-            centerra = None
-        if 'DEC' in headerdata and headerdata['DEC'] is not None:
-            centerdec = headerdata['DEC']
-        else:
-            centerdec = None
+        # get header keywords from header_list
+        headerdata = get_header_keyword_list(fitsfile, header_list)
 
-        if 'FOV' in headerdata and headerdata['FOV']:
-            fovdeg = headerdata['FOV']
-        else:
-            fovdeg = None
+        # get the frame's photometry info (useful for selecting refs)
+        photfits, photinfo = get_frame_info(fitsfile)
 
-        # get the frame's framenum, ccdnum, subframe, frametype
-        stationid, cfn, cfs, ccd = felems[0]
-        if 'IMAGETYP' in headerdata and headerdata['IMAGETYP']:
-            frt = headerdata['IMAGETYP']
-        else:
-            frt = None
-
-        # generate frame's fistar, wcs, and fiphot filenames
-        prospective_fistar = '%s-%s%s_%s.fistar' % (stationid, cfn, cfs, ccd)
-        prospective_wcs = '%s-%s%s_%s.wcs' % (stationid, cfn, cfs, ccd)
-        prospective_fiphot = '%s-%s%s_%s.fiphot' % (stationid, cfn, cfs, ccd)
-
-        # get their paths
-        prospective_fistar = os.path.join(os.path.dirname(fitsfile),
-                                          prospective_fistar)
-        prospective_wcs = os.path.join(os.path.dirname(fitsfile),
-                                       prospective_wcs)
-        prospective_fiphot = os.path.join(os.path.dirname(fitsfile),
-                                          prospective_fiphot)
-
+        # check if frames are bad
         if nonwcsframes_are_ok:
             badframecheck = (
                 os.path.exists(prospective_fistar) and
                 os.path.exists(prospective_fiphot) and
                 (badframetag not in os.path.abspath(fitsfile))
             )
+
         else:
             badframecheck = (
                 os.path.exists(prospective_fistar) and
@@ -683,9 +645,8 @@ def calibrated_frame_to_database(fitsfile,
                 (badframetag not in os.path.abspath(fitsfile))
             )
 
-        # check if this is a bad frame and set stuff accordingly
+        # if this is a bad frame set stuff accordingly
         if badframecheck:
-
             frameisok = True
             fits = os.path.abspath(fitsfile)
             fistar = os.path.abspath(prospective_fistar)
@@ -696,11 +657,8 @@ def calibrated_frame_to_database(fitsfile,
             fiphot = os.path.abspath(prospective_fiphot)
 
         else:
-
             frameisok = False
-
             fits = os.path.abspath(fitsfile)
-
             if os.path.exists(prospective_fistar):
                 fistar = os.path.abspath(prospective_fistar)
             else:
@@ -714,235 +672,64 @@ def calibrated_frame_to_database(fitsfile,
             else:
                 fiphot = None
 
+        # Convert fits COMMENT (many lines!) to a dictionary that merges all the
+        # comments. The mega-comment string will be
+        # formatted like this:
+        # "'Weather.WTextern=0'|'Weather.WTweb=0'|'Weather.WTparan=3'|"
+        # For HATPI, these COMMENTS include info on camera groups, dome status,
+        # mount status, filter, observe info, station IDs, weather, bias, flats
+        # and darks applied.
 
-        # get the frame's filter ID and version
-        if 'FILID' in headerdata and headerdata['FILID'] is not None:
-            flt = headerdata['FILID']
-        else:
-            flt = None
-        if 'filters.flver' in headercomments:
-            flvind = headercomments.find('filters.flver')
-            flv = headercomments[flvind:flvind+16]
-            flv = int(flv.split('=')[-1].rstrip("'\""))
-        else:
-            flv = 0
+        fitsheader = headerdata
 
-        # get the frame's camera config
-        if 'CMID' in headerdata and headerdata['CMID'] is not None:
-            cid = headerdata['CMID']
-        else:
-            cid = None
-        if 'CMVER' in headerdata and headerdata['CMVER'] is not None:
-            cvn = headerdata['CMVER']
-        else:
-            cvn = 0
-        if 'BIASVER' in headerdata and headerdata['BIASVER'] is not None:
-            cbv = headerdata['BIASVER']
-        else:
-            cbv = 0
-        if 'DARKVER' in headerdata and headerdata['DARKVER'] is not None:
-            cdv = headerdata['DARKVER']
-        else:
-            cdv = 0
-        if 'FLATVER' in headerdata and headerdata['FLATVER'] is not None:
-            cfv = headerdata['FLATVER']
-        else:
-            cfv = 0
-        if 'EXPTIME' in headerdata and headerdata['EXPTIME'] is not None:
-            exp = headerdata['EXPTIME']
-        else:
-            exp = None
+        if observatory=='hatpi':
 
-        # get the frame's telescope config
-        if 'TELID' in headerdata and headerdata['TELID'] is not None:
-            tid = headerdata['TELID']
-        else:
-            tid = None
-        if 'TELVER' in headerdata and headerdata['TELVER'] is not None:
-            tvn = headerdata['TELVER']
-        else:
-            tvn = 0
-        if 'FOCUS' in headerdata and headerdata['FOCUS'] is not None:
-            tfs = headerdata['FOCUS']
-        else:
-            tfs = None
-        if 'MNTSTATE' in headerdata and headerdata['MNTSTATE'] is not None:
-            tms = headerdata['MNTSTATE']
-        else:
-            tms = None
-        if 'MTID' in headerdata and headerdata['MTID'] is not None:
-            tmi = headerdata['MTID']
-        else:
-            tmi = None
-        if 'MTVER' in headerdata and headerdata['MTVER'] is not None:
-            tmv = headerdata['MTVER']
-        else:
-            tmv = 0
-        if 'MGENSTAT' in headerdata and headerdata['MGENSTAT'] is not None:
-            tgs = headerdata['MGENSTAT']
-        else:
-            tgs = None
+            # replace whitespace by underscores because json binary does not
+            # respect whitespace.
+            bigstr = re.sub('\\n=\ ','|',
+                            repr(headerdata['COMMENT'])).replace(' ','_')
 
-        # get the frame's photometry info (useful for selecting refs)
-        photfits, photinfo = get_frame_info(fitsfile)
+            # make the dict that parses the comment lines
+            # keep only the comment lines in the format "*=*"
+            commentdict = {}
+            for commentline in bigstr.split("'|'"):
+                if len(commentline.split('='))==2:
+                    commentdict[commentline.split('=')[0]] = commentline.split('=')[1]
 
-        # make sure the frame actually has photinfo before inserting
+            fitsheader['COMMENT'] = commentdict
+
+        fitsheaderjson = Json(fitsheader)
+
         if photinfo:
-            ngo = photinfo['ngoodobjects']
-            mme = photinfo['medmagerr']
-            mem = photinfo['magerrmad']
-            mbg = photinfo['medsrcbgv']
-            sbg = photinfo['stdsrcbgv']
-            mfs = photinfo['medsval']
-            mfd = photinfo['meddval']
+            photinfojson = Json(photinfo)
         else:
-            ngo = None
-            mme = None
-            mem = None
-            mbg = None
-            sbg = None
-            mfs = None
-            mfd = None
-            frameisok = False
+            photinfojson = None
 
-
-        # get the frame's environmental info
-        if 'MOONPH' in headerdata and headerdata['MOONPH'] is not None:
-            mph = headerdata['MOONPH']
-        else:
-            mph = None
-        if 'MOONDIST' in headerdata and headerdata['MOONDIST'] is not None:
-            mds = headerdata['MOONDIST']
-        else:
-            mds = None
-        if 'MOONELEV' in headerdata and headerdata['MOONELEV'] is not None:
-            mel = headerdata['MOONELEV']
-        else:
-            mel = None
-        if 'HA' in headerdata and headerdata['HA'] is not None:
-            iha = headerdata['HA']
-        else:
-            iha = None
-        if 'Z' in headerdata and headerdata['Z'] is not None:
-            izd = headerdata['Z']
-        else:
-            izd = None
-        if 'WIND' in headerdata and headerdata['WIND'] is not None:
-            wis = headerdata['WIND']
-        else:
-            wis = None
-        if 'HUMIDITY' in headerdata and headerdata['HUMIDITY'] is not None:
-            hum = headerdata['HUMIDITY']
-        else:
-            hum = None
-        if 'SKYTDIFF' in headerdata and headerdata['SKYTDIFF'] is not None:
-            skt = headerdata['SKYTDIFF']
-        else:
-            skt = None
-        if 'AMBTEMP' in headerdata and headerdata['AMBTEMP'] is not None:
-            amt = headerdata['AMBTEMP']
-        else:
-            amt = None
-        if 'DEWPT' in headerdata and headerdata['DEWPT'] is not None:
-            dew = headerdata['DEWPT']
-        else:
-            dew = None
-
-        # put together the query and execute it, inserting the object into the
-        # database and overwriting if told to do so
         if overwrite:
-
             query = ("insert into calibratedframes ("
-                     "network, projectid, stationid, obsfield, "
-                     "framerjd, centerra, centerdec, fovdeg, frameisok, "
-                     "fits, fistar, fiphot, wcs, "
-                     "cfn, cfs, ccd, frt, "
-                     "flt, flv, "
-                     "cid, cvn, cbv, cdv, cfv, exp, "
-                     "tid, tvn, tfs, tms, tmi, tmv, tgs, "
-                     "ngo, mme, mem, mbg, sbg, mfs, mfd, "
-                     "mph, mds, mel, iha, izd, wis, hum, skt, amt, dew"
-                     ") values ("
-                     "%s, %s, %s, %s, "
-                     "%s, %s, %s, %s, %s, "
-                     "%s, %s, %s, %s, "
-                     "%s, %s, %s, %s, "
-                     "%s, %s, "
+                     "fits, fistar, fiphot, wcs, fitsheader, photinfo, "
+                     "frameisok) values ("
                      "%s, %s, %s, %s, %s, %s, "
-                     "%s, %s, %s, %s, %s, %s, %s, "
-                     "%s, %s, %s, %s, %s, %s, %s, "
-                     "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s"
-                     ") "
-                     "on conflict "
-                     "(network, projectid, stationid, obsfield, "
-                     "cfn, cfs, ccd, frt) "
-                     "do update set "
-                     "framerjd = %s, centerra = %s, centerdec = %s, "
-                     "fovdeg = %s, frameisok = %s, fits = %s, fistar = %s, "
-                     "fiphot = %s, wcs = %s, flt = %s, flv = %s, "
-                     "cid = %s, cvn = %s, cbv = %s, cdv = %s, cfv = %s, "
-                     "exp = %s, tid = %s, tvn = %s, tfs = %s, tms = %s, "
-                     "tmi = %s, tmv = %s, tgs = %s, ngo = %s, mme = %s, "
-                     "mem = %s, mbg = %s, sbg = %s, mfs = %s, mfd = %s, "
-                     "mph = %s, mds = %s, mel = %s, iha = %s, izd = %s, "
-                     "wis = %s, hum = %s, skt = %s, amt = %s, dew = %s, "
-                     "entryts = current_timestamp")
-            params = (network, projectid, stationid, obsfield,
-                      framerjd, centerra, centerdec, fovdeg, frameisok,
-                      fits, fistar, fiphot, wcs,
-                      cfn, cfs, ccd, frt,
-                      flt, flv,
-                      cid, cvn, cbv, cdv, cfv, exp,
-                      tid, tvn, tfs, tms, tmi, tmv, tgs,
-                      ngo, mme, mem, mbg, sbg, mfs, mfd,
-                      mph, mds, mel, iha, izd, wis, hum, skt, amt, dew,
-                      framerjd, centerra, centerdec, fovdeg, frameisok,
-                      fits, fistar, fiphot, wcs, flt, flv,
-                      cid, cvn, cbv, cdv, cfv,
-                      exp, tid, tvn, tfs, tms,
-                      tmi, tmv, tgs, ngo, mme,
-                      mem, mbg, sbg, mfs, mfd,
-                      mph, mds, mel, iha, izd,
-                      wis, hum, skt, amt, dew)
-
+                     "%s) on conflict "
+                     "(fits, fistar, fiphot, wcs) do update "
+                     "set fitsheader = %s,"
+                     "photinfo = %s, entryts = current_timestamp")
+            params = (fits, fistar, fiphot, wcs, fitsheaderjson, photinfojson,
+                     frameisok, fitsheaderjson, photinfojson)
         else:
-
             query = ("insert into calibratedframes ("
-                     "network, projectid, stationid, obsfield, "
-                     "framerjd, centerra, centerdec, fovdeg, frameisok, "
-                     "fits, fistar, fiphot, wcs, "
-                     "cfn, cfs, ccd, frt, "
-                     "flt, flv, "
-                     "cid, cvn, cbv, cdv, cfv, exp, "
-                     "tid, tvn, tfs, tms, tmi, tmv, tgs, "
-                     "ngo, mme, mem, mbg, sbg, mfs, mfd, "
-                     "mph, mds, mel, iha, izd, wis, hum, skt, amt, dew"
-                     ") values ("
-                     "%s, %s, %s, %s, "
-                     "%s, %s, %s, %s, %s, "
-                     "%s, %s, %s, %s, "
-                     "%s, %s, %s, %s, "
-                     "%s, %s, "
+                     "fits, fistar, fiphot, wcs, fitsheader, photinfo, "
+                     "frameisok) values ("
                      "%s, %s, %s, %s, %s, %s, "
-                     "%s, %s, %s, %s, %s, %s, %s, "
-                     "%s, %s, %s, %s, %s, %s, %s, "
-                     "%s, %s, %s, %s, %s, %s, %s, %s, %s, %s"
-                     ") ")
-            params = (network, projectid, stationid, obsfield,
-                      framerjd, centerra, centerdec, fovdeg, frameisok,
-                      fits, fistar, fiphot, wcs,
-                      cfn, cfs, ccd, frt,
-                      flt, flv,
-                      cid, cvn, cbv, cdv, cfv, exp,
-                      tid, tvn, tfs, tms, tmi, tmv, tgs,
-                      ngo, mme, mem, mbg, sbg, mfs, mfd,
-                      mph, mds, mel, iha, izd, wis, hum, skt, amt, dew)
+                     "%s) " )
+            params = (fits, fistar, fiphot, wcs, fitsheaderjson, photinfojson,
+                     frameisok)
 
         # execute the query and commit
         cursor.execute(query, params)
         database.commit()
 
-        message = 'inserted %s into DB OK' % fits
+        message = 'inserted %s into calibratedframes DB OK' % fits
         print('%sZ: %s' %
               (datetime.utcnow().isoformat(), message) )
         returnval = (fits, True)
@@ -995,7 +782,6 @@ def calframe_to_db_worker(task):
 
 def arefshifted_frame_to_database(
         fitsfile,
-        network='HP',
         overwrite=False,
         badframetag='badframes',
         nonwcsframes_are_ok=False,
@@ -1210,8 +996,8 @@ def arefshifted_frame_to_db_worker(task):
 
 def parallel_frames_to_database(fitsbasedir,
                                 frametype,
+                                observatory='hatpi',
                                 fitsglob='1-???????_?.fits',
-                                network='HP',
                                 overwrite=False,
                                 badframetag='badframes',
                                 nonwcsframes_are_ok=False,
@@ -1226,7 +1012,7 @@ def parallel_frames_to_database(fitsbasedir,
         fitsbasedir: base directory with fits files. For example,
             `/nfs/phtess1/ar1/HATPI/HP0/RED/projid12-G577-ccd8-sdssr/`
 
-        frametype: 'calframes' and 'arefshifted_frames' are the currently
+        frametype: 'calibratedframes' and 'arefshifted_frames' are the currently
             implemented options, corresponding to putting calibrated frames,
             and astrometrically shifted frames, into the database.
 
@@ -1235,9 +1021,9 @@ def parallel_frames_to_database(fitsbasedir,
     '''
 
     # choose the frame to database worker
-    if not (frametype == 'calframes' or frametype == 'arefshifted_frames'):
+    if not (frametype=='calibratedframes' or frametype=='arefshifted_frames'):
         raise NotImplementedError
-    if frametype == 'calframes':
+    if frametype == 'calibratedframes':
         frame_to_db_worker = calframe_to_db_worker
     elif frametype == 'arefshifted_frames':
         frame_to_db_worker = arefshifted_frame_to_db_worker
@@ -1256,12 +1042,12 @@ def parallel_frames_to_database(fitsbasedir,
         fitslist = sorted(fitslist[:-1])
 
         # generate the task list
-        tasks = [(x, {'network':network,
+        tasks = [(x, {'observatory':observatory,
                       'overwrite':overwrite,
                       'nonwcsframes_are_ok':nonwcsframes_are_ok,
                       'badframetag':badframetag}) for x in fitslist]
 
-        print('%sZ: %s files to process' %
+        print('%sZ: %s files to send to db' %
               (datetime.utcnow().isoformat(), len(tasks)))
 
         if len(tasks) > 0:
@@ -1352,7 +1138,6 @@ def dbupdate_calibratedframe(fitspath,
 
 def convsubtracted_frame_to_database(
         fitsfile,
-        network='HP',
         overwrite=False,
         badframetag='badframes',
         database=None):
@@ -1413,21 +1198,17 @@ def convsubtracted_frame_to_database(
 ## ASTROMETRIC REFERENCE FRAMES ##
 ##################################
 
-def dbgen_astromref_projectidfieldccd(projectid,
-                                      field,
-                                      ccd,
-                                      makeactive=True,
-                                      overwrite=False,
-                                      refdir=REFBASEDIR,
-                                      database=None):
+def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
+                        overwrite=False, refdir=REFBASEDIR, database=None):
 
     '''
     This gets all the frame info from the DB and finds a good astromref.
 
-    example args:
-        projectid = 12
-        field = 'G1830-2230_577'
-        ccd = 8
+    Args:
+
+        fieldinfo: dict with keys that point to values for projectid,
+        field, and ccd (if HATPI), or camera and ccd (if TESS).
+
     '''
     # open a database connection
     if database:
@@ -1445,11 +1226,51 @@ def dbgen_astromref_projectidfieldccd(projectid,
     try:
 
         # get all the frame info for the requested projectid-field-ccd
-        query = ("select framekey, fits, fistar, fiphot, mfs, mfd, mbg, ngo "
-                 "from calibratedframes where "
-                 "(projectid = %s) and (obsfield = %s) and (ccd = %s) and "
-                 "frameisok = true")
-        params = (str(projectid), field, ccd)
+        if observatory == 'hatpi':
+
+            # e.g., projectid = 12, field = 'G1830-2230_577', ccd = 8
+            projectid = fieldinfo['projectid']
+            field = fieldinfo['field']
+            ccd = fieldinfo['ccd']
+
+            query = ("select framekey, fits, fistar, fiphot, "
+                     "photinfo->'medsval', "
+                     "photinfo->'meddval', photinfo->'medsrcbgv', "
+                     "photinfo->'ngoodobjects' "
+                     "from calibratedframes where "
+                     "(fitsheader->'PROJID' = %s) and "
+                     "(replace(fitsheader->'OBJECT'#>>'{}','-','') = %s) and "
+                     "(fitsheader->'COMMENT'->>'CamGroups.CGncam' = %s) and "
+                     "(frameisok = true)")
+
+            # NOTE: the replace line is needed because of insane json rules that
+            # say you are not allowed "-" characters. Best I could come up with.
+            # This approach to ccd number extraction is also silly. Why is
+            # it not already in the fits header?
+
+            params = (str(projectid), field.replace('-',''), str(ccd))
+
+        elif observatory == 'tess':
+
+            # e.g., camera=1, ccd=1, field='ete6'
+            camera = fieldinfo['camera']
+            ccd = fieldinfo['ccd']
+            field = fieldinfo['field']
+            projectid = fieldinfo['projectid']
+
+            query = ("select framekey, fits, fistar, fiphot, "
+                     "photinfo->'medsval', "
+                     "photinfo->'meddval', photinfo->'medsrcbgv', "
+                     "photinfo->'ngoodobjects' "
+                     "from calibratedframes where "
+                     "(fitsheader->'CAMERA' = %s) and "
+                     "(fitsheader->'CCD' = %s) and "
+                     "(frameisok = true)")
+
+            params = (str(camera), str(ccd))
+
+        else:
+            raise ValueError('observatory must be tess or hatpi')
 
         cursor.execute(query, params)
         rows = cursor.fetchall()
@@ -1655,16 +1476,31 @@ def dbgen_astromref_projectidfieldccd(projectid,
                 # now that we have the astromref frame, copy it over to the
                 # system-wide reference-images directory along with its JPEG
                 # snapshot
-                areftargetfits = (
-                    'proj{projectid}-{field}-'
-                    'ccd{ccd}-astromref-{origfname}.fits').format(
-                        projectid=projectid,
-                        field=field,
-                        ccd=ccd,
-                        origfname=os.path.splitext(
-                            os.path.basename(arefinfo['fits'])
-                        )[0]
-                    )
+                if observatory=='hatpi':
+                    areftargetfits = (
+                        'proj{projectid}-{field}-'
+                        'ccd{ccd}-astromref-{origfname}.fits').format(
+                            projectid=projectid,
+                            field=field,
+                            ccd=ccd,
+                            origfname=os.path.splitext(
+                                os.path.basename(arefinfo['fits'])
+                            )[0]
+                        )
+
+                elif observatory=='tess':
+                    areftargetfits = (
+                        'proj{projectid}-'
+                        'camera{camera}-ccd{ccd}-'
+                        'astromref-{origfname}.fits').format(
+                            projectid=projectid,
+                            camera=camera,
+                            ccd=ccd,
+                            origfname=os.path.splitext(
+                                os.path.basename(arefinfo['fits'])
+                            )[0]
+                        )
+
                 areftargetjpeg = areftargetfits.replace('.fits','.jpg')
                 areftargetfistar = areftargetfits.replace('.fits','.fistar')
                 areftargetfiphot = areftargetfits.replace('.fits','.fiphot')
@@ -1680,7 +1516,7 @@ def dbgen_astromref_projectidfieldccd(projectid,
                             os.path.join(REFBASEDIR, areftargetfiphot))
 
                 # now, update the astomrefs table in the database
-                if overwrite:
+                if overwrite and observatory=='hatpi':
 
                     query = (
                         "insert into astromrefs ("
@@ -1718,31 +1554,37 @@ def dbgen_astromref_projectidfieldccd(projectid,
                         arefinfo['bgv'],arefinfo['ndet'], arefinfo['comment'],
                     )
 
-                else:
+                elif not overwrite and (observatory=='hatpi' or
+                                        observatory=='tess'):
 
                     query = (
                         "insert into astromrefs ("
-                        "projectid, field, ccd, isactive, entryts, "
-                        "framekey, fits, fistar, fiphot, jpeg, "
-                        "mediansval, mediandval, medianbgv, ngoodobj, "
+                        "projectid, field, ccd, isactive, "
+                        "unixtime, "
+                        "framepath, jpegpath, "
+                        "sval, dval, bgv, ndet, "
                         "comment"
                         ") values ("
-                        "%s, %s, %s, %s, current_timestamp, "
-                        "%s, %s, %s, %s, %s, "
+                        "%s, %s, %s, %s, "
+                        "%s, "
+                        "%s, %s, "
                         "%s, %s, %s, %s, "
                         "%s"
                         ")"
                     )
                     params = (
-                        str(projectid), field, ccd, makeactive,
+                        str(projectid), field, ccd, int(makeactive),
                         arefinfo['framekey'],
                         os.path.join(REFBASEDIR, areftargetfits),
-                        os.path.join(REFBASEDIR, areftargetfistar),
-                        os.path.join(REFBASEDIR, areftargetfiphot),
                         os.path.join(REFBASEDIR, areftargetjpeg),
                         arefinfo['sval'], arefinfo['dval'],
                         arefinfo['bgv'],arefinfo['ndet'], arefinfo['comment']
                     )
+
+                elif overwrite and observatory=='tess':
+
+                        raise NotImplementedError
+
 
                 # execute the query to insert the astromref into the DB
                 cursor.execute(query, params)
@@ -1760,9 +1602,9 @@ def dbgen_astromref_projectidfieldccd(projectid,
         else:
 
             print('ERR! %sZ: could not select a '
-                  'good astrometric reference frame for %s, %s, %s!'
+                  'good astrometric reference frame for %s!'
                   ' no frames exist' %
-                  (datetime.utcnow().isoformat(), projectid, field, ccd))
+                  (datetime.utcnow().isoformat(), repr(fieldinfo)))
             returnval = None
 
     # catch the overwrite = False scenario
@@ -1773,20 +1615,17 @@ def dbgen_astromref_projectidfieldccd(projectid,
         message = ('failed to insert astromref '
                    'into DB because it exists already '
                    'and overwrite = False')
-        print('EXC! %sZ: %s\n%s' %
-               (datetime.utcnow().isoformat(), message, format_exc()) )
+        print('EXC! %sZ: %s\n%s' % (datetime.utcnow().isoformat(), message,
+                                    format_exc()) )
         returnval = None
 
     except Exception as e:
 
         database.rollback()
 
-        message = 'failed to get astromref for %s, %s, %s' % (projectid,
-                                                              field,
-                                                              ccd)
+        message = 'failed to get astromref for %s' % repr(fieldinfo)
         print('EXC! %sZ: %s\nexception was: %s' %
-               (datetime.utcnow().isoformat(),
-                message, format_exc()) )
+              (datetime.utcnow().isoformat(), message, format_exc()) )
         returnval = None
 
     finally:
@@ -1986,7 +1825,6 @@ def generate_astromref(fitsfiles,
 def dbget_astromref(projectid, field, ccd, database=None):
     '''
     This finds the reference frame using the PG database.
-
     '''
 
     # open a database connection
@@ -2006,24 +1844,25 @@ def dbget_astromref(projectid, field, ccd, database=None):
     try:
 
         query = (
-            "select projectid, field, ccd, entryts, "
-            "framekey, fits, fistar, fiphot, jpeg, "
-            "mediansval, mediandval, medianbgv, ngoodobj, comment "
+            "select projectid, field, ccd, unixtime, "
+            "framepath, jpegpath, "
+            "sval, dval, bgv, ndet, comment "
             "from astromrefs where "
-            "projectid = %s and field = %s and ccd = %s and isactive = true"
+            "projectid = %s and field = %s and ccd = %s and isactive = 1"
         )
         params = (str(projectid), field, ccd)
 
+        print(query)
         cursor.execute(query, params)
         row = cursor.fetchone()
 
         if row and len(row) > 0:
 
             astromref = {
-                x:y for (x,y) in zip(('projectid','field','ccd','entryts',
-                                      'framekey','fits','fistar','fiphot',
-                                      'jpeg','mediansval','mediandval',
-                                      'medianbgv','ngoodobj','comment'), row)
+                x:y for (x,y) in zip(('projectid','field','ccd','unixtime',
+                                      'framepath',
+                                      'jpegpath','sval','dval',
+                                      'bgv','ndet','comment'), row)
             }
 
             returnval = astromref
@@ -2107,37 +1946,53 @@ def frames_astromref_worker(task):
     task[2] = refinfo
     task[3] = warpcheck
     task[4] = warpcheck kwargs {'threshold', 'margins'}
+    task[5] = observatory ('tess', or 'hatpi')
+    task[6] = fieldinfo
 
+        fieldinfo is a dict like
+            {'ccd': 1, 'camera': 1, 'field':
+            'ete6_field0', 'projectid': 42},
+        for TESS. For HATPI, it can be None (since REGEXes were hard-coded to
+        deal with HATPI naming scheme). If you were to pass it, it would look
+        like:
+            {'ccd': 8, 'camera': 42, 'field': 'G1830-2230_577', 'projectid': 12}
     '''
 
     try:
 
-        frame, outdir, refinfo, warpcheck, warpcheckkwargs = task
+        (frame, outdir, refinfo,
+         warpcheck, warpcheckkwargs, observatory, fieldinfo ) = task
 
         # figure out this frame's field, ccd, and projectid
-        frameelems = get_header_keyword_list(frame,
-                                             ['object',
-                                              'projid'])
+        if observatory=='hatpi':
+            frameelems = get_header_keyword_list(frame, ['object', 'projid'])
+            felems = FRAMEREGEX.findall(os.path.basename(frame))
 
-        felems = FRAMEREGEX.findall(
-            os.path.basename(frame)
-        )
+        elif observatory=='tess':
+            frameelems = {}
+            frameelems['object'] = fieldinfo['field']
+            frameelems['projid'] = fieldinfo['projectid']
 
         framefistar = frame.replace('.fits','.fistar')
 
-        if felems and felems[0] and os.path.exists(framefistar):
+        if os.path.exists(framefistar) and ( (observatory=='hatpi' and felems
+                                              and felems[0]) or
+                                            (observatory=='tess') ):
 
-            ccd = felems[0][2]
+            if observatory=='hatpi':
+                ccd = felems[0][2]
+            elif observatory=='tess':
+                ccd = fieldinfo['ccd']
+
             frameinfo = {'field':frameelems['object'],
                          'ccd':ccd,
                          'projectid':frameelems['projid']}
-
 
             # find this frame's associated active astromref
             framearef = dbget_astromref(frameinfo['projectid'],
                                         frameinfo['field'],
                                         frameinfo['ccd'])
-            areffistar = framearef['fistar']
+            areffistar = framearef['framepath'].replace('.fits','.fistar')
 
             # calculate the shift and write the itrans back to the frame's
             # directory
@@ -2295,8 +2150,11 @@ def framelist_make_xtrnsfits(fitsfiles,
                              warpthreshold=15000.0,
                              warpmargins=100,
                              nworkers=16,
-                             maxworkertasks=1000):
-    '''This calculates the shifts between frames in fitsfiles and the appropriate
+                             observatory='hatpi',
+                             maxworkertasks=1000,
+                             fieldinfo=None):
+    '''
+    This calculates the shifts between frames in fitsfiles and the appropriate
     astromref for the projectid, field and CCD, then shifts each frame to the
     astromref's coordinate system, generating -xtrns.fits files.
 
@@ -2306,7 +2164,8 @@ def framelist_make_xtrnsfits(fitsfiles,
     '''
 
     # check if astrometric translation was already done.
-    existing = glob.glob(sv.REDPATH+'1-???????_?-xtrns.fits')
+    existing = glob.glob(sv.REDPATH+sv.LOCAL_GLOBPATTERN.replace('.fits',
+                                                                 '-xtrns.fits'))
 
     if len(existing) > 0 and not overwrite:
 
@@ -2320,12 +2179,12 @@ def framelist_make_xtrnsfits(fitsfiles,
         setdiff = np.setdiff1d(requested, alreadyexists)
 
         if len(setdiff) == 0:
-            print('WRN! %sZ: astrometric shift already done on requested frames.' %
+            print('WRN! %sZ: already astrom-shifted all requested frames.' %
                   (datetime.utcnow().isoformat(),))
             return
 
         else:
-            fitsfiles = [sv.REDPATH+sd+'-xtrns.fits' for sd in setdiff]
+            fitsfiles = [sv.REDPATH+sd+'.fits' for sd in setdiff]
 
     print('%sZ: %s files to astrometrically shift' %
           (datetime.utcnow().isoformat(), len(fitsfiles)))
@@ -2333,7 +2192,8 @@ def framelist_make_xtrnsfits(fitsfiles,
     pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
     tasks = [(x, outdir, refinfo, warpcheck,
-              {'threshold':warpthreshold, 'margins':warpmargins})
+              {'threshold':warpthreshold, 'margins':warpmargins},
+             observatory, fieldinfo)
              for x in fitsfiles if os.path.exists(x)]
 
     # fire up the pool of workers
@@ -2342,6 +2202,15 @@ def framelist_make_xtrnsfits(fitsfiles,
     # wait for the processes to complete work
     pool.close()
     pool.join()
+
+    print('%sZ: done with astrometric shifting' %
+          (datetime.utcnow().isoformat()))
+
+    existing = glob.glob(sv.REDPATH+
+                         sv.LOCAL_GLOBPATTERN.replace('.fits','-xtrns.fits'))
+
+    if len(existing) != len(requested) + len(alreadyexists):
+        raise AssertionError, 'something wrong in astrometric shift'
 
     return {x:y for (x,y) in results}
 
@@ -2353,6 +2222,7 @@ def framelist_make_xtrnsfits(fitsfiles,
 
 def generate_photref_candidates_from_xtrns(fitsfiles,
                                            minframes=50,
+                                           observatory='hatpi',
                                            maxhourangle=3.0,
                                            maxmoonphase=25.0,
                                            maxmoonelev=0.0,
@@ -2375,13 +2245,15 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
         minframes: minimum number of candidate frames needed to construct
         photometric reference
 
-        maxhourangle:
+        observatory: 'hatpi' or 'tess'
 
-        maxmoonphase:
+        maxhourangle: ignored if TESS
 
-        maxmoonelev:
+        maxmoonphase: ignored if TESS
 
-        maxzenithdist:
+        maxmoonelev: ignored if TESS
+
+        maxzenithdist: ignored if TESS
 
         maxbackgroundstdevpctile: percentile (given in %) from array of
         background standard deviations from each frame. I don't understand why
@@ -2438,52 +2310,45 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
 
         return photrefinfo
 
-    ## OTHERWISE, RUN THE FULL PROCESS ##
-
-    # then, apply our conditions to these fits files to generate a list of
+    # apply our conditions to these fits files to generate a list of
     # photref candidates
-    # filter on hour angle
-    haind = np.fabs(frameinfo['hourangle']) < maxhourangle
-    print('%sZ: %s frames with hour angle < %s' %
-          (datetime.utcnow().isoformat(),
-           len(np.where(haind)[0]),
-           maxhourangle))
 
-    # get dark nights
-    moonind = ((np.fabs(frameinfo['moonphase']) < maxmoonphase) |
-               (frameinfo['moonelev'] < maxmoonelev))
-    print('%sZ: %s frames with moon phase < %s or moon elev < %s' %
-          (datetime.utcnow().isoformat(),
-           len(np.where(moonind)[0]),
-           maxmoonphase,
-           maxmoonelev))
+    if observatory=='hatpi':
+        # filter on hour angle
+        haind = np.fabs(frameinfo['hourangle']) < maxhourangle
+        print('%sZ: %s frames with hour angle < %s' %
+              (datetime.utcnow().isoformat(), len(np.where(haind)[0]),
+               maxhourangle))
 
-    # get low zenith distance nights
-    zenithind = frameinfo['zenithdist'] < maxzenithdist
-    print('%sZ: %s frames with zenith distance < %s' %
-          (datetime.utcnow().isoformat(),
-           len(np.where(zenithind)[0]),
-           maxzenithdist))
+        # get dark nights
+        moonind = ((np.fabs(frameinfo['moonphase']) < maxmoonphase) |
+                   (frameinfo['moonelev'] < maxmoonelev))
+        print('%sZ: %s frames with moon phase < %s or moon elev < %s' %
+              (datetime.utcnow().isoformat(), len(np.where(moonind)[0]),
+               maxmoonphase, maxmoonelev))
 
-    # get nights with background stdev < max_bgv_stdev (to possibly remove
-    # cloudy nights)
+        # get low zenith distance nights
+        zenithind = frameinfo['zenithdist'] < maxzenithdist
+        print('%sZ: %s frames with zenith distance < %s' %
+              (datetime.utcnow().isoformat(), len(np.where(zenithind)[0]),
+               maxzenithdist))
+
+    # get nights with background stdev < max_bgv_stdev (to possibly remove bad
+    # frames)
     maxbackgroundstdev = np.nanpercentile(frameinfo['stdsrcbgv'],
                                           maxbackgroundstdevpctile)
     backgroundstdevind = frameinfo['stdsrcbgv'] < maxbackgroundstdev
     print('%sZ: %s frames with background stdev < %s' %
-          (datetime.utcnow().isoformat(),
-           len(np.where(backgroundstdevind)[0]),
+          (datetime.utcnow().isoformat(), len(np.where(backgroundstdevind)[0]),
            maxbackgroundstdev))
 
     # get nights with background median < maxbackgroundmedian (to possibly
-    # remove cloudy nights)
+    # remove bad frames)
     maxbackgroundmedian = np.nanpercentile(frameinfo['medsrcbgv'],
                                            maxbackgroundmedianpctile)
     backgroundmedind = frameinfo['medsrcbgv'] < maxbackgroundmedian
-
     print('%sZ: %s frames with background median < %s' %
-          (datetime.utcnow().isoformat(),
-           len(np.where(backgroundmedind)[0]),
+          (datetime.utcnow().isoformat(), len(np.where(backgroundmedind)[0]),
            maxbackgroundmedian))
 
     # get nights with ngoodobjects > minngoodobjects (to possibly
@@ -2497,10 +2362,14 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
            len(np.where(ngoodobjectind)[0]),
            minngoodobjects))
 
-
     # this is the final operating set of frames that will be sorted for the
     # following tests
-    selectind = haind & moonind & zenithind & backgroundstdevind & ngoodobjectind
+    if observatory=='hatpi':
+        selectind = haind & moonind & zenithind & backgroundstdevind & ngoodobjectind
+    elif observatory=='tess':
+        selectind = backgroundstdevind & ngoodobjectind
+    else:
+        raise NotImplementedError
 
     selected_frames = frameinfo['frames'][selectind]
     selected_ngoodobj = frameinfo['ngoodobjects'][selectind]
@@ -2744,6 +2613,7 @@ def generate_combined_photref(
         photrefinfo,
         photreftype,
         dbtype,
+        photref_reformedfovcat=None,
         makeactive=True,
         field=None,
         ccd=None,
@@ -2762,7 +2632,9 @@ def generate_combined_photref(
         framewidth=None,
         searchradius=8.0,
         nworkers=8,
-        maxworkertasks=1000):
+        maxworkertasks=1000,
+        fieldinfo=None,
+        observatory='hatpi'):
     '''
     This generates a combined photref from photref target and candidates and
     updates the TM-refinfo.sqlite database.
@@ -2787,6 +2659,11 @@ def generate_combined_photref(
         dbtype is either 'sqlite' or 'postgres'.
 
         searchradius: astrometry.net solver search radius (in degrees)
+
+        fieldinfo: optional dict (used if reducing tess data) of form
+            {'ccd': 1, 'camera': 1, 'field': 'ete6_field0', 'projectid': 42},
+
+        fovcatalog: the REFORMED FoV catalog file (12 columns)
 
     Returns:
 
@@ -2819,19 +2696,25 @@ def generate_combined_photref(
 
     masterphotref = photrefinfo['masterphotref']
 
-    frameelems = get_header_keyword_list(masterphotref,
-                                         ['object','projid'])
+    if observatory=='hatpi':
+        frameelems = get_header_keyword_list(masterphotref,
+                                             ['object','projid'])
+        felems = FRAMEREGEX.findall(
+            os.path.basename(masterphotref)
+        )
 
-    felems = FRAMEREGEX.findall(
-        os.path.basename(masterphotref)
-    )
+        if felems and felems[0]:
 
-    if felems and felems[0]:
+            ccd = felems[0][2]
+            masterphotrefinfo = {'field':frameelems['object'],
+                                 'ccd':int(ccd),
+                                 'projectid':frameelems['projid']}
 
-        ccd = felems[0][2]
-        masterphotrefinfo = {'field':frameelems['object'],
-                             'ccd':int(ccd),
-                             'projectid':frameelems['projid']}
+    elif observatory=='tess':
+        ccd = fieldinfo['ccd']
+        masterphotrefinfo = {'field':fieldinfo['field'],
+                             'ccd':fieldinfo['ccd'],
+                             'projectid':fieldinfo['projectid']}
 
     else:
 
@@ -2916,47 +2799,52 @@ def generate_combined_photref(
     # rearrange the returned combinedphotref filename
     combinedphotref = combinedphotref[1]
 
-    # find the fovcat file for the field, ccd, projectid, photreftype combo
-    # photreftype = 'oneframe' -> default field-gri.catalog
-    # photreftype = 'onehour' -> default field-gri-18.0.catalog
-    # photreftype = 'onenight' -> default field-gri-20.0.catalog
+    if not photref_reformedfovcat:
 
-    fovcat_template = '{field}{bandspec}{magspec}.catalog'
+        # find the fovcat file for the field, ccd, projectid, photreftype combo
+        # photreftype = 'oneframe' -> default field-gri.catalog
+        # photreftype = 'onehour' -> default field-gri-18.0.catalog
+        # photreftype = 'onenight' -> default field-gri-20.0.catalog
 
-    if photreftype == 'oneframe':
-        photref_fovcatpath = os.path.join(
-            fovcatdir,
-            fovcat_template.format(
-                field=masterphotrefinfo['field'],
-                bandspec='-gri',
-                magspec=''
+        fovcat_template = '{field}{bandspec}{magspec}.catalog'
+
+        if photreftype == 'oneframe':
+            photref_reformedfovcatpath = os.path.join(
+                fovcatdir,
+                fovcat_template.format(
+                    field=masterphotrefinfo['field'],
+                    bandspec='-gri',
+                    magspec=''
+                    )
                 )
-            )
-    elif photreftype == 'onehour':
-        photref_fovcatpath = os.path.join(
-            fovcatdir,
-            fovcat_template.format(
-                field=masterphotrefinfo['field'],
-                bandspec='-gri',
-                magspec='-18.0'
+        elif photreftype == 'onehour':
+            photref_reformedfovcatpath = os.path.join(
+                fovcatdir,
+                fovcat_template.format(
+                    field=masterphotrefinfo['field'],
+                    bandspec='-gri',
+                    magspec='-18.0'
+                    )
                 )
-            )
-    elif photreftype == 'onenight':
-        photref_fovcatpath = os.path.join(
-            fovcatdir,
-            fovcat_template.format(
-                field=masterphotrefinfo['field'],
-                bandspec='-gri',
-                magspec='-20.0'
+        elif photreftype == 'onenight':
+            photref_reformedfovcatpath = os.path.join(
+                fovcatdir,
+                fovcat_template.format(
+                    field=masterphotrefinfo['field'],
+                    bandspec='-gri',
+                    magspec='-20.0'
+                    )
                 )
-            )
+        else:
+            print('ERR! %sZ: unknown photreftype: %s specified '
+                  'can\'t continue...' %
+                  (datetime.utcnow().isoformat(), photreftype))
+            return
+
     else:
-        print('ERR! %sZ: unknown photreftype: %s specified '
-              'can\'t continue...' %
-              (datetime.utcnow().isoformat(), photreftype))
-        return
+        photref_reformedfovcatpath = photref_reformedfovcat
 
-    if not os.path.exists(photref_fovcatpath):
+    if not os.path.exists(photref_reformedfovcatpath):
         print('ERR! %sZ: no FOV catalog available '
               'for field %s, photreftype %s, '
               'can\'t do photometry on combinedphotref %s' %
@@ -2968,7 +2856,7 @@ def generate_combined_photref(
     # run photometry on the combinedphotref and generate a cmrawphot file
     cphotref_photometry = ism.photometry_on_combined_photref(
         combinedphotref,
-        photref_fovcatpath,
+        photref_reformedfovcatpath,
         masterphotrefinfo['ccd'],
         ccdgain=ccdgain,
         zeropoint=zeropoint,
@@ -2978,6 +2866,7 @@ def generate_combined_photref(
         framewidth=framewidth,
         searchradius=searchradius,
         astrometrysourcethreshold=astrometrysrcthreshold,
+        observatory=observatory
     )
 
     if not (cphotref_photometry and
@@ -3001,7 +2890,7 @@ def generate_combined_photref(
         'kernelspec':kernelspec,
         'phottype':'re-extracted' if extractsources else 'cat-projected',
         'photaps':apertures,
-        'fovcat':photref_fovcatpath,
+        'fovcat':photref_reformedfovcatpath,
     }
     photrefinfo['combinedphotref'] = combinedphotrefinfo
 
@@ -3258,6 +3147,8 @@ def xtrnsfits_convsub_worker(task):
     task[3] = kernelspec
     task[4] = reversesubtract boolean
     task[5] = refinfo
+    task[6] = observatory
+    task[7] = fieldinfo (if observatory is tess, otherwise None)
 
     This only does convolution and subtraction. Finding new objects is handled
     by another function in transients.py, and doing photometry on the subtracted
@@ -3266,20 +3157,20 @@ def xtrnsfits_convsub_worker(task):
     '''
 
     (frame, photreftype, outdir,
-     kernelspec, reversesubtract, refinfo) = task
+     kernelspec, reversesubtract, refinfo, observatory, fieldinfo) = task
 
     try:
 
         # first, figure out the input frame's projid, field, and ccd
-        frameelems = get_header_keyword_list(frame,
-                                             ['object',
-                                              'projid'])
-        felems = FRAMEREGEX.findall(
-            os.path.basename(frame)
-        )
-        field, ccd, projectid = (frameelems['object'],
-                                 int(felems[0][2]),
-                                 frameelems['projid'])
+        if observatory=='hatpi':
+            frameelems = get_header_keyword_list(frame, ['object', 'projid'])
+            felems = FRAMEREGEX.findall(os.path.basename(frame))
+            field, ccd, projectid = (frameelems['object'], int(felems[0][2]),
+                                     frameelems['projid'])
+        elif observatory=='tess':
+            field = fieldinfo['field']
+            projectid = fieldinfo['projectid']
+            ccd = fieldinfo['ccd']
 
         # then, find the associated combined photref frame, regfile, cmrawphot
         cphotref = get_combined_photref(projectid, field, ccd, photreftype,
@@ -3314,6 +3205,8 @@ def xtrnsfits_convsub_worker(task):
 
 def parallel_xtrnsfits_convsub(xtrnsfits,
                                photreftype,
+                               observatory='hatpi',
+                               fieldinfo=None,
                                overwrite=False,
                                outdir=None,
                                refinfo=REFINFO,
@@ -3329,7 +3222,7 @@ def parallel_xtrnsfits_convsub(xtrnsfits,
     # and overwrite == False, then do not run them.
 
     existingcsframes = glob.glob(
-        sv.REDPATH+'rsub-????????-?-???????_?-xtrns.fits')
+        sv.REDPATH+'rsub-'+sv.LOCAL_GLOBPATTERN.replace('.fits','-xtrns.fits'))
 
     if len(existingcsframes) > 0 and not overwrite:
 
@@ -3354,7 +3247,7 @@ def parallel_xtrnsfits_convsub(xtrnsfits,
             xtrnsfits = [sv.REDPATH+sd for sd in setdiff]
 
     tasks = [(x, photreftype, outdir, kernelspec,
-              reversesubtract, refinfo)
+              reversesubtract, refinfo, observatory, fieldinfo)
              for x in xtrnsfits if os.path.exists(x)]
 
     print('%sZ: %s files convolve and subtract' %
@@ -3386,7 +3279,8 @@ def parallel_xtrnsfits_convsub(xtrnsfits,
 #########################################
 
 def convsubfits_staticphot_worker(task):
-    '''This does subtracted frame photometry on already-known objects from the
+    '''
+    This does subtracted frame photometry on already-known objects from the
     photref.
 
     task[0] = subframe
@@ -3396,6 +3290,9 @@ def convsubfits_staticphot_worker(task):
     task[4] = disjointradius
     task[5] = outdir
     task[6] = refinfo
+    task[7] = observatory
+    task[8] = fieldinfo
+    task[9] = photparams
 
     currently produces iphot files.
 
@@ -3404,7 +3301,8 @@ def convsubfits_staticphot_worker(task):
     '''
 
     (subframe, photreftype, kernelspec,
-     lcapertures, disjrad, outdir, refinfo) = task
+     lcapertures, disjrad, outdir, refinfo,
+     observatory, fieldinfo, photparams) = task
 
     try:
 
@@ -3416,17 +3314,16 @@ def convsubfits_staticphot_worker(task):
             kernelspec
         )
 
-        frameinfo = FRAMEREGEX.findall(
-            os.path.basename(subframe)
-        )
-
-        # first, figure out the input frame's projid, field, and ccd
-        frameelems = get_header_keyword_list(subframe,
-                                             ['object',
-                                              'projid'])
-        field, ccd, projectid = (frameelems['object'],
-                                 int(frameinfo[0][2]),
-                                 frameelems['projid'])
+        if observatory=='hatpi':
+            # first, figure out the input frame's projid, field, and ccd
+            frameinfo = FRAMEREGEX.findall(os.path.basename(subframe))
+            frameelems = get_header_keyword_list(subframe, ['object', 'projid'])
+            field, ccd, projectid = (frameelems['object'], int(frameinfo[0][2]),
+                                     frameelems['projid'])
+        elif observatory=='tess':
+            field = fieldinfo['field']
+            ccd = fieldinfo['ccd']
+            projectid = fieldinfo['projectid']
 
         # then, find the associated combined photref frame, regfile, cmrawphot
         cphotref = get_combined_photref(projectid, field, ccd, photreftype,
@@ -3442,23 +3339,40 @@ def convsubfits_staticphot_worker(task):
             'rsub' if os.path.basename(subframe).startswith('rsub') else 'nsub'
         )
 
-        kernelf = '%s-%s-%s-%s_%s-xtrns.fits-kernel' % (photrefbit,
-                                                        convsubhash,
-                                                        frameinfo[0][0],
-                                                        frameinfo[0][1],
-                                                        frameinfo[0][2])
-        kernel = os.path.abspath(os.path.join(os.path.dirname(subframe),kernelf))
+        if observatory=='hatpi':
 
-        itransf = '%s-%s_%s.itrans' % (frameinfo[0][0],
-                                       frameinfo[0][1],
-                                       frameinfo[0][2])
-        itrans = os.path.abspath(os.path.join(os.path.dirname(subframe),itransf))
+            kernelf = '%s-%s-%s-%s_%s-xtrns.fits-kernel' % (photrefbit,
+                                                            convsubhash,
+                                                            frameinfo[0][0],
+                                                            frameinfo[0][1],
+                                                            frameinfo[0][2])
+            kernel = os.path.abspath(os.path.join(os.path.dirname(subframe),kernelf))
 
-        xysdkf = '%s-%s_%s.xysdk' % (frameinfo[0][0],
-                                     frameinfo[0][1],
-                                     frameinfo[0][2])
-        xysdk = os.path.abspath(os.path.join(os.path.dirname(subframe),xysdkf))
+            itransf = '%s-%s_%s.itrans' % (frameinfo[0][0],
+                                           frameinfo[0][1],
+                                           frameinfo[0][2])
+            itrans = os.path.abspath(os.path.join(os.path.dirname(subframe),itransf))
 
+            xysdkf = '%s-%s_%s.xysdk' % (frameinfo[0][0],
+                                         frameinfo[0][1],
+                                         frameinfo[0][2])
+            xysdk = os.path.abspath(os.path.join(os.path.dirname(subframe),xysdkf))
+
+        if observatory=='tess':
+
+            namesub = re.findall('tess20.*?-0016_cal_img', subframe)
+            assert len(namesub) == 1, 'TESS ETE6 specific regex!'
+            namesub = namesub[0]
+
+            kernelf = '%s-%s-%s-xtrns.fits-kernel' % (photrefbit, convsubhash,
+                                                      namesub)
+            kernel = os.path.abspath(os.path.join(os.path.dirname(subframe),kernelf))
+
+            itransf = '%s.itrans' % (namesub)
+            itrans = os.path.abspath(os.path.join(os.path.dirname(subframe),itransf))
+
+            xysdkf = '%s.xysdk' % (namesub)
+            xysdk = os.path.abspath(os.path.join(os.path.dirname(subframe),xysdkf))
 
         # write the photometry file to /dev/shm by default
         # if outdir is None:
@@ -3467,7 +3381,7 @@ def convsubfits_staticphot_worker(task):
         _, subphot = ism.subframe_photometry_worker(
             (subframe, cphotref_cmrawphot, disjrad,
              kernel, itrans, xysdk, outdir,
-             photreftype, kernelspec, lcapertures)
+             photreftype, kernelspec, lcapertures, observatory, photparams)
         )
 
         if subphot and os.path.exists(subphot):
@@ -3507,7 +3421,10 @@ def parallel_convsubfits_staticphot(
         refinfo=REFINFO,
         nworkers=16,
         maxworkertasks=1000,
-        overwrite=False):
+        observatory='hatpi',
+        fieldinfo=None,
+        overwrite=False,
+        photparams=None):
     '''
     This does static object photometry on the all subtracted FITS in
     subfitslist.
@@ -3516,7 +3433,8 @@ def parallel_convsubfits_staticphot(
     # check if the convolved, subtracted frames already have photometry. if so,
     # and overwrite == False, then do not re-run photometry.
 
-    existingiphot = glob.glob(sv.REDPATH+'rsub-????????-?-???????_?.iphot')
+    existingiphot = glob.glob(sv.REDPATH+'rsub-????????-'+
+                       sv.LOCAL_GLOBPATTERN.replace('.fits','iphot'))
 
     if len(existingiphot) > 0 and not overwrite:
 
@@ -3538,9 +3456,9 @@ def parallel_convsubfits_staticphot(
         else:
             subfitslist = [sv.REDPATH+sd+'.iphot' for sd in setdiff]
 
-    tasks = [(x, photreftype, kernelspec,
-              lcapertures, photdisjointradius,
-              outdir, refinfo) for x in subfitslist if os.path.exists(x)]
+    tasks = [(x, photreftype, kernelspec, lcapertures, photdisjointradius,
+              outdir, refinfo, observatory, fieldinfo, photparams)
+             for x in subfitslist if os.path.exists(x)]
 
     if len(tasks) > 0:
 

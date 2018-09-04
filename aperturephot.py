@@ -125,7 +125,7 @@ except:
 ########################
 
 # set this to show extra info
-DEBUG = False
+DEBUG = True
 
 # CCD minimum and maximum X,Y pixel coordinates
 # used to strip things outside FOV from output of make_frame_sourcelist
@@ -210,13 +210,14 @@ TRANSFORMCMD = ("{transformer} -w {framewcsfile} "
 #                 e.g. for 1-377741e_5.fits, this is 1-377741e_5
 #                 (used for later collection of fiphot files into an LC)
 # {outfile}:      name of the output .phot file (binary format)
+# {format}:       for text output, e.g.,'ISXY,BbMms', see fiphot manpage
 FIPHOTCMD = ("fiphot --input {fits} --input-list {sourcelist} "
              "--col-id 1 --col-xy {xycols} --gain {ccdgain:f} "
              "--mag-flux {zeropoint:f},{ccdexptime:f} "
              "--apertures {aperturelist} "
              "--sky-fit 'mode,sigma=3,iterations=2' --disjoint-radius 2 "
              "--serial {fitsbase} "
-             "--format 'ISXY,BbMms' --nan-string 'NaN' "
+             "--format {formatstr} --nan-string 'NaN' "
              "--aperture-mask-ignore 'saturated' --comment '--comment' "
              "--single-background 3 {binaryout} --output {outfile} -k")
 
@@ -327,7 +328,9 @@ def anet_solve_frame(srclist,
                      radius=13,
                      xpix=2048,
                      ypix=2048,
-                     cols=(2,3)):
+                     cols=(2,3),
+                     scale=None,
+                     usescalenotwidth=False):
     '''This uses anet to solve frame astrometry.
 
     Uses the frame extracted sources (.fistar file) and returns a .wcs file
@@ -349,6 +352,10 @@ def anet_solve_frame(srclist,
     indexpath = /P/HP0/CAT/ANET_INDEX/ucac4_2014/   # path to the indexes
 
     otherwise, we'll need to provide these as kwargs to the anet executable.
+
+    If usescalenotwidth, instead executes
+
+    anet --ra 60. --dec -22 --radius 12 --scale 21.1 -s 2048,2048 --tweak 6 --cols 2,3 foo.fistar --wcs foo.wcs
 
     The input sourcelist can come from fistar, with a fluxthreshold set to 10000
     to just get the bright stars. This makes anet way faster.
@@ -394,21 +401,41 @@ def anet_solve_frame(srclist,
 
             ra = ra*360.0/24.0
 
-    ANETCMDSTR = ("anet -r {ra} -d {dec} -w {width} "
-                  "--tweak {tweak} --radius {radius} -s {xpix},{ypix} "
-                  "--cols {colx},{coly} --wcs {outwcsfile} {sourcelist}")
+    if usescalenotwidth:
 
-    anetcmd = ANETCMDSTR.format(ra=ra,
-                                dec=dec,
-                                width=width,
-                                tweak=tweak,
-                                radius=radius,
-                                xpix=xpix,
-                                ypix=ypix,
-                                colx=cols[0],
-                                coly=cols[1],
-                                outwcsfile=wcsout,
-                                sourcelist=srclist)
+        ANETCMDSTR = ("anet -r {ra} -d {dec} --scale {scale} "
+                      "--tweak {tweak} --radius {radius} -s {xpix},{ypix} "
+                      "--cols {colx},{coly} --wcs {outwcsfile} {sourcelist}")
+
+        anetcmd = ANETCMDSTR.format(ra=ra,
+                                    dec=dec,
+                                    scale=scale,
+                                    tweak=tweak,
+                                    radius=radius,
+                                    xpix=xpix,
+                                    ypix=ypix,
+                                    colx=cols[0],
+                                    coly=cols[1],
+                                    outwcsfile=wcsout,
+                                    sourcelist=srclist)
+
+    else:
+
+        ANETCMDSTR = ("anet -r {ra} -d {dec} -w {width} "
+                      "--tweak {tweak} --radius {radius} -s {xpix},{ypix} "
+                      "--cols {colx},{coly} --wcs {outwcsfile} {sourcelist}")
+
+        anetcmd = ANETCMDSTR.format(ra=ra,
+                                    dec=dec,
+                                    width=width,
+                                    tweak=tweak,
+                                    radius=radius,
+                                    xpix=xpix,
+                                    ypix=ypix,
+                                    colx=cols[0],
+                                    coly=cols[1],
+                                    outwcsfile=wcsout,
+                                    sourcelist=srclist)
 
     if DEBUG:
         print(anetcmd)
@@ -501,8 +528,9 @@ def parallel_anet(srclistdir,
                             intailstr='.fistar',
                             outtailstr='.wcs',
                             skipifpartial=True)
-    if fistarlist == -1:
-        return -1
+    if type(fistarlist) == int:
+        if fistarlist == -1:
+            return -1
 
     pool = mp.Pool(nworkers, maxtasksperchild=maxtasksperworker)
 
@@ -613,7 +641,8 @@ def make_fov_catalog(ra=None, dec=None, size=None,
                      outdir=None,
                      catalog='2MASS',
                      catalogpath=None,
-                     columns=None):
+                     columns=None,
+                     observatory='hatpi'):
     '''
     This function gets all the sources in the field of view of the frame, given
     its central pointing coordinates and plate-scale from either 2MASS or
@@ -637,16 +666,18 @@ def make_fov_catalog(ra=None, dec=None, size=None,
 
         frame, hdr = read_fits(fits)
         catbox = sv.FIELDCAT_FOV
-        catra = float(hdr['RACA'])   # RA [DECIMAL hr] (averaged field center)
-        catdec = float(hdr['DECCA']) # Dec [decimal deg] (averaged field center)
 
-        print('WRN! %sZ: converting decimal hour RA to decimal degree' %
-              (datetime.utcnow().isoformat()))
-
-        from astropy.coordinates import Angle
-        import astropy.units as units
-        tempra = Angle(str(catra)+'h')
-        catra = tempra.to(units.degree).value
+        if observatory=='hatpi':
+            catra = float(hdr['RACA'])   # RA [DECIMAL hr] (averaged field center)
+            catdec = float(hdr['DECCA']) # Dec [decimal deg] (averaged field center)
+            print('WRN! %sZ: converting decimal hour RA to decimal degree' %
+                  (datetime.utcnow().isoformat()))
+            from astropy.coordinates import Angle
+            import astropy.units as units
+            tempra = Angle(str(catra)+'h')
+            catra = tempra.to(units.degree).value
+        else:
+            raise NotImplementedError
 
     else:
         print('%sZ: need a FITS file to work on, or center coords and size' %
@@ -680,6 +711,13 @@ def make_fov_catalog(ra=None, dec=None, size=None,
 
     if DEBUG:
         print(catalogcmd)
+
+    if os.path.exists(outfile):
+
+        print('%sZ: found FOV catalog %s, continuing... ' %
+              (datetime.utcnow().isoformat(), os.path.abspath(outfile)))
+
+        return os.path.abspath(outfile)
 
     # execute the cataloger shell command
     catalogproc = subprocess.Popen(shlex.split(catalogcmd),
@@ -918,8 +956,9 @@ def parallel_extract_sources(fitsdir,
                             outdir,
                             intailstr=tailstr,
                             outtailstr='.fistar')
-    if toextract == -1:
-        return -1
+    if type(toextract) == int:
+        if toextract == -1:
+            return -1
 
     pool = mp.Pool(nworkers, maxtasksperchild=maxtasksperworker)
 
@@ -1064,14 +1103,22 @@ def parallel_extract_sources_for_list(fitslist,
     return returndict
 
 
-
 def match_fovcatalog_framesources(frame_extracted_sourcelist,
                                   frame_projected_fovcatalog,
                                   outfile,
                                   srclist_cols=(0,1,2,5,6,7),
                                   fovcat_cols=(0,1,2,12,13),
                                   match_pixel_distance=0.5):
-    '''Does frame_projected_fovcatalog and frame_extracted_sourcelist matching.
+    '''
+    Does frame_projected_fovcatalog and frame_extracted_sourcelist matching.
+
+        frame_extracted_sourcelist: *.fistar file
+        frame_projected_fovcatalog: *.projcatalog file
+        outfile: *.sourcelist file to be created by this function. Each line
+        looks like:
+
+     ID              RA       DEC     x          y         phot_id   x       y          s,d,k
+    HAT-381-0000008 249.39070 5.27754 1261.64440 517.39870 4620 1261.75400 517.42700 1.39400 0.24400 -0.17900
 
     This matches the fovcatalog transformed to pixel coordinates to the
     extracted source list pixel coordinates and gets the IDs of the sources to
@@ -1287,9 +1334,11 @@ def run_fiphot(fits,
                zeropoint=None,
                ccdexptime=None,
                aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
+               formatstr='ISXY,BbMms',
                outfile=None,
                removesourcelist=False,
-               binaryoutput=True):
+               binaryoutput=True,
+               observatory='hatpi'):
     '''
     Thus runs fiphot for a single frame. Only the fits filename is required. If
     other parameters are not provided, they will be obtained from the image
@@ -1297,15 +1346,16 @@ def run_fiphot(fits,
 
     Returns the path of the .fiphot file produced if successful, otherwise
     returns None.
-
     '''
 
     # get the required header keywords from the FITS file
-    header = imageutils.get_header_keyword_list(fits,
-                                                ['GAIN',
-                                                 'GAIN1',
-                                                 'GAIN2',
-                                                 'EXPTIME'])
+    if observatory=='hatpi':
+        headerlist = ['GAIN', 'GAIN1', 'GAIN2', 'EXPTIME', 'RAC', 'DECC',
+                      'FOV']
+    elif observatory=='tess':
+        headerlist = ['GAINA', 'TELAPSE', 'CRVAL1', 'CRVAL2']
+
+    header = imageutils.get_header_keyword_list(fits, headerlist)
 
     # handle the gain and exptime parameters
     if not ccdgain:
@@ -1376,6 +1426,7 @@ def run_fiphot(fits,
                                  ccdexptime=ccdexptime,
                                  aperturelist=aperturelist,
                                  fitsbase=fitsbase,
+                                 formatstr=formatstr,
                                  binaryout=binaryout,
                                  outfile=outfile)
 
@@ -1413,10 +1464,11 @@ def run_fiphot(fits,
 
 
 def do_photometry(fits,
-                  fovcatalog,
+                  reformedfovcatalog,
                   extractsources=True,
                   fluxthreshold=500.0,
                   fovcat_xycols=(12,13),
+                  projcat_xycols=(24,25),
                   fiphot_xycols='7,8', # set for matched source list
                   outdir=None,
                   ccdextent=None,
@@ -1426,19 +1478,21 @@ def do_photometry(fits,
                   removesourcetemp=True,
                   pixborders=0.0,
                   aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
+                  formatstr='ISXY,BbMms',
                   removesourcelist=False,
                   binaryoutput=True,
                   minsrcbgv=100.0,
                   maxmadbgv=20.0,
                   maxframebgv=2000.0,
-                  minnstars=500):
+                  minnstars=500,
+                  observatory='hatpi'):
     '''This rolls up the sourcelist and fiphot functions above.
 
     Runs both stages on fits, and puts the output in outdir if it exists. If it
     doesn't or is None, then puts the output in the same directory as fits.
 
-    fovcatalog is the path to the 2MASS/UCAC4 catalog for all sources in the
-    observed field.
+    reformedfovcatalog is the path to the 2MASS/UCAC4 catalog for all sources in the
+    observed field. (12 columns!)
 
     '''
 
@@ -1471,14 +1525,13 @@ def do_photometry(fits,
         print('output source list will be %s' % outsourcelist)
         print('output fiphot will be %s' % outfiphot)
 
-    # get the frame project catalog
+    # make the .projcatalog files (projects catalog onto the frame)
     projcatfile = make_frameprojected_catalog(fits,
-                                              fovcatalog,
+                                              reformedfovcatalog,
                                               ccdextent=ccdextent,
                                               out=outprojcat,
                                               removetemp=removesourcetemp,
                                               pixborders=pixborders)
-
     if projcatfile:
 
         # if we're supposed to extract sources and run photometry on them
@@ -1486,22 +1539,37 @@ def do_photometry(fits,
         if extractsources:
 
             # extract sources
-            framesources = extract_frame_sources(
-                fits,
-                os.path.join(
-                    outdir,
-                    re.sub(sv.FITS_TAIL,'.fistar',os.path.basename(fits))
-                    ),
-                fluxthreshold=fluxthreshold
+            if observatory=='hatpi':
+                framesources = extract_frame_sources(
+                    fits,
+                    os.path.join(
+                        outdir,
+                        re.sub(sv.FITS_TAIL,'.fistar',os.path.basename(fits))
+                        ),
+                    fluxthreshold=fluxthreshold
+                )
+
+            elif observatory=='tess':
+                framesources = extract_frame_sources(
+                    fits,
+                    os.path.join(
+                        outdir,
+                        re.sub(sv.FITS_TAIL,'.fistar',os.path.basename(fits))
+                        ),
+                    fluxthreshold=fluxthreshold,
+                    ccdgain=ccdgain,
+                    zeropoint=zeropoint,
+                    exptime=ccdexptime
                 )
 
             if framesources:
 
-                # match these to the projected fovcatalog
+                # match extracted frame sources to the projected fovcatalog.
+                # this makes a .sourcelist file, named "outsourcelist". 
                 matchedsources = match_fovcatalog_framesources(
-                    framesources,
-                    projcatfile,
-                    outsourcelist
+                    framesources, # *.fistar file
+                    projcatfile,  # *.projcatalog file
+                    outsourcelist # *.sourcelist file, created by this function
                     )
 
                 fiphot_xycols = '7,8'
@@ -1525,9 +1593,11 @@ def do_photometry(fits,
                                 xycols=fiphot_xycols,
                                 ccdgain=ccdgain,
                                 zeropoint=zeropoint,
+                                formatstr=formatstr,
                                 ccdexptime=ccdexptime,
                                 removesourcelist=removesourcelist,
-                                binaryoutput=binaryoutput)
+                                binaryoutput=binaryoutput,
+                                observatory=observatory)
 
         if fiphotfile:
 
@@ -1619,6 +1689,7 @@ def parallel_fitsdir_photometry(
         maxmadbgv=150.0,
         maxframebgv=2000.0,
         minnstars=500,
+        formatstr='ISXY,BbMms',
         ccdgain=None,
         ccdexptime=None,
         zeropoint=None,
@@ -1659,6 +1730,7 @@ def parallel_fitsdir_photometry(
                'maxmadbgv':maxmadbgv,
                'maxframebgv':maxframebgv,
                'minnstars':minnstars,
+               'formatstr':formatstr,
                'ccdgain':ccdgain,
                'ccdexptime':ccdexptime,
                'zeropoint':zeropoint}, rejectbadframes] for x in fitslist]
@@ -1704,6 +1776,7 @@ def parallel_fitslist_photometry(
         maxtasksperworker=1000,
         saveresults=True,
         rejectbadframes=True,
+        formatstr='ISXY,BbMms',
         minsrcbgv=200.0,
         maxmadbgv=150.0,
         maxframebgv=2000.0,
@@ -1750,6 +1823,7 @@ def parallel_fitslist_photometry(
                'fluxthreshold':fluxthreshold,
                'binaryoutput':binaryoutput,
                'minsrcbgv':minsrcbgv,
+               'formatstr':formatstr,
                'maxmadbgv':maxmadbgv,
                'maxframebgv':maxframebgv,
                'minnstars':minnstars}, rejectbadframes] for x in goodlist]
@@ -2013,7 +2087,8 @@ def get_magfit_frames(fitsdir,
                       selectreference=True,
                       framestats=False,
                       linkfiles=True,
-                      outlistfile=None):
+                      outlistfile=None,
+                      observatory='hatpi'):
     '''
     fitsdir = directory where the FITS object frames are
     fitsglob = glob to select a subset of the FITS object frames
@@ -2179,18 +2254,20 @@ def get_magfit_frames(fitsdir,
     if selectreference:
 
         print('%sZ: selecting a reference frame...' %
-              (datetime.utcnow().isoformat(),))
+              (datetime.utcnow().isoformat()))
 
-        zenithdist, moondist, moonelev = [], [], []
+        if observatory=='hatpi':
+            zenithdist, moondist, moonelev = [], [], []
+        elif observatory=='tess':
+            pass
         ngoodobjects, medmagerr, magerrmad = [], [], []
 
         # for each FITS and fiphot combo, collect stats
         for fits, fiphot in zip(workfitslist, workphotlist):
 
-            headerdata = imageutils.get_header_keyword_list(
-                fits,
-                ['Z','MOONDIST','MOONELEV']
-                )
+            if observatory=='hatpi':
+                headerdata = imageutils.get_header_keyword_list(
+                                            fits, ['Z','MOONDIST','MOONELEV'])
 
             # decide if the fiphot file is binary or not. read the first 600
             # bytes and look for the '--binary-output' text
@@ -2252,42 +2329,49 @@ def get_magfit_frames(fitsdir,
             # append to result lists
             goodframes.append(fits)
             goodphots.append(fiphot)
-            zenithdist.append(headerdata['Z'])
-            moondist.append(headerdata['MOONDIST'])
-            moonelev.append(headerdata['MOONELEV'])
             ngoodobjects.append(ngood)
             medmagerr.append(median_magerr)
             magerrmad.append(medabsdev_mag)
+            if observatory=='hatpi':
+                zenithdist.append(headerdata['Z'])
+                moondist.append(headerdata['MOONDIST'])
+                moonelev.append(headerdata['MOONELEV'])
 
             if DEBUG:
-                print('frame = %s, phot = %s, Z = %s, MOONDIST = %s, '
-                      'MOONELEV = %s, ngood = %s, medmagerr = %.5f, '
-                      'magerrmad = %.5f' %
-                      (fits, fiphot,
-                       headerdata['Z'],
-                       headerdata['MOONDIST'],
-                       headerdata['MOONELEV'],
-                       ngood, median_magerr, medabsdev_mag))
+                if observatory=='hatpi':
+                    print('frame = %s, phot = %s, Z = %s, MOONDIST = %s, '
+                          'MOONELEV = %s, ngood = %s, medmagerr = %.5f, '
+                          'magerrmad = %.5f' %
+                          (fits, fiphot, headerdata['Z'],
+                           headerdata['MOONDIST'], headerdata['MOONELEV'],
+                           ngood, median_magerr, medabsdev_mag))
+
+                elif observatory=='tess':
+                    print('frame = %s, phot = %s, '
+                          'ngood = %s, medmagerr = %.5f, '
+                          'magerrmad = %.5f' %
+                          (fits, fiphot, ngood, median_magerr, medabsdev_mag))
 
         # now that we're done collecting data, sort them in orders we want
         goodframes = np.array(goodframes)
         goodphots = np.array(goodphots)
-        zenithdist_ind = np.argsort(zenithdist)
-        moondist_ind = np.argsort(moondist)[::-1]
-        moonelev_ind = np.argsort(moonelev)
         ngood_ind = np.argsort(ngoodobjects)[::-1]
         mederr_ind = np.argsort(medmagerr)
         magmad_ind = np.argsort(magerrmad)
+        if observatory=='hatpi':
+            zenithdist_ind = np.argsort(zenithdist)
+            moondist_ind = np.argsort(moondist)[::-1]
+            moonelev_ind = np.argsort(moonelev)
 
         # get the first 200 of these or all 200 if n < 200
         if len(goodframes) > 200:
-            zenithdist_ind = zenithdist_ind[:500]
-            moondist_ind = moondist_ind[:500]
-            moonelev_ind = moonelev_ind[:500]
-
             ngood_ind = ngood_ind[:500]
             mederr_ind = mederr_ind[:500]
             magmad_ind = magmad_ind[:500]
+            if observatory=='hatpi':
+                zenithdist_ind = zenithdist_ind[:500]
+                moondist_ind = moondist_ind[:500]
+                moonelev_ind = moonelev_ind[:500]
 
         # intersect all arrays to find a set of common indices that belong to
         # the likely reference frames
@@ -2297,13 +2381,18 @@ def get_magfit_frames(fitsdir,
                                                      assume_unique=True),
                                       mederr_ind,assume_unique=True)
 
-        headergood_ind =  np.intersect1d(np.intersect1d(moondist_ind,
-                                                        moonelev_ind,
-                                                        assume_unique=True),
-                                         zenithdist_ind,assume_unique=True)
+        if observatory=='hatpi':
+            headergood_ind =  np.intersect1d(np.intersect1d(moondist_ind,
+                                                            moonelev_ind,
+                                                            assume_unique=True),
+                                             zenithdist_ind,assume_unique=True)
 
-        allgood_ind = np.intersect1d(photgood_ind, headergood_ind,
-                                     assume_unique=True)
+            allgood_ind = np.intersect1d(photgood_ind, headergood_ind,
+                                         assume_unique=True)
+        elif observatory=='tess':
+            allgood_ind = photgood_ind
+        else:
+            raise NotImplementedError
 
         # if the headers and photometry produce a good reference frame, use
         # that. if they don't, use the photometry to choose a good reference
@@ -2329,11 +2418,17 @@ def get_magfit_frames(fitsdir,
         # update the returndict with reference frame and stats
         returndict['referenceframe'] = selectedreference
         returndict['referencephot'] = goodphots[selectedind]
-        if selectedreference:
+        if selectedreference and observatory=='hatpi':
             returndict['referencestats'] = {
                 'zenithdist':zenithdist[selectedind],
                 'moondist':moondist[selectedind],
                 'moonelev':moonelev[selectedind],
+                'ngood':ngoodobjects[selectedind],
+                'magmad':magerrmad[selectedind],
+                'mederr':medmagerr[selectedind],
+                }
+        elif selectedreference and observatory=='tess':
+            returndict['referencestats'] = {
                 'ngood':ngoodobjects[selectedind],
                 'magmad':magerrmad[selectedind],
                 'mederr':medmagerr[selectedind],
@@ -2343,6 +2438,8 @@ def get_magfit_frames(fitsdir,
 
         # add all frame stats to the returndict
         if framestats:
+            if observatory=='tess':
+                raise NotImplementedError
             returndict['framestats'] = {'frame':goodframes,
                                         'phot':goodphots,
                                         'zenithdist':zenithdist,
@@ -3579,14 +3676,13 @@ def choose_tfa_template(statsfile,
     is a subsample of the stars, and is supposed to represent all the types of
     systematics across the dataset. Kovacs et al (2005) give details.
 
-    statsfile = the file to use to get LC statistics from
+    statsfile = the file with LC statistics made when running EPD
 
     fovcatalog = the fovcatalog file, this must have xi and eta coordinates,
                  ras, decs, and magnitudes
 
     Returns a dict with lists of stars chosen, their stats, and filenames of
     where each star list was written.
-
     '''
 
     # read in the stats file
@@ -4860,41 +4956,39 @@ def parallel_lc_statistics(lcdir,
     '''
     This calculates statistics on all lc files in lcdir.
 
-    Uses lcglob to find the files. Puts the results in text file outfile. Needs
-    the fovcatalog to get the catalog magnitude to use as the canonical
-    magnitude.
+    Args:
+        lcdir (str): directory containing lightcurves
 
-    outfile contains the following columns:
+        lcglob (str): glob to epd lcs, inside lcdir. E.g., '*.epdlc'. These
+        contain the rlc, and are used to derive the filenames of the tfalcs.
 
-    object, ndet,
-    median RM[1-3], MAD RM[1-3], mean RM[1-3], stdev RM[1-3],
-    median EP[1-3], MAD EP[1-3], mean EP[1-3], stdev EP[1-3],
-    median TF[1-3], MAD TF[1-3], mean TF[1-3], stdev TF[1-3]
+        fovcatalog (str): path to the REFORMED fov catalog, which gets the
+        catalog magnitude corresponding to canonical magnitude for any star.
 
-    if a value is missing, it will be np.nan.
+    Output:
 
-    For ISM (LC format as of 2015/11/01):
+        Puts the results in text file outfile.
+        outfile contains the following columns:
 
-    parallel_lc_statistics('ccd8-LC','*.epdlc','../G545-riz.catalog',
-                           rmcols=[14,19,24],
-                           epcols=[27,28,29],
-                           tfcols=[30,31,32],
-                           rfcols=[12,17,22],
-                           sigclip=3.0,outfile='ccd8-tfa-lcstats.txt')
+            object, ndet,
+            median RM[1-3], MAD RM[1-3], mean RM[1-3], stdev RM[1-3],
+            median EP[1-3], MAD EP[1-3], mean EP[1-3], stdev EP[1-3],
+            median TF[1-3], MAD TF[1-3], mean TF[1-3], stdev TF[1-3]
 
-    IMPORTANT: the lcfile is always the .epdlc file (which contains the rlc, and
-    is used to derive the filenames of the tfalcs)
+        if a value is missing, it will be np.nan.
 
-    For ISM, consider using correctioncoeffs as well. These are c1, c2 resulting
-    from a fit to the catalogmag-flux relation using the expression:
+    Notes:
+        For ISM, consider using correctioncoeffs as well. These are c1, c2
+        resulting from a fit to the catalogmag-flux relation using the
+        expression:
 
-    catrmag = -2.5 * log10(flux/c1) + c2
+        catrmag = -2.5 * log10(flux/c1) + c2
 
-    where the fit is done in the bright limit (8.0 < r < 12.0). this corrects
-    for too-faint catalog mags because of crowding and blending.
+        where the fit is done in the bright limit (8.0 < r < 12.0). this
+        corrects for too-faint catalog mags because of crowding and blending.
 
-    correctioncoeffs is like: [[ap1_c1,ap1_c2],[ap2_c1,ap2_c2],[ap3_c1,ap3_c2]]
-
+        correctioncoeffs is like:
+            [[ap1_c1,ap1_c2],[ap2_c1,ap2_c2],[ap3_c1,ap3_c2]]
     '''
 
     lcfiles = glob.glob(os.path.join(lcdir, lcglob))
@@ -6342,7 +6436,8 @@ def plot_stats_file(statsfile, outdir, outprefix,
                     logy=False,
                     logx=False,
                     correctmagsafter=None,
-                    rangex=(5.9,14.1)):
+                    rangex=(5.9,14.1),
+                    observatory='hatpi'):
     '''This makes all the plots for a stats file.
 
     correctmagsafter will use the corrected mags for all objects with mags >
@@ -6462,15 +6557,38 @@ def plot_stats_file(statsfile, outdir, outprefix,
             plt.xlim(rangex)
 
             if binned:
-                plt.ylim((0.0001,1.0))
+                if observatory=='hatpi':
+                    plt.ylim((0.0001,1.0))
+                elif observatory=='tess':
+                    plt.ylim((0.00001,1.0))
                 plt.hlines([0.001,0.002,0.003],
                            xmin=rangex[0],xmax=rangex[1],colors='b')
                 plt.hlines([0.0005],
                            xmin=rangex[0],xmax=rangex[1],colors='r')
 
             else:
+                if observatory=='hatpi':
+                    plt.ylim((0.0009,1.0))
+                elif observatory=='tess':
+                    plt.ylim((0.00009,1.0))
+
+                    # overplot tess noise model
+                    Tmag = np.linspace(6, 13, num=200)
+                    lnA = 3.29685004771
+                    B = 0.8500214657
+                    C = -0.2850416324
+                    D = 0.039590832137
+                    E = -0.00223080159
+                    F = 4.73508403525e-5
+                    ln_sigma_1hr = lnA + B*Tmag + C*Tmag**2 + D*Tmag**3 + \
+                                   E*Tmag**4 + F*Tmag**5
+                    sigma_1hr = np.exp(ln_sigma_1hr)
+                    sigma_30min = sigma_1hr * np.sqrt(2)
+
+                    plt.plot(Tmag, sigma_30min/1e6, 'k-', zorder=3, lw=2)
+
+
                 # make the horizontal lines for 10, 5, 1 mmag
-                plt.ylim((0.0009,1.0))
                 plt.hlines([0.001, 0.002, 0.003, 0.004, 0.005],
                            xmin=rangex[0],xmax=rangex[1],colors='b')
 

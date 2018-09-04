@@ -23,7 +23,7 @@ GENERAL ORDER OF THINGS
    (if using autoimagesub.py with sqlite3, use generate_astromref for this
    step.  if instead using PostgreSQL, parallel_frames_to_database with the
    "calibrated frames" arg in the appropriate place, then
-   dbgen_astromref_projectidfieldccd does this. The latter is the faster
+   dbgen_get_astromref does this. The latter is the faster
    option.)
 
 2. next, use get_smoothed_xysdk_coeffs to generate files that contain the
@@ -163,9 +163,8 @@ different from the aperture photometry lightcurves.
 ## IMPORTS ##
 #############
 
-import os
+import os, glob, time
 import os.path
-import glob
 import multiprocessing as mp
 
 try:
@@ -184,6 +183,7 @@ import json
 import shutil
 import random
 from hashlib import md5
+from cStringIO import StringIO
 
 # used for fast random access to lines in text files
 from linecache import getline
@@ -229,7 +229,7 @@ import shared_variables as sv
 #################
 
 # set this to show extra info
-DEBUG = False
+DEBUG = True
 
 # CCD minimum and maximum X,Y pixel coordinates
 # used to strip things outside FOV from output of make_frame_sourcelist
@@ -333,7 +333,7 @@ SUBFRAMEPHOTCMD = (
     "--output - | sort -k 1 > {outiphot}"
 )
 
-GRCOLLECTCMD = ('grcollect {fiphotfile} --col-base 1 '
+GRCOLLECTCMD = ('grcollect {fiphotfileglob} --col-base {objectidcol} '
                 '--prefix {lcdir} --extension {lcextension} '
                 '--max-memory {maxmemory}'
                )
@@ -847,6 +847,9 @@ def astromref_shift_worker(task):
     cmdtorun = FRAMESHIFTCALCCMD.format(astromref=astromref,
                                         fistartoshift=fistartoshift,
                                         outtransfile=outfile)
+
+    if DEBUG:
+        print(FRAMESHIFTCALCCMD)
 
     returncode = os.system(cmdtorun)
 
@@ -1673,6 +1676,7 @@ def photometry_on_combined_photref(
         framewidth=None,
         searchradius=8.0,
         astrometrysourcethreshold=50000,
+        observatory='hatpi'
         ):
     '''
     This does source extraction, WCS, catalog projection, and then runs fiphot
@@ -1685,19 +1689,21 @@ def photometry_on_combined_photref(
     '''
 
     # get the required header keywords from the FITS file
-    header = imageutils.get_header_keyword_list(photref_frame,
-                                                ['GAIN',
-                                                 'GAIN1',
-                                                 'GAIN2',
-                                                 'EXPTIME',
-                                                 'RAC',
-                                                 'DECC',
-                                                 'FOV'])
+    if observatory=='hatpi':
+        headerlist = ['GAIN', 'GAIN1', 'GAIN2', 'EXPTIME', 'RAC', 'DECC',
+                      'FOV']
+    elif observatory=='tess':
+        headerlist = ['GAINA', 'TELAPSE', 'CRVAL1', 'CRVAL2']
+
+    header = imageutils.get_header_keyword_list(photref_frame, headerlist)
 
     # get the RA and DEC from the frame header for astrometry
     if 'RAC' in header and 'DECC' in header:
         frame_ra = header['RAC']*360.0/24.0
         frame_dec = header['DECC']
+    elif 'CRVAL1' in header and 'CRVAL2' in header:
+        frame_ra = header['CRVAL1']
+        frame_dec = header['CRVAL2']
     else:
         print('ERR! %sZ: no RAC or DECC defined for %s' %
               (datetime.utcnow().isoformat(),
@@ -1707,6 +1713,8 @@ def photometry_on_combined_photref(
     # figure out the width of the frame for astrometry
     if 'FOV' in header:
         framewidth = header['FOV']
+    elif 'FOV' not in header and observatory=='tess':
+        framewidth = 24
     elif framewidth is None:
         print('ERR! %sZ: no frame width defined for %s, '
               'astrometry not possible' %
@@ -1721,6 +1729,8 @@ def photometry_on_combined_photref(
             ccdgain = (header['GAIN1'] + header['GAIN2'])/2.0
         elif 'GAIN' in header:
             ccdgain = header['GAIN']
+        elif 'GAINA' in header:
+            ccdgain = header['GAINA']
         else:
             ccdgain = None
 
@@ -1736,7 +1746,9 @@ def photometry_on_combined_photref(
     # handle the zeropoints
     # if the zeropoint isn't provided and if this is a HAT frame, the ccd
     # number will get us the zeropoint in the ZEROPOINTS dictionary
-    if not zeropoint and ccdnumber in ZEROPOINTS:
+    if zeropoint:
+        pass
+    elif (not zeropoint) and (ccdnumber in ZEROPOINTS) and (observatory=='hatpi'):
         zeropoint = ZEROPOINTS[ccdnumber]
     else:
         print('ERR! %sZ: no zeropoint magnitude defined for %s' %
@@ -1754,31 +1766,61 @@ def photometry_on_combined_photref(
           (datetime.utcnow().isoformat(), photref_frame))
     astromfistarf = os.path.abspath(re.sub(sv.FITS_TAIL, '.fistar-astrometry',
                                            photref_frame))
+    print(zeropoint, ccdgain, ccdexptime)
     astromfistar = extract_frame_sources(
         photref_frame,
         astromfistarf,
-        fluxthreshold=astrometrysourcethreshold
+        fluxthreshold=astrometrysourcethreshold,
+        zeropoint=zeropoint,
+        ccdgain=ccdgain,
+        exptime=ccdexptime
     )
 
     # SECOND: add WCS
     print('%sZ: running astrometry solution for %s...' %
           (datetime.utcnow().isoformat(), photref_frame))
     wcsf = os.path.abspath(re.sub(sv.FITS_TAIL, '.wcs', photref_frame))
-    wcsfile = anet_solve_frame(astromfistar,
-                               wcsf,
-                               frame_ra,
-                               frame_dec,
-                               width=framewidth,
-                               radius=searchradius)
+    if observatory=='hatpi':
+        wcsfile = anet_solve_frame(astromfistar,
+                                   wcsf,
+                                   frame_ra,
+                                   frame_dec,
+                                   width=framewidth,
+                                   radius=searchradius)
+    elif observatory=='tess':
+        # For magic reasons, astrometry fails if giving total image width, but
+        # works if giving plate scale. This makes no sense. Maybe tied to large
+        # fov and distortions?
+        wcsfile = anet_solve_frame(astromfistar,
+                                   wcsf,
+                                   frame_ra,
+                                   frame_dec,
+                                   width=framewidth,
+                                   radius=searchradius,
+                                   scale=21.1,
+                                   usescalenotwidth=True)
 
     # THIRD: run do_photometry to get a .sourcelist file with HATID,X,Y
-    photf = do_photometry(
-        os.path.abspath(photref_frame),
-        os.path.abspath(fovcatalog),
-        outdir=os.path.dirname(os.path.abspath(photref_frame)),
-        extractsources=extractsources,
-        zeropoint=zeropoint
-    )
+    if observatory=='hatpi':
+        photf = do_photometry(
+            os.path.abspath(photref_frame),
+            os.path.abspath(fovcatalog),
+            outdir=os.path.dirname(os.path.abspath(photref_frame)),
+            extractsources=extractsources,
+            zeropoint=zeropoint
+        )
+    elif observatory=='tess':
+        photf = do_photometry(
+            os.path.abspath(photref_frame),
+            os.path.abspath(fovcatalog),
+            outdir=os.path.dirname(os.path.abspath(photref_frame)),
+            extractsources=extractsources,
+            zeropoint=zeropoint,
+            ccdgain=ccdgain,
+            ccdexptime=ccdexptime,
+            binaryoutput=False,
+            observatory='tess'
+        )
 
     if extractsources:
         photref_sourcelist = os.path.abspath(re.sub(sv.FITS_TAIL,
@@ -2025,31 +2067,46 @@ def subframe_photometry_worker(task):
     task[7] -> photrefprefix
     task[8] -> kernelspec (copy this from input to subtraction)
     task[9] -> lcapertures (copy this from input to photref photometry)
+    task[10] -> observatory
+    task[11] -> photparams. if hatpi, None. elif tess, dict with gain, exptime,
+                and zeropoint.
 
     '''
 
     # get the info out of the task
     (subframe, photrefrawphot, disjointrad,
-     subframekernel, subframeitrans, subframexysdk,
-     outdir, photrefprefix, kernelspec, lcapertures) = task
+     subframekernel, subframeitrans, subframexysdk, outdir, photrefprefix,
+     kernelspec, lcapertures, observatory, photparams) = task
 
     try:
 
-        # get the CCD info out of the subframe
-        header = imageutils.get_header_keyword_list(subframe,
-                                                    ['GAIN',
-                                                     'GAIN1',
-                                                     'GAIN2',
-                                                     'EXPTIME'])
+        if observatory=='hatpi':
 
-        if 'GAIN1' in header and 'GAIN2' in header:
-            ccdgain = (header['GAIN1'] + header['GAIN2'])/2.0
-        elif 'GAIN' in header:
-            ccdgain = header['GAIN']
-        else:
-            ccdgain = None
+            headerlist = ['GAIN', 'GAIN1', 'GAIN2', 'EXPTIME']
+            # get the CCD info out of the subframe
+            header = imageutils.get_header_keyword_list(subframe, headerlist)
 
-        ccdexptime = header['EXPTIME'] if 'EXPTIME' in header else None
+            if 'GAIN1' in header and 'GAIN2' in header:
+                ccdgain = (header['GAIN1'] + header['GAIN2'])/2.0
+            elif 'GAIN' in header:
+                ccdgain = header['GAIN']
+            else:
+                ccdgain = None
+
+            ccdexptime = header['EXPTIME'] if 'EXPTIME' in header else None
+
+            # get the zeropoint. if this is a HAT frame, the ccd number will get us
+            # the zeropoint in the ZEROPOINTS dictionary
+            frameinfo = FRAMEREGEX.findall(os.path.basename(subframe))
+
+            if frameinfo:
+                zeropoint = ZEROPOINTS[int(frameinfo[0][-1])]
+
+        elif observatory=='tess':
+
+            ccdgain = photparams['ccdgain']
+            ccdexptime = photparams['ccdexptime']
+            zeropoint = photparams['zeropoint']
 
         if not (ccdgain or ccdexptime):
             print('%sZ: no GAIN or EXPTIME defined for %s' %
@@ -2057,17 +2114,12 @@ def subframe_photometry_worker(task):
                    subframe))
             return subframe, None
 
-        # get the zeropoint. if this is a HAT frame, the ccd number will get us
-        # the zeropoint in the ZEROPOINTS dictionary
-        frameinfo = FRAMEREGEX.findall(os.path.basename(subframe))
-
-        if frameinfo:
-            zeropoint = ZEROPOINTS[int(frameinfo[0][-1])]
-        else:
-            print('%sZ: no zeropoint magnitude defined for %s' %
-                  (datetime.utcnow().isoformat(),
-                   subframe))
-            return subframe, None
+        if observatory=='hatpi':
+            if not frameinfo:
+                print('%sZ: no zeropoint magnitude defined for %s' %
+                      (datetime.utcnow().isoformat(),
+                       subframe))
+                return subframe, None
 
         # set up the subtraction type in the output filename
         if (os.path.basename(subframe)).startswith('rsub'):
@@ -2088,12 +2140,17 @@ def subframe_photometry_worker(task):
                                             kernelspec,
                                             lcapertures)
 
-
-        frameiphot = '%s-%s-%s-%s_%s.iphot' % (subtractionbit,
-                                               outiphothash,
-                                               frameinfo[0][0],
-                                               frameinfo[0][1],
-                                               frameinfo[0][2])
+        if observatory=='hatpi':
+            frameiphot = '%s-%s-%s-%s_%s.iphot' % (subtractionbit,
+                                                   outiphothash,
+                                                   frameinfo[0][0],
+                                                   frameinfo[0][1],
+                                                   frameinfo[0][2])
+        elif observatory=='tess':
+            name = re.findall('tess20.*?-0016_cal_img', subframe)
+            assert len(name) == 1, 'TESS ETE6 specific regex!'
+            name = name[0]
+            frameiphot = '%s-%s-%s.iphot' % (subtractionbit, outiphothash, name)
 
         if outdir:
             outfile = os.path.join(os.path.abspath(outdir),
@@ -2155,7 +2212,8 @@ def photometry_on_subtracted_frames(subframedir,
                                     kernelspec='b/4;i/4;d=4/4',
                                     lcapertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
                                     maxworkertasks=1000,
-                                    outdir=None):
+                                    outdir=None,
+                                    photparams=None):
 
     '''
     This runs photometry on the subtracted frames and finally produces the ISM
@@ -2168,10 +2226,8 @@ def photometry_on_subtracted_frames(subframedir,
     if isinstance(subframedir, list):
         subframelist = subframedir
     else:
-        # find all the subtracted frames
         subframelist = glob.glob(os.path.join(os.path.abspath(subframedir),
                                               subframeglob))
-
 
     # we need to find the accompanying kernel, itrans, and xysdk files for each
     # subtracted frame for the tasks list
@@ -2195,7 +2251,6 @@ def photometry_on_subtracted_frames(subframedir,
 
     # find matching kernel, itrans, and xysdk files for each subtracted frame
     for subframe in subframelist:
-
 
         frameinfo = FRAMEREGEX.findall(os.path.basename(subframe))
         kernel = '%s%s%s-%s_%s-xtrns.fits-kernel' % (photrefbit,
@@ -2316,8 +2371,10 @@ def get_lc_for_object(lcobject,
 ## LIGHTCURVE COLLECTION ##
 ###########################
 
-def dump_lightcurves_with_grcollect(photfiles, lcdir, maxmemory,
-                                    lcextension='grcollectilc'):
+def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
+                                    objectidcol=3,
+                                    lcextension='grcollectilc',
+                                    observatory='tess'):
     '''
     Given a list of photometry files (text files at various times output by
     fiphot with rows that are objects), make lightcurve files (text files for
@@ -2327,16 +2384,28 @@ def dump_lightcurves_with_grcollect(photfiles, lcdir, maxmemory,
     is comparably fast to the postgresql indexing approach without heavy
     optimization (dumps ~1 photometry file per second).
 
-    ASSUMES the objectid is in the first column of the *.iphot photometry
-    output files that `fiphot` makes.
+    An important intermediate step, implemented here, is prepending times and
+    filenames to *.iphot lightcurve files, to make *.iphottemp files.
 
-    TODO a quick dumb way to parallelize involves splitting up the photfiles
-    list before the call. However `grcollect` does voodoo in memory allocation
-    so be careful.
+    *.iphot photometry files look like:
+
+        HAT-381-0000004     1482.093      521.080   1482.10899   521.079941
+        1.86192159    -0.217043415    -0.152707564         0.35         0.41
+        583942.10       334.31      5.54226      0.00062            G
+        605285.46       340.12      5.50328      0.00061            G
+        619455.38       344.29      5.47816      0.00060            G
 
     Args:
 
-        photfiles (list): list of full paths to photometry files
+        photfileglob (str): bash glob to pass to grcollect, e.g., the first
+        input line below
+
+            grcollect /home/mypath/rsub-3f62ef9f-tess201913112*.iphot \
+            --col-base 1 --prefix /nfs/phtess1/ar1/TESS/SIMFFI/LC/ISP_1-1/ \
+            --extension grcollectilc --max-memory 4g
+
+        objectidcol (int): column of object id in *.iphottemp files (default:
+            3)
 
         lcdir (str): directory where lightcurves get dumped
 
@@ -2356,39 +2425,89 @@ def dump_lightcurves_with_grcollect(photfiles, lcdir, maxmemory,
         diddly-squat.
     '''
 
-    totphot = len(photfiles)
-    print('%sZ: called dump lightcurves for %d photfiles' % totphot)
-
     starttime = time.time()
 
-    for ix, photfile in enumerate(photfiles):
+    photpaths = glob.glob(photfileglob)
 
-        # make sure the photometry file exists before we proceed
-        if not os.path.exists(photfile):
-            print('ERR! %sZ: failed to find %s, continuing' %
-                  (datetime.utcnow().isoformat(), frametoshift))
-            continue
+    print('%sZ: called dump lightcurves for %d photfiles' %
+          (datetime.utcnow().isoformat(), len(photpaths)))
 
-        cmdtorun = GRCOLLECTCMD.format(fiphotfile=photfile,
-                                       lcdir=lcdir,
-                                       lcextension=lcextension,
-                                       maxmemory=maxmemory)
+    if len(photpaths)==0:
+        print('ERR! %sZ: failed to find %s, continuing' %
+              (datetime.utcnow().isoformat(), frametoshift))
+        return 0
 
-        # execute the grcollect shell command
-        grcollectproc = subprocess.Popen(shlex.split(cmdtorun),
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
+    # *.iphot files need to have timestamp and filenames prepended on each
+    # line, otherwise lightcurves will have no times. make the correctly
+    # formatted ".iphottemp" files here.
+    for ix, photpath in enumerate(photpaths):
 
-        _, stderr = grcollectproc.communicate()
-
-        if grcollectproc.returncode == 0:
-            print('%sZ: grcollect %d/%d: %s was dumped' %
-                  (datetime.utcnow().isoformat(), ix, totphot, photfile))
-
+        if observatory=='tess':
+            framekey = re.findall('tess20.*?-0016_cal_img', photpath)
+            assert len(framekey) == 1, 'TESS ETE6 specific regex!'
+            originalframe = os.path.join(os.path.dirname(photpath),
+                                         framekey[0]+'.fits')
         else:
-            print('ERR! %sZ: grcollect failed for %s' %
-                  (datetime.utcnow().isoformat(), photfile))
-            print('error was %s' % stderr )
+            raise NotImplementedError
+
+        # check these files exist, and populate the dict if they do
+        if os.path.exists(originalframe):
+
+            tempphotpath = photpath.replace('.iphot','.iphottemp')
+
+            if os.path.exists(tempphotpath):
+                print('%sZ: skipping %d/%d frame, found .iphottemp file %s' %
+                      (datetime.utcnow().isoformat(), ix, len(photpaths),
+                       tempphotpath))
+                continue
+
+            print('%sZ: writing %d/%d frame, %s to .iphottemp file %s' %
+                  (datetime.utcnow().isoformat(), ix, len(photpaths), photpath,
+                   tempphotpath))
+
+            # this is the ORIGINAL FITS frame, since the subtracted one
+            # contains some weird JD header (probably inherited from the
+            # photref frame)
+            if observatory=='tess':
+                frametime = get_header_keyword(originalframe, 'TSTART')
+            else:
+                raise NotImplementedError
+
+            # now open the phot file, read it, and write to the tempphot file.
+            output = StringIO()
+            with open(photpath, 'rb') as photfile:
+
+                for line in photfile:
+                    output.write('%.6f\t%s\t%s' % (frametime, framekey[0], line))
+
+            with open(tempphotpath, 'w') as tempphotfile:
+                output.seek(0)
+                shutil.copyfileobj(output, tempphotfile)
+
+            output.close()
+
+    grcollectglob = photfileglob.replace('.iphot', '.iphottemp')
+    cmdtorun = GRCOLLECTCMD.format(fiphotfileglob=grcollectglob,
+                                   lcdir=lcdir,
+                                   objectidcol=objectidcol,
+                                   lcextension=lcextension,
+                                   maxmemory=maxmemory)
+    if DEBUG:
+        print(cmdtorun)
+
+    # execute the grcollect shell command. NB we execute through a shell
+    # interpreter to get correct wildcards applied.
+    grcollectproc = subprocess.Popen(cmdtorun, shell=True,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+
+    _, stderr = grcollectproc.communicate()
+
+    if grcollectproc.returncode == 0:
+        print('%sZ: grcollect dump succeeded' % datetime.utcnow().isoformat())
+    else:
+        print('ERR! %sZ: grcollect failed' % datetime.utcnow().isoformat())
+        print('error was %s' % stderr )
 
     print('%sZ: done, time taken: %.2f minutes' %
           (datetime.utcnow().isoformat(), (time.time() - starttime)/60.0))
@@ -3294,7 +3413,8 @@ def serial_run_epd_imagesub(ilcdir,
                             ilcglob='*.ilc',
                             outdir=None,
                             smooth=21,
-                            sigmaclip=3.0):
+                            sigmaclip=3.0,
+                            minndet=200):
     '''
     This runs EPD on the lightcurves from the pipeline.
 
@@ -3366,7 +3486,8 @@ def serial_run_epd_imagesub(ilcdir,
                 outfile=outepd,
                 smooth=smooth,
                 sigmaclip=sigmaclip,
-                ilcext=os.path.splitext(ilcglob)[-1]
+                ilcext=os.path.splitext(ilcglob)[-1],
+                minndet=minndet
                 )
         except Exception as e:
             print('EPD failed for %s, error was: %s' % (ilc, e))
@@ -3381,21 +3502,23 @@ def parallel_epd_worker(task):
     task[1] = outdir
     task[2] = smooth
     task[3] = sigmaclip
+    task[4] = minndet
 
     '''
 
     try:
 
-        ilc, outdir, smooth, sigmaclip = task
+        ilc, outdir, smooth, sigmaclip, minndet = task
         ilcext = os.path.splitext(ilc)[-1]
         outepd = os.path.join(outdir,
-                              os.path.basename(ilc).replace('.ilc','.epdlc'))
+                              os.path.basename(ilc).replace(ilcext,'.epdlc'))
         outf = epd_lightcurve_imagesub(
             ilc,
             outfile=outepd,
             smooth=smooth,
             sigmaclip=sigmaclip,
-            ilcext=ilcext
+            ilcext=ilcext,
+            minndet=minndet
         )
 
         print('%sZ: %s -> %s EPD OK' %
@@ -3418,10 +3541,10 @@ def parallel_run_epd_imagesub(ilcdir,
                               sigmaclip=3.0,
                               nworkers=16,
                               overwrite=False,
-                              maxworkertasks=1000):
+                              maxworkertasks=1000,
+                              minndet=200):
     '''
     This runs EPD in parallel.
-
     '''
 
     if not outdir:
@@ -3458,7 +3581,7 @@ def parallel_run_epd_imagesub(ilcdir,
         else:
             ilcfiles = [os.path.join(ilcdir,sd+'.ilc') for sd in setdiff]
 
-    tasks = [(x, outdir, smooth, sigmaclip) for x in ilcfiles]
+    tasks = [(x, outdir, smooth, sigmaclip, minndet) for x in ilcfiles]
 
     print('%sZ: starting...' %
           (datetime.utcnow().isoformat(), ))

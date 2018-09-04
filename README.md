@@ -3,14 +3,16 @@
 Timeseries photometry pipeline used for HATPI prototype, and TESS simulated
 data.
 
-# Install
+## Install
 
 TODO FOR INSTALL INSTRUCTIONS:
 * figure out `anet` substitute (can it be replaced by just using
   astrometry.net?)
-* find other dependencies that require installation
+* figure out `2massread` substitute (or how to make it free)
+* check this actually works.
 
-__Environment basics__
+
+### Environment basics
 
 First, clone this repo into a working directory, that we will call $TREX.
 
@@ -49,13 +51,17 @@ dependencies):
   (trex_27) pip install astrobase
   ```
 
-__fitsh (and HATpipe) dependencies__
+### fitsh and HATpipe dependencies
 
 This code inherits a large amount from the
 [`fitsh`](https://fitsh.net/wiki/Main_Page) project, developed mostly by Andras
 Pal. Much of `fitsh` was inherited by `HATpipe` circa 2010, when it forked.
 `HATpipe` now has top-secret special-sauce added, that you are not allowed to
-reuse without express written permission.
+see or reuse without express written permission.
+
+The utilities we want working on our path include: `ficalib`, `fistar`,
+`fiphot`, `grmatch`, `grtrans`, `ficonv`, `fitrans`, and `ficombine`, `anet`,
+and `2massread`.
 
 If you had access to the top-secret HATpipe svn repo, you would do something
 like this:
@@ -70,10 +76,6 @@ like this:
 Compiling the HATpipe source on a mac is challenging, because many of the
 libraries are linux-specific.
 
-------------------------------
-
-The utilities we want working on our path include: `anet`, `ficalib`, `fistar`,
-`fiphot`, `grmatch`, `grtrans`, `ficonv`, `fitrans`, and `ficombine`.
 
 Most of these are `fitsh` tasks. We will proceed using only free software
 unless absolutely necessary, which means using Andras' public version.
@@ -90,7 +92,7 @@ The `fitsh` installation instructions are
   make install
   ```
 
-__PostgreSQL installation__
+### PostgreSQL installation
 
 For macs, see [here](https://www.postgresql.org/download/macosx/).
 For linux boxes, see
@@ -109,7 +111,7 @@ $ createdb -U hpx hpx
 and add the appropriate password and info to your `~/.pgpass` file.
   
 
-__Making pipe-trex accessible within virtual environment__
+### Making pipe-trex accessible within virtual environment
 For the moment, go into the venv's `usr/lib/python2.7/site-packages` directory
 and create a `.pth` file, e.g.  `pipe-trex.pth` with the location of the local
 git cloned repository in it: `/path/to/where/you/cloned/pipe-trex`.
@@ -121,14 +123,12 @@ py> import imagesubphot as ism
 ```
 
 
-# Getting Started
-
-Congratulations on installing all the things.
+## Getting Started
 
 Some usage examples are given in the `examples/` directory.
 
 
-## Concepts: Directory and database structure
+### Concepts: Directory and database structure
 
 As Thom Yorke understood, everything must be in its right place for your
 photometry to Just Work. The assumed directory structure at its first level
@@ -216,10 +216,11 @@ relations include:
    public | subtractedframes_framekey_seq  | sequence | hpx
   ```
 
-## Usage
+### Usage
 
 * `shared_variables.py`: contains path variables that are set across the
   pipeline.
+
 
 # Useful things
 
@@ -232,7 +233,6 @@ and libx264 installed) to make a movie of these frames:
 replace the \*.jpg above with the appropriate glob pattern to use for the files
 in question
 
-
 # Authors
 
 Waqas Bhatti
@@ -241,3 +241,41 @@ _Contributors:_
 Luke Bouma
 
 # License
+
+MIT
+
+# Notes on mac installation
+
+**Aside**: compiling the HATpipe source on a mac is not advised, because many
+of the libraries are linux-specific. The entire pipeline is untested on macs,
+and the following are some notes from a _failed_ attempt at getting the
+pipeline to work on a mac.
+
+  To compile `2massread`:
+    ```
+    cd /Users/luke/local/HATpipe_R3186/source/2mass
+    cp /usr/include/malloc/malloc.h .
+    # change 2massread.c's malloc include statement to be `#include "malloc.h"`.
+    ./hatconf.sh
+    make
+    ```
+  you then need to put the appropriately formatted ~150Gb of 2MASS index files
+  somewhere accessible, and point to them in your `~/.2massreadrc` file.
+
+  To compile `anrd2xy`:
+    ```
+    cd /Users/luke/local/HATpipe_R3186/source/odoncontrib/anet
+    brew install gsl  # this is not a default on macs
+    ```
+
+  If on a mac, you then must edit all six makefiles, 
+  ```
+    /Users/luke/local/HATpipe_R3186/source/odoncontrib/anet/Makefile
+    /Users/luke/local/HATpipe_R3186/source/odoncontrib/anet/libc*/Makefile
+    /Users/luke/local/HATpipe_R3186/source/odoncontrib/anet/libc*/*/Makefile
+  ```
+  to use GNU `gcp`, not `cp`, because mac `cp` has different options.  Even then
+  though, linking on my mac fails because of architecture problems that I don't
+  understand. This is perhaps a waste of time, and you should just develop on
+  linux, if you have a very good internet connection, or do not develop.
+
