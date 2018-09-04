@@ -3,7 +3,7 @@
 Timeseries photometry pipeline used for HATPI prototype, and TESS simulated
 data.
 
-# Install
+## Install
 
 TODO FOR INSTALL INSTRUCTIONS:
 * figure out `anet` substitute (can it be replaced by just using
@@ -12,7 +12,7 @@ TODO FOR INSTALL INSTRUCTIONS:
 * check this actually works.
 
 
-__Environment basics__
+### Environment basics
 
 First, clone this repo into a working directory, that we will call $TREX.
 
@@ -51,7 +51,7 @@ dependencies):
   (trex_27) pip install astrobase
   ```
 
-__fitsh and HATpipe dependencies__
+### fitsh and HATpipe dependencies
 
 This code inherits a large amount from the
 [`fitsh`](https://fitsh.net/wiki/Main_Page) project, developed mostly by Andras
@@ -62,6 +62,20 @@ see or reuse without express written permission.
 The utilities we want working on our path include: `ficalib`, `fistar`,
 `fiphot`, `grmatch`, `grtrans`, `ficonv`, `fitrans`, and `ficombine`, `anet`,
 and `2massread`.
+
+If you had access to the top-secret HATpipe svn repo, you would do something
+like this:
+  ```
+  cd ~/local
+  svn checkout --username lbouma https://hat.astro.princeton.edu/svn/HATreduc/HATpipe
+  cd HATpipe
+  svn up -r3186   # we froze dependencies for pipe-trex
+  cd ../ ; cp -r HATpipe HATpipe_R3186
+  ```
+
+Compiling the HATpipe source on a mac is challenging, because many of the
+libraries are linux-specific.
+
 
 Most of these are `fitsh` tasks. We will proceed using only free software
 unless absolutely necessary, which means using Andras' public version.
@@ -78,25 +92,7 @@ The `fitsh` installation instructions are
   make install
   ```
 
-------------------------------
-
-If you had access to the top-secret HATpipe svn repo, you would then do
-something like this:
-  ```
-  cd ~/local
-  svn checkout --username lbouma https://hat.astro.princeton.edu/svn/HATreduc/HATpipe
-  cd HATpipe
-  svn up -r3186   # we froze dependencies for pipe-trex
-  cd ../ ; cp -r HATpipe HATpipe_R3186
-  ```
-
-If you were convinced you wanted to try a mac install, I would point you to
-some notes at the bottom of this readme. However I would first try to convince
-you otherwise.
-
-------------------------------
-
-__PostgreSQL installation__
+### PostgreSQL installation
 
 For macs, see [here](https://www.postgresql.org/download/macosx/).
 For linux boxes, see
@@ -115,7 +111,7 @@ $ createdb -U hpx hpx
 and add the appropriate password and info to your `~/.pgpass` file.
   
 
-__Making pipe-trex accessible within virtual environment__
+### Making pipe-trex accessible within virtual environment
 For the moment, go into the venv's `usr/lib/python2.7/site-packages` directory
 and create a `.pth` file, e.g.  `pipe-trex.pth` with the location of the local
 git cloned repository in it: `/path/to/where/you/cloned/pipe-trex`.
@@ -127,14 +123,12 @@ py> import imagesubphot as ism
 ```
 
 
-# Getting Started
-
-Congratulations on installing things.
+## Getting Started
 
 Some usage examples are given in the `examples/` directory.
 
 
-## Concepts: Directory and database structure
+### Concepts: Directory and database structure
 
 As Thom Yorke understood, everything must be in its right place for your
 photometry to Just Work. The assumed directory structure at its first level
@@ -222,7 +216,7 @@ relations include:
    public | subtractedframes_framekey_seq  | sequence | hpx
   ```
 
-## Usage
+### Usage
 
 * `shared_variables.py`: contains path variables that are set across the
   pipeline.
@@ -250,10 +244,8 @@ Luke Bouma
 
 MIT
 
+# Notes on mac installation
 
-
-# notes on mac installation
-----------
 **Aside**: compiling the HATpipe source on a mac is not advised, because many
 of the libraries are linux-specific. The entire pipeline is untested on macs,
 and the following are some notes from a _failed_ attempt at getting the
@@ -286,5 +278,4 @@ pipeline to work on a mac.
   though, linking on my mac fails because of architecture problems that I don't
   understand. This is perhaps a waste of time, and you should just develop on
   linux, if you have a very good internet connection, or do not develop.
-----------
 
