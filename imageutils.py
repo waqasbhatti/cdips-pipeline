@@ -727,7 +727,8 @@ def fits_to_full_jpeg(fits_image,
                       scale_func=clipped_linscale_img,
                       scale_func_params={'cap':255.0,
                                          'lomult':2,
-                                         'himult':2.5}):
+                                         'himult':2.5},
+                      frame_time=None):
     '''
     This converts a FITS image to a full frame JPEG.
 
@@ -799,6 +800,8 @@ def fits_to_full_jpeg(fits_image,
         # this is useful for subtracted images
         if fits_jdsrc is not None and os.path.exists(fits_jdsrc):
             framejd = get_header_keyword(fits_jdsrc, 'JD')
+        elif frame_time is not None:
+            framejd = frame_time
         else:
             framejd = hdr['JD'] if 'JD' in hdr else None
 
