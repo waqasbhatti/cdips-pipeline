@@ -805,12 +805,12 @@ def fits_to_full_jpeg(fits_image,
         else:
             framejd = hdr['JD'] if 'JD' in hdr else None
 
-            if framejd is not None:
-                timeannotation = '%.5f' % framejd
-                draw.text((10, resized_img.shape[1] - 40),
-                          timeannotation,
-                          font=fontlarge,
-                          fill=255)
+        if framejd is not None:
+            timeannotation = '%.5f' % framejd
+            draw.text((10, resized_img.shape[1] - 40),
+                      timeannotation,
+                      font=fontlarge,
+                      fill=255)
 
         del draw
         outimg.save(out_fname)
