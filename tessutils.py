@@ -13,32 +13,6 @@ from glob import glob
 from astropy.io import fits
 from astroquery.mast import Catalogs
 
-def query_TIC(ra, dec, radius_deg):
-    '''
-    Access TIC by querying MAST directly.  Can do positional queries, as well
-    as observation criteria queries.  For details, see:
-        http://astroquery.readthedocs.io/en/latest/mast/mast.html#id1.
-    Documentation on the accessible fields is here:
-        https://mast.stsci.edu/api/v0/_t_i_cfields.html
-
-        args:
-            all in degrees
-    '''
-
-
-    cat = Catalogs.query_criteria(coordinates=str(ra)+''+str(dec),
-                                  catalog="Tic", objType="STAR",
-                                  radius=radius_deg)
-
-    # TODO
-    # obnoxiously, it seems like cutting on Tmag does not work! ASTROQUERY BUG?
-    # cat = Catalogs.query_criteria(catalog="Tic", ra=[240,260], dec=[22,42],
-    #                               Tmag=[7,7.5],objType="STAR")
-    # cat = Catalogs.query_criteria(catalog="TIC", Tmag=[7,10], objType="STAR")
-
-    return cat
-
-
 def from_ete6_to_fitsh_compatible(fits_list, outdir):
     '''
     This function takes a list of ETE6 reduced images and turns them into
