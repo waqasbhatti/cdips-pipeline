@@ -1,7 +1,7 @@
 # `pipe-trex`
 
-Timeseries photometry pipeline used for HATPI prototype, and TESS simulated
-data.
+Timeseries photometry pipeline used for HATPI prototype, TESS simulated
+data, and real TESS data.
 
 ## Install
 
