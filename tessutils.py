@@ -2,6 +2,8 @@
 functions specific to wrangling TESS data
 '''
 
+##########################################
+
 import aperturephot as ap
 import imageutils as iu
 import shared_variables as sv
@@ -13,6 +15,10 @@ from glob import glob
 from astropy.io import fits
 from astroquery.mast import Catalogs
 
+from numpy import array as nparr, all as npall
+
+##########################################
+
 def from_ete6_to_fitsh_compatible(fits_list, outdir):
     '''
     This function takes a list of ETE6 reduced images and turns them into
@@ -23,11 +29,35 @@ def from_ete6_to_fitsh_compatible(fits_list, outdir):
         * trimmed to remove virtual columns
     '''
 
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+
+    path_exists = []
+    for ix, fits_name in enumerate(fits_list):
+        outname = (
+            outdir + os.path.basename(
+                fits_name.replace('-s_ffic.fits', '_cal_img.fits'))
+        )
+        if os.path.exists(outname):
+            path_exists.append(1)
+        else:
+            path_exists.append(0)
+
+    path_exists = nparr(path_exists)
+
+    if npall(path_exists):
+        print(
+            'found all {:d} fitsh-compatible files, continuing'.
+            format(len(path_exists))
+        )
+        return 0
 
     for ix, fits_name in enumerate(fits_list):
 
-        outname = outdir + os.path.basename(fits_name.replace('-s_ffic.fits',
-                                                              '_cal_img.fits'))
+        outname = (
+            outdir + os.path.basename(
+                fits_name.replace('-s_ffic.fits', '_cal_img.fits'))
+        )
 
         if os.path.exists(outname):
             print(

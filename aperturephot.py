@@ -1698,7 +1698,6 @@ def parallel_fitsdir_photometry(
     '''
     This does photometry for all FITS files in a directory using nworkers
     parallel workers.
-
     '''
 
     # get a list of all fits files in the directory
