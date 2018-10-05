@@ -717,11 +717,13 @@ def calibrated_frame_to_database(fitsfile,
             params = (fits, fistar, fiphot, wcs, fitsheaderjson, photinfojson,
                      frameisok, fitsheaderjson, photinfojson)
         else:
+            # one row per fits image. if the fits image already has a row, do
+            # nothing.
             query = ("insert into calibratedframes ("
                      "fits, fistar, fiphot, wcs, fitsheader, photinfo, "
                      "frameisok) values ("
                      "%s, %s, %s, %s, %s, %s, "
-                     "%s) " )
+                     "%s) on conflict (fits) do nothing" )
             params = (fits, fistar, fiphot, wcs, fitsheaderjson, photinfojson,
                      frameisok)
 
@@ -729,7 +731,10 @@ def calibrated_frame_to_database(fitsfile,
         cursor.execute(query, params)
         database.commit()
 
-        message = 'inserted %s into calibratedframes DB OK' % fits
+        message = (
+            'inserted {:s} into calibratedframes (or not if conflict) -- OK'.
+            format(fits)
+        )
         print('%sZ: %s' %
               (datetime.utcnow().isoformat(), message) )
         returnval = (fits, True)
@@ -1004,9 +1009,10 @@ def parallel_frames_to_database(fitsbasedir,
                                 nworkers=16,
                                 maxworkertasks=1000):
     '''
-    This runs a DB ingest on all FITS located in fitsbasedir and subdirs.
-
-    Runs a 'find' subprocess to find all the FITS to process.
+    This runs a DB ingest on all FITS located in fitsbasedir and subdirs.  Runs
+    a 'find' subprocess to find all the FITS to process.  If the frames have
+    already been injested, based on their fits file paths they will not be
+    changed.
 
     Args:
         fitsbasedir: base directory with fits files. For example,
@@ -1570,7 +1576,8 @@ def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
                         "%s, %s, "
                         "%s, %s, %s, %s, "
                         "%s"
-                        ")"
+                        ") "
+                        "on conflict on constraint astromrefs_pkey do nothing"
                     )
                     params = (
                         str(projectid), field, ccd, int(makeactive),

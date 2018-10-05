@@ -132,8 +132,8 @@ create table calibratedframes (
        entryts timestamp with time zone not null default current_timestamp,
        frameisok bool not null,
        -- frame paths
-       fits text not null,
-       fistar text not null,
+       fits text not null unique, -- uniqueness enables "on conflict (fits, fistar) do nothing" statements
+       fistar text not null unique,
        fiphot text,
        wcs text,
        fitsheader jsonb not null, -- metadata about the image. frame, filter, camera, scope, photometry, environment...
