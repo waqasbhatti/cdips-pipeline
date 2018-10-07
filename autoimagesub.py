@@ -2150,6 +2150,8 @@ def frames_astromref_worker(task):
 
 
 def framelist_make_xtrnsfits(fitsfiles,
+                             fitsdir=sv.REDPATH,
+                             fitsglob=sv.LOCAL_GLOBPATTERN,
                              outdir=None,
                              refinfo=REFINFO,
                              overwrite=False,
@@ -2171,13 +2173,14 @@ def framelist_make_xtrnsfits(fitsfiles,
     '''
 
     # check if astrometric translation was already done.
-    existing = glob.glob(sv.REDPATH+sv.LOCAL_GLOBPATTERN.replace('.fits',
-                                                                 '-xtrns.fits'))
+    existing = glob.glob(
+        fitsdir+fitsglob.replace('.fits', '-xtrns.fits')
+    )
+
+    requested = list(map(os.path.basename, fitsfiles))
+    alreadyexists = list(map(os.path.basename, existing))
 
     if len(existing) > 0 and not overwrite:
-
-        requested = list(map(os.path.basename, fitsfiles))
-        alreadyexists = list(map(os.path.basename, existing))
 
         # substitute out the hash string
         alreadyexists = [ae.replace('-xtrns.fits','') for ae in alreadyexists]
@@ -2191,7 +2194,8 @@ def framelist_make_xtrnsfits(fitsfiles,
             return
 
         else:
-            fitsfiles = [sv.REDPATH+sd+'.fits' for sd in setdiff]
+            fitsfiles = [fitsdir+sd+'.fits' for sd in setdiff]
+
 
     print('%sZ: %s files to astrometrically shift' %
           (datetime.utcnow().isoformat(), len(fitsfiles)))
@@ -2213,8 +2217,8 @@ def framelist_make_xtrnsfits(fitsfiles,
     print('%sZ: done with astrometric shifting' %
           (datetime.utcnow().isoformat()))
 
-    existing = glob.glob(sv.REDPATH+
-                         sv.LOCAL_GLOBPATTERN.replace('.fits','-xtrns.fits'))
+    existing = glob.glob(fitsdir+
+                         fitsglob.replace('.fits','-xtrns.fits'))
 
     if len(existing) != len(requested) + len(alreadyexists):
         raise AssertionError, 'something wrong in astrometric shift'
@@ -2745,6 +2749,28 @@ def generate_combined_photref(
         )
     )
 
+    # the output combinedphotref path
+    combinedphotrefpath = os.path.join(
+        refdir,
+        photreffname.format(
+            projid=masterphotrefinfo['projectid'],
+            field=masterphotrefinfo['field'],
+            ccd=masterphotrefinfo['ccd'],
+            photreftype=photreftype,
+            fileext='fits'
+        )
+    )
+
+    if os.path.exists(regfpath) and os.path.exists(combinedphotrefpath):
+        print(
+            'WRN! {:s}Z: found regfpath {:s} and combinedphotrefpath {:s}'.
+            format(datetime.utcnow().isoformat(),
+                   regfpath,
+                   combinedphotrefpath)+
+            'continuing'
+        )
+        return
+
     masterphotref_fistar = masterphotref.replace('-xtrns.fits','.fistar')
 
     if not os.path.exists(masterphotref_fistar):
@@ -2780,18 +2806,6 @@ def generate_combined_photref(
 
     # combine all the convolved photrefs into a single combinedphotref, using
     # combinemethod
-
-    # the output combinedphotref path
-    combinedphotrefpath = os.path.join(
-        refdir,
-        photreffname.format(
-            projid=masterphotrefinfo['projectid'],
-            field=masterphotrefinfo['field'],
-            ccd=masterphotrefinfo['ccd'],
-            photreftype=photreftype,
-            fileext='fits'
-        )
-    )
 
     combinedphotref = ism.combine_frames(convphotrefs,
                                          combinedphotrefpath,
@@ -3212,6 +3226,8 @@ def xtrnsfits_convsub_worker(task):
 
 def parallel_xtrnsfits_convsub(xtrnsfits,
                                photreftype,
+                               fitsdir=sv.REDPATH,
+                               fitsglob=sv.LOCAL_GLOBPATTERN,
                                observatory='hatpi',
                                fieldinfo=None,
                                overwrite=False,
@@ -3229,7 +3245,7 @@ def parallel_xtrnsfits_convsub(xtrnsfits,
     # and overwrite == False, then do not run them.
 
     existingcsframes = glob.glob(
-        sv.REDPATH+'rsub-'+sv.LOCAL_GLOBPATTERN.replace('.fits','-xtrns.fits'))
+        fitsdir+'rsub-????????-'+fitsglob.replace('.fits','-xtrns.fits'))
 
     if len(existingcsframes) > 0 and not overwrite:
 
@@ -3251,7 +3267,7 @@ def parallel_xtrnsfits_convsub(xtrnsfits,
 
         else:
 
-            xtrnsfits = [sv.REDPATH+sd for sd in setdiff]
+            xtrnsfits = [fitsdir+sd for sd in setdiff]
 
     tasks = [(x, photreftype, outdir, kernelspec,
               reversesubtract, refinfo, observatory, fieldinfo)
@@ -3420,6 +3436,8 @@ def convsubfits_staticphot_worker(task):
 
 def parallel_convsubfits_staticphot(
         subfitslist,
+        fitsdir=sv.REDPATH,
+        fitsglob=sv.LOCAL_GLOBPATTERN,
         photreftype='oneframe',
         kernelspec='b/4;i/4;d=4/4',
         lcapertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
@@ -3440,8 +3458,8 @@ def parallel_convsubfits_staticphot(
     # check if the convolved, subtracted frames already have photometry. if so,
     # and overwrite == False, then do not re-run photometry.
 
-    existingiphot = glob.glob(sv.REDPATH+'rsub-????????-'+
-                       sv.LOCAL_GLOBPATTERN.replace('.fits','iphot'))
+    existingiphot = glob.glob(fitsdir+'rsub-????????-'+
+                              fitsglob.replace('.fits','iphot'))
 
     if len(existingiphot) > 0 and not overwrite:
 
@@ -3461,7 +3479,7 @@ def parallel_convsubfits_staticphot(
             return
 
         else:
-            subfitslist = [sv.REDPATH+sd+'.iphot' for sd in setdiff]
+            subfitslist = [fitsdir+sd+'.iphot' for sd in setdiff]
 
     tasks = [(x, photreftype, kernelspec, lcapertures, photdisjointradius,
               outdir, refinfo, observatory, fieldinfo, photparams)

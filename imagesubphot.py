@@ -804,6 +804,15 @@ def get_smoothed_xysdk_coeffs(fistardir,
 
     fistarlist = glob.glob(os.path.join(os.path.abspath(fistardir), fistarglob))
 
+    # if all the files exist, don't bother replicating them.
+    xysdk_exists = np.array(
+        [os.path.exists(f.replace('.fistar','.xysdk')) for f in fistarlist]
+    )
+    if np.all(xysdk_exists):
+        print('%sZ: found all xysdk files already existed. continue.' %
+              (datetime.utcnow().isoformat()))
+        return None
+
     print('%sZ: %s files to process in %s' %
           (datetime.utcnow().isoformat(), len(fistarlist), fistardir))
 
@@ -2424,6 +2433,9 @@ def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
 
         diddly-squat.
     '''
+
+    if not os.path.exists(lcdir):
+        os.mkdir(lcdir)
 
     starttime = time.time()
 
