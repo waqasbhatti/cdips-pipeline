@@ -436,7 +436,6 @@ def clipped_linscale_img(img_array,
     return cap*clipped_linear_img/(img_med+himult*img_stdev)
 
 
-
 def logscale_img(img_array,
                  cap=255.0,
                  coeff=1000.0):
@@ -457,6 +456,43 @@ def logscale_img(img_array,
     '''
 
     logscaled_img = np.log(coeff*img_array/np.nanmax(img_array)+1)/np.log(coeff)
+    return cap*logscaled_img
+
+
+def clipped_logscale_img(img_array,
+                         cap=255.0,
+                         lomult=2.0,
+                         himult=2.0,
+                         coeff=1000.0):
+    '''
+    This clips the image between the values:
+
+    [median(img_array) - lomult*stdev(img_array),
+     median(img_array) + himult*stdev(img_array)]
+
+    and returns a log-scaled image using the cap given.
+
+    logscale_img = np.log(coeff*(img/max(img))+1)/np.log(coeff)
+    '''
+
+    img_med, img_stdev = np.median(img_array), np.std(img_array)
+    clipped_linear_img = np.clip(img_array,
+                                 img_med-lomult*img_stdev,
+                                 img_med+himult*img_stdev)
+
+    clipped_linear_img = clipped_linear_img/(img_med+himult*img_stdev)
+
+    # janky
+    clipped_linear_img[clipped_linear_img<0] = np.nan
+
+    div = np.nanmax(clipped_linear_img)
+
+    logscaled_img = (
+            np.log(coeff*clipped_linear_img/div+1)
+            /
+            np.log(coeff)
+    )
+
     return cap*logscaled_img
 
 
