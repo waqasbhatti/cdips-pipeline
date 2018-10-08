@@ -12,7 +12,7 @@
 
 # data-specific parameters
 camnum=1
-ccdnum=2
+ccdnum=3
 projectid=42
 field='sector1'
 
@@ -21,6 +21,7 @@ nworkers=20
 aperturelist="1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0"
 epdsmooth=11    # 5.5 hour median smoothing in EPD pre-processing.
 epdsigclip=10
+photdisjointradius=2
 
 # paths
 LOCAL_IMGBASE="/nfs/phtess1/ar1/TESS/SIMFFI/" # tess ete6 data is here
@@ -35,4 +36,4 @@ python TESS_ETE6_reduction.py \
   --fitsdir $fitsdir --fitsglob $fitsglob --outdir $fitsdir --field $field\
   --nworkers $nworkers --aperturelist $aperturelist --lcdirectory $lcdir \
   --convert_to_fitsh_compatible --epdsmooth $epdsmooth \
-  --epdsigclip $epdsigclip
+  --epdsigclip $epdsigclip --photdisjointradius $photdisjointradius

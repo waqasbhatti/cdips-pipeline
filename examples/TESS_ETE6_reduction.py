@@ -160,7 +160,7 @@ def is_presubtraction_complete(outdir, fitsglob):
     N_files = [N_fitsfiles, N_fistarfiles, N_wcsfiles, N_fiphotfiles,
                N_sourcelistfiles, N_projcatalog]
 
-    if np.any( np.diff(N_files) ):
+    if np.any( np.diff(N_files) ) or np.any( np.array(N_files)==0 ):
         print('did not find completed source extraction, astrometry, and '
               'initial photometry')
         return False
@@ -186,7 +186,7 @@ def is_imagesubtraction_complete(fitsdir, fitsglob, lcdir):
     N_files = [N_subfitslist, N_iphotlist, N_kernellist, N_subconvjpglist,
                N_lcs]
 
-    if np.any( np.diff(N_files) ):
+    if np.any( np.diff(N_files) ) or np.any( np.array(N_files)==0 ):
         print('did not find completed image-subtracted photometry products '
               'including photometry, images, and lightcurves.')
         return False
@@ -199,7 +199,8 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
                          photreftype, dbtype, reformed_cat_file, xtrnsglob,
                          iphotpattern, lcdirectory, kernelspec='b/4;i/4;d=4/4',
                          refdir=sv.REFBASEDIR, nworkers=1,
-                         aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0'):
+                         aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
+                         photdisjointradius=2):
 
     ccdgain = photparams['ccdgain']
     exptime = photparams['ccdexptime']
@@ -283,9 +284,9 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
     _ = ais.parallel_convsubfits_staticphot(
         subfitslist, fitsdir=fitsdir, fitsglob=fitsglob,
         photreftype=photreftype, kernelspec=kernelspec,
-        lcapertures=aperturelist, photdisjointradius=2, outdir=None,
-        fieldinfo=fieldinfo, observatory='tess', nworkers=nworkers,
-        maxworkertasks=1000, photparams=photparams)
+        lcapertures=aperturelist, photdisjointradius=photdisjointradius,
+        outdir=None, fieldinfo=fieldinfo, observatory='tess',
+        nworkers=nworkers, maxworkertasks=1000, photparams=photparams)
 
     # Step ISP9 + 10 : dump lightcurves.
     ism.dump_lightcurves_with_grcollect(
@@ -344,6 +345,7 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
     else:
         print('already made EPD LC stats and plots')
 
+    statdir = os.path.dirname(epdstatfile)+'/'
     if not os.path.exists(lcdirectory+'aperture-1-tfa-template.list'):
         _ = ap.choose_tfa_template(epdstatfile, reformed_cat_file, lcdirectory,
                                    ignoretfamin=False, fovcat_idcol=0,
@@ -352,7 +354,7 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
                                    min_nstars=50, max_nstars=1000,
                                    brightest_mag=8.5, faintest_mag=12.0,
                                    max_rms=0.1, max_sigma_above_rmscurve=5.0,
-                                   outprefix=None, tfastage1=True)
+                                   outprefix=statdir, tfastage1=True)
     if not os.path.exists(tfastatfile):
         templatefiles = glob(lcdirectory+'aperture-?-tfa-template.list')
         ism.parallel_run_tfa(lcdirectory, templatefiles, epdlc_glob='*.epdlc',
@@ -466,14 +468,14 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
          aperturelist='1.45:7.0:6.0,1.95:7.0:6.0,2.45:7.0:6.0',
          kernelspec='b/4;i/4;d=4/4', convert_to_fitsh_compatible=True,
          anetfluxthreshold=20000, zeropoint=11.82,
-         epdsmooth=21, epdsigclip=10
+         epdsmooth=21, epdsigclip=10, photdisjointradius=2
          ):
     '''
     args:
 
-        projectid (int):
+        projectid (int): ...
 
-        field (str):
+        field (str): ...
 
     kwargs:
 
@@ -564,8 +566,9 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
 
     epdlcglob, tfalcglob = '*.epdlc', '*.tfalc'
     statspath = os.path.dirname(lcdirectory) + '/stats_files/'
-    if not os.path.exists(statspath):
-        os.mkdir(statspath)
+    for dirname in [lcdirectory, statspath]:
+        if not os.path.exists(dirname):
+            os.mkdir(dirname)
     epdstatfile = statspath + 'camera' + str(camera) + '_ccd' + str(ccd) + '.epdstats'
     tfastatfile = statspath + 'camera' + str(camera) + '_ccd' + str(ccd) + '.tfastats'
 
@@ -578,7 +581,10 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
                              fits_list, photreftype, dbtype, reformed_cat_file,
                              xtrnsglob, iphotpattern, lcdirectory,
                              kernelspec=kernelspec, refdir=sv.REFBASEDIR,
-                             nworkers=nworkers, aperturelist=aperturelist)
+                             nworkers=nworkers, aperturelist=aperturelist,
+                             photdisjointradius=photdisjointradius)
+    else:
+        print('found that image subtraction is complete.')
 
     run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
                    reformed_cat_file, statspath, field, epdsmooth=epdsmooth,
@@ -641,6 +647,15 @@ if __name__ == '__main__':
              )
     )
 
+    parser.add_argument(
+        '--photdisjointradius', type=int, default=2,
+        help=('https://fitsh.net/wiki/man/fiphot gives details. '
+              'During the bacground determination on the aperture annuli, '
+              'omit the pixels which are closer to the other centroids than '
+              'the specified radius.'
+             )
+    )
+
     parser.add_argument('--epdsmooth', type=int, default=21,
         help=(
             'number of cadences used when passing a median filter over the'
@@ -677,5 +692,6 @@ if __name__ == '__main__':
          outdir=args.outdir, lcdirectory=args.lcdirectory,
          nworkers=args.nworkers, aperturelist=args.aperturelist,
          convert_to_fitsh_compatible=args.cfc, kernelspec=args.kernelspec,
-         epdsmooth=args.epdsmooth
+         epdsmooth=args.epdsmooth, epdsigclip=args.epdsigclip,
+         photdisjointradius=args.photdisjointradius
     )
