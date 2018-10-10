@@ -200,7 +200,7 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
                          iphotpattern, lcdirectory, kernelspec='b/4;i/4;d=4/4',
                          refdir=sv.REFBASEDIR, nworkers=1,
                          aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
-                         photdisjointradius=2):
+                         photdisjointradius=2, colorscheme='bwr'):
 
     ccdgain = photparams['ccdgain']
     exptime = photparams['ccdexptime']
@@ -274,7 +274,7 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
         xtrnsfiles, photreftype, fitsdir=fitsdir, fitsglob=fitsglob,
         outdir=None, observatory='tess', fieldinfo=fieldinfo,
         reversesubtract=True, kernelspec=kernelspec, nworkers=nworkers,
-        maxworkertasks=1000)
+        maxworkertasks=1000, colorscheme=colorscheme)
 
     # Step ISP8: do photometry on your subtracted frames to produce .iphot files.
     # With 30 workers, at best process ~few frames per second.
