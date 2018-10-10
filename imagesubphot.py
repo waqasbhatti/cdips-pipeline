@@ -184,6 +184,7 @@ import shutil
 import random
 from hashlib import md5
 from cStringIO import StringIO
+from functools import partial
 
 # used for fast random access to lines in text files
 from linecache import getline
@@ -208,7 +209,8 @@ import matplotlib.pyplot as plt
 from astropy.io import fits as pyfits
 
 import imageutils
-from imageutils import get_header_keyword, fits_to_full_jpeg
+from imageutils import get_header_keyword, fits_to_full_jpeg, \
+        clipped_linscale_img
 
 # get fiphot binary reader
 try:
@@ -1902,10 +1904,10 @@ def get_convsubphot_hash(photreftype, subtracttype,
 
 
 
-def subframe_convolution_worker(task):
+def subframe_convolution_worker(task, **kwargs):
     '''This is a parallel worker to convolve the combined photref frame to each
-input frame, subtract them, and then return the subtracted frame. Used by
-convolve_and_subtract_frames below.
+    input frame, subtract them, and then return the subtracted frame. Used by
+    convolve_and_subtract_frames below.
 
     task[0] -> the frame to convolve
     task[1] -> the frame to use as the convolution target
@@ -1919,6 +1921,12 @@ convolve_and_subtract_frames below.
 
     (frametoconvolve, targetframe, convregfile,
      kernelspec, outdir, reversesubtract, photrefprefix) = task
+
+    try:
+        colorscheme = kwargs['colorscheme']
+    except KeyError:
+        colorscheme = None
+
 
     # get the hash to prepend to the file
     outfitshash = get_convsubfits_hash(photrefprefix,
@@ -1998,7 +2006,9 @@ convolve_and_subtract_frames below.
                     os.path.dirname(outfile),
                     ('JPEG-SUBTRACTEDCONV-%s.jpg' %
                      os.path.basename(re.sub(sv.FITS_TAIL, '', outfile)))
-                    )
+                    ),
+                scale_func=clipped_linscale_img,
+                colorscheme=colorscheme
                 )
 
             return frametoconvolve, outfile
@@ -2026,7 +2036,8 @@ def convolve_and_subtract_frames(fitsdir,
                                  photrefprefix=None,
                                  nworkers=16,
                                  maxworkertasks=1000,
-                                 outdir=None):
+                                 outdir=None,
+                                 colorscheme=None):
     '''
     This convolves the photometric reference to each frame, using the specified
     kernel, then subtracts the frame from the photometric reference to produce
@@ -2052,7 +2063,12 @@ def convolve_and_subtract_frames(fitsdir,
     pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
     # fire up the pool of workers
-    results = pool.map(subframe_convolution_worker, tasks)
+    # NOTE: without kwargs, this would look like:
+    #       `results = pool.map(subframe_convolution_worker, tasks)`
+    kwargs = {'colorscheme':colorscheme}
+    results = pool.map(
+        partial(subframe_convolution_worker, **kwargs), tasks
+    )
 
     # wait for the processes to complete work
     pool.close()

@@ -35,6 +35,7 @@ import re
 import json
 import shutil
 import random
+from functools import partial
 
 try:
     import cPickle as pickle
@@ -3159,7 +3160,7 @@ def get_combined_photref(projectid,
 ## IMAGE SUBTRACTION ##
 #######################
 
-def xtrnsfits_convsub_worker(task):
+def xtrnsfits_convsub_worker(task, **kwargs):
     '''This is a parallel worker for framelist_convsub_photref below.
 
     task[0] = xtrnsfits file
@@ -3203,7 +3204,8 @@ def xtrnsfits_convsub_worker(task):
         # do the subtraction (take care of reversesubtract here)
         _, convsub = ism.subframe_convolution_worker(
             (frame, cphotref_frame, cphotref_reg,
-             kernelspec, outdir, reversesubtract, photreftype)
+             kernelspec, outdir, reversesubtract, photreftype),
+            **kwargs
         )
 
         if not (convsub and os.path.exists(convsub)):
@@ -3236,7 +3238,8 @@ def parallel_xtrnsfits_convsub(xtrnsfits,
                                reversesubtract=True,
                                kernelspec='b/4;i/4;d=4/4',
                                nworkers=16,
-                               maxworkertasks=1000):
+                               maxworkertasks=1000,
+                               colorscheme=None):
     '''
     This convolves, and subtracts all FITS files in the xtrnsfits list.
     '''
@@ -3281,7 +3284,9 @@ def parallel_xtrnsfits_convsub(xtrnsfits,
         pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
         # fire up the pool of workers
-        results = pool.map(xtrnsfits_convsub_worker, tasks)
+        kwargs = {'colorscheme':colorscheme}
+        results = pool.map(
+            partial(xtrnsfits_convsub_worker, **kwargs), tasks)
 
         # wait for the processes to complete work
         pool.close()
