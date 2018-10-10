@@ -58,6 +58,7 @@ from astropy import wcs
 from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
+import matplotlib.cm as mplcm
 
 # get the ImageFont
 fontpath = os.path.join(os.path.dirname(__file__), 'DejaVuSans.ttf')
@@ -764,10 +765,17 @@ def fits_to_full_jpeg(fits_image,
                       scale_func_params={'cap':255.0,
                                          'lomult':2,
                                          'himult':2.5},
-                      frame_time=None):
+                      frame_time=None,
+                      colorscheme=None):
     '''
     This converts a FITS image to a full frame JPEG.
 
+    kwargs:
+
+        scale_func (function): clipped_linscale_img, clipped_logscale_img
+
+        colorscheme (None or str): name of matplotlib colorscheme to use. e.g.,
+        "bwr" looks good for subtracted images.
     '''
     compressed_ext = compressed_fits_ext(fits_image)
 
@@ -805,7 +813,18 @@ def fits_to_full_jpeg(fits_image,
 
     scipy.misc.imsave(out_fname,resized_img)
 
-    # flip the saved image
+    # recolor the saved image if told to do so
+    if colorscheme:
+        cm = mplcm.get_cmap(colorscheme)
+        outimg = Image.open(out_fname)
+        im = np.array(outimg)
+        im = cm(im)
+        im = np.uint8( im*255.0 )
+        outimg = Image.fromarray(im)
+        rgb_outimg = outimg.convert('RGB')
+        rgb_outimg.save(out_fname)
+
+    # flip the saved image if told to do so
     if flip:
         outimg = Image.open(out_fname)
         outimg = outimg.transpose(Image.FLIP_TOP_BOTTOM)
