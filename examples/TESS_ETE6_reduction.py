@@ -468,7 +468,8 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
          aperturelist='1.45:7.0:6.0,1.95:7.0:6.0,2.45:7.0:6.0',
          kernelspec='b/4;i/4;d=4/4', convert_to_fitsh_compatible=True,
          anetfluxthreshold=20000, zeropoint=11.82,
-         epdsmooth=21, epdsigclip=10, photdisjointradius=2
+         epdsmooth=21, epdsigclip=10, photdisjointradius=2,
+         tuneparameters='true', is_ete6=True
          ):
     '''
     args:
@@ -491,12 +492,21 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
     ###########################################################################
     # get list of ete6 reduced images. (different format from images fitsh can
     # work with). trim images, and save to a single-extension fits file.
-     #NOTE temporary -- for testing purposes!
-    ete6_reddir = '/nfs/phtess1/ar1/TESS/SIMFFI/RED/'
-    ete6_list = np.sort(
-        glob(ete6_reddir+fitsglob.replace('_cal_img.fits','-s_ffic.fits'))
-    )
-    ete6_list = ete6_list[100:300]
+
+    if is_ete6:
+        ete6_reddir = '/nfs/phtess1/ar1/TESS/SIMFFI/RED/'
+        ete6_list = np.sort(
+            glob(ete6_reddir+fitsglob.replace('_cal_img.fits','-s_ffic.fits'))
+        )
+    else:
+        raise NotImplementedError('need path for real images')
+
+    if tuneparameters=='true':
+        # select subset of images for pipeline tuning
+        ete6_list = ete6_list[100:300]
+    else:
+        pass
+
     if convert_to_fitsh_compatible:
         tu.from_ete6_to_fitsh_compatible(ete6_list, outdir)
 
@@ -598,6 +608,8 @@ def check_args(args):
         print('fitsglob must not be null')
     if not args.field:
         print('field must not be null')
+    if not (args.tuneparameters=='true') or (args.tuneparameters=='false'):
+        raise AssertionError('boolean tuneparameters must be set as string.')
 
 
 if __name__ == '__main__':
@@ -684,6 +696,14 @@ if __name__ == '__main__':
     )
     parser.set_defaults(cfc=True)
 
+    parser.add_argument(
+        '--tuneparameters', type=str,
+        default="true",
+        help=('TUNING: iterate through different img subtraction parameters '
+              'if true. Gain speed by selecting a small set of frames. '
+              'Otherwise, run in FULL reduction mode.')
+    )
+
     args = parser.parse_args()
 
     check_args(args)
@@ -693,5 +713,6 @@ if __name__ == '__main__':
          nworkers=args.nworkers, aperturelist=args.aperturelist,
          convert_to_fitsh_compatible=args.cfc, kernelspec=args.kernelspec,
          epdsmooth=args.epdsmooth, epdsigclip=args.epdsigclip,
-         photdisjointradius=args.photdisjointradius
+         photdisjointradius=args.photdisjointradius,
+         tuneparameters=args.tuneparameters
     )
