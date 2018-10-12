@@ -20,13 +20,14 @@ orbit='orbit-10'
 tuneparameters=true
 nworkers=20
 aperturelist="1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0"
-epdsmooth=11    # 5.5 hour median smoothing in EPD pre-processing.
+epdsmooth=11    # 11*30min = 5.5 hour median smooth in EPD pre-processing.
 epdsigclip=10
 photdisjointradius=2
 
-# paths.  trimmed, single-extension fits images get worked on in fitsdir. they
-# match fitsdir+fitsglob. their lightcurvs are written to lcdir.
-# ...do something interesting...
+###############################################################################
+# define paths. trimmed, single-extension fits images get worked on in fitsdir.
+# they match fitsdir+fitsglob. their lightcurvs are written to lcdir.
+###############################################################################
 if [ "$tuneparameters" = true ] ; then
   tunefullstr='TUNE'
 else
@@ -64,9 +65,9 @@ if [ ! -d "$lcdir" ]; then
   mkdir $lcdir
 fi
 
-####################
-# make lightcurves #
-####################
+################################
+# turn images into lightcurves #
+################################
 python TESS_ETE6_reduction.py \
   --projectid $projectid \
   --fitsdir $fitsdir --fitsglob $fitsglob --outdir $fitsdir --field $orbit\
