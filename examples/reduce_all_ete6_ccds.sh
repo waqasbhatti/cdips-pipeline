@@ -23,6 +23,10 @@ aperturelist="1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0"
 epdsmooth=11    # 11*30min = 5.5 hour median smooth in EPD pre-processing.
 epdsigclip=10
 photdisjointradius=2
+anetfluxthreshold=40000
+anettweak=6
+anetradius=30
+initccdextent="0:2048,0:2048"
 
 ###############################################################################
 # define paths, make directories.
@@ -77,7 +81,9 @@ for camnum in {1..4}; do
       --nworkers $nworkers --aperturelist $aperturelist --lcdirectory $lcdir \
       --convert_to_fitsh_compatible --epdsmooth $epdsmooth \
       --epdsigclip $epdsigclip --photdisjointradius $photdisjointradius \
-      --tuneparameters $tuneparameters \
+      --tuneparameters $tuneparameters  \
+      --anetfluxthreshold $anetfluxthreshold --anettweak $anettweak \
+      --initccdextent $initccdextent --anetradius $anetradius \
       &> logs/$logname &
 
   done

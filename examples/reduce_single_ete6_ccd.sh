@@ -11,9 +11,9 @@
 ##########################################
 
 # data-specific parameters
-camnum=2
-ccdnum=1
-projectid=42
+camnum=4
+ccdnum=2
+projectid=43
 orbit='orbit-10'
 
 # reduction-specific parameters
@@ -23,6 +23,10 @@ aperturelist="1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0"
 epdsmooth=11    # 11*30min = 5.5 hour median smooth in EPD pre-processing.
 epdsigclip=10
 photdisjointradius=2
+anetfluxthreshold=50000
+anettweak=6
+anetradius=30
+initccdextent="0:2048,0:2048"
 
 ###############################################################################
 # define paths. trimmed, single-extension fits images get worked on in fitsdir.
@@ -74,4 +78,6 @@ python TESS_ETE6_reduction.py \
   --nworkers $nworkers --aperturelist $aperturelist --lcdirectory $lcdir \
   --convert_to_fitsh_compatible --epdsmooth $epdsmooth \
   --epdsigclip $epdsigclip --photdisjointradius $photdisjointradius \
-  --tuneparameters $tuneparameters
+  --tuneparameters $tuneparameters --anetfluxthreshold $anetfluxthreshold \
+  --anettweak $anettweak --initccdextent $initccdextent \
+  --anetradius $anetradius

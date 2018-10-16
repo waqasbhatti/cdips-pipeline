@@ -75,17 +75,19 @@ projectid = 42 # an integer, to identify the "project" (mostly avoids rewriting 
 field = 'ete6_field0'
 
 def get_files_needed_before_image_subtraction(
-        fitsdir, fitsglob, outdir, ccdextent, ccdgain, zeropoint, exptime,
+        fitsdir, fitsglob, outdir, initccdextent, ccdgain, zeropoint, exptime,
         ra_nom, dec_nom,
         catra, catdec, ccd_fov,
         catalog, catalog_file, reformed_cat_file,
         fnamestr='*-1-1-0016_cal_img.fits', anetfluxthreshold=20000,
         fistarglob='*.fistar',
-        width=13, tweak=6, radius=13, xpix=2048, ypix=2048, cols=(2,3),
+        width=13, anettweak=6, anetradius=30, xpix=2048, ypix=2048, cols=(2,3),
         brightrmag=6.0, faintrmag=13.0,
         fistarfluxthreshold=1000,
         aperturelist='1.45:7.0:6.0,1.95:7.0:6.0,2.45:7.0:6.0',
-        nworkers=20
+        nworkers=20,
+        useastrometrydotnet=True,
+        useimagenotfistar=True
     ):
     '''
     get .fistar, .fiphot, and .wcs files needed before image subtraction
@@ -100,23 +102,35 @@ def get_files_needed_before_image_subtraction(
     fistar)
     '''
 
-    ap.parallel_extract_sources(fitsdir, outdir, ccdextent=ccdextent,
+    ap.parallel_extract_sources(fitsdir, outdir, ccdextent=initccdextent,
                                 ccdgain=ccdgain,
                                 fluxthreshold=anetfluxthreshold,
                                 zeropoint=zeropoint, exptime=exptime,
                                 tailstr='.fits',
                                 fnamestr=fnamestr)
 
-    # Really width=24 deg for TESS frames. But this makes anet fail. Instead,
-    # get wcs for the inside of the frame. [and stuff on the edge less
-    # accurate?]
-    ap.parallel_anet(fitsdir, outdir, ra_nom, dec_nom,
-                     fistarglob=fistarglob,
-                     infofromframe=False, width=width, tweak=tweak,
-                     radius=radius,
-                     xpix=xpix, ypix=ypix,
-                     cols=cols # columns with x,y in fistar file.
-                    )
+    if useastrometrydotnet:
+
+        ap.fistar_to_xy(fitsdir, fistarglob=fistarglob)
+
+        ap.parallel_astrometrydotnet(
+            fitsdir, outdir, ra_nom, dec_nom,
+            fistarfitsxyglob=fistarglob.replace('.fistar','.fistar-fits-xy'),
+            tweakorder=anettweak, radius=anetradius, xpix=xpix, ypix=ypix,
+            nworkers=nworkers, scalelow=10, scalehigh=30,
+            scaleunits='arcsecperpix', nobjs=200, xcolname='ximage',
+            ycolname='yimage', useimagenotfistar=useimagenotfistar,
+            downsample=4
+        )
+
+    else:
+        ap.parallel_anet(fitsdir, outdir, ra_nom, dec_nom,
+                         fistarglob=fistarglob,
+                         infofromframe=False, width=width, tweak=anettweak,
+                         radius=anetradius,
+                         xpix=xpix, ypix=ypix,
+                         cols=cols # columns with x,y in fistar file.
+        )
 
     # This function gets all the sources in the field of view of the frame, given
     # its central pointing coordinates and plate-scale from 2MASS. This catalog
@@ -145,6 +159,16 @@ def get_files_needed_before_image_subtraction(
                                    fitsglob=fitsglob, ccdgain=ccdgain,
                                    ccdexptime=exptime, zeropoint=zeropoint)
 
+def initial_wcs_worked_well_enough(outdir, fitsglob):
+    # check whether initial anet converged on over half of frames.
+
+    N_fitsfiles = len(glob(outdir+fitsglob))
+    N_wcsfiles = len(glob(outdir+fitsglob.replace('.fits','.wcs')))
+
+    if N_wcsfiles < N_fitsfiles/2:
+        return False
+    else:
+        return True
 
 def is_presubtraction_complete(outdir, fitsglob):
     # returns True if ready to move on to image subtraction.
@@ -467,7 +491,9 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
          lcdirectory=None, nworkers=1,
          aperturelist='1.45:7.0:6.0,1.95:7.0:6.0,2.45:7.0:6.0',
          kernelspec='b/4;i/4;d=4/4', convert_to_fitsh_compatible=True,
-         anetfluxthreshold=20000, zeropoint=11.82,
+         anetfluxthreshold=20000, anettweak=6, initccdextent='0:2048,0:2048',
+         anetradius=30,
+         zeropoint=11.82,
          epdsmooth=21, epdsigclip=10, photdisjointradius=2,
          tuneparameters='true', is_ete6=True
          ):
@@ -479,6 +505,13 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
         field (str): ...
 
     kwargs:
+
+        initccdextent (string): <x1>:<x2>,<y1>:<y2> for initial source
+        extraction and astrometry.
+
+        anetradius (float): how far apart the index files used for anet can be.
+        make this a good deal bigger than the FoV of the image you're using,
+        especially if it's wide-field (> 10deg x 10deg).
 
         anetfluxthreshold (float/int): this value sets the minimum flux for
         bright stars used in the astrometric solution. if it's too low, then
@@ -527,8 +560,6 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
     ra_nom = hdr['CRVAL1']  # RA at CRPIX1, CRPIX2. Not "camera boresight".
     dec_nom = hdr['CRVAL2'] # DEC at CRPIX1, CRPIX2
 
-    ccdextent = '0:2048,0:2048'
-
     catalog, catra, catdec, catbox = '2MASS', ra_nom, dec_nom, ccd_fov
     catalog_file = (
         '%s-RA%s-DEC%s-SIZE%s.catalog' % (catalog, catra, catdec, catbox)
@@ -543,17 +574,22 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
     if not is_presubtraction_complete(outdir, fitsglob):
 
         get_files_needed_before_image_subtraction(
-            fitsdir, fitsglob, outdir, ccdextent, ccdgain, zeropoint, exptime,
+            fitsdir, fitsglob, outdir, initccdextent, ccdgain, zeropoint, exptime,
             ra_nom, dec_nom, catra, catdec, ccd_fov, catalog, catalog_file,
             reformed_cat_file, fnamestr=fitsglob,
-            anetfluxthreshold=anetfluxthreshold, fistarglob='*.fistar',
-            width=13, tweak=6, radius=13, xpix=2048, ypix=2048, cols=(2,3),
-            brightrmag=6.0, faintrmag=13.0, fistarfluxthreshold=1000,
-            aperturelist=aperturelist, nworkers=nworkers)
+            anetfluxthreshold=anetfluxthreshold, anetradius=anetradius,
+            fistarglob='*.fistar', width=13, anettweak=anettweak,
+            xpix=2048, ypix=2048, cols=(2,3), brightrmag=6.0, faintrmag=13.0,
+            fistarfluxthreshold=1000, aperturelist=aperturelist,
+            nworkers=nworkers)
 
     else:
         print('found fistar, fiphot, and wcs files. proceeding to image '
               'subtraction.')
+
+    if not initial_wcs_worked_well_enough(outdir, fitsglob):
+        raise AssertionError('if initial wcs failed on majority of frames, '
+                             'you need to fix that.')
 
     #############################################################
     # run image subtraction convolution, then do the photometry #
@@ -668,6 +704,31 @@ if __name__ == '__main__':
              )
     )
 
+    parser.add_argument('--anetfluxthreshold', type=int, default=20000,
+        help=(
+            'flux threshold used to identify bright stars in anet '
+            'initial wcs solution attempt of frames.'
+        )
+    )
+    parser.add_argument('--anettweak', type=int, default=6,
+        help=(
+            'SIP (Simple Imaging Polynomial) order. Higher = more flexibility '
+            'for frame distortion. Max of 10.'
+        )
+    )
+    parser.add_argument('--anetradius', type=float, default=30.,
+        help=(
+            'Radius (in deg) over which to search for index files in '
+            'astrometry.net or net. For TESS, you want to go big -- e.g., 30.'
+        )
+    )
+    parser.add_argument(
+        '--initccdextent', type=str,
+        default="0:2048,0:2048",
+        help=(' section <x1>:<x2>,<y1>:<y2> for initial source extraction and '
+              'astrometry. (not for initial photometry).')
+    )
+
     parser.add_argument('--epdsmooth', type=int, default=21,
         help=(
             'number of cadences used when passing a median filter over the'
@@ -714,5 +775,8 @@ if __name__ == '__main__':
          convert_to_fitsh_compatible=args.cfc, kernelspec=args.kernelspec,
          epdsmooth=args.epdsmooth, epdsigclip=args.epdsigclip,
          photdisjointradius=args.photdisjointradius,
-         tuneparameters=args.tuneparameters
+         tuneparameters=args.tuneparameters,
+         anetfluxthreshold=args.anetfluxthreshold,
+         anettweak=args.anettweak, initccdextent=args.initccdextent,
+         anetradius=args.anetradius
     )
