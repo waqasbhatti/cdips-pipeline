@@ -317,6 +317,174 @@ def reform_fistars(fistardir,
         inf.close()
 
 
+def fistar_to_xy(fistardir, fistarglob='1-*_?.fistar'):
+    '''
+    This takes the fistar output, and converts it to comma-separated x,y files
+    of the source positions. The latter is readable by astrometry.net.
+    '''
+
+    import pandas as pd
+    from astropy.table import Table
+    from astropy.io import fits
+
+    fistars = glob.glob(os.path.join(os.path.abspath(fistardir),
+                                     fistarglob))
+
+    for fistar in fistars:
+
+        df = pd.read_csv(fistar, comment='#',
+                         names=['ident','x','y','bg','amp','s','d','k','flux','s/n'],
+                         delimiter=r"\s*", engine='python')
+
+        col1 = fits.Column(name='ximage', format='D', array=np.array(df['x']))
+        col2 = fits.Column(name='yimage', format='D', array=np.array(df['y']))
+        coldefs = fits.ColDefs([col1, col2])
+        hdu = fits.BinTableHDU.from_columns(coldefs)
+
+        outfname = fistar.replace('.fistar','.fistar-fits-xy')
+        hdu.writeto(outfname, overwrite=True)
+
+        print('%s -> %s' % (fistar, outfname))
+
+
+def astrometrydotnet_solve_frame(srclist,
+                                 wcsout,
+                                 ra,
+                                 dec,
+                                 radius=30,
+                                 scalelow=1,
+                                 scalehigh=30,
+                                 scaleunits='arcsecperpix',
+                                 tweakorder=6,
+                                 nobjs=200,
+                                 xpix=2048,
+                                 ypix=2048,
+                                 xcolname='ximage',
+                                 ycolname='yimage',
+                                 useimagenotfistar=False,
+                                 downsample=4):
+    '''This uses astrometry.net to solve frame astrometry. This is the
+    free version of anet_solve_frame.
+
+    Uses the frame extracted sources (.fistar-fits-xy file, see
+    aperturephot.fistar_to_xy) and returns a .wcs file containing the
+    astrometric transformation between frame x,y and RA/DEC.
+
+    Optionally, if `useimagenotfistar` is true, uses the fits image
+    corresponding to the frame extracted sources and the astrometry.net
+    in-built source extraction to produce the solution, along with sick
+    constellation plots.
+
+    Example astrometry.net frame-solve command (using the fits table of x,y
+    positions):
+
+        solve-field --ra 274.5 --dec 58.0 --radius 30 --scale-low 1
+        --scale-high 30 --scale-units arcsecperpix --tweak-order 2
+        --wcs /dirname/tess2019135090826-4-2-0016_cal_img.wcs
+        --overwrite --objs 200 -w 2048 -e 2048 --x-column ximage --y-column yimage
+        /dirname/tess2019135090826-4-2-0016_cal_img.fistar-fits-xy
+
+    For astrometry.net to work, you need to install it, and get all the index
+    files. See http://astrometry.net/doc/readme.html.
+    '''
+
+    if useimagenotfistar:
+
+        ASTROMETRYDOTNETCMD = (
+            "solve-field --ra {ra} --dec {dec} --radius {radius} "
+            "--scale-low {scalelow} --scale-high {scalehigh} "
+            "--scale-units {scaleunits} --tweak-order {tweakorder} "
+            "--wcs {wcsout} --downsample {downsample} "
+            "--overwrite --objs {nobjs} --fits-image -no-verify "
+            "{srcimage}"
+
+        )
+
+        astrometrycmd = ASTROMETRYDOTNETCMD.format(
+            ra=ra,
+            dec=dec,
+            radius=radius,
+            scalelow=scalelow,
+            scalehigh=scalehigh,
+            scaleunits=scaleunits,
+            tweakorder=tweakorder,
+            downsample=downsample,
+            nobjs=nobjs,
+            wcsout=wcsout,
+            srcimage=srclist.replace('.fistar-fits-xy','.fits')
+        )
+
+
+    else:
+
+        ASTROMETRYDOTNETCMD = (
+            "solve-field --ra {ra} --dec {dec} --radius {radius} "
+            "--scale-low {scalelow} --scale-high {scalehigh} "
+            "--scale-units {scaleunits} --tweak-order {tweakorder} "
+            "--wcs {wcsout} "
+            "--overwrite --objs {nobjs} --width {xpix} --height {ypix} "
+            " --x-column {xcolname} --y-column {ycolname} --no-plot "
+            "{srclist}"
+
+        )
+
+        astrometrycmd = ASTROMETRYDOTNETCMD.format(
+            ra=ra,
+            dec=dec,
+            radius=radius,
+            scalelow=scalelow,
+            scalehigh=scalehigh,
+            scaleunits=scaleunits,
+            tweakorder=tweakorder,
+            xpix=xpix,
+            ypix=ypix,
+            nobjs=nobjs,
+            xcolname=xcolname,
+            ycolname=ycolname,
+            wcsout=wcsout,
+            srclist=srclist
+        )
+
+    if DEBUG:
+        print(astrometrycmd)
+
+    # execute the anet shell command
+    anetproc = subprocess.Popen(shlex.split(astrometrycmd),
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+
+    # get results
+    anet_stdout, anet_stderr = anetproc.communicate()
+
+    # get results if succeeded, log outcome, and return path of outfile
+    if (anetproc.returncode == 0 and
+        os.path.exists(os.path.abspath(wcsout)) and
+        os.stat(os.path.abspath(wcsout)).st_size > 0):
+
+        print('%sZ: astrometrydotnet %s generated for frame sourcelist %s' %
+              (datetime.utcnow().isoformat(),
+               os.path.abspath(wcsout), os.path.abspath(srclist)))
+
+        return os.path.abspath(wcsout)
+
+    # if astrometry did not succeed, complain and remove the zero-size wcs file
+    # anet inexplicably makes anyway
+    else:
+
+        print('{:s}Z: astrometrydotnet {:s} failed for frame sourcelist {:s}! '
+              .format(datetime.utcnow().isoformat(),
+                      os.path.abspath(wcsout),
+                      os.path.abspath(srclist)
+              )+
+              'Error was: {:s}'.format(anet_stderr)
+        )
+
+        # remove the broken wcs if astrometry failed
+        if os.path.exists(os.path.abspath(wcsout)):
+            os.remove(os.path.abspath(wcsout))
+
+        return None
+
 
 def anet_solve_frame(srclist,
                      wcsout,
@@ -477,15 +645,29 @@ def anet_solve_frame(srclist,
 
 
 def parallel_anet_worker(task):
-    '''
-    This expands the task arg into the args and kwargs necessary for
-    extract_frame_sources.
-
+    ''' This expands the task arg into the args and kwargs necessary for
+    anet_solve_frame.
     '''
 
-    return (task[0], anet_solve_frame(task[0],task[1], task[2], task[3],
-                                      **task[4]))
+    return (
+        task[0],
+        anet_solve_frame(
+            task[0], task[1], task[2], task[3], **task[4]
+        )
+    )
 
+
+def parallel_astrometrydotnet_worker(task):
+    ''' This expands the task arg into the args and kwargs necessary for
+    astrometrydotnet_solve_frame.
+    '''
+
+    return (
+        task[0],
+        astrometrydotnet_solve_frame(
+            task[0], task[1], task[2], task[3], **task[4]
+        )
+    )
 
 
 def parallel_anet(srclistdir,
@@ -563,6 +745,91 @@ def parallel_anet(srclistdir,
     returndict = {x:y for (x,y) in results}
     return returndict
 
+
+def parallel_astrometrydotnet(
+        srclistdir,
+        outdir,
+        ra, dec,
+        fistarfitsxyglob='tess2019135090826-4-2-0016_cal_img.fistar-fits-xy',
+        nworkers=10,
+        maxtasksperworker=1000,
+        radius=30,
+        scalelow=1,
+        scalehigh=30,
+        scaleunits='arcsecperpix',
+        tweakorder=6,
+        nobjs=200,
+        xpix=2048,
+        ypix=2048,
+        xcolname='ximage',
+        ycolname='yimage',
+        useimagenotfistar=False,
+        downsample=4
+    ):
+
+    '''
+    Uses astrometrydotnet_solve_frame to do parallel astrometry for all frames
+    in srclistdir and generate their wcs files.
+    '''
+
+    # get a list of all fits files in the directory
+    fistarfitsxylist = glob.glob(os.path.join(srclistdir, fistarfitsxyglob))
+
+    print('%sZ: found %s fistar files in %s, starting astrometry...' %
+          (datetime.utcnow().isoformat(),
+           len(fistarfitsxylist), srclistdir))
+
+    if outdir and not os.path.exists(outdir):
+
+        print('%sZ: making new output directory %s' %
+              (datetime.utcnow().isoformat(),
+               outdir))
+        os.mkdir(outdir)
+
+    # get the files for which astrometry hasn't already been done
+    fistarfitsxylist = check_files(fistarfitsxylist, 'astrometry', outdir,
+                                   intailstr='.fistar-fits-xy',
+                                   outtailstr='.wcs', skipifpartial=False)
+    if type(fistarfitsxylist) == int:
+        if fistarfitsxylist == -1:
+            return -1
+
+    pool = mp.Pool(nworkers, maxtasksperchild=maxtasksperworker)
+
+    inpostfix = os.path.splitext(fistarfitsxyglob)[-1]
+
+    tasks = [
+        [x, os.path.join(
+                outdir, os.path.basename(
+                    x.replace(inpostfix, '.wcs')
+                    )
+                ),
+         ra, dec, {'radius':radius,
+                   'scalelow':scalelow,
+                   'scalehigh':scalehigh,
+                   'scaleunits':scaleunits,
+                   'tweakorder':tweakorder,
+                   'nobjs':nobjs,
+                   'xpix':xpix,
+                   'ypix':ypix,
+                   'xcolname':xcolname,
+                   'ycolname':ycolname,
+                   'useimagenotfistar':useimagenotfistar
+                   }
+        ]
+        for x in fistarfitsxylist
+    ]
+
+    # fire up the pool of workers
+    results = pool.map(parallel_astrometrydotnet_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    # this is the return dictionary
+    returndict = {x:y for (x,y) in results}
+    return returndict
 
 
 def parallel_anet_list(srclistlist,

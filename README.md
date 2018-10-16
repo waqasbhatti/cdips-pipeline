@@ -6,10 +6,7 @@ data, and real TESS data.
 ## Install
 
 TODO FOR INSTALL INSTRUCTIONS:
-* figure out `anet` substitute (can it be replaced by just using
-  astrometry.net?)
 * figure out `2massread` substitute (or how to make it free)
-* check this actually works.
 
 
 ### Environment basics
@@ -50,6 +47,14 @@ dependencies):
   (trex_27) pip install pyeebls
   (trex_27) pip install astrobase
   ```
+
+### anet and astrometry.net dependencies
+
+You must use either `anet` or `astrometry.net`. I recommend the later, since
+it's free.  To install, follow [this
+page](http://astrometry.net/doc/build.html#build). If you're doing wide-field
+work, be sure to get both the 4100 and 4200 indexes.
+
 
 ### fitsh and HATpipe dependencies
 
