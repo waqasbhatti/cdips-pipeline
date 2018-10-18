@@ -68,11 +68,6 @@ import argparse
 
 np.random.seed(42)
 
-# insane "globals" to prevent rewriting all the code
-camera = 1
-ccd = 1
-projectid = 42 # an integer, to identify the "project" (mostly avoids rewriting code)
-field = 'ete6_field0'
 
 def get_files_needed_before_image_subtraction(
         fitsdir, fitsglob, outdir, initccdextent, ccdgain, zeropoint, exptime,
@@ -224,7 +219,8 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
                          iphotpattern, lcdirectory, kernelspec='b/4;i/4;d=4/4',
                          refdir=sv.REFBASEDIR, nworkers=1,
                          aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
-                         photdisjointradius=2, colorscheme='bwr'):
+                         photdisjointradius=2, colorscheme='bwr',
+                         anetfluxthreshold=30000):
 
     ccdgain = photparams['ccdgain']
     exptime = photparams['ccdexptime']
@@ -239,9 +235,11 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
                                         nworkers=nworkers, maxworkertasks=1000)
 
     # Step ISP1.
-    _ = ais.dbgen_get_astromref(fieldinfo, makeactive=True, observatory='tess',
-                                overwrite=False, refdir=sv.REFBASEDIR,
-                                database=None)
+    arefinfo = ais.dbgen_get_astromref(fieldinfo, makeactive=True,
+                                       observatory='tess', overwrite=False,
+                                       refdir=sv.REFBASEDIR, database=None)
+    if arefinfo == None:
+        raise AssertionError('you need an astrometric reference!!')
 
     # Step ISP2. Takes ~1 sec per 20-30 frames.
     _ = ism.get_smoothed_xysdk_coeffs(fitsdir, fistarglob='*.fistar',
@@ -285,10 +283,10 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
         photref_reformedfovcat=reformed_cat_file, makeactive=True, field=None,
         ccd=None, projectid=None, combinemethod='median',
         kernelspec=kernelspec, ccdgain=ccdgain, zeropoint=zeropoint,
-        ccdexptime=exptime, extractsources=True, astrometrysrcthreshold=25000,
-        apertures=aperturelist, framewidth=None, searchradius=8.0,
-        nworkers=nworkers, maxworkertasks=1000, observatory='tess',
-        fieldinfo=fieldinfo)
+        ccdexptime=exptime, extractsources=True,
+        astrometrysrcthreshold=anetfluxthreshold, apertures=aperturelist,
+        framewidth=None, searchradius=8.0, nworkers=nworkers,
+        maxworkertasks=1000, observatory='tess', fieldinfo=fieldinfo)
 
     # Step ISP7: convolve and subtract all FITS files in the xtrnsfits list from the
     # photometric reference.  With 30 workers, at best process ~few frames per
@@ -628,7 +626,8 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
                              xtrnsglob, iphotpattern, lcdirectory,
                              kernelspec=kernelspec, refdir=sv.REFBASEDIR,
                              nworkers=nworkers, aperturelist=aperturelist,
-                             photdisjointradius=photdisjointradius)
+                             photdisjointradius=photdisjointradius,
+                             anetfluxthreshold=anetfluxthreshold)
     else:
         print('found that image subtraction is complete.')
 
