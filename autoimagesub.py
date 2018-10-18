@@ -1239,6 +1239,8 @@ def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
             projectid = fieldinfo['projectid']
             field = fieldinfo['field']
             ccd = fieldinfo['ccd']
+            # "camera" is 0 for HATPI. (would be set by postgres db otherwise)
+            camera = 0
 
             query = ("select framekey, fits, fistar, fiphot, "
                      "photinfo->'medsval', "
@@ -1523,16 +1525,18 @@ def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
                             os.path.join(REFBASEDIR, areftargetfiphot))
 
                 # now, update the astomrefs table in the database
-                if overwrite and observatory=='hatpi':
+                if overwrite and (
+                    observatory=='tess' or observatory=='hatpi'
+                ):
 
                     query = (
                         "insert into astromrefs ("
-                        "projectid, field, ccd, isactive, entryts, "
+                        "projectid, field, camera, ccd, isactive, entryts, "
                         "framekey, fits, fistar, fiphot, jpeg, "
                         "mediansval, mediandval, medianbgv, ngoodobj, "
                         "comment"
                         ") values ("
-                        "%s, %s, %s, %s, current_timestamp, "
+                        "%s, %s, %s, %s, %s, current_timestamp, "
                         "%s, %s, %s, %s, %s, "
                         "%s, %s, %s, %s, "
                         "%s"
@@ -1544,7 +1548,7 @@ def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
                         "medianbgv = %s, ngoodobj = %s, comment = %s"
                     )
                     params = (
-                        str(projectid), field, ccd, makeactive,
+                        str(projectid), field, camera, ccd, int(makeactive),
                         arefinfo['framekey'],
                         os.path.join(REFBASEDIR, areftargetfits),
                         os.path.join(REFBASEDIR, areftargetfistar),
@@ -1561,18 +1565,19 @@ def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
                         arefinfo['bgv'],arefinfo['ndet'], arefinfo['comment'],
                     )
 
-                elif not overwrite and (observatory=='hatpi' or
-                                        observatory=='tess'):
+                elif not overwrite and (
+                    observatory=='tess' or observatory=='hatpi'
+                ):
 
                     query = (
                         "insert into astromrefs ("
-                        "projectid, field, ccd, isactive, "
+                        "projectid, field, camera, ccd, isactive, "
                         "unixtime, "
                         "framepath, jpegpath, "
                         "sval, dval, bgv, ndet, "
                         "comment"
                         ") values ("
-                        "%s, %s, %s, %s, "
+                        "%s, %s, %s, %s, %s, "
                         "%s, "
                         "%s, %s, "
                         "%s, %s, %s, %s, "
@@ -1581,18 +1586,13 @@ def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
                         "on conflict on constraint astromrefs_pkey do nothing"
                     )
                     params = (
-                        str(projectid), field, ccd, int(makeactive),
+                        str(projectid), field, camera, ccd, int(makeactive),
                         arefinfo['framekey'],
                         os.path.join(REFBASEDIR, areftargetfits),
                         os.path.join(REFBASEDIR, areftargetjpeg),
                         arefinfo['sval'], arefinfo['dval'],
                         arefinfo['bgv'],arefinfo['ndet'], arefinfo['comment']
                     )
-
-                elif overwrite and observatory=='tess':
-
-                        raise NotImplementedError
-
 
                 # execute the query to insert the astromref into the DB
                 cursor.execute(query, params)
@@ -2716,16 +2716,19 @@ def generate_combined_photref(
         )
 
         if felems and felems[0]:
-
+            cam = 0
             ccd = felems[0][2]
             masterphotrefinfo = {'field':frameelems['object'],
+                                 'cam':cam,
                                  'ccd':int(ccd),
                                  'projectid':frameelems['projid']}
 
     elif observatory=='tess':
+        cam = fieldinfo['camera']
         ccd = fieldinfo['ccd']
         masterphotrefinfo = {'field':fieldinfo['field'],
                              'ccd':fieldinfo['ccd'],
+                             'cam':fieldinfo['camera'],
                              'projectid':fieldinfo['projectid']}
 
     else:
@@ -2736,7 +2739,7 @@ def generate_combined_photref(
 
     # make the convolution registration file
 
-    photreffname = ('proj{projid}-{field}-ccd{ccd}'
+    photreffname = ('proj{projid}-{field}-cam{cam}-ccd{ccd}'
                     '-combinedphotref-{photreftype}.{fileext}')
 
     regfpath = os.path.join(
@@ -2744,6 +2747,7 @@ def generate_combined_photref(
         photreffname.format(
             projid=masterphotrefinfo['projectid'],
             field=masterphotrefinfo['field'],
+            cam=masterphotrefinfo['cam'],
             ccd=masterphotrefinfo['ccd'],
             photreftype=photreftype,
             fileext='reg'
@@ -2756,6 +2760,7 @@ def generate_combined_photref(
         photreffname.format(
             projid=masterphotrefinfo['projectid'],
             field=masterphotrefinfo['field'],
+            cam=masterphotrefinfo['cam'],
             ccd=masterphotrefinfo['ccd'],
             photreftype=photreftype,
             fileext='fits'
@@ -2764,7 +2769,7 @@ def generate_combined_photref(
 
     if os.path.exists(regfpath) and os.path.exists(combinedphotrefpath):
         print(
-            'WRN! {:s}Z: found regfpath {:s} and combinedphotrefpath {:s}'.
+            'WRN! {:s}Z: found regfpath {:s} and combinedphotrefpath {:s} '.
             format(datetime.utcnow().isoformat(),
                    regfpath,
                    combinedphotrefpath)+
@@ -2903,9 +2908,8 @@ def generate_combined_photref(
     combinedphotrefinfo = {
         'reftype':photreftype,
         'frame':combinedphotref,
-        'jpeg':combinedphotref.replace('.fits',
-                                       '.jpg').replace('proj',
-                                                       'JPEG-COMBINED-proj'),
+        'jpeg':combinedphotref.replace(
+            '.fits', '.jpg').replace('proj', 'JPEG-COMBINED-proj'),
         'cmrawphot':cphotref_photometry[1],
         'regfile':regfpath,
         'combinemethod':combinemethod,
@@ -2945,7 +2949,7 @@ def generate_combined_photref(
             detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES
         )
         query = ("insert into photrefs ("
-                 "field, projectid, ccd, photreftype, isactive, unixtime, "
+                 "field, projectid, camera, ccd, photreftype, isactive, unixtime, "
                  "framepath, jpegpath, "
                  "convolvetarget, convolveregpath, cmrawphotpath, "
                  "target_zenithdist, target_moondist, target_moonelev, "
@@ -2954,7 +2958,7 @@ def generate_combined_photref(
                  "target_stdsrcbgv, target_medsval, target_meddval, "
                  "photrefinfo"
                  ") values ("
-                 "?, ?, ?, ?, ?, ?, "
+                 "?, ?, ?, ?, ?, ?, ?, "
                  "?, ?, "
                  "?, ?, ?, "
                  "?, ?, ?, "
@@ -2970,7 +2974,7 @@ def generate_combined_photref(
                         database=PGDATABASE,
                         host=PGHOST)
         query = ("insert into photrefs ("
-                 "field, projectid, ccd, photreftype, isactive, unixtime, "
+                 "field, projectid, camera, ccd, photreftype, isactive, unixtime, "
                  "framepath, jpegpath, "
                  "convolvetarget, convolveregpath, cmrawphotpath, "
                  "target_zenithdist, target_moondist, target_moonelev, "
@@ -2979,7 +2983,7 @@ def generate_combined_photref(
                  "target_stdsrcbgv, target_medsval, target_meddval, "
                  "photrefinfo"
                  ") values ("
-                 "%s, %s, %s, %s, %s, %s, "
+                 "%s, %s, %s, %s, %s, %s, %s, "
                  "%s, %s, "
                  "%s, %s, %s, "
                  "%s, %s, %s, "
@@ -2992,6 +2996,7 @@ def generate_combined_photref(
     params = (
         masterphotrefinfo['field'],
         masterphotrefinfo['projectid'],
+        masterphotrefinfo['cam'],
         masterphotrefinfo['ccd'],
         photreftype,
         1 if makeactive else 0,
@@ -3031,10 +3036,11 @@ def generate_combined_photref(
         db.commit()
 
         print('%sZ: will use combinedphotref %s for '
-              'field %s, ccd %s, project id %s, database updated.' %
+              'field %s, cam %s, ccd %s, project id %s, database updated.' %
               (datetime.utcnow().isoformat(),
                combinedphotref,
                masterphotrefinfo['field'],
+               masterphotrefinfo['cam'],
                masterphotrefinfo['ccd'],
                masterphotrefinfo['projectid']))
 

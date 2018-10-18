@@ -111,6 +111,10 @@ from imageutils import get_header_keyword, read_fits, extract_img_background
 from shared_variables import FITS_TAIL
 import shared_variables as sv
 
+import pandas as pd
+from astropy.table import Table
+from astropy.io import fits
+
 # get fiphot binary reader
 try:
     from HATpipepy.Common.BinPhot import read_fiphot
@@ -317,34 +321,43 @@ def reform_fistars(fistardir,
         inf.close()
 
 
-def fistar_to_xy(fistardir, fistarglob='1-*_?.fistar'):
+def fistarfile_to_xy(fistarfile):
     '''
-    This takes the fistar output, and converts it to comma-separated x,y files
-    of the source positions. The latter is readable by astrometry.net.
+    Takes a single fistar file and convert it to a binary fits table of the
+    source positions. The latter is readable by astrometry.net.
     '''
 
-    import pandas as pd
-    from astropy.table import Table
-    from astropy.io import fits
+    if not isinstance(fistarfile, str):
+        raise AssertionError('called fistarfile_to_xy on not a path')
 
-    fistars = glob.glob(os.path.join(os.path.abspath(fistardir),
-                                     fistarglob))
+    df = pd.read_csv(fistarfile, comment='#',
+                     names=['ident','x','y','bg','amp','s','d','k','flux','s/n'],
+                     delimiter=r"\s*", engine='python')
+
+    col1 = fits.Column(name='ximage', format='D', array=np.array(df['x']))
+    col2 = fits.Column(name='yimage', format='D', array=np.array(df['y']))
+    coldefs = fits.ColDefs([col1, col2])
+    hdu = fits.BinTableHDU.from_columns(coldefs)
+
+    outfname = fistarfile.replace('.fistar','.fistar-fits-xy')
+    hdu.writeto(outfname, overwrite=True)
+
+    print('%s -> %s' % (fistarfile, outfname))
+
+
+def fistardir_to_xy(fistardir, fistarglob='1-*_?.fistar'):
+    '''
+    Convert a directory of fistar outputs to binary fits table of x,y source
+    positions. The latter is readable by astrometry.net.
+    '''
+
+    fistars = glob.glob(
+        os.path.join(os.path.abspath(fistardir), fistarglob)
+    )
 
     for fistar in fistars:
+        fistarfile_to_xy(fistar)
 
-        df = pd.read_csv(fistar, comment='#',
-                         names=['ident','x','y','bg','amp','s','d','k','flux','s/n'],
-                         delimiter=r"\s*", engine='python')
-
-        col1 = fits.Column(name='ximage', format='D', array=np.array(df['x']))
-        col2 = fits.Column(name='yimage', format='D', array=np.array(df['y']))
-        coldefs = fits.ColDefs([col1, col2])
-        hdu = fits.BinTableHDU.from_columns(coldefs)
-
-        outfname = fistar.replace('.fistar','.fistar-fits-xy')
-        hdu.writeto(outfname, overwrite=True)
-
-        print('%s -> %s' % (fistar, outfname))
 
 
 def astrometrydotnet_solve_frame(srclist,

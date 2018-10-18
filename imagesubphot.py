@@ -222,7 +222,8 @@ except:
     HAVEBINPHOT = False
 
 # get useful things from aperturephot
-from aperturephot import extract_frame_sources, anet_solve_frame, do_photometry
+from aperturephot import extract_frame_sources, anet_solve_frame, \
+    do_photometry, astrometrydotnet_solve_frame, fistarfile_to_xy
 
 import shared_variables as sv
 
@@ -1799,17 +1800,19 @@ def photometry_on_combined_photref(
                                    width=framewidth,
                                    radius=searchradius)
     elif observatory=='tess':
-        # For magic reasons, astrometry fails if giving total image width, but
-        # works if giving plate scale. This makes no sense. Maybe tied to large
-        # fov and distortions?
-        wcsfile = anet_solve_frame(astromfistar,
-                                   wcsf,
-                                   frame_ra,
-                                   frame_dec,
-                                   width=framewidth,
-                                   radius=searchradius,
-                                   scale=21.1,
-                                   usescalenotwidth=True)
+
+        fistarfile_to_xy(astromfistar)
+
+        wcsfile = astrometrydotnet_solve_frame(
+            astromfistar.replace('.fistar','.fistar-fits-xy'),
+            wcsf,
+            frame_ra,
+            frame_dec,
+            scalelow=1,
+            scalehigh=30,
+            scaleunits='arcsecperpix',
+            useimagenotfistar=False
+        )
 
     # THIRD: run do_photometry to get a .sourcelist file with HATID,X,Y
     if observatory=='hatpi':
