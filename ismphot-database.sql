@@ -1,6 +1,7 @@
--- this contains the PostgreSQL DB photometry tables for image subtraction
+-- PURPOSE: make the tables used by autoimagesub's PostgreSQL routines.
 
 -- the iphotfile table
+drop table if exists iphotfiles;
 create table iphotfiles (
        projectid integer not null default 0,
        field text not null,
@@ -18,6 +19,7 @@ create table iphotfiles (
 
 
 -- the objects table
+drop table if exists iphotobjects;
 create table iphotobjects (
        projectid integer not null,
        field text not null,
@@ -36,11 +38,13 @@ create table iphotobjects (
 
 
 -- for astrometric reference selection per field, ccd, and projectid
-CREATE TABLE astromrefs (
+drop table if exists astromrefs;
+create table astromrefs (
        projectid integer not null default 0,
        field text not null,
+       camera integer not null default 0,
        ccd integer not null,
-       isactive bool not null default true,
+       isactive integer not null default 1,
        unixtime double precision not null,
        framepath text not null,
        jpegpath text not null,
@@ -49,14 +53,16 @@ CREATE TABLE astromrefs (
        bgv real,
        ndet integer,
        comment text,
-       primary key(projectid, field, ccd, isactive)
+       primary key(projectid, field, camera, ccd, isactive)
 );
 
 
 -- for combined photometric reference selection per field, ccd, and projectid
-CREATE TABLE photrefs (
+drop table if exists photrefs;
+create table photrefs (
        projectid integer not null default 0,
        field text not null,
+       camera integer not null default 0,
        ccd integer not null,
        photreftype text not null,
        isactive integer not null,
@@ -79,5 +85,5 @@ CREATE TABLE photrefs (
        target_medsval real,
        target_meddval real,
        photrefinfo jsonb, -- photref selection-info pickle JSON
-       primary key(projectid, field, ccd, photreftype, isactive)
+       primary key(projectid, field, camera, ccd, photreftype, isactive)
 );

@@ -1,3 +1,7 @@
+-- PURPOSE: make the TM-refinfo.sqlite DB used by autoimagesub.get_astromref
+-- WB notes (2018/10/17) that though postgres can be not, it's not worth
+-- depricating this quite yet!
+
 -- database to use for automatic ISM photometry
 
 -- for astrometric reference selection per field, ccd, and projectid
