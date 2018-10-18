@@ -408,7 +408,7 @@ def astrometrydotnet_solve_frame(srclist,
             "--scale-low {scalelow} --scale-high {scalehigh} "
             "--scale-units {scaleunits} --tweak-order {tweakorder} "
             "--wcs {wcsout} --downsample {downsample} "
-            "--overwrite --objs {nobjs} --fits-image -no-verify "
+            "--overwrite --objs {nobjs} --fits-image --no-verify "
             "{srcimage}"
 
         )

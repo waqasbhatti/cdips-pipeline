@@ -106,7 +106,7 @@ def get_files_needed_before_image_subtraction(
 
     if useastrometrydotnet:
 
-        ap.fistar_to_xy(fitsdir, fistarglob=fistarglob)
+        ap.fistardir_to_xy(fitsdir, fistarglob=fistarglob)
 
         ap.parallel_astrometrydotnet(
             fitsdir, outdir, ra_nom, dec_nom,
