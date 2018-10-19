@@ -56,7 +56,7 @@ optional arguments:
                         don't do fitsh-compatibility conversion.
 '''
 
-import os
+import os, time
 import numpy as np
 import aperturephot as ap, shared_variables as sv, autoimagesub as ais, \
        imagesubphot as ism, tessutils as tu
@@ -493,7 +493,7 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
          anetradius=30,
          zeropoint=11.82,
          epdsmooth=21, epdsigclip=10, photdisjointradius=2,
-         tuneparameters='true', is_ete6=True
+         tuneparameters='true', is_ete6=True, delaymin=None
          ):
     '''
     args:
@@ -519,6 +519,9 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
         since we're doing relative photometry, and the same stars are always in
         the same cameras, the exact value isn't very important.
     '''
+
+    if delaymin:
+        time.sleep(60*delaymin)
 
     ###########################################################################
     # get list of ete6 reduced images. (different format from images fitsh can
@@ -764,6 +767,10 @@ if __name__ == '__main__':
               'Otherwise, run in FULL reduction mode.')
     )
 
+    parser.add_argument('--delaymin', type=int, default=None,
+        help=('number of minutes to delay this reduction. needed to not '
+              'overload postgres server with queries.'))
+
     args = parser.parse_args()
 
     check_args(args)
@@ -777,5 +784,5 @@ if __name__ == '__main__':
          tuneparameters=args.tuneparameters,
          anetfluxthreshold=args.anetfluxthreshold,
          anettweak=args.anettweak, initccdextent=args.initccdextent,
-         anetradius=args.anetradius
+         anetradius=args.anetradius, delaymin=args.delaymin
     )

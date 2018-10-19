@@ -10,9 +10,9 @@
 #
 ##########################################
 
+#
+#
 # data-specific parameters
-camnum=2
-ccdnum=1
 projectid=43
 orbit='orbit-10'
 
@@ -27,6 +27,7 @@ anetfluxthreshold=50000
 anettweak=6
 anetradius=30
 initccdextent="0:2048,0:2048"
+kernelspec="b/4;i/4;d=4/4"
 
 ###############################################################################
 # define paths, make directories.
@@ -37,8 +38,9 @@ else
   tunefullstr='FULL'
 fi
 
-for camnum in {1..4}; do
-  for ccdnum in {1..4}; do
+ix=0
+for camnum in {4..1}; do
+  for ccdnum in {3..1}; do
 
     # define paths
     LOCAL_IMGBASE="/nfs/phtess1/ar1/TESS/SIMFFI/RED_IMGSUB/"${tunefullstr}
@@ -71,9 +73,8 @@ for camnum in {1..4}; do
       mkdir $lcdir
     fi
 
-    echo "launching reduction for "${fitsdir}
-
     logname=${orbit}'-cam'${camnum}'-ccd'${ccdnum}'.log'
+    delaymin=$((30*ix))
 
     python TESS_ETE6_reduction.py \
       --projectid $projectid \
@@ -81,10 +82,15 @@ for camnum in {1..4}; do
       --nworkers $nworkers --aperturelist $aperturelist --lcdirectory $lcdir \
       --convert_to_fitsh_compatible --epdsmooth $epdsmooth \
       --epdsigclip $epdsigclip --photdisjointradius $photdisjointradius \
-      --tuneparameters $tuneparameters  \
+      --tuneparameters $tuneparameters --kernelspec $kernelspec \
       --anetfluxthreshold $anetfluxthreshold --anettweak $anettweak \
       --initccdextent $initccdextent --anetradius $anetradius \
+      --delaymin $delaymin \
       &> logs/$logname &
+
+    echo "launching reduction for "${fitsdir}" in "$delaymin" minutes"
+
+    ix=$((ix + 1))
 
   done
 done

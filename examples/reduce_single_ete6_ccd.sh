@@ -3,7 +3,7 @@
 ##########################################
 #
 # USAGE:
-#   ./reduce_ete6_field.sh &> logs/log1.txt &
+#   ./reduce_ete6_field.sh
 #
 # PURPOSE:
 #   make lightcurves from images
@@ -12,7 +12,7 @@
 
 # data-specific parameters
 camnum=4
-ccdnum=2
+ccdnum=4
 projectid=43
 orbit='orbit-10'
 
@@ -27,6 +27,7 @@ anetfluxthreshold=50000
 anettweak=6
 anetradius=30
 initccdextent="0:2048,0:2048"
+kernelspec="b/4;i/4;d=4/4"
 
 ###############################################################################
 # define paths. trimmed, single-extension fits images get worked on in fitsdir.
@@ -72,12 +73,15 @@ fi
 ################################
 # turn images into lightcurves #
 ################################
+logname=${orbit}'-cam'${camnum}'-ccd'${ccdnum}'.log'
+
 python TESS_ETE6_reduction.py \
   --projectid $projectid \
   --fitsdir $fitsdir --fitsglob $fitsglob --outdir $fitsdir --field $orbit\
   --nworkers $nworkers --aperturelist $aperturelist --lcdirectory $lcdir \
   --convert_to_fitsh_compatible --epdsmooth $epdsmooth \
+  --kernelspec $kernelspec \
   --epdsigclip $epdsigclip --photdisjointradius $photdisjointradius \
   --tuneparameters $tuneparameters --anetfluxthreshold $anetfluxthreshold \
   --anettweak $anettweak --initccdextent $initccdextent \
-  --anetradius $anetradius
+  --anetradius $anetradius &> logs/$logname &
