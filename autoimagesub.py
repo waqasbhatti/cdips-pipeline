@@ -1026,15 +1026,6 @@ def parallel_frames_to_database(fitsbasedir,
         fitsglob: if arefshifted frames, it's actually '1-???????_?-xtrns.fits'
 
     '''
-
-    # choose the frame to database worker
-    if not (frametype=='calibratedframes' or frametype=='arefshifted_frames'):
-        raise NotImplementedError
-    if frametype == 'calibratedframes':
-        frame_to_db_worker = calframe_to_db_worker
-    elif frametype == 'arefshifted_frames':
-        frame_to_db_worker = arefshifted_frame_to_db_worker
-
     # find all the FITS files
     try:
 
@@ -1049,10 +1040,24 @@ def parallel_frames_to_database(fitsbasedir,
         fitslist = sorted(fitslist[:-1])
 
         # generate the task list
-        tasks = [(x, {'observatory':observatory,
-                      'overwrite':overwrite,
-                      'nonwcsframes_are_ok':nonwcsframes_are_ok,
-                      'badframetag':badframetag}) for x in fitslist]
+ 
+        # choose the frame to database worker
+        if not (frametype=='calibratedframes' 
+                or frametype=='arefshifted_frames'):
+            raise NotImplementedError
+
+        if frametype == 'calibratedframes':
+            frame_to_db_worker = calframe_to_db_worker
+            tasks = [(x, {'observatory':observatory,
+                          'overwrite':overwrite,
+                          'nonwcsframes_are_ok':nonwcsframes_are_ok,
+                          'badframetag':badframetag}) for x in fitslist]
+        elif frametype == 'arefshifted_frames':
+            frame_to_db_worker = arefshifted_frame_to_db_worker
+            tasks = [(x, {'overwrite':overwrite,
+                          'nonwcsframes_are_ok':nonwcsframes_are_ok,
+                          'badframetag':badframetag}) for x in fitslist]
+ 
 
         print('%sZ: %s files to send to db' %
               (datetime.utcnow().isoformat(), len(tasks)))
@@ -2646,7 +2651,8 @@ def generate_combined_photref(
         nworkers=8,
         maxworkertasks=1000,
         fieldinfo=None,
-        observatory='hatpi'):
+        observatory='hatpi',
+        overwrite=False):
     '''
     This generates a combined photref from photref target and candidates and
     updates the TM-refinfo.sqlite database.
@@ -2767,7 +2773,8 @@ def generate_combined_photref(
         )
     )
 
-    if os.path.exists(regfpath) and os.path.exists(combinedphotrefpath):
+    if (overwrite is False and
+        os.path.exists(regfpath) and os.path.exists(combinedphotrefpath)):
         print(
             'WRN! {:s}Z: found regfpath {:s} and combinedphotrefpath {:s} '.
             format(datetime.utcnow().isoformat(),

@@ -2478,6 +2478,11 @@ def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
             assert len(framekey) == 1, 'TESS ETE6 specific regex!'
             originalframe = os.path.join(os.path.dirname(photpath),
                                          framekey[0]+'.fits')
+        elif observatory=='hatpi':
+            framekey = re.findall('(.-.{7}_.)\.iphot', photpath)
+            assert len(framekey) == 1, 'HATPI specific regex!'
+            originalframe = os.path.join(os.path.dirname(photpath),
+                                         framekey[0]+'.fits')
         else:
             raise NotImplementedError
 
@@ -2501,6 +2506,8 @@ def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
             # photref frame)
             if observatory=='tess':
                 frametime = get_header_keyword(originalframe, 'TSTART')
+            elif observatory=='hatpi':
+                frametime = get_header_keyword(originalframe, 'JD')
             else:
                 raise NotImplementedError
 
@@ -3589,7 +3596,7 @@ def parallel_run_epd_imagesub(ilcdir,
         ilcfiles = ilcdir
     else:
         ilcfiles = glob.glob(os.path.join(ilcdir, ilcglob))
-
+    
     # if overwrite is false, only run EPD on LCs that don't have it
     existingepd = glob.glob(outdir+'HAT-???-???????.epdlc')
 
