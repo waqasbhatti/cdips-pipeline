@@ -4,10 +4,17 @@ usage: TESS_ETE6_reduction.py [-h] [--fitsdir FITSDIR] [--fitsglob FITSGLOB]
                               [--outdir OUTDIR] [--lcdirectory LCDIRECTORY]
                               [--aperturelist APERTURELIST]
                               [--kernelspec KERNELSPEC]
+                              [--photdisjointradius PHOTDISJOINTRADIUS]
+                              [--anetfluxthreshold ANETFLUXTHRESHOLD]
+                              [--anettweak ANETTWEAK]
+                              [--anetradius ANETRADIUS]
+                              [--initccdextent INITCCDEXTENT]
                               [--epdsmooth EPDSMOOTH]
                               [--epdsigclip EPDSIGCLIP] [--nworkers NWORKERS]
                               [--convert_to_fitsh_compatible]
                               [--no-convert_to_fitsh_compatible]
+                              [--tuneparameters TUNEPARAMETERS]
+                              [--delaymin DELAYMIN]
 
 Given images, make lightcurves.
 
@@ -38,6 +45,25 @@ optional arguments:
                         deviation of <sigma> andHermite basis order of
                         <order>, with the specified order ofpolynomial spatial
                         variations
+  --photdisjointradius PHOTDISJOINTRADIUS
+                        https://fitsh.net/wiki/man/fiphot gives details.
+                        During the bacground determination on the aperture
+                        annuli, omit the pixels which are closer to the other
+                        centroids than the specified radius.
+  --anetfluxthreshold ANETFLUXTHRESHOLD
+                        flux threshold used to identify bright stars in anet
+                        initial wcs solution attempt of frames.
+  --anettweak ANETTWEAK
+                        SIP (Simple Imaging Polynomial) order. Higher = more
+                        flexibility for frame distortion. Max of 10.
+  --anetradius ANETRADIUS
+                        Radius (in deg) over which to search for index files
+                        in astrometry.net or net. For TESS, you want to go big
+                        -- e.g., 30.
+  --initccdextent INITCCDEXTENT
+                        section <x1>:<x2>,<y1>:<y2> for initial source
+                        extraction and astrometry. (not for initial
+                        photometry).
   --epdsmooth EPDSMOOTH
                         number of cadences used when passing a median filter
                         over themagnitude time series before EPD (see
@@ -54,6 +80,12 @@ optional arguments:
                         skip.
   --no-convert_to_fitsh_compatible
                         don't do fitsh-compatibility conversion.
+  --tuneparameters TUNEPARAMETERS
+                        TUNING: iterate through different img subtraction
+                        parameters if true. Gain speed by selecting a small
+                        set of frames. Otherwise, run in FULL reduction mode.
+  --delaymin DELAYMIN   number of minutes to delay this reduction. needed to
+                        not overload postgres server with queries.
 '''
 
 import os, time
@@ -536,8 +568,8 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
         raise NotImplementedError('need path for real images')
 
     if tuneparameters=='true':
-        # select subset of images for pipeline tuning
-        ete6_list = ete6_list[100:300]
+        # select 150 sequential images for pipeline tuning
+        ete6_list = ete6_list[400:550]
     else:
         pass
 
