@@ -861,7 +861,7 @@ def astromref_shift_worker(task):
                                         outtransfile=outfile)
 
     if DEBUG:
-        print(FRAMESHIFTCALCCMD)
+        print(cmdtorun)
 
     returncode = os.system(cmdtorun)
 
