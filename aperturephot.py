@@ -356,7 +356,12 @@ def fistardir_to_xy(fistardir, fistarglob='1-*_?.fistar'):
     )
 
     for fistar in fistars:
-        fistarfile_to_xy(fistar)
+        if not os.path.exists(fistar.replace('.fistar','.fistar-fits-xy')):
+            fistarfile_to_xy(fistar)
+        else:
+            print('found {:s}, continue.'.format(
+            fistar.replace('.fistar','.fistar-fits-xy'))
+            )
 
 
 
