@@ -197,9 +197,13 @@ def initial_wcs_worked_well_enough(outdir, fitsglob):
     else:
         return True
 
-def is_presubtraction_complete(outdir, fitsglob):
-    # returns True if ready to move on to image subtraction.
-    # else, returns False.
+def is_presubtraction_complete(outdir, fitsglob, percentage_required=95):
+    '''
+    require at least e.g., 95% of the initial astrometry, photometry, etc to
+    exist to return True. in that case, ready to move on to image
+    subtraction.
+    else, returns False.
+    '''
 
     N_fitsfiles = len(glob(outdir+fitsglob))
     N_fistarfiles = len(glob(outdir+fitsglob.replace('.fits','.fistar')))
@@ -211,12 +215,19 @@ def is_presubtraction_complete(outdir, fitsglob):
     N_files = [N_fitsfiles, N_fistarfiles, N_wcsfiles, N_fiphotfiles,
                N_sourcelistfiles, N_projcatalog]
 
-    if np.any( np.diff(N_files) ) or np.any( np.array(N_files)==0 ):
-        print('did not find completed source extraction, astrometry, and '
-              'initial photometry')
+    if (np.any( np.abs(np.diff(N_files)/N_fitsfiles)>(1-percentage_required/100) )
+        or
+        np.any( np.array(N_files)==0 )
+    ):
+        print('did not find {:d}% completed source extraction, astrometry, '.
+              format(percentage_required)+
+              'and initial photometry')
         return False
 
     else:
+        print('found {:d}% completed source extraction, astrometry, '.
+              format(percentage_required)+
+              'and initial photometry. skipping presubtraction steps.')
         return True
 
 
