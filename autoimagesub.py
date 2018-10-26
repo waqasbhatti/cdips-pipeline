@@ -1838,7 +1838,7 @@ def generate_astromref(fitsfiles,
 
 
 
-def dbget_astromref(projectid, field, ccd, database=None):
+def dbget_astromref(projectid, field, ccd, database=None, camera=0):
     '''
     This finds the reference frame using the PG database.
     '''
@@ -1860,13 +1860,13 @@ def dbget_astromref(projectid, field, ccd, database=None):
     try:
 
         query = (
-            "select projectid, field, ccd, unixtime, "
+            "select projectid, field, camera, ccd, unixtime, "
             "framepath, jpegpath, "
             "sval, dval, bgv, ndet, comment "
             "from astromrefs where "
-            "projectid = %s and field = %s and ccd = %s and isactive = 1"
+            "projectid = %s and field = %s and camera = %s and ccd = %s and isactive = 1"
         )
-        params = (str(projectid), field, ccd)
+        params = (str(projectid), field, camera, ccd)
 
         print(query)
         cursor.execute(query, params)
@@ -1875,7 +1875,7 @@ def dbget_astromref(projectid, field, ccd, database=None):
         if row and len(row) > 0:
 
             astromref = {
-                x:y for (x,y) in zip(('projectid','field','ccd','unixtime',
+                x:y for (x,y) in zip(('projectid','field','camera','ccd','unixtime',
                                       'framepath',
                                       'jpegpath','sval','dval',
                                       'bgv','ndet','comment'), row)
@@ -1996,8 +1996,10 @@ def frames_astromref_worker(task):
                                             (observatory=='tess') ):
 
             if observatory=='hatpi':
+                camera = 0
                 ccd = felems[0][2]
             elif observatory=='tess':
+                camera = fieldinfo['camera']
                 ccd = fieldinfo['ccd']
 
             frameinfo = {'field':frameelems['object'],
@@ -2007,7 +2009,8 @@ def frames_astromref_worker(task):
             # find this frame's associated active astromref
             framearef = dbget_astromref(frameinfo['projectid'],
                                         frameinfo['field'],
-                                        frameinfo['ccd'])
+                                        frameinfo['ccd'],
+                                        camera=camera)
             areffistar = framearef['framepath'].replace('.fits','.fistar')
 
             # calculate the shift and write the itrans back to the frame's
