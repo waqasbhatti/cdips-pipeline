@@ -28,6 +28,10 @@ anettweak=6
 anetradius=30
 initccdextent="0:2048,0:2048"
 kernelspec="b/4;i/4;d=4/4"
+catalog_faintrmag=15.5
+fistarfluxthreshold=1000
+photreffluxthreshold=1000
+
 
 ###############################################################################
 # define paths, make directories.
@@ -85,7 +89,9 @@ for camnum in {4..1}; do
       --tuneparameters $tuneparameters --kernelspec $kernelspec \
       --anetfluxthreshold $anetfluxthreshold --anettweak $anettweak \
       --initccdextent $initccdextent --anetradius $anetradius \
-      --delaymin $delaymin \
+      --delaymin $delaymin --catalog_faintrmag $catalog_faintrmag \
+      --fistarfluxthreshold $fistarfluxthreshold \
+      --photreffluxthreshold $photreffluxthreshold \
       &> logs/$logname &
 
     echo "launching reduction for "${fitsdir}" in "$delaymin" minutes"
