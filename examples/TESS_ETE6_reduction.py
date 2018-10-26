@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 '''
 usage: TESS_ETE6_reduction.py [-h] [--fitsdir FITSDIR] [--fitsglob FITSGLOB]
                               [--projectid PROJECTID] [--field FIELD]
@@ -87,6 +88,7 @@ optional arguments:
   --delaymin DELAYMIN   number of minutes to delay this reduction. needed to
                         not overload postgres server with queries.
 '''
+from __future__ import division, print_function
 
 import os, time
 import numpy as np
@@ -263,7 +265,7 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
                          refdir=sv.REFBASEDIR, nworkers=1,
                          aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
                          photdisjointradius=2, colorscheme='bwr',
-                         anetfluxthreshold=30000):
+                         photreffluxthreshold=30000):
 
     ccdgain = photparams['ccdgain']
     exptime = photparams['ccdexptime']
@@ -327,7 +329,7 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
         ccd=None, projectid=None, combinemethod='median',
         kernelspec=kernelspec, ccdgain=ccdgain, zeropoint=zeropoint,
         ccdexptime=exptime, extractsources=True,
-        astrometrysrcthreshold=anetfluxthreshold, apertures=aperturelist,
+        astrometrysrcthreshold=photreffluxthreshold, apertures=aperturelist,
         framewidth=None, searchradius=8.0, nworkers=nworkers,
         maxworkertasks=1000, observatory='tess', fieldinfo=fieldinfo)
 
@@ -406,7 +408,7 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
 
         ap.plot_stats_file(epdstatfile, statspath, field, binned=False,
                            logy=True, logx=False, correctmagsafter=None,
-                           rangex=(5.9,13.1), observatory='tess')
+                           rangex=(5.9,14.1), observatory='tess')
     else:
         print('already made EPD LC stats and plots')
 
@@ -417,7 +419,7 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
                                    fovcat_xicol=3, fovcat_etacol=4,
                                    fovcat_magcol=9, min_ndet=100,
                                    min_nstars=50, max_nstars=1000,
-                                   brightest_mag=8.5, faintest_mag=12.0,
+                                   brightest_mag=8.5, faintest_mag=13.0,
                                    max_rms=0.1, max_sigma_above_rmscurve=5.0,
                                    outprefix=statdir, tfastage1=True)
     if not os.path.exists(tfastatfile):
@@ -441,7 +443,7 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
                                   sigclip=5.0)
         ap.plot_stats_file(tfastatfile, statspath, field, binned=False,
                            logy=True, logx=False, correctmagsafter=None,
-                           rangex=(5.9,13.1), observatory='tess')
+                           rangex=(5.9,14.1), observatory='tess')
     else:
         print('already made TFA LC stats and plots')
 
@@ -536,7 +538,9 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
          anetradius=30,
          zeropoint=11.82,
          epdsmooth=21, epdsigclip=10, photdisjointradius=2,
-         tuneparameters='true', is_ete6=True, delaymin=None
+         tuneparameters='true', is_ete6=True, delaymin=None,
+         catalog_faintrmag=13, fistarfluxthreshold=1000,
+         photreffluxthreshold=1000
          ):
     '''
     args:
@@ -580,7 +584,7 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
 
     if tuneparameters=='true':
         # select 150 sequential images for pipeline tuning
-        ete6_list = ete6_list[400:550]
+        ete6_list = ete6_list[400:600]
     else:
         pass
 
@@ -622,9 +626,9 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
             ra_nom, dec_nom, catra, catdec, ccd_fov, catalog, catalog_file,
             reformed_cat_file, fnamestr=fitsglob,
             anetfluxthreshold=anetfluxthreshold, anetradius=anetradius,
-            fistarglob='*.fistar', width=13, anettweak=anettweak,
-            xpix=2048, ypix=2048, cols=(2,3), brightrmag=6.0, faintrmag=13.0,
-            fistarfluxthreshold=1000, aperturelist=aperturelist,
+            fistarglob='*.fistar', width=13, anettweak=anettweak, xpix=2048,
+            ypix=2048, cols=(2,3), brightrmag=6.0, faintrmag=catalog_faintrmag,
+            fistarfluxthreshold=fistarfluxthreshold, aperturelist=aperturelist,
             nworkers=nworkers)
 
     else:
@@ -673,7 +677,8 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
                              kernelspec=kernelspec, refdir=sv.REFBASEDIR,
                              nworkers=nworkers, aperturelist=aperturelist,
                              photdisjointradius=photdisjointradius,
-                             anetfluxthreshold=anetfluxthreshold)
+                             colorscheme='bwr',
+                             photreffluxthreshold=photreffluxthreshold)
     else:
         print('found that image subtraction is complete.')
 
@@ -814,6 +819,20 @@ if __name__ == '__main__':
         help=('number of minutes to delay this reduction. needed to not '
               'overload postgres server with queries.'))
 
+    parser.add_argument('--catalog_faintrmag', type=float, default=13.0,
+        help=('faint 2MASS catalog r magnitude used to make fovcat, '
+              'which sets the stars that get photometered (TODO: is this '
+              'true?)'))
+    parser.add_argument('--fistarfluxthreshold', type=int, default=1000,
+        help=('faint flux threshold used to do initial raw photometry on '
+              'frame, in pre-img subtraction.'
+             ))
+    parser.add_argument('--photreffluxthreshold', type=int, default=1000,
+        help=('faint flux threshold used to extract sources on photometric '
+              'reference frame, in image subtraction. (these sources will '
+              'then be subtracted against).'
+             ))
+
     args = parser.parse_args()
 
     check_args(args)
@@ -827,5 +846,8 @@ if __name__ == '__main__':
          tuneparameters=args.tuneparameters,
          anetfluxthreshold=args.anetfluxthreshold,
          anettweak=args.anettweak, initccdextent=args.initccdextent,
-         anetradius=args.anetradius, delaymin=args.delaymin
+         anetradius=args.anetradius, delaymin=args.delaymin,
+         catalog_faintrmag=args.catalog_faintrmag,
+         fistarfluxthreshold=args.fistarfluxthreshold,
+         photreffluxthreshold=args.photreffluxthreshold
     )
