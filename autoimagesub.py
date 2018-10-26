@@ -1283,6 +1283,9 @@ def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
 
             params = (str(camera), str(ccd))
 
+            if DEBUG:
+                print('query: {:s}\nparams: {:s}'.format(query,params))
+
         else:
             raise ValueError('observatory must be tess or hatpi')
 
@@ -2223,11 +2226,15 @@ def framelist_make_xtrnsfits(fitsfiles,
     print('%sZ: done with astrometric shifting' %
           (datetime.utcnow().isoformat()))
 
-    existing = glob.glob(fitsdir+
-                         fitsglob.replace('.fits','-xtrns.fits'))
+    xtrns = glob.glob(fitsdir+ fitsglob.replace('.fits','-xtrns.fits'))
+    fitsn = glob.glob(fitsdir+ fitsglob)
 
-    if len(existing) != len(requested) + len(alreadyexists):
-        raise AssertionError, 'something wrong in astrometric shift'
+    if len(xtrns) != len(fitsn):
+        raise AssertionError(
+            'something wrong in astrometric shift.'+
+            '\nN_fits: {:d}'.format(len(fits))+
+            '\nN_xtrns: {:d}'.format(len(xtrns))
+        )
 
     return {x:y for (x,y) in results}
 
