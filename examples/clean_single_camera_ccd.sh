@@ -10,7 +10,7 @@
 # clear out calibratedframes table.
 # clear frameinfo cache from past day.
 
-camnum=2
+camnum=4
 ccdnum=4
 
 ##########
@@ -90,3 +90,9 @@ rm -rf `find /nfs/phtess1/ar1/TESS/SIMFFI/BASE/frameinfo-cache/* -mtime -1 -prin
 
 psql -U hpx -h xphtess1 hpx -c \
   "DELEte from calibratedframes where fits like '"${fitsdir}"%';"
+
+# clean cache
+echo "removing all reference files"
+rm /nfs/phtess1/ar1/TESS/SIMFFI/BASE/reference-frames/*cam${camnum}-ccd${ccdnum}*
+rm /nfs/phtess1/ar1/TESS/SIMFFI/BASE/reference-frames/*camera${camnum}-ccd${ccdnum}*
+rm -rf /nfs/phtess1/ar1/TESS/SIMFFI/BASE/frameinfo-cache/*
