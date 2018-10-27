@@ -3079,7 +3079,8 @@ def get_combined_photref(projectid,
                          ccd,
                          photreftype,
                          dbtype='postgres',
-                         refinfo=REFINFO):
+                         refinfo=REFINFO,
+                         camera=0):
     '''
     This gets the combined photref for the given combo of projid, field, ccd.
 
@@ -3116,7 +3117,7 @@ def get_combined_photref(projectid,
                         database=PGDATABASE,
                         host=PGHOST)
         query = (
-            'select field,projectid,ccd,photreftype,unixtime,'
+            'select field,projectid,camera,ccd,photreftype,unixtime,'
             'framepath,jpegpath,convolvetarget,convolveregpath,'
             'cmrawphotpath,target_zenithdist,target_moondist,'
             'target_moonelev,target_moonphase,target_hourangle,'
@@ -3125,12 +3126,13 @@ def get_combined_photref(projectid,
             'target_meddval,photrefinfo from photrefs where '
             '(isactive = 1) and '
             '(projectid = %s) and '
+            '(camera = %s) and '
             '(ccd = %s) and '
             '(field = %s) and '
             '(photreftype = %s)'
         )
 
-    params = (projectid, ccd, field, photreftype)
+    params = (projectid, camera, ccd, field, photreftype)
     cur = db.cursor()
 
     try:
@@ -3138,7 +3140,7 @@ def get_combined_photref(projectid,
         cur.execute(query, params)
         rows = cur.fetchone()
 
-        cphotref = {x:y for (x,y) in zip(('field','projectid','ccd',
+        cphotref = {x:y for (x,y) in zip(('field','projectid','camera','ccd',
                                           'photreftype','unixtime',
                                           'framepath','jpegpath',
                                           'convolvetarget','convolveregpath',
@@ -3212,14 +3214,16 @@ def xtrnsfits_convsub_worker(task, **kwargs):
             felems = FRAMEREGEX.findall(os.path.basename(frame))
             field, ccd, projectid = (frameelems['object'], int(felems[0][2]),
                                      frameelems['projid'])
+            camera = 0
         elif observatory=='tess':
+            camera = fieldinfo['camera']
             field = fieldinfo['field']
             projectid = fieldinfo['projectid']
             ccd = fieldinfo['ccd']
 
         # then, find the associated combined photref frame, regfile, cmrawphot
         cphotref = get_combined_photref(projectid, field, ccd, photreftype,
-                                        refinfo=refinfo)
+                                        refinfo=refinfo, camera=camera)
         cphotref_frame = cphotref['framepath']
         cphotref_reg = cphotref['convolveregpath']
         cphotref_cmrawphot = cphotref['cmrawphotpath']
@@ -3299,7 +3303,7 @@ def parallel_xtrnsfits_convsub(xtrnsfits,
               reversesubtract, refinfo, observatory, fieldinfo)
              for x in xtrnsfits if os.path.exists(x)]
 
-    print('%sZ: %s files convolve and subtract' %
+    print('%sZ: %s files to convolve and subtract' %
           (datetime.utcnow().isoformat(), len(tasks)))
 
     if len(tasks) > 0:
@@ -3371,14 +3375,16 @@ def convsubfits_staticphot_worker(task):
             frameelems = get_header_keyword_list(subframe, ['object', 'projid'])
             field, ccd, projectid = (frameelems['object'], int(frameinfo[0][2]),
                                      frameelems['projid'])
+            camera = 0
         elif observatory=='tess':
             field = fieldinfo['field']
             ccd = fieldinfo['ccd']
             projectid = fieldinfo['projectid']
+            camera = fieldinfo['camera']
 
         # then, find the associated combined photref frame, regfile, cmrawphot
         cphotref = get_combined_photref(projectid, field, ccd, photreftype,
-                                        refinfo=refinfo)
+                                        refinfo=refinfo, camera=camera)
         cphotref_frame = cphotref['framepath']
         cphotref_reg = cphotref['convolveregpath']
         cphotref_cmrawphot = cphotref['cmrawphotpath']
