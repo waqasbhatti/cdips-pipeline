@@ -584,7 +584,7 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
 
     if tuneparameters=='true':
         # select 150 sequential images for pipeline tuning
-        ete6_list = ete6_list[400:600]
+        ete6_list = ete6_list[400:550]
     else:
         pass
 
