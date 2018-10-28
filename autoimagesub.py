@@ -2654,7 +2654,7 @@ def generate_combined_photref(
         zeropoint=None,
         ccdexptime=None,
         extractsources=True,
-        astrometrysrcthreshold=25000,
+        photreffluxthreshold=25000,
         apertures='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
         framewidth=None,
         searchradius=8.0,
@@ -2674,6 +2674,8 @@ def generate_combined_photref(
     amend_candidate_photrefs function above.
 
     Args:
+        photreffluxthreshold: This is the threshold flux used to extract stars
+        from the photometric reference, if extractsources is True.
 
         photrefinfo is the output of generate_photref_candidates_from_xtrns
 
@@ -2897,7 +2899,9 @@ def generate_combined_photref(
         return
 
 
-    # run photometry on the combinedphotref and generate a cmrawphot file
+    # run photometry on the combinedphotref and generate a cmrawphot file. this
+    # produces the base photometry values that we'll be diffing from those
+    # found in the difference images to get difference magnitudes.
     cphotref_photometry = ism.photometry_on_combined_photref(
         combinedphotref,
         photref_reformedfovcatpath,
@@ -2909,7 +2913,7 @@ def generate_combined_photref(
         apertures=apertures,
         framewidth=framewidth,
         searchradius=searchradius,
-        astrometrysourcethreshold=astrometrysrcthreshold,
+        photreffluxthreshold=photreffluxthreshold,
         observatory=observatory
     )
 
