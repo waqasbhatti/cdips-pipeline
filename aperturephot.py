@@ -1048,7 +1048,6 @@ def reform_fov_catalog(incat,
                   'Junc','H','Hunc','K','Kunc','qlt','B',
                   'V','R','I','u','g','r','i','z','field','num']
 
-
     columns = columns.split(',')
     colstoget = [allcolumns.index(x) for x in columns]
 
@@ -1978,7 +1977,12 @@ def parallel_fitsdir_photometry(
         ccdgain=None,
         ccdexptime=None,
         zeropoint=None,
-        fitsglob='?-*_?.fits'
+        fitsglob='?-*_?.fits',
+        extractsources=True,
+        fovcat_xycols=(12,13),
+        projcat_xycols=(24,25),
+        fiphot_xycols='7,8',
+        observatory='hatpi'
         ):
     '''
     This does photometry for all FITS files in a directory using nworkers
@@ -2017,7 +2021,12 @@ def parallel_fitsdir_photometry(
                'formatstr':formatstr,
                'ccdgain':ccdgain,
                'ccdexptime':ccdexptime,
-               'zeropoint':zeropoint}, rejectbadframes] for x in fitslist]
+               'zeropoint':zeropoint,
+               'extractsources':extractsources,
+               'observatory':observatory,
+               'fovcat_xycols':fovcat_xycols,
+               'projcat_xycols':projcat_xycols,
+               'fiphot_xycols':fiphot_xycols}, rejectbadframes] for x in fitslist]
 
     # if the badframes directory doesn't exist, make it
     badframesdir = os.path.join(outdir, 'badframes')
