@@ -1040,9 +1040,9 @@ def parallel_frames_to_database(fitsbasedir,
         fitslist = sorted(fitslist[:-1])
 
         # generate the task list
- 
+
         # choose the frame to database worker
-        if not (frametype=='calibratedframes' 
+        if not (frametype=='calibratedframes'
                 or frametype=='arefshifted_frames'):
             raise NotImplementedError
 
@@ -1057,7 +1057,7 @@ def parallel_frames_to_database(fitsbasedir,
             tasks = [(x, {'overwrite':overwrite,
                           'nonwcsframes_are_ok':nonwcsframes_are_ok,
                           'badframetag':badframetag}) for x in fitslist]
- 
+
 
         print('%sZ: %s files to send to db' %
               (datetime.utcnow().isoformat(), len(tasks)))
