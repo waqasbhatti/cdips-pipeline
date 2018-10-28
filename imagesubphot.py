@@ -1687,8 +1687,8 @@ def photometry_on_combined_photref(
         outfile=None,
         framewidth=None,
         searchradius=8.0,
-        astrometrysourcethreshold=50000,
-        observatory='hatpi'
+        photreffluxthreshold=50000,
+        observatory='hatpi',
         ):
     '''
     This does source extraction, WCS, catalog projection, and then runs fiphot
@@ -1782,7 +1782,7 @@ def photometry_on_combined_photref(
     astromfistar = extract_frame_sources(
         photref_frame,
         astromfistarf,
-        fluxthreshold=astrometrysourcethreshold,
+        fluxthreshold=photreffluxthreshold,
         zeropoint=zeropoint,
         ccdgain=ccdgain,
         exptime=ccdexptime
@@ -1833,7 +1833,8 @@ def photometry_on_combined_photref(
             ccdgain=ccdgain,
             ccdexptime=ccdexptime,
             binaryoutput=False,
-            observatory='tess'
+            observatory='tess',
+            fluxthreshold=photreffluxthreshold,
         )
 
     if extractsources:
