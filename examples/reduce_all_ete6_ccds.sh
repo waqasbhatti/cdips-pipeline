@@ -28,9 +28,10 @@ anettweak=6
 anetradius=30
 initccdextent="0:2048,0:2048"
 kernelspec="b/4;i/4;d=4/4"
-catalog_faintrmag=15.5
-fistarfluxthreshold=1000
-photreffluxthreshold=1000
+catalog_faintrmag=16
+fistarfluxthreshold=300
+photreffluxthreshold=300
+extractsources=0
 
 
 ###############################################################################
@@ -43,8 +44,8 @@ else
 fi
 
 ix=0
-for camnum in {4..1}; do
-  for ccdnum in {3..1}; do
+for camnum in {1..4}; do
+  for ccdnum in {1..4}; do
 
     # define paths
     LOCAL_IMGBASE="/nfs/phtess1/ar1/TESS/SIMFFI/RED_IMGSUB/"${tunefullstr}
@@ -92,6 +93,7 @@ for camnum in {4..1}; do
       --delaymin $delaymin --catalog_faintrmag $catalog_faintrmag \
       --fistarfluxthreshold $fistarfluxthreshold \
       --photreffluxthreshold $photreffluxthreshold \
+      --extractsources $extractsources \
       &> logs/$logname &
 
     echo "launching reduction for "${fitsdir}" in "$delaymin" minutes"

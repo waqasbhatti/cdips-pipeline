@@ -8,10 +8,9 @@
 # remove select reference images
 # clear out astromrefs and photrefs table.
 # clear out calibratedframes table.
-# clear frameinfo cache from past day.
-
-camnum=4
-ccdnum=4
+# clear frameinfo cache from past week. 
+camnum=3
+ccdnum=3
 
 ##########
 
@@ -80,10 +79,10 @@ echo "removing all reference files"
 rm /nfs/phtess1/ar1/TESS/SIMFFI/BASE/reference-frames/*proj${projectid}-camera${camnum}-ccd${ccdnum}*
 
 # for the frameinfo-cache, the name is tricky. But if you're running this, it's
-# probably safe to remove everything from the past day.
-echo "removing frameinfo cache from past day"
+# probably safe to remove everything from the past week.
+echo "removing frameinfo cache from past week"
 
-rm -rf `find /nfs/phtess1/ar1/TESS/SIMFFI/BASE/frameinfo-cache/* -mtime -1 -print`
+rm -rf `find /nfs/phtess1/ar1/TESS/SIMFFI/BASE/frameinfo-cache/* -mtime -7 -print`
 
 # clean calibratedframes. regex reference:
 # https://www.postgresql.org/docs/9.5/static/functions-matching.html

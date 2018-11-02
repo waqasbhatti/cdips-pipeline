@@ -116,7 +116,8 @@ def get_files_needed_before_image_subtraction(
         aperturelist='1.45:7.0:6.0,1.95:7.0:6.0,2.45:7.0:6.0',
         nworkers=20,
         useastrometrydotnet=True,
-        useimagenotfistar=True
+        useimagenotfistar=True,
+        extractsources=True
     ):
     '''
     get .fistar, .fiphot, and .wcs files needed before image subtraction
@@ -174,6 +175,10 @@ def get_files_needed_before_image_subtraction(
     # required for magfit. Also useful for general reforming of the columns.
     ap.reform_fov_catalog(catalog_file, reformed_cat_file)
 
+    if extractsources==True:
+        fiphot_xycols = '7,8'
+    else:
+        fiphot_xycols = '13,14'
     ap.parallel_fitsdir_photometry(fitsdir, outdir, reformed_cat_file,
                                    fluxthreshold=fistarfluxthreshold,
                                    ccdextent={'x':[0.,2048.],'y':[0.,2048.]},
@@ -186,7 +191,13 @@ def get_files_needed_before_image_subtraction(
                                    minsrcbgv=200.0, maxmadbgv=150.0,
                                    maxframebgv=2000.0, minnstars=500,
                                    fitsglob=fitsglob, ccdgain=ccdgain,
-                                   ccdexptime=exptime, zeropoint=zeropoint)
+                                   ccdexptime=exptime, zeropoint=zeropoint,
+                                   extractsources=extractsources,
+                                   fovcat_xycols=(12,13),
+                                   projcat_xycols=(24,25),
+                                   fiphot_xycols=fiphot_xycols,
+                                   observatory='tess'
+                                  )
 
 def initial_wcs_worked_well_enough(outdir, fitsglob):
     # check whether initial anet converged on over half of frames.
@@ -265,7 +276,7 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
                          refdir=sv.REFBASEDIR, nworkers=1,
                          aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
                          photdisjointradius=2, colorscheme='bwr',
-                         photreffluxthreshold=30000):
+                         photreffluxthreshold=30000, extractsources=True):
 
     ccdgain = photparams['ccdgain']
     exptime = photparams['ccdexptime']
@@ -328,10 +339,10 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
         photref_reformedfovcat=reformed_cat_file, makeactive=True, field=None,
         ccd=None, projectid=None, combinemethod='median',
         kernelspec=kernelspec, ccdgain=ccdgain, zeropoint=zeropoint,
-        ccdexptime=exptime, extractsources=True,
-        astrometrysrcthreshold=photreffluxthreshold, apertures=aperturelist,
-        framewidth=None, searchradius=8.0, nworkers=nworkers,
-        maxworkertasks=1000, observatory='tess', fieldinfo=fieldinfo)
+        ccdexptime=exptime, extractsources=extractsources,
+        apertures=aperturelist, framewidth=None, searchradius=8.0,
+        nworkers=nworkers, maxworkertasks=1000, observatory='tess',
+        fieldinfo=fieldinfo, photreffluxthreshold=photreffluxthreshold)
 
     # Step ISP7: convolve and subtract all FITS files in the xtrnsfits list from the
     # photometric reference.  With 30 workers, at best process ~few frames per
@@ -408,7 +419,7 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
 
         ap.plot_stats_file(epdstatfile, statspath, field, binned=False,
                            logy=True, logx=False, correctmagsafter=None,
-                           rangex=(5.9,14.1), observatory='tess')
+                           rangex=(5.9,15.6), observatory='tess')
     else:
         print('already made EPD LC stats and plots')
 
@@ -443,7 +454,7 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
                                   sigclip=5.0)
         ap.plot_stats_file(tfastatfile, statspath, field, binned=False,
                            logy=True, logx=False, correctmagsafter=None,
-                           rangex=(5.9,14.1), observatory='tess')
+                           rangex=(5.9,15.6), observatory='tess')
     else:
         print('already made TFA LC stats and plots')
 
@@ -540,7 +551,7 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
          epdsmooth=21, epdsigclip=10, photdisjointradius=2,
          tuneparameters='true', is_ete6=True, delaymin=None,
          catalog_faintrmag=13, fistarfluxthreshold=1000,
-         photreffluxthreshold=1000
+         photreffluxthreshold=1000, extractsources=True
          ):
     '''
     args:
@@ -565,6 +576,11 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
         zeropoint (float): 11.82, from "get_zero_point.py" in ete6 repo.
         since we're doing relative photometry, and the same stars are always in
         the same cameras, the exact value isn't very important.
+
+        extractsources (bool): if True, uses fistar for source extraction
+        (with the fistarfluxthreshold). if False, uses the background catalog
+        (e.g., 2MASS), projected onto the frame with WCS, and the
+        catalog_faintrmag cutoff to make the list of sources.
     '''
 
     if delaymin:
@@ -629,7 +645,7 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
             fistarglob='*.fistar', width=13, anettweak=anettweak, xpix=2048,
             ypix=2048, cols=(2,3), brightrmag=6.0, faintrmag=catalog_faintrmag,
             fistarfluxthreshold=fistarfluxthreshold, aperturelist=aperturelist,
-            nworkers=nworkers)
+            nworkers=nworkers, extractsources=extractsources)
 
     else:
         print('found fistar, fiphot, and wcs files. proceeding to image '
@@ -678,7 +694,8 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
                              nworkers=nworkers, aperturelist=aperturelist,
                              photdisjointradius=photdisjointradius,
                              colorscheme='bwr',
-                             photreffluxthreshold=photreffluxthreshold)
+                             photreffluxthreshold=photreffluxthreshold,
+                             extractsources=extractsources)
     else:
         print('found that image subtraction is complete.')
 
@@ -832,10 +849,24 @@ if __name__ == '__main__':
               'reference frame, in image subtraction. (these sources will '
               'then be subtracted against).'
              ))
+    parser.add_argument('--extractsources', type=int, default=1,
+        help=(
+            'extractsources (int): if 1, uses fistar for source extraction '
+            '(with the fistarfluxthreshold). if 0, use the background catalog '
+            '(e.g., 2MASS), projected onto the frame with WCS, and the '
+            'catalog_faintrmag cutoff to make the list of sources. ')
+         )
 
     args = parser.parse_args()
 
     check_args(args)
+
+    if args.extractsources not in [0,1]:
+        raise AssertionError('extractsources must be 0 or 1')
+    if args.extractsources == 1:
+        extractsources = True
+    else:
+        extractsources = False
 
     main(args.fitsdir, args.fitsglob, args.projectid, args.field,
          outdir=args.outdir, lcdirectory=args.lcdirectory,
@@ -849,5 +880,6 @@ if __name__ == '__main__':
          anetradius=args.anetradius, delaymin=args.delaymin,
          catalog_faintrmag=args.catalog_faintrmag,
          fistarfluxthreshold=args.fistarfluxthreshold,
-         photreffluxthreshold=args.photreffluxthreshold
+         photreffluxthreshold=args.photreffluxthreshold,
+         extractsources=extractsources
     )

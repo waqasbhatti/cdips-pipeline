@@ -11,8 +11,8 @@
 ##########################################
 
 # data-specific parameters
-camnum=2
-ccdnum=4
+camnum=3
+ccdnum=3
 projectid=43
 orbit='orbit-10'
 
@@ -28,9 +28,10 @@ anettweak=6
 anetradius=30
 initccdextent="0:2048,0:2048"
 kernelspec="b/4;i/4;d=4/4"
-catalog_faintrmag=15.5
-fistarfluxthreshold=1000
-photreffluxthreshold=1000
+catalog_faintrmag=16
+fistarfluxthreshold=300
+photreffluxthreshold=300
+extractsources=0
 
 ###############################################################################
 # define paths. trimmed, single-extension fits images get worked on in fitsdir.
@@ -90,4 +91,5 @@ python TESS_ETE6_reduction.py \
   --anetradius $anetradius --catalog_faintrmag $catalog_faintrmag \
   --fistarfluxthreshold $fistarfluxthreshold \
   --photreffluxthreshold $photreffluxthreshold \
+  --extractsources $extractsources \
   &> logs/$logname &
