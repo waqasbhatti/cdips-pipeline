@@ -728,6 +728,9 @@ def calibrated_frame_to_database(fitsfile,
             params = (fits, fistar, fiphot, wcs, fitsheaderjson, photinfojson,
                      frameisok)
 
+        if DEBUG:
+            print('query: {:s}\nparams: {:s}'.format(query,params))
+
         # execute the query and commit
         cursor.execute(query, params)
         database.commit()
@@ -2804,8 +2807,7 @@ def generate_combined_photref(
         return
 
     # conv registration file
-    ism.genreg(masterphotref_fistar,
-               regfpath)
+    ism.genreg(masterphotref_fistar, regfpath)
 
     if not os.path.exists(regfpath):
         print('ERR! %sZ: could not make regfile for masterphotref: %s' %
@@ -2902,6 +2904,9 @@ def generate_combined_photref(
     # run photometry on the combinedphotref and generate a cmrawphot file. this
     # produces the base photometry values that we'll be diffing from those
     # found in the difference images to get difference magnitudes.
+    # if extractsources==False, a placeholder fistar file with SDK values is
+    # nonetheless generated, to be used for photometric reference frame
+    # statistical bookkeeping.
     cphotref_photometry = ism.photometry_on_combined_photref(
         combinedphotref,
         photref_reformedfovcatpath,
@@ -2957,6 +2962,18 @@ def generate_combined_photref(
     # decided.
 
     # first, get the frame info from the combinedphotref
+    combinedphotref_fistar = combinedphotref.replace('.fits','.fistar')
+    if not os.path.exists(combinedphotref_fistar):
+        print('WRN! %sZ: did not find %s.' %
+              (datetime.utcnow().isoformat(), combinedphotref_fistar)
+             )
+        print('It is needed for SDK values which are used to so making it '
+             )
+        _ = ap.extract_frame_sources(fits, None,
+                                     fluxthreshold=photreffluxthreshold,
+                                     ccdgain=ccdgain, zeropoint=zeropoint,
+                                     exptime=ccdexptime)
+
     _, photref_frameinfo = get_frame_info(combinedphotref)
 
     if not photref_frameinfo:

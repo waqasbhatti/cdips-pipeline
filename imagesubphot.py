@@ -1773,7 +1773,8 @@ def photometry_on_combined_photref(
         outfile = os.path.abspath(re.sub(sv.FITS_TAIL, '.cmrawphot',
                                          photref_frame))
 
-    # FIRST: add source extraction
+    # FIRST: do source extraction so that we can get a .wcs file for the
+    # photometric reference.
     print('%sZ: extracting sources for astrometry from %s...' %
           (datetime.utcnow().isoformat(), photref_frame))
     astromfistarf = os.path.abspath(re.sub(sv.FITS_TAIL, '.fistar-astrometry',
@@ -1824,6 +1825,14 @@ def photometry_on_combined_photref(
             zeropoint=zeropoint
         )
     elif observatory=='tess':
+        # nb. fiphot_xycols is adjusted inside `do_photometry` to match
+        # extractsources. extractforsdk makes a fistar file with SDK values for
+        # the photref frame, which are kept for later bookkeeping.
+        if extractsources==True:
+            extractforsdk = False
+        elif extractsources==False:
+            extractforsdk = True
+
         photf = do_photometry(
             os.path.abspath(photref_frame),
             os.path.abspath(fovcatalog),
@@ -1835,6 +1844,7 @@ def photometry_on_combined_photref(
             binaryoutput=False,
             observatory='tess',
             fluxthreshold=photreffluxthreshold,
+            extractforsdk=extractforsdk
         )
 
     if extractsources:

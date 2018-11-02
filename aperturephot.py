@@ -1769,15 +1769,21 @@ def do_photometry(fits,
                   maxmadbgv=20.0,
                   maxframebgv=2000.0,
                   minnstars=500,
-                  observatory='hatpi'):
+                  observatory='hatpi',
+                  extractforsdk=False):
     '''This rolls up the sourcelist and fiphot functions above.
 
     Runs both stages on fits, and puts the output in outdir if it exists. If it
     doesn't or is None, then puts the output in the same directory as fits.
 
-    reformedfovcatalog is the path to the 2MASS/UCAC4 catalog for all sources in the
-    observed field. (12 columns!)
+    kwargs:
 
+        reformedfovcatalog is the path to the 2MASS/UCAC4 catalog for all sources in the
+        observed field. (12 columns!)
+
+        extractforsdk (bool): if you want to run fistar source extraction on
+        the frame to get SDK values, even though you're really forcing the
+        photometry from a projected catalog.
     '''
 
     outprojcat = re.sub(sv.FITS_TAIL,'.projcatalog',os.path.basename(fits))
@@ -1866,7 +1872,27 @@ def do_photometry(fits,
 
         else:
 
+            # even if you don't want to extract sources for *photometry*, you
+            # might want to extract them for their SDK values. for example,
+            # this is needed so that you can select photometric reference
+            # frames, while still running forced photometry from a base
+            # catalog.
+            if extractforsdk:
+
+                _ = extract_frame_sources(
+                    fits,
+                    os.path.join(
+                        outdir,
+                        re.sub(sv.FITS_TAIL,'.fistar',os.path.basename(fits))
+                        ),
+                    fluxthreshold=fluxthreshold,
+                    ccdgain=ccdgain,
+                    zeropoint=zeropoint,
+                    exptime=ccdexptime
+                )
+
             outsourcelist = projcatfile
+            fiphot_xycols = '13,14'
 
 
         # run fiphot on the source list
