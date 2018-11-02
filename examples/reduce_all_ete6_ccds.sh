@@ -3,14 +3,14 @@
 ##########################################
 #
 # USAGE:
-#   ./reduce_ete6_field.sh &> logs/log1.txt &
+#   ./reduce_all_ete6_ccds.sh > logs/times.txt &
 #
 # PURPOSE:
-#   make lightcurves from images
+#   FULL reduction.
 #
 ##########################################
 
-#
+# comment-lines for parity w/ reduce_single_ete6_ccd.sh
 #
 # data-specific parameters
 projectid=43
@@ -43,7 +43,6 @@ else
   tunefullstr='FULL'
 fi
 
-ix=0
 for camnum in {1..4}; do
   for ccdnum in {1..4}; do
 
@@ -79,7 +78,10 @@ for camnum in {1..4}; do
     fi
 
     logname=${orbit}'-cam'${camnum}'-ccd'${ccdnum}'.log'
-    delaymin=$((30*ix))
+
+    echo `date`
+    echo "launching reduction for "${fitsdir}
+    echo
 
     python TESS_ETE6_reduction.py \
       --projectid $projectid \
@@ -90,15 +92,11 @@ for camnum in {1..4}; do
       --tuneparameters $tuneparameters --kernelspec $kernelspec \
       --anetfluxthreshold $anetfluxthreshold --anettweak $anettweak \
       --initccdextent $initccdextent --anetradius $anetradius \
-      --delaymin $delaymin --catalog_faintrmag $catalog_faintrmag \
+      --catalog_faintrmag $catalog_faintrmag \
       --fistarfluxthreshold $fistarfluxthreshold \
       --photreffluxthreshold $photreffluxthreshold \
       --extractsources $extractsources \
-      &> logs/$logname &
-
-    echo "launching reduction for "${fitsdir}" in "$delaymin" minutes"
-
-    ix=$((ix + 1))
+      &> logs/$logname
 
   done
 done

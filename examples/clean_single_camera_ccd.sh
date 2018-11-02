@@ -9,8 +9,8 @@
 # clear out astromrefs and photrefs table.
 # clear out calibratedframes table.
 # clear frameinfo cache from past week. 
-camnum=3
-ccdnum=3
+camnum=2
+ccdnum=2
 
 ##########
 
@@ -28,15 +28,6 @@ orbit='orbit-10'
 
 # reduction-specific parameters
 tuneparameters=true
-nworkers=20
-aperturelist="1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0"
-epdsmooth=11    # 11*30min = 5.5 hour median smooth in EPD pre-processing.
-epdsigclip=10
-photdisjointradius=2
-anetfluxthreshold=50000
-anettweak=6
-anetradius=30
-initccdextent="0:2048,0:2048"
 
 # define paths to remove
 

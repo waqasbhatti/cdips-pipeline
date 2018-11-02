@@ -11,8 +11,8 @@
 ##########################################
 
 # data-specific parameters
-camnum=3
-ccdnum=3
+camnum=2
+ccdnum=2
 projectid=43
 orbit='orbit-10'
 
