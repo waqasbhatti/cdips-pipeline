@@ -91,12 +91,14 @@ optional arguments:
 from __future__ import division, print_function
 
 import os, time
-import numpy as np
+import numpy as np, pandas as pd, matplotlib.pyplot as plt
 import aperturephot as ap, shared_variables as sv, autoimagesub as ais, \
-       imagesubphot as ism, tessutils as tu
+       imagesubphot as ism, tessutils as tu, lcstatistics as lcs
 from glob import glob
 from tqdm import tqdm
 from astropy.io import fits
+from astropy import units as units, constants as constants
+from datetime import datetime
 
 import argparse
 
@@ -199,6 +201,7 @@ def get_files_needed_before_image_subtraction(
                                    observatory='tess'
                                   )
 
+
 def initial_wcs_worked_well_enough(outdir, fitsglob):
     # check whether initial anet converged on over half of frames.
 
@@ -210,25 +213,36 @@ def initial_wcs_worked_well_enough(outdir, fitsglob):
     else:
         return True
 
-def is_presubtraction_complete(outdir, fitsglob, percentage_required=95):
+
+def is_presubtraction_complete(outdir, fitsglob, lcdir, percentage_required=95,
+                               extractsources=False):
     '''
     require at least e.g., 95% of the initial astrometry, photometry, etc to
-    exist to return True. in that case, ready to move on to image
-    subtraction.
-    else, returns False.
+    exist to return True. in that case, or if any stats_files products are
+    found, move on to image subtraction.  else, returns False.
     '''
 
     N_fitsfiles = len(glob(outdir+fitsglob))
     N_fistarfiles = len(glob(outdir+fitsglob.replace('.fits','.fistar')))
     N_wcsfiles = len(glob(outdir+fitsglob.replace('.fits','.wcs')))
-    N_sourcelistfiles = len(glob(outdir+fitsglob.replace('.fits','.sourcelist')))
     N_projcatalog = len(glob(outdir+fitsglob.replace('.fits','.projcatalog')))
+    N_sourcelistfiles = len(glob(outdir+fitsglob.replace('.fits','.sourcelist')))
     N_fiphotfiles = len(glob(outdir+fitsglob.replace('.fits','.fiphot')))
 
-    N_files = [N_fitsfiles, N_fistarfiles, N_wcsfiles, N_fiphotfiles,
-               N_sourcelistfiles, N_projcatalog]
+    if extractsources:
+        N_files = [N_fitsfiles, N_fistarfiles, N_wcsfiles, N_fiphotfiles,
+                   N_sourcelistfiles, N_projcatalog]
+    else:
+        N_files = [N_fitsfiles, N_fistarfiles, N_wcsfiles, N_fiphotfiles,
+                   N_projcatalog]
 
-    if (np.any( np.abs(np.diff(N_files)/N_fitsfiles)>(1-percentage_required/100) )
+    statsdir = lcdir+'stats_files'
+    N_statsfiles_products = len(glob(statsdir+"*"))
+    if N_statsfiles_products >= 1:
+        print('found stats_files product. skipping to detrending.')
+        return True
+
+    elif (np.any( np.abs(np.diff(N_files)/N_fitsfiles)>(1-percentage_required/100) )
         or
         np.any( np.array(N_files)==0 )
     ):
@@ -258,10 +272,16 @@ def is_imagesubtraction_complete(fitsdir, fitsglob, lcdir):
     N_lcs = len(glob(
         lcdir+'*.grcollectilc'))
 
-    N_files = [N_subfitslist, N_iphotlist, N_kernellist, N_subconvjpglist,
-               N_lcs]
+    N_files = [N_subfitslist, N_iphotlist, N_kernellist, N_subconvjpglist]
+    full_N_files = N_files.append(N_lcs)
 
-    if np.any( np.diff(N_files) ) or np.any( np.array(N_files)==0 ):
+    statsdir = lcdir+'stats_files'
+    N_statsfiles_products = len(glob(statsdir+"*"))
+    if N_statsfiles_products >= 1:
+        print('found stats_files product. skipping to detrending.')
+        return True
+
+    elif np.any( np.diff(N_files) ) or np.any( np.array(full_N_files)==0 ):
         print('did not find completed image-subtracted photometry products '
               'including photometry, images, and lightcurves.')
         return False
@@ -399,6 +419,7 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
     .epdlc stats. Then run TFA, to get .tfalc.TF{1,2,3} files. Turn them into
     single .tfalc files. Then collect statistics.
     '''
+
     if not os.path.exists(epdstatfile):
 
         _ = ism.parallel_run_epd_imagesub(lcdirectory,
@@ -416,14 +437,18 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
                                   epcols=[27,28,29], tfcols=[30,31,32],
                                   rfcols=None, correctioncoeffs=None,
                                   sigclip=5.0)
-
-        ap.plot_stats_file(epdstatfile, statspath, field, binned=False,
-                           logy=True, logx=False, correctmagsafter=None,
-                           rangex=(5.9,15.6), observatory='tess')
     else:
-        print('already made EPD LC stats and plots')
+        print('already made EPD LC stats file')
 
     statdir = os.path.dirname(epdstatfile)+'/'
+    epdmadplot = glob(os.path.join(statdir, '*median-EP1-vs-mad-*png'))
+    if not epdmadplot:
+        ap.plot_stats_file(epdstatfile, statspath, field, binned=False,
+                           logy=True, logx=False, correctmagsafter=None,
+                           rangex=(5.9,16), observatory='tess')
+    else:
+        print('already made EPD LC plots')
+
     if not os.path.exists(lcdirectory+'aperture-1-tfa-template.list'):
         _ = ap.choose_tfa_template(epdstatfile, reformed_cat_file, lcdirectory,
                                    ignoretfamin=False, fovcat_idcol=0,
@@ -452,11 +477,23 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
                                   rfcols=None,
                                   correctioncoeffs=None,
                                   sigclip=5.0)
+    else:
+        print('already made TFA LC stats file')
+
+    statdir = os.path.dirname(tfastatfile)
+    tfastatusfile = os.path.join(statdir,'are_tfa_plots_done.txt')
+
+    if not os.path.exists(tfastatusfile):
+
         ap.plot_stats_file(tfastatfile, statspath, field, binned=False,
                            logy=True, logx=False, correctmagsafter=None,
-                           rangex=(5.9,15.6), observatory='tess')
+                           rangex=(5.9,16), observatory='tess')
+
+        with open(tfastatusfile+'','w') as f:
+            f.write('1\n')
+
     else:
-        print('already made TFA LC stats and plots')
+        print('found done TFA plots. continuing.')
 
 
 def run_detrending_on_raw_photometry():
@@ -500,7 +537,7 @@ def run_detrending_on_raw_photometry():
 
     17. run parallel_lc_statistics to collect stats on .tfalc files.
 
-    20. run plot_stats_file to make RMS vs. mag plots for all unbinned and
+    20. run plot_stats_file to make MAD vs. mag plots for all unbinned and
     binned LCs.
     '''
 
@@ -586,6 +623,8 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
     if delaymin:
         time.sleep(60*delaymin)
 
+    starttime = datetime.utcnow()
+
     ###########################################################################
     # get list of ete6 reduced images. (different format from images fitsh can
     # work with). trim images, and save to a single-extension fits file.
@@ -635,7 +674,8 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
 
     ###########################################################################
 
-    if not is_presubtraction_complete(outdir, fitsglob):
+    if not is_presubtraction_complete(outdir, fitsglob, lcdirectory,
+                                      extractsources=extractsources):
 
         get_files_needed_before_image_subtraction(
             fitsdir, fitsglob, outdir, initccdextent, ccdgain, zeropoint, exptime,
@@ -703,6 +743,54 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
                    reformed_cat_file, statspath, field, epdsmooth=epdsmooth,
                    epdsigclip=epdsigclip, nworkers=nworkers)
 
+    statdir = os.path.dirname(epdstatfile)+'/'
+    assess_run(statdir, lcdirectory, starttime, field, binned=False,
+               make_whisker_plot=True)
+
+    # TODO: maybe change the statsfile format, and include CDPP? or some
+    # duration-aware RMS measure
+
+
+def assess_run(statdir, lcdirectory, starttime, outprefix, binned=False,
+               make_whisker_plot=True, whisker_xlim=[4,17],
+               whisker_ylim=[1e-5,1e-1]):
+    '''
+    write files with summary statistics of run.
+
+    args:
+        statdir (str): e.g.,
+        '/nfs/phtess1/ar1/TESS/SIMFFI/LC/TUNE/orbit-10/ISP_1-2/stats_files/'
+
+        lcdirectory (str): one level up from statdir.
+
+        starttime (datetime obj)
+
+    kwargs:
+        is statfile binned?
+
+        make_whisker_plot (bool)
+    '''
+
+    # how long did the pipeline take?
+    endtime = datetime.utcnow()
+    howlong = (endtime - starttime).total_seconds()*units.s
+
+    SUMMARY={
+        'starttime': starttime.isoformat(),
+        'endttime': endtime.isoformat(),
+        'howlong_day':howlong.to(units.day).value,
+        'howlong_hr':howlong.to(units.hr).value,
+        'howlong_min':howlong.to(units.minute).value,
+        'howlong_sec':howlong.to(units.second).value
+    }
+    summarydf = pd.DataFrame(SUMMARY, index=[0])
+    summarypath = statdir+'timing_summary.csv'
+    summarydf.to_csv(summarypath, index=False)
+
+    lcs.whisker_MAD_stats_and_plots(statdir, outprefix, binned=binned,
+                                    make_whisker_plot=make_whisker_plot,
+                                    whisker_xlim=whisker_xlim,
+                                    whisker_ylim=whisker_ylim)
 
 def check_args(args):
     if not args.fitsdir:
