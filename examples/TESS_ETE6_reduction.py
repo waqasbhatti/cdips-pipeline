@@ -15,7 +15,6 @@ usage: TESS_ETE6_reduction.py [-h] [--fitsdir FITSDIR] [--fitsglob FITSGLOB]
                               [--convert_to_fitsh_compatible]
                               [--no-convert_to_fitsh_compatible]
                               [--tuneparameters TUNEPARAMETERS]
-                              [--delaymin DELAYMIN]
 
 Given images, make lightcurves.
 
@@ -85,8 +84,6 @@ optional arguments:
                         TUNING: iterate through different img subtraction
                         parameters if true. Gain speed by selecting a small
                         set of frames. Otherwise, run in FULL reduction mode.
-  --delaymin DELAYMIN   number of minutes to delay this reduction. needed to
-                        not overload postgres server with queries.
 '''
 from __future__ import division, print_function
 
@@ -586,7 +583,7 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
          anetradius=30,
          zeropoint=11.82,
          epdsmooth=21, epdsigclip=10, photdisjointradius=2,
-         tuneparameters='true', is_ete6=True, delaymin=None,
+         tuneparameters='true', is_ete6=True,
          catalog_faintrmag=13, fistarfluxthreshold=1000,
          photreffluxthreshold=1000, extractsources=True
          ):
@@ -619,9 +616,6 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
         (e.g., 2MASS), projected onto the frame with WCS, and the
         catalog_faintrmag cutoff to make the list of sources.
     '''
-
-    if delaymin:
-        time.sleep(60*delaymin)
 
     starttime = datetime.utcnow()
 
@@ -920,10 +914,6 @@ if __name__ == '__main__':
               'Otherwise, run in FULL reduction mode.')
     )
 
-    parser.add_argument('--delaymin', type=int, default=None,
-        help=('number of minutes to delay this reduction. needed to not '
-              'overload postgres server with queries.'))
-
     parser.add_argument('--catalog_faintrmag', type=float, default=13.0,
         help=('faint 2MASS catalog r magnitude used to make fovcat, '
               'which sets the stars that get photometered (TODO: is this '
@@ -965,7 +955,7 @@ if __name__ == '__main__':
          tuneparameters=args.tuneparameters,
          anetfluxthreshold=args.anetfluxthreshold,
          anettweak=args.anettweak, initccdextent=args.initccdextent,
-         anetradius=args.anetradius, delaymin=args.delaymin,
+         anetradius=args.anetradius,
          catalog_faintrmag=args.catalog_faintrmag,
          fistarfluxthreshold=args.fistarfluxthreshold,
          photreffluxthreshold=args.photreffluxthreshold,
