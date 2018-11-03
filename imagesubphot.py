@@ -232,7 +232,7 @@ import shared_variables as sv
 #################
 
 # set this to show extra info
-DEBUG = True
+DEBUG = False
 
 # CCD minimum and maximum X,Y pixel coordinates
 # used to strip things outside FOV from output of make_frame_sourcelist

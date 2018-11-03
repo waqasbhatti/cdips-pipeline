@@ -50,7 +50,7 @@ The usual sequence is:
 
 19. run parallel_binnedlc_statistics to collect stats for the binned LCs.
 
-20. run plot_stats_file to make RMS vs. mag plots for all unbinned and binned
+20. run plot_stats_file to make MAD vs. mag plots for all unbinned and binned
     LCs.
 
 21. run plot_magrms_comparison to compare the mag-RMS relation for various CCDs.
@@ -129,7 +129,7 @@ except:
 ########################
 
 # set this to show extra info
-DEBUG = True
+DEBUG = False
 
 # CCD minimum and maximum X,Y pixel coordinates
 # used to strip things outside FOV from output of make_frame_sourcelist
@@ -6757,13 +6757,24 @@ def plot_stats_file(statsfile, outdir, outprefix,
                     correctmagsafter=None,
                     rangex=(5.9,14.1),
                     observatory='hatpi'):
-    '''This makes all the plots for a stats file.
+    '''This plots MAD vs magnitude for RAW, EPD, TFA for all apertures.
 
-    correctmagsafter will use the corrected mags for all objects with mags >
-    than this value. This is used for crowded fields where the catalog
-    photometry may not be as precise, so will get incorrect mags for fainter
-    stars.
+    args:
 
+        statsfile (str): path to statsfile
+
+        outdir (str): path to directory that writes plots
+
+        outprefix (str): string to prefix on plots
+
+    kwargs:
+
+        binned (bool): whether the passed statsfile is binned, or not.
+
+        correctmagsafter (float): use the corrected mags for all objects with
+        mags > than this value. This is used for crowded fields where the
+        catalog photometry may not be as precise, so will get incorrect mags
+        for fainter stars.
     '''
 
     # read the stats file
