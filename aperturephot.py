@@ -5675,7 +5675,6 @@ def time_bin_lightcurve(lcprefix,
                         jdcol=0,
                         lcmagcols=([22,23,24],[25,],[25,],[25,]),
                         binsize=540,
-                        minperbin=10,
                         outfile=None):
     '''
     This bins a lightcurve in time using the binsize given. binsize is in
@@ -5691,8 +5690,6 @@ def time_bin_lightcurve(lcprefix,
     For gzipped TFA LCs, use:
 
     lcexts = ('epdlc','tfalc.TF1.gz','tfalc.TF2.gz','tfalc.TF3.gz')
-
-
     '''
 
     collected_binned_mags = {}
