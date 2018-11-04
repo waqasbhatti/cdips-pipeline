@@ -92,7 +92,8 @@ import matplotlib as mpl
 mpl.use('AGG')
 import numpy as np, pandas as pd, matplotlib.pyplot as plt
 import aperturephot as ap, shared_variables as sv, autoimagesub as ais, \
-       imagesubphot as ism, tessutils as tu, lcstatistics as lcs
+       imagesubphot as ism, tessutils as tu, lcstatistics as lcs, \
+       imageutils as iu
 from glob import glob
 from tqdm import tqdm
 from astropy.io import fits
@@ -481,7 +482,7 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
     tfastatusfile = os.path.join(statsdir,'are_tfa_plots_done.txt')
     if not os.path.exists(tfastatusfile):
         ap.plot_stats_file(tfastatfile, statsdir, field, binned=False,
-                           logy=True, logx=False, correctmagsafter=12,
+                           logy=True, logx=False, correctmagsafter=None,
                            rangex=(5.9,16), observatory='tess')
         with open(tfastatusfile+'','w') as f:
             f.write('1\n')
@@ -615,8 +616,9 @@ def run_detrending_on_raw_photometry():
     # ap.plot_stats_file()
 
 
-def assess_run(statsdir, lcdirectory, starttime, outprefix, binned=False,
-               make_whisker_plot=True, whisker_xlim=[4,17],
+def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir,
+               projectid, field, camera, ccd,
+               binned=False, make_whisker_plot=True, whisker_xlim=[4,17],
                whisker_ylim=[1e-5,1e-1]):
     '''
     write files with summary statistics of run.
@@ -657,12 +659,109 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, binned=False,
                                         make_whisker_plot=make_whisker_plot,
                                         whisker_xlim=whisker_xlim,
                                         whisker_ylim=whisker_ylim)
+    else:
+        print('found whisker plots')
 
-    # TODO histogram of difference pixels, per Oelkers' paper
+    is_image_noise_gaussian(fitsdir, projectid, field, camera, ccd)
 
-    # open all the rsub fits images
-    # count the number of pixels in each value bin (e.g., normalized by the
-    # maximum readout, which is probably like norm~100k)
+
+def _plot_normalized_subtractedimg_histogram(
+    subimg_normalized, rsubimgfile, zerooutnans=True):
+    '''subimg_normalized: subtracted, normalized image.'''
+
+    if zerooutnans:
+        subimg_normalized[np.isnan(subimg_normalized)] = 0
+        print('ERR! you maybe should not have nans in your image...')
+    else:
+        raise NotImplementedError
+
+    plt.close('all')
+    f, ax = plt.subplots(figsize=(4,3))
+
+    bins = np.arange(-100,100,0.1)
+    bins, edges = np.histogram(subimg_normalized, bins=bins)
+    left, right = edges[:-1], edges[1:]
+
+    # data
+    X = np.array([left,right]).T.flatten()
+    Y = np.array([bins,bins]).T.flatten()
+
+    ax.plot(X, Y, label='data')
+
+    # theory: a gaussian
+    # 1/sqrt(2pi*sigma^2) * exp( -(x-mu)^2 / (2 sigma^2)  )
+    mu, sigma = 0, 1
+    x_theory = np.linspace(X.min(), X.max(), num=int(5e3))
+    y_theory = 1/np.sqrt(2*np.pi*sigma**2) * np.exp(
+        - (x_theory - mu)**2 / (2*sigma**2)
+    )
+
+    n_pixels = len(subimg_normalized.flatten())
+    ax.plot(x_theory, y_theory*n_pixels, label='theory')
+
+    ax.set_xlim([-4*sigma, 4*sigma])
+
+    ax.legend(loc='best')
+    ax.set_xlabel('normalized difference pixel value')
+    ax.set_ylabel('number of pixels')
+    plt.ticklabel_format(axis='y', style='sci', scilimits=(-1,1))
+
+    savdir = os.path.dirname(rsubimgfile)
+    savname = (
+        os.path.basename(rsubimgfile).replace(
+            '.fits','-normalized_histogram.png')
+    )
+    savpath = os.path.join(savdir, savname)
+
+    f.tight_layout()
+    f.savefig(savpath, dpi=200, bbox_inches='tight')
+    print('%sZ: wrote %s' % (datetime.utcnow().isoformat(), savpath))
+
+
+def is_image_noise_gaussian(
+    fitsdir, projectid, field, camera, ccd,
+    photrefdir='/nfs/phtess1/ar1/TESS/SIMFFI/BASE/reference-frames/'):
+    '''
+    The noise in the differenced image should be gaussian.  Oelkers & Stassun
+    (2018) suggest the following approach to check whether it is.
+
+    For each subtracted frame, normalize it by the combination of the noise
+    from the science frame  and the photref frame:
+
+        expected noise = sqrt( science frame  + photref frame ).
+
+    The normalized pixels should be a gaussian centered at zero, with a std
+    devn of 1.
+    '''
+
+    rsubglob = 'rsub-*-tess*-xtrns.fits'
+    rsubfiles = np.sort(glob(fitsdir+rsubglob))
+
+    imgglob = 'tess*-xtrns.fits'
+    sciimgfiles = np.sort(glob(fitsdir+imgglob))
+
+    # e.g., proj43-orbit-10-cam1-ccd2-combinedphotref-onenight.fits
+    photrefglob = ('proj{:d}-{:s}-cam{:s}-ccd{:s}-*.fits'.format(
+                   projectid,field,str(camera),str(ccd)))
+    photreffile = np.sort(glob(photrefdir+photrefglob))
+
+    if len(photreffile) != 1:
+        raise AssertionError('expected a single photometric reference')
+
+    photreffile = photreffile[0]
+    photrefimg, _ = iu.read_fits(photreffile, ext=0)
+
+    for rsubimgfile, sciimgfile in zip(rsubfiles, sciimgfiles):
+
+        subimg, subhdr = iu.read_fits(rsubimgfile, ext=0)
+        sciimg, scihdr = iu.read_fits(sciimgfile, ext=0)
+
+        expected_noise = np.sqrt(photrefimg + sciimg)
+
+        subimg_normalized = subimg / expected_noise
+
+        _plot_normalized_subtractedimg_histogram(
+            subimg_normalized, rsubimgfile)
 
 
 def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
@@ -828,8 +927,8 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
                    binlightcurves=binlightcurves)
 
     statsdir = os.path.dirname(epdstatfile)+'/'
-    assess_run(statsdir, lcdirectory, starttime, field, binned=False,
-               make_whisker_plot=True)
+    assess_run(statsdir, lcdirectory, starttime, field, fitsdir, projectid,
+               field, camera, ccd, binned=False, make_whisker_plot=True)
 
     # TODO: maybe change the statsfile format, and include CDPP? or some
     # duration-aware RMS measure
