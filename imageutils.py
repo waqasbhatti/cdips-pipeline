@@ -3,26 +3,38 @@
 '''
 imageutils.py - Waqas Bhatti (wbhatti@astro.princeton.edu) - Jan 2013
 
-This contains various utilities for:
+This contains various utilities for operating on images. This includes
+generating stamps for an image, converting an image to JPEGs, and getting
+values of certain keywords from FITS headers.
 
-- generating stamps for an image, converting an image to JPEGs
-- getting the value of a certain keyword from the FITS header for a series of
-  FITS files
+====================
+fits-reading functions:
+    read_fits
+    read_fits_header
+    trim_image
+    make_superflat
+    compressed_fits_ext
+    get_header_keyword: get the value of a header keyword in a fits file
+    get_header_keyword_list
 
-Important FITS header keywords:
+image-scaling functions:
+    zscale_img
+    clipped_linscale_img
+    logscale_img
+    clipped_logscale_img
+    extract_img_background
 
-FOCUS (steps)
-BJD
-MIDTIME (HH:MM:SS.SSS - middle of exposure)
-MIDDATE (YYYY-MM-DD - middle of exposure)
-TIMESYS (should be UTC)
-OBJECT (field name)
-JD (JD of middle exposure)
-HA (hour angle)
-Z (zenith distance)
-ABORTED (0 = exp not aborted, 1 = aborted exp)
-IMAGETYP
-
+image-sectioning and image-writing functions:
+    img_to_stamps
+    stamps_background
+    stamps_to_jpeg
+    fits_to_stamps_jpeg
+    fits_to_full_jpeg: make a jpg from a fits image
+    frame_radecbox_to_jpeg: cuts out box centered at RA/DEC and width
+    fitscoords_to_jpeg
+    nparr_to_full_jpeg
+    check_frame_warping
+====================
 '''
 
 import os
@@ -886,8 +898,7 @@ def frame_radecbox_to_jpeg(
         scale_func=clipped_linscale_img,
         scale_func_params={'cap':255.0,
                            'lomult':2,
-                           'himult':2.5}
-):
+                           'himult':2.5}):
     '''This cuts out a box centered at RA/DEC and width from the FITS to JPEG.
 
     wcsfrom indicates that the frame WCS should be taken from the specified file

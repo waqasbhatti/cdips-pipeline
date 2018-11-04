@@ -5819,7 +5819,7 @@ def serial_bin_lightcurves(lcdir,
 def parallel_lcbinning_worker(task):
     '''
     This calls time_bin_lightcurve above with all binsizes specified in
-    task[1]. task[0] contains the lcprefix, and task[3] is a dict containing
+    task[1]. task[0] contains the lcprefix, and task[2] is a dict containing
     kwargs, which are expanded.
 
     '''
