@@ -6143,7 +6143,7 @@ def get_binnedlc_statistics(lcfile,
 
     ## COLLECT STATS
 
-    print('%sZ: done with statistics for %s' %
+    print('%sZ: collected binned lc statistics for %s' %
           (datetime.utcnow().isoformat(), lcfile))
 
     return {'lcfile':lcfile,
@@ -6766,13 +6766,17 @@ def plot_stats_file(statsfile, outdir, outprefix,
 
     kwargs:
 
-        binned (bool): whether the passed statsfile is binned, or not.
+        binned (bool, or int): whether the passed statsfile is binned, or not.
+        If an integer is passed, it is assumed to be the bin cadence in
+        seconds. This is then used to overplot model precision curves.
 
         correctmagsafter (float): use the corrected mags for all objects with
         mags > than this value. This is used for crowded fields where the
         catalog photometry may not be as precise, so will get incorrect mags
         for fainter stars.
     '''
+
+    plt.close('all')
 
     # read the stats file
     if binned:
@@ -6886,16 +6890,39 @@ def plot_stats_file(statsfile, outdir, outprefix,
             if binned:
                 if observatory=='hatpi':
                     plt.ylim((0.0001,1.0))
+                    plt.hlines([0.001,0.002,0.003],
+                               xmin=rangex[0],xmax=rangex[1],colors='b')
+                    plt.hlines([0.0005],
+                               xmin=rangex[0],xmax=rangex[1],colors='r')
                 elif observatory=='tess':
                     plt.ylim((0.00001,1.0))
-                plt.hlines([0.001,0.002,0.003],
-                           xmin=rangex[0],xmax=rangex[1],colors='b')
-                plt.hlines([0.0005],
-                           xmin=rangex[0],xmax=rangex[1],colors='r')
+
+                    # overplot toy tess noise model
+                    Tmag = np.linspace(6, 13, num=200)
+                    lnA = 3.29685004771
+                    B = 0.8500214657
+                    C = -0.2850416324
+                    D = 0.039590832137
+                    E = -0.00223080159
+                    F = 4.73508403525e-5
+                    ln_sigma_1hr = lnA + B*Tmag + C*Tmag**2 + D*Tmag**3 + \
+                                   E*Tmag**4 + F*Tmag**5
+                    sigma_1hr = np.exp(ln_sigma_1hr)
+
+                    if isinstance(binned,int):
+                        bincadence_hr = binned/3600
+
+                    sigma_binned = sigma_1hr * np.sqrt(1/bincadence_hr)
+                    plt.plot(Tmag, sigma_binned/1e6, 'k-', zorder=3, lw=2)
 
             else:
                 if observatory=='hatpi':
                     plt.ylim((0.0009,1.0))
+
+                    # make the horizontal lines for 10, 5, 1 mmag
+                    plt.hlines([0.001, 0.002, 0.003, 0.004, 0.005],
+                               xmin=rangex[0],xmax=rangex[1],colors='b')
+
                 elif observatory=='tess':
                     plt.ylim((0.00009,1.0))
 
@@ -6914,11 +6941,6 @@ def plot_stats_file(statsfile, outdir, outprefix,
 
                     plt.plot(Tmag, sigma_30min/1e6, 'k-', zorder=3, lw=2)
 
-
-                # make the horizontal lines for 10, 5, 1 mmag
-                plt.hlines([0.001, 0.002, 0.003, 0.004, 0.005],
-                           xmin=rangex[0],xmax=rangex[1],colors='b')
-
             # put the grid on the plot
             plt.gca().grid(color='#a9a9a9',
                            alpha=0.9,
@@ -6927,7 +6949,7 @@ def plot_stats_file(statsfile, outdir, outprefix,
                            linestyle=':')
 
             plt.savefig(outfile)
-            plt.close()
+            plt.close('all')
 
             print('%sZ: made %s plot: %s' %
                   (datetime.utcnow().isoformat(), title, outfile))
