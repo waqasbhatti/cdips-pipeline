@@ -88,6 +88,8 @@ optional arguments:
 from __future__ import division, print_function
 
 import os, time
+import matplotlib as mpl
+mpl.use('AGG')
 import numpy as np, pandas as pd, matplotlib.pyplot as plt
 import aperturephot as ap, shared_variables as sv, autoimagesub as ais, \
        imagesubphot as ism, tessutils as tu, lcstatistics as lcs
@@ -406,8 +408,8 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
 
 
 def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
-                   reformed_cat_file, statspath, field, epdsmooth=11,
-                   epdsigclip=10, nworkers=10):
+                   reformed_cat_file, statsdir, field, epdsmooth=11,
+                   epdsigclip=10, nworkers=10, binlightcurves=False):
     '''
     Step ISP11: do EPD on all the LCs, and collect stats on the results.
     for ISP LCs, use lcmagcols=([27,28,29],[30,],[30,],[30,])
@@ -437,10 +439,9 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
     else:
         print('already made EPD LC stats file')
 
-    statdir = os.path.dirname(epdstatfile)+'/'
-    epdmadplot = glob(os.path.join(statdir, '*median-EP1-vs-mad-*png'))
+    epdmadplot = glob(os.path.join(statsdir, '*median-EP1-vs-mad-*png'))
     if not epdmadplot:
-        ap.plot_stats_file(epdstatfile, statspath, field, binned=False,
+        ap.plot_stats_file(epdstatfile, statsdir, field, binned=False,
                            logy=True, logx=False, correctmagsafter=None,
                            rangex=(5.9,16), observatory='tess')
     else:
@@ -454,7 +455,7 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
                                    min_nstars=50, max_nstars=1000,
                                    brightest_mag=8.5, faintest_mag=13.0,
                                    max_rms=0.1, max_sigma_above_rmscurve=5.0,
-                                   outprefix=statdir, tfastage1=True)
+                                   outprefix=statsdir, tfastage1=True)
     if not os.path.exists(tfastatfile):
         templatefiles = glob(lcdirectory+'aperture-?-tfa-template.list')
         ism.parallel_run_tfa(lcdirectory, templatefiles, epdlc_glob='*.epdlc',
@@ -470,27 +471,66 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
                                   workerntasks=500,
                                   rmcols=[14,19,24],
                                   epcols=[27,28,29],
-                                  tfcols=[30,30,30], #NOTE weird call b/c .TF[1-3]
+                                  tfcols=[30,30,30], # odd call b/c .TF[1-3]
                                   rfcols=None,
                                   correctioncoeffs=None,
                                   sigclip=5.0)
     else:
         print('already made TFA LC stats file')
 
-    statdir = os.path.dirname(tfastatfile)
-    tfastatusfile = os.path.join(statdir,'are_tfa_plots_done.txt')
-
+    tfastatusfile = os.path.join(statsdir,'are_tfa_plots_done.txt')
     if not os.path.exists(tfastatusfile):
-
-        ap.plot_stats_file(tfastatfile, statspath, field, binned=False,
-                           logy=True, logx=False, correctmagsafter=None,
+        ap.plot_stats_file(tfastatfile, statsdir, field, binned=False,
+                           logy=True, logx=False, correctmagsafter=12,
                            rangex=(5.9,16), observatory='tess')
-
         with open(tfastatusfile+'','w') as f:
             f.write('1\n')
-
     else:
-        print('found done TFA plots. continuing.')
+        print('found done TFA plots (unbinned) through {:s}. continuing.'.
+              format(tfastatusfile))
+
+    if binlightcurves:
+
+        binsizes = [3600,21600]
+
+        binnedlcfiles = glob(lcdirectory+'*.binned-*sec-lc.pkl')
+        if len(binnedlcfiles) == 0:
+            ap.parallel_bin_lightcurves(
+                lcdirectory, '*epdlc', binsizes=binsizes,
+                lcexts=('epdlc', 'tfalc.TF1','tfalc.TF2','tfalc.TF3'),
+                lcmagcols=([27,28,29],[30,],[30,],[30,]),
+                jdcol=0, nworkers=nworkers, workerntasks=1000)
+        else:
+            print('found >=1 binned lightcurve. continuing.')
+
+        onehr_binstatfile = (
+            os.path.join(statsdir,'onehr-binned-lightcurve-statistics.txt'))
+        onehrglob = '*.binned-3600sec-lc.pkl'
+        sixhr_binstatfile = (
+            os.path.join(statsdir,'sixhr-binned-lightcurve-statistics.txt'))
+        sixhrglob = '*.binned-21600sec-lc.pkl'
+
+        # make statfiles and MAD vs. mag plots for all binned LCs.
+        for binstatfile, binglob, cadence in zip(
+            [onehr_binstatfile, sixhr_binstatfile], [onehrglob, sixhrglob],
+            binsizes):
+
+            if not os.path.exists(binstatfile):
+                ap.parallel_binnedlc_statistics(
+                    lcdirectory, binglob, reformed_cat_file, fovcatcols=(0,9),
+                    fovcatmaglabel='r', corrmagsource=None, corrmag_idcol=0,
+                    corrmag_magcols=[122,123,124], outfile=binstatfile,
+                    nworkers=nworkers, workerntasks=500, sigclip=5)
+            else:
+                print('found {:s}, continue'.format(binstatfile))
+
+            outprefix = field+'-'+str(cadence)
+            ap.plot_stats_file(binstatfile, statsdir, outprefix,
+                               binned=cadence, logy=True, logx=False,
+                               correctmagsafter=None, rangex=(5.9,16),
+                               observatory='tess')
+    else:
+        print('will not bin lightcurves or make assoiated statplots')
 
 
 def run_detrending_on_raw_photometry():
@@ -575,6 +615,56 @@ def run_detrending_on_raw_photometry():
     # ap.plot_stats_file()
 
 
+def assess_run(statsdir, lcdirectory, starttime, outprefix, binned=False,
+               make_whisker_plot=True, whisker_xlim=[4,17],
+               whisker_ylim=[1e-5,1e-1]):
+    '''
+    write files with summary statistics of run.
+
+    args:
+        statsdir (str): e.g.,
+        '/nfs/phtess1/ar1/TESS/SIMFFI/LC/TUNE/orbit-10/ISP_1-2/stats_files/'
+
+        lcdirectory (str): one level up from statsdir.
+
+        starttime (datetime obj)
+
+    kwargs:
+        is statfile binned?
+
+        make_whisker_plot (bool)
+    '''
+
+    # how long did the pipeline take?
+    endtime = datetime.utcnow()
+    howlong = (endtime - starttime).total_seconds()*units.s
+
+    SUMMARY={
+        'starttime': starttime.isoformat(),
+        'endttime': endtime.isoformat(),
+        'howlong_day':howlong.to(units.day).value,
+        'howlong_hr':howlong.to(units.hr).value,
+        'howlong_min':howlong.to(units.minute).value,
+        'howlong_sec':howlong.to(units.second).value
+    }
+    summarydf = pd.DataFrame(SUMMARY, index=[0])
+    summarypath = statsdir+'timing_summary.csv'
+    summarydf.to_csv(summarypath, index=False)
+
+    whiskerfiles = glob(statsdir+'whisker_*png')
+    if not whiskerfiles:
+        lcs.whisker_MAD_stats_and_plots(statsdir, outprefix, binned=binned,
+                                        make_whisker_plot=make_whisker_plot,
+                                        whisker_xlim=whisker_xlim,
+                                        whisker_ylim=whisker_ylim)
+
+    # TODO histogram of difference pixels, per Oelkers' paper
+
+    # open all the rsub fits images
+    # count the number of pixels in each value bin (e.g., normalized by the
+    # maximum readout, which is probably like norm~100k)
+
+
 def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
          lcdirectory=None, nworkers=1,
          aperturelist='1.45:7.0:6.0,1.95:7.0:6.0,2.45:7.0:6.0',
@@ -585,7 +675,7 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
          epdsmooth=21, epdsigclip=10, photdisjointradius=2,
          tuneparameters='true', is_ete6=True,
          catalog_faintrmag=13, fistarfluxthreshold=1000,
-         photreffluxthreshold=1000, extractsources=True
+         photreffluxthreshold=1000, extractsources=True, binlightcurves=False
          ):
     '''
     args:
@@ -670,7 +760,6 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
 
     if not is_presubtraction_complete(outdir, fitsglob, lcdirectory,
                                       extractsources=extractsources):
-
         get_files_needed_before_image_subtraction(
             fitsdir, fitsglob, outdir, initccdextent, ccdgain, zeropoint, exptime,
             ra_nom, dec_nom, catra, catdec, ccd_fov, catalog, catalog_file,
@@ -709,12 +798,12 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
     photreftype, dbtype = 'onenight', 'postgres'
 
     epdlcglob, tfalcglob = '*.epdlc', '*.tfalc'
-    statspath = os.path.dirname(lcdirectory) + '/stats_files/'
-    for dirname in [lcdirectory, statspath]:
+    statsdir = os.path.dirname(lcdirectory) + '/stats_files/'
+    for dirname in [lcdirectory, statsdir]:
         if not os.path.exists(dirname):
             os.mkdir(dirname)
-    epdstatfile = statspath + 'camera' + str(camera) + '_ccd' + str(ccd) + '.epdstats'
-    tfastatfile = statspath + 'camera' + str(camera) + '_ccd' + str(ccd) + '.tfastats'
+    epdstatfile = statsdir + 'camera' + str(camera) + '_ccd' + str(ccd) + '.epdstats'
+    tfastatfile = statsdir + 'camera' + str(camera) + '_ccd' + str(ccd) + '.tfastats'
 
     xtrnsglob = fitsglob.replace('.fits','-xtrns.fits')
     iphotpattern = fitsdir+'rsub-????????-'+fitsglob.replace('.fits','.iphot')
@@ -734,57 +823,17 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
         print('found that image subtraction is complete.')
 
     run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
-                   reformed_cat_file, statspath, field, epdsmooth=epdsmooth,
-                   epdsigclip=epdsigclip, nworkers=nworkers)
+                   reformed_cat_file, statsdir, field, epdsmooth=epdsmooth,
+                   epdsigclip=epdsigclip, nworkers=nworkers,
+                   binlightcurves=binlightcurves)
 
-    statdir = os.path.dirname(epdstatfile)+'/'
-    assess_run(statdir, lcdirectory, starttime, field, binned=False,
+    statsdir = os.path.dirname(epdstatfile)+'/'
+    assess_run(statsdir, lcdirectory, starttime, field, binned=False,
                make_whisker_plot=True)
 
     # TODO: maybe change the statsfile format, and include CDPP? or some
     # duration-aware RMS measure
 
-
-def assess_run(statdir, lcdirectory, starttime, outprefix, binned=False,
-               make_whisker_plot=True, whisker_xlim=[4,17],
-               whisker_ylim=[1e-5,1e-1]):
-    '''
-    write files with summary statistics of run.
-
-    args:
-        statdir (str): e.g.,
-        '/nfs/phtess1/ar1/TESS/SIMFFI/LC/TUNE/orbit-10/ISP_1-2/stats_files/'
-
-        lcdirectory (str): one level up from statdir.
-
-        starttime (datetime obj)
-
-    kwargs:
-        is statfile binned?
-
-        make_whisker_plot (bool)
-    '''
-
-    # how long did the pipeline take?
-    endtime = datetime.utcnow()
-    howlong = (endtime - starttime).total_seconds()*units.s
-
-    SUMMARY={
-        'starttime': starttime.isoformat(),
-        'endttime': endtime.isoformat(),
-        'howlong_day':howlong.to(units.day).value,
-        'howlong_hr':howlong.to(units.hr).value,
-        'howlong_min':howlong.to(units.minute).value,
-        'howlong_sec':howlong.to(units.second).value
-    }
-    summarydf = pd.DataFrame(SUMMARY, index=[0])
-    summarypath = statdir+'timing_summary.csv'
-    summarydf.to_csv(summarypath, index=False)
-
-    lcs.whisker_MAD_stats_and_plots(statdir, outprefix, binned=binned,
-                                    make_whisker_plot=make_whisker_plot,
-                                    whisker_xlim=whisker_xlim,
-                                    whisker_ylim=whisker_ylim)
 
 def check_args(args):
     if not args.fitsdir:
@@ -907,6 +956,17 @@ if __name__ == '__main__':
     parser.set_defaults(cfc=True)
 
     parser.add_argument(
+        '--binlightcurves', dest='binlcs', action='store_true',
+        help=('will bin lightcurves to 1hr and 6hr cadence. only purpose: '
+              'making plots to understand the red noise')
+    )
+    parser.add_argument(
+        '--no-binlightcurves', dest='binlcs', action='store_false',
+        help=('don\'t bin lightcurves (it takes a while).')
+    )
+    parser.set_defaults(binlcs=True)
+
+    parser.add_argument(
         '--tuneparameters', type=str,
         default="true",
         help=('TUNING: iterate through different img subtraction parameters '
@@ -959,5 +1019,6 @@ if __name__ == '__main__':
          catalog_faintrmag=args.catalog_faintrmag,
          fistarfluxthreshold=args.fistarfluxthreshold,
          photreffluxthreshold=args.photreffluxthreshold,
-         extractsources=extractsources
+         extractsources=extractsources,
+         binlightcurves=args.binlcs
     )

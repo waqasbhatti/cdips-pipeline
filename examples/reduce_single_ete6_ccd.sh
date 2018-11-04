@@ -11,7 +11,7 @@
 ##########################################
 
 # data-specific parameters
-camnum=2
+camnum=1
 ccdnum=2
 projectid=43
 orbit='orbit-10'
@@ -32,6 +32,16 @@ catalog_faintrmag=16
 fistarfluxthreshold=300
 photreffluxthreshold=300
 extractsources=0
+binlightcurves=0
+
+#########################
+# interpret the options #
+#########################
+if [ "$binlightcurves" = 1 ] ; then
+  binlcoption=binlightcurves
+else
+  binlcoption=no-binlightcurves
+fi
 
 ###############################################################################
 # define paths. trimmed, single-extension fits images get worked on in fitsdir.
@@ -91,5 +101,6 @@ python TESS_ETE6_reduction.py \
   --anetradius $anetradius --catalog_faintrmag $catalog_faintrmag \
   --fistarfluxthreshold $fistarfluxthreshold \
   --photreffluxthreshold $photreffluxthreshold \
-  --extractsources $extractsources \
-  &> logs/$logname &
+  --extractsources $extractsources --$binlcoption #\
+  #&> logs/$logname &
+#FIXME

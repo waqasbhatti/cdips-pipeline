@@ -32,7 +32,16 @@ catalog_faintrmag=16
 fistarfluxthreshold=300
 photreffluxthreshold=300
 extractsources=0
+binlightcurves=0
 
+#########################
+# interpret the options #
+#########################
+if [ "$binlightcurves" = 1 ] ; then
+  binlcoption=binlightcurves
+else
+  binlcoption=no-binlightcurves
+fi
 
 ###############################################################################
 # define paths, make directories.
@@ -95,7 +104,7 @@ for camnum in {1..4}; do
       --catalog_faintrmag $catalog_faintrmag \
       --fistarfluxthreshold $fistarfluxthreshold \
       --photreffluxthreshold $photreffluxthreshold \
-      --extractsources $extractsources \
+      --extractsources $extractsources --$binlcoption \
       &> logs/$logname
 
   done
