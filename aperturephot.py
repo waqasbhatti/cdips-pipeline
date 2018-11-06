@@ -3441,7 +3441,6 @@ def make_photometry_indexdb(framedir,
     return outfile
 
 
-
 def get_fiphot_line(fiphot, linenum, fiphotlinechars=249):
     '''
     This gets a random fiphot line out of the file fiphot.
@@ -3461,11 +3460,9 @@ def get_fiphot_line_linecache(fiphot, linenum, fiphotlinechars=249):
     '''
     This uses linecache's getline function to get the line out of the file
     fiphot.
-
     '''
 
     return getline(fiphot, linenum)
-
 
 
 def collect_aperturephot_lightcurve(hatid,
@@ -3520,8 +3517,6 @@ def collect_aperturephot_lightcurve(hatid,
     19 rm1    Reduced Mags from magfit in aperture 1
     20 rm2    Reduced Mags from magfit in aperture 2
     21 rm3    Reduced Mags from magfit in aperture 3
-
-
     '''
 
     # connect to the photindex sqlite3 database
@@ -3607,7 +3602,6 @@ def collect_aperturephot_lightcurve(hatid,
     return returnf
 
 
-
 def aperturephotlc_collection_worker(task):
     '''
     This wraps collect_aperurephot_lightcurve for parallel_collect_lightcurves
@@ -3632,7 +3626,6 @@ def aperturephotlc_collection_worker(task):
         print('ERR! %sZ: failed to get LC for %s, error: %s' %
               (datetime.utcnow().isoformat(), task[0], e ))
         return task[0], None
-
 
 
 def parallel_collect_aperturephot_lightcurves(framedir,
@@ -3712,7 +3705,6 @@ def parallel_collect_aperturephot_lightcurves(framedir,
 
         print('ERR! %sZ: specified photometry index DB does not exist!' %
               (datetime.utcnow().isoformat(), ))
-
 
 
 ###################
