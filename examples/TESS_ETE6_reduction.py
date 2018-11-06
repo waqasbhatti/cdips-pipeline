@@ -472,23 +472,23 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
                                   workerntasks=500,
                                   rmcols=[14,19,24],
                                   epcols=[27,28,29],
-                                  tfcols=[30,30,30], # odd call b/c .TF[1-3]
+                                  tfcols=[30,31,32],
                                   rfcols=None,
                                   correctioncoeffs=None,
                                   sigclip=5.0)
     else:
         print('already made TFA LC stats file')
 
-    tfastatusfile = os.path.join(statsdir,'are_tfa_plots_done.txt')
-    if not os.path.exists(tfastatusfile):
+    tfaboolstatusfile = os.path.join(statsdir,'are_tfa_plots_done.txt')
+    if not os.path.exists(tfaboolstatusfile):
         ap.plot_stats_file(tfastatfile, statsdir, field, binned=False,
                            logy=True, logx=False, correctmagsafter=None,
                            rangex=(5.9,16), observatory='tess')
-        with open(tfastatusfile+'','w') as f:
+        with open(tfaboolstatusfile+'','w') as f:
             f.write('1\n')
     else:
         print('found done TFA plots (unbinned) through {:s}. continuing.'.
-              format(tfastatusfile))
+              format(tfaboolstatusfile))
 
     if binlightcurves:
 
@@ -498,8 +498,8 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
         if len(binnedlcfiles) == 0:
             ap.parallel_bin_lightcurves(
                 lcdirectory, '*epdlc', binsizes=binsizes,
-                lcexts=('epdlc', 'tfalc.TF1','tfalc.TF2','tfalc.TF3'),
-                lcmagcols=([27,28,29],[30,],[30,],[30,]),
+                lcexts=('epdlc', 'tfalc'),
+                lcmagcols=([27,28,29],[30,31,32]),
                 jdcol=0, nworkers=nworkers, workerntasks=1000)
         else:
             print('found >=1 binned lightcurve. continuing.')
@@ -570,8 +570,7 @@ def run_detrending_on_raw_photometry():
     15. run choose_tfa_template to choose TFA template stars using the .epdlc
     stats.
 
-    16. run parallel_run_tfa for TFA to get .tfalc.TF{1,2,3} files (FIXME:
-        still need to collect into single .tfalc files for all apertures)
+    16. run parallel_run_tfa for TFA to get .tfalc files
 
     17. run parallel_lc_statistics to collect stats on .tfalc files.
 
