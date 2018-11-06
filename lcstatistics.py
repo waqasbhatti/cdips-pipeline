@@ -281,5 +281,60 @@ def whisker_MAD_stats_and_plots(statdir, outprefix, binned=False,
               (datetime.utcnow().isoformat(), csvname))
 
 
+def plot_raw_epd_tfa(time, rawmag, epdmag, tfamag, ap_index, savpath=None,
+                     xlabel='BTJD = BJD - 2457000'):
+    '''
+    Plot a 3 row, 1 column plot with rows of:
+        * raw mags vs time
+        * EPD mags vs time
+        * TFA mags vs time.
 
+    args:
+        time, rawmag, epdmag, tfamag (np.ndarray)
 
+        ap_index (int): integer, e.g., "2" for aperture #2.
+    '''
+
+    from matplotlib.ticker import FormatStrFormatter
+
+    plt.close('all')
+    fig, axs = plt.subplots(nrows=3, ncols=1, sharex=True, figsize=(6,4))
+
+    axs = axs.flatten()
+
+    apstr = 'AP{:d}'.format(ap_index)
+    stagestrs = ['RM{:d}'.format(ap_index),
+                 'EP{:d}'.format(ap_index),
+                 'TF{:d}'.format(ap_index)]
+
+    for ax, mag, txt in zip(axs, [rawmag,epdmag,tfamag], stagestrs):
+        ax.plot(time, mag, c='k', linestyle='-', marker='o',
+                markerfacecolor='k', markeredgecolor='k', ms=3, lw=0.,
+                zorder=1, rasterized=True)
+        ax.plot(time, mag, c='orange', linestyle='-', marker='o',
+                markerfacecolor='orange', markeredgecolor='orange', ms=1.5,
+                lw=0., zorder=2, rasterized=True)
+        txt_x, txt_y = 0.99, 0.98
+        t = ax.text(txt_x, txt_y, txt, horizontalalignment='right',
+                verticalalignment='top', fontsize='small', zorder=3,
+                transform=ax.transAxes)
+        ax.yaxis.set_major_formatter(FormatStrFormatter('%.3f'))
+        ax.get_yaxis().set_tick_params(which='both', direction='in',
+                                       labelsize='x-small')
+        ax.get_xaxis().set_tick_params(which='both', direction='in',
+                                       labelsize='x-small')
+
+    axs[2].set_xlabel(xlabel, fontsize='small')
+
+    # make the y label
+    ax_hidden = fig.add_subplot(111, frameon=False)
+    ax_hidden.tick_params(labelcolor='none', top=False, bottom=False,
+                          left=False, right=False)
+    ax_hidden.set_ylabel('instrument mag', fontsize='small', labelpad=3)
+
+    if not savpath:
+        savpath = 'temp_{:s}.png'.format(apstr)
+
+    fig.tight_layout(h_pad=-0.5)
+    fig.savefig(savpath, dpi=250, bbox_inches='tight')
+    print('%sZ: made plot: %s' % (datetime.utcnow().isoformat(), savpath))
