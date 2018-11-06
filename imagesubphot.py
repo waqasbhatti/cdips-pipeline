@@ -135,8 +135,8 @@ different from the aperture photometry lightcurves.
 
 15. run choose_tfa_template to choose TFA template stars using the .epdlc stats.
 
-16. run parallel_run_tfa for TFA to get .tfalc.TF{1,2,3} files (FIXME: still
-    need to collect into single .tfalc files for all apertures)
+16. run parallel_run_tfa for TFA to get .tfalc files (and .tfalc.TF{1,2,3}
+    files).
 
 17. run parallel_lc_statistics to collect stats on .tfalc files.
 
@@ -3044,7 +3044,6 @@ def lc_concatenate_worker(task):
     lines to baselc file directly
 
     FIXME: add sorting by any column
-
     '''
 
     try:
@@ -3607,7 +3606,7 @@ def parallel_run_epd_imagesub(ilcdir,
         ilcfiles = ilcdir
     else:
         ilcfiles = glob.glob(os.path.join(ilcdir, ilcglob))
-    
+
     # if overwrite is false, only run EPD on LCs that don't have it
     existingepd = glob.glob(outdir+'HAT-???-???????.epdlc')
 
@@ -3659,11 +3658,11 @@ def run_tfa_singlelc(epdlc,
                      epdlc_magcol=(27,28,29),
                      template_sigclip=5.0,
                      epdlc_sigclip=5.0):
-    '''This runs TFA for all apertures defined in epdlc_magcol for the input
+    '''
+    This runs TFA for all apertures defined in epdlc_magcol for the input
     epdlc file, given an existing TFA template list in templatefile. If outfile
     is None, the output TFA LC will be in the same directory as epdlc but with
     an extension of .tfalc.
-
     '''
 
     tfacmdstr = ("tfa -i {epdlc} -t {templatefile} "
@@ -3742,10 +3741,55 @@ def run_tfa_singlelc(epdlc,
 
             else:
 
-                print('%sZ: aperture %s TFA failed for %s! Error was: %s' %
-                      (datetime.utcnow().isoformat(), magind+1, epdlc), tfa_stderr)
+                print('%sZ: aperture %s TFA failed for %s! Error was: %s' % (
+                      datetime.utcnow().isoformat(), magind+1, epdlc,
+                      tfa_stderr))
 
                 tfalc_output.append(None)
+
+        try:
+            # make the .tfalc file, by moving the .tfalc.TF{1..3} end columns
+            tfa_ap1_lc = outfile+'.TF1'
+            tfa_ap2_lc = outfile+'.TF2'
+            tfa_ap3_lc = outfile+'.TF3'
+
+            ap1_handle = open(tfa_ap1_lc, 'r')
+            ap2_handle = open(tfa_ap2_lc, 'r')
+            ap3_handle = open(tfa_ap3_lc, 'r')
+
+            ap1_lines = ap1_handle.readlines()
+            ap2_lines = ap2_handle.readlines()
+            ap3_lines = ap3_handle.readlines()
+
+            if not len(ap3_lines) == len(ap2_lines) == len(ap1_lines):
+                print('%sZ: ERR! .tfalc.TF{1..3} files need equal number of '+
+                      'to make tfalc %s' % (datetime.utcnow().isoformat(), outfile)
+                     )
+                raise AssertionError
+
+            outlines = [ ' '.join(
+                            [a1.rstrip('\n'),
+                             a2.split(' ')[-1].split('\t')[-1].strip('\n'),
+                             a3.split(' ')[-1].split('\t')[-1].strip('\n')
+                            ]
+                        ) + '\n'
+                        for a1,a2,a3 in zip(ap1_lines, ap2_lines, ap3_lines)
+                        if not a1.startswith('#')
+                       ]
+
+            out_handle = open(outfile, 'w')
+            out_handle.writelines(outlines)
+
+            for handle in [ap1_handle, ap2_handle, ap3_handle, out_handle]:
+                handle.close()
+
+            print('%sZ: made %s' % (
+                  datetime.utcnow().isoformat(), outfile))
+
+        except Exception as e:
+
+            print('%sZ: .tfalc.TF{1..3} merge failed for %s! Error was: %s' %
+                  (datetime.utcnow().isoformat(), outfile, e))
 
         return tfalc_output
 
@@ -3788,7 +3832,6 @@ def parallel_run_tfa(lcdir,
                      workerntasks=1000):
     '''
     This runs TFA on the EPD lightcurves.
-
     '''
 
     # pick up the list/dir of EPD LCs to run TFA on
