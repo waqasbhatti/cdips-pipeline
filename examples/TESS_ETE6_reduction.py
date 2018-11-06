@@ -1,89 +1,7 @@
 # -*- coding: utf-8 -*-
 '''
-usage: TESS_ETE6_reduction.py [-h] [--fitsdir FITSDIR] [--fitsglob FITSGLOB]
-                              [--projectid PROJECTID] [--field FIELD]
-                              [--outdir OUTDIR] [--lcdirectory LCDIRECTORY]
-                              [--aperturelist APERTURELIST]
-                              [--kernelspec KERNELSPEC]
-                              [--photdisjointradius PHOTDISJOINTRADIUS]
-                              [--anetfluxthreshold ANETFLUXTHRESHOLD]
-                              [--anettweak ANETTWEAK]
-                              [--anetradius ANETRADIUS]
-                              [--initccdextent INITCCDEXTENT]
-                              [--epdsmooth EPDSMOOTH]
-                              [--epdsigclip EPDSIGCLIP] [--nworkers NWORKERS]
-                              [--convert_to_fitsh_compatible]
-                              [--no-convert_to_fitsh_compatible]
-                              [--tuneparameters TUNEPARAMETERS]
-
-Given images, make lightcurves.
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --fitsdir FITSDIR     e.g., /foo/FFI/RED
-  --fitsglob FITSGLOB   e.g., *.fits.gz. Chosen frames are fitsdir+fitsglob.
-  --projectid PROJECTID
-                        unique integer identifying this reduction run
-  --field FIELD         field identifier string, e.g., "sector1"
-  --outdir OUTDIR       e.g., /foo/FFI/RED
-  --lcdirectory LCDIRECTORY
-                        e.g., /foo/RED/LC
-  --aperturelist APERTURELIST
-                        formatted as "inner radius: outer radius: bkgd annulus
-                        width"
-  --kernelspec KERNELSPEC
-                        https://fitsh.net/wiki/man/ficonv explains the
-                        formatting.i/<spatial order> identity kernel (a.k.a.
-                        flux term) with thespecified order of polynomial
-                        spatial variations.b/<spatial order> constant offset
-                        kernel (a.k.a. backgroundterm) with the specified
-                        order of polynomial spatialvariationsd=<size>/<spatial
-                        order> discrete kernel with the half-size of<size> and
-                        the specified order of polynomial spatial
-                        variationsg=<size>,<sigma>,<order>/<spatial order>
-                        Gaussian kernel withthe half-size of <size>, standard
-                        deviation of <sigma> andHermite basis order of
-                        <order>, with the specified order ofpolynomial spatial
-                        variations
-  --photdisjointradius PHOTDISJOINTRADIUS
-                        https://fitsh.net/wiki/man/fiphot gives details.
-                        During the bacground determination on the aperture
-                        annuli, omit the pixels which are closer to the other
-                        centroids than the specified radius.
-  --anetfluxthreshold ANETFLUXTHRESHOLD
-                        flux threshold used to identify bright stars in anet
-                        initial wcs solution attempt of frames.
-  --anettweak ANETTWEAK
-                        SIP (Simple Imaging Polynomial) order. Higher = more
-                        flexibility for frame distortion. Max of 10.
-  --anetradius ANETRADIUS
-                        Radius (in deg) over which to search for index files
-                        in astrometry.net or net. For TESS, you want to go big
-                        -- e.g., 30.
-  --initccdextent INITCCDEXTENT
-                        section <x1>:<x2>,<y1>:<y2> for initial source
-                        extraction and astrometry. (not for initial
-                        photometry).
-  --epdsmooth EPDSMOOTH
-                        number of cadences used when passing a median filter
-                        over themagnitude time series before EPD (see
-                        imagesubphot.epd_magseries_imagesub). For HATPI
-                        default is 21, or a ~10 minute median filter. For TESS
-                        FFIs, try 11 = 5.5hrs.
-  --epdsigclip EPDSIGCLIP
-                        sigma clipping aplpied to epd lightcurves. assumed
-                        symmetric.
-  --nworkers NWORKERS   number of workers to thread over
-  --convert_to_fitsh_compatible
-                        converts calibrated frames to single-fits-header fitsh
-                        readableobjects. if already done, will find them and
-                        skip.
-  --no-convert_to_fitsh_compatible
-                        don't do fitsh-compatibility conversion.
-  --tuneparameters TUNEPARAMETERS
-                        TUNING: iterate through different img subtraction
-                        parameters if true. Gain speed by selecting a small
-                        set of frames. Otherwise, run in FULL reduction mode.
+run
+$ python TESS_ETE6_reduction.py --help
 '''
 from __future__ import division, print_function
 
@@ -99,11 +17,9 @@ from tqdm import tqdm
 from astropy.io import fits
 from astropy import units as units, constants as constants
 from datetime import datetime
-
 import argparse
 
 np.random.seed(42)
-
 
 def get_files_needed_before_image_subtraction(
         fitsdir, fitsglob, outdir, initccdextent, ccdgain, zeropoint, exptime,
@@ -114,7 +30,7 @@ def get_files_needed_before_image_subtraction(
         fistarglob='*.fistar',
         width=13, anettweak=6, anetradius=30, xpix=2048, ypix=2048, cols=(2,3),
         brightrmag=6.0, faintrmag=13.0,
-        fistarfluxthreshold=1000,
+        fiphotfluxthreshold=1000,
         aperturelist='1.45:7.0:6.0,1.95:7.0:6.0,2.45:7.0:6.0',
         nworkers=20,
         useastrometrydotnet=True,
@@ -182,7 +98,7 @@ def get_files_needed_before_image_subtraction(
     else:
         fiphot_xycols = '13,14'
     ap.parallel_fitsdir_photometry(fitsdir, outdir, reformed_cat_file,
-                                   fluxthreshold=fistarfluxthreshold,
+                                   fluxthreshold=fiphotfluxthreshold,
                                    ccdextent={'x':[0.,2048.],'y':[0.,2048.]},
                                    pixborders=0.0,
                                    aperturelist=aperturelist,
@@ -273,10 +189,12 @@ def is_imagesubtraction_complete(fitsdir, fitsglob, lcdir):
         lcdir+'*.grcollectilc'))
 
     N_files = [N_subfitslist, N_iphotlist, N_kernellist, N_subconvjpglist]
-    full_N_files = N_files.append(N_lcs)
+    full_N_files = [N_subfitslist, N_iphotlist, N_kernellist, N_subconvjpglist,
+                    N_lcs]
 
-    statsdir = lcdir+'stats_files'
+    statsdir = lcdir+'stats_files/'
     N_statsfiles_products = len(glob(statsdir+"*"))
+
     if N_statsfiles_products >= 1:
         print('found stats_files product. skipping to detrending.')
         return True
@@ -457,12 +375,14 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
                                    brightest_mag=8.5, faintest_mag=13.0,
                                    max_rms=0.1, max_sigma_above_rmscurve=5.0,
                                    outprefix=statsdir, tfastage1=True)
+
     if not os.path.exists(tfastatfile):
         templatefiles = glob(lcdirectory+'aperture-?-tfa-template.list')
         ism.parallel_run_tfa(lcdirectory, templatefiles, epdlc_glob='*.epdlc',
                             epdlc_jdcol=0, epdlc_magcol=(27,28,29),
                             template_sigclip=5.0, epdlc_sigclip=5.0, nworkers=nworkers,
                             workerntasks=1000)
+
         ap.parallel_lc_statistics(lcdirectory, '*.epdlc', reformed_cat_file,
                                   tfalcrequired=True,
                                   fovcatcols=(0,9), # objectid, magcol from fovcat
@@ -772,7 +692,7 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
          zeropoint=11.82,
          epdsmooth=21, epdsigclip=10, photdisjointradius=2,
          tuneparameters='true', is_ete6=True,
-         catalog_faintrmag=13, fistarfluxthreshold=1000,
+         catalog_faintrmag=13, fiphotfluxthreshold=1000,
          photreffluxthreshold=1000, extractsources=True, binlightcurves=False
          ):
     '''
@@ -800,7 +720,7 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
         the same cameras, the exact value isn't very important.
 
         extractsources (bool): if True, uses fistar for source extraction
-        (with the fistarfluxthreshold). if False, uses the background catalog
+        (with the fiphotfluxthreshold). if False, uses the background catalog
         (e.g., 2MASS), projected onto the frame with WCS, and the
         catalog_faintrmag cutoff to make the list of sources.
     '''
@@ -865,7 +785,7 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
             anetfluxthreshold=anetfluxthreshold, anetradius=anetradius,
             fistarglob='*.fistar', width=13, anettweak=anettweak, xpix=2048,
             ypix=2048, cols=(2,3), brightrmag=6.0, faintrmag=catalog_faintrmag,
-            fistarfluxthreshold=fistarfluxthreshold, aperturelist=aperturelist,
+            fiphotfluxthreshold=fiphotfluxthreshold, aperturelist=aperturelist,
             nworkers=nworkers, extractsources=extractsources)
 
     else:
@@ -1076,7 +996,7 @@ if __name__ == '__main__':
         help=('faint 2MASS catalog r magnitude used to make fovcat, '
               'which sets the stars that get photometered (TODO: is this '
               'true?)'))
-    parser.add_argument('--fistarfluxthreshold', type=int, default=1000,
+    parser.add_argument('--fiphotfluxthreshold', type=int, default=1000,
         help=('faint flux threshold used to do initial raw photometry on '
               'frame, in pre-img subtraction.'
              ))
@@ -1088,7 +1008,7 @@ if __name__ == '__main__':
     parser.add_argument('--extractsources', type=int, default=1,
         help=(
             'extractsources (int): if 1, uses fistar for source extraction '
-            '(with the fistarfluxthreshold). if 0, use the background catalog '
+            '(with the fiphotfluxthreshold). if 0, use the background catalog '
             '(e.g., 2MASS), projected onto the frame with WCS, and the '
             'catalog_faintrmag cutoff to make the list of sources. ')
          )
@@ -1115,7 +1035,7 @@ if __name__ == '__main__':
          anettweak=args.anettweak, initccdextent=args.initccdextent,
          anetradius=args.anetradius,
          catalog_faintrmag=args.catalog_faintrmag,
-         fistarfluxthreshold=args.fistarfluxthreshold,
+         fiphotfluxthreshold=args.fiphotfluxthreshold,
          photreffluxthreshold=args.photreffluxthreshold,
          extractsources=extractsources,
          binlightcurves=args.binlcs

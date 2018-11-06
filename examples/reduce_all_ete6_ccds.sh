@@ -29,7 +29,7 @@ anetradius=30
 initccdextent="0:2048,0:2048"
 kernelspec="b/4;i/4;d=4/4"
 catalog_faintrmag=16
-fistarfluxthreshold=300
+fiphotfluxthreshold=300
 photreffluxthreshold=300
 extractsources=0
 binlightcurves=0
@@ -102,7 +102,7 @@ for camnum in {1..4}; do
       --anetfluxthreshold $anetfluxthreshold --anettweak $anettweak \
       --initccdextent $initccdextent --anetradius $anetradius \
       --catalog_faintrmag $catalog_faintrmag \
-      --fistarfluxthreshold $fistarfluxthreshold \
+      --fiphotfluxthreshold $fiphotfluxthreshold \
       --photreffluxthreshold $photreffluxthreshold \
       --extractsources $extractsources --$binlcoption \
       &> logs/$logname

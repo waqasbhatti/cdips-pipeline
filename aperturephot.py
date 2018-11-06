@@ -5853,7 +5853,6 @@ def parallel_bin_lightcurves(lcdir,
     For gzipped TFA LCs, use:
 
     lcexts = ('epdlc','tfalc.TF1.gz','tfalc.TF2.gz','tfalc.TF3.gz')
-
     '''
 
     epdlcfiles = glob.glob(os.path.join(lcdir, epdlc_glob))

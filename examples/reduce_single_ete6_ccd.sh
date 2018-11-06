@@ -28,9 +28,12 @@ anettweak=6
 anetradius=30
 initccdextent="0:2048,0:2048"
 kernelspec="b/4;i/4;d=4/4"
-catalog_faintrmag=16
-fistarfluxthreshold=300
-photreffluxthreshold=300
+catalog_faintrmag=13
+fiphotfluxthreshold=3000
+photreffluxthreshold=3000
+## catalog_faintrmag=16
+## fiphotfluxthreshold=300
+## photreffluxthreshold=300
 extractsources=0
 binlightcurves=0
 
@@ -99,8 +102,7 @@ python TESS_ETE6_reduction.py \
   --tuneparameters $tuneparameters --anetfluxthreshold $anetfluxthreshold \
   --anettweak $anettweak --initccdextent $initccdextent \
   --anetradius $anetradius --catalog_faintrmag $catalog_faintrmag \
-  --fistarfluxthreshold $fistarfluxthreshold \
+  --fiphotfluxthreshold $fiphotfluxthreshold \
   --photreffluxthreshold $photreffluxthreshold \
-  --extractsources $extractsources --$binlcoption #\
-  #&> logs/$logname &
-#FIXME
+  --extractsources $extractsources --$binlcoption \
+  &> logs/$logname &
