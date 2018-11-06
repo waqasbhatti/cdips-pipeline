@@ -9,7 +9,7 @@
 # clear out astromrefs and photrefs table.
 # clear out calibratedframes table.
 # clear frameinfo cache from past week. 
-camnum=2
+camnum=1
 ccdnum=2
 
 ##########
@@ -47,6 +47,7 @@ fitsglob=$LOCAL_GLOBPATTERN
 lcbase="/nfs/phtess1/ar1/TESS/SIMFFI/LC/"${tunefullstr}
 lcorbit=$lcbase"/"${orbit}"/"
 lcdir=${lcorbit}"ISP_"${camnum}"-"${ccdnum}"/"
+lcdirold=${lcorbit}"ISP_"${camnum}"-"${ccdnum}"_old/"
 
 echo "removing post-presubtraction files from "${fitsdir}
 
@@ -59,10 +60,12 @@ rm ${fitsdir}*ASTOMREF*jpg
 rm ${fitsdir}rsub-*
 rm ${fitsdir}JPEG-SUBTRACTEDCONV*jpg
 
-echo "removing lightcurves from "${lcdir}
-
-# from lightcurves. takes a while (millions of files) -> run in "parallel"
-echo ${lcdir}* | xargs rm -rf &
+# remove lightcurves and stats. since this takes a while... first rename, then
+# run!
+echo "moving "${lcdir}" to "${lcdirold}
+mv ${lcdir} ${lcdirold}
+echo "removing lightcurves from "${lcdirold}
+rm -rf ${lcdirold}
 
 # remove specific reference files (otherwise bad old cached files get collected)
 echo "removing all reference files"
