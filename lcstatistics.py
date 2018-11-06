@@ -25,6 +25,78 @@ from glob import glob
 from astropy import units as units, constants as constants
 from datetime import datetime
 
+################################
+# LIGHTCURVE READING FUNCTIONS #
+################################
+
+def read_tfa_lc(tfafile,
+                jdcol=0,
+                timename='btjd',
+                rmcols=[14,19,24],
+                epcols=[27,28,29],
+                tfcols=[30,31,32]):
+    '''
+    Get the times and mags from a .tfalc file. For speed, don't read any of the
+    rest. The full contents of a .tfalc file are written below.
+
+    Args:
+        column ids for RAW, EPD, and TFA columns.
+
+    Returns:
+        np.ndarray of times and magnitudes.
+
+    ------------------------------------------
+    00 rjd    Barycentric TESS Julian Date (BTJD := BJD - 2457000) if TESS.
+              Reduced Julian Date (RJD = JD - 2400000.0) if HATPI.
+    01 rstfc  Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
+    02 hat    HAT ID of the object
+    03 xcc    Original X coordinate on CCD on photref frame
+    04 ycc    Original y coordinate on CCD on photref frame
+    05 xic    Shifted X coordinate on CCD on subtracted frame
+    06 yic    Shifted Y coordinate on CCD on subtracted frame
+    07 fsv    Measured S value
+    08 fdv    Measured D value
+    09 fkv    Measured K value
+    10 bgv    Background value
+    11 bge    Background measurement error
+
+    12 ifl1   Flux in aperture 1 (ADU)
+    13 ife1   Flux error in aperture 1 (ADU)
+    14 irm1   Instrumental magnitude in aperture 1
+    15 ire1   Instrumental magnitude error for aperture 1
+    16 irq1   Instrumental magnitude quality flag for aperture 1 (0/G OK, X bad)
+
+    17 ifl2   Flux in aperture 2 (ADU)
+    18 ife2   Flux error in aperture 2 (ADU)
+    19 irm2   Instrumental magnitude in aperture 2
+    20 ire2   Instrumental magnitude error for aperture 2
+    21 irq2   Instrumental magnitude quality flag for aperture 2 (0/G OK, X bad)
+
+    22 ifl3   Flux in aperture 3 (ADU)
+    23 ife3   Flux error in aperture 3 (ADU)
+    24 irm3   Instrumental magnitude in aperture 3
+    25 ire3   Instrumental magnitude error for aperture 3
+    26 irq3   Instrumental magnitude quality flag for aperture 3 (0/G OK, X bad)
+
+    27 ep1    EPD magnitude for aperture 1
+    28 ep2    EPD magnitude for aperture 2
+    29 ep3    EPD magnitude for aperture 3
+
+    30 ep1    TFA magnitude for aperture 1
+    31 ep2    TFA magnitude for aperture 2
+    32 ep3    TFA magnitude for aperture 3
+    ------------------------------------------
+    '''
+
+    lcmagcols = [pre+str(ix) for pre in ['RM','EP','TF'] for ix in range(1,4)]
+
+    lcdata = np.genfromtxt(tfafile,
+                           usecols=tuple([jdcol] + rmcols + epcols + tfcols),
+                           names=[timename] + lcmagcols)
+
+    return lcdata
+
+
 ####################
 # HELPER FUNCTIONS #
 ####################
