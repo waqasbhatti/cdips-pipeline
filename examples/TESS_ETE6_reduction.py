@@ -583,6 +583,52 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir,
 
     is_image_noise_gaussian(fitsdir, projectid, field, camera, ccd)
 
+    _plot_random_lightcurve_subsample(lcdirectory, tfastatfile, n_lcs=20)
+
+
+def _plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20,
+                                      timename='btjd'):
+    # make sequential RAW, EPD, TFA plots for `n_desired_lcs`
+
+    rlcglob, epdglob, tfaglob = '*.grcollectilc', '*.epdlc', '*.tfalc'
+    rlctail, epdtail, tfatail = '.grcollectilc', '.epdlc', '.tfalc'
+
+    tfafiles = glob(os.path.join(lcdirectory,tfaglob))
+
+    n_possible_lcs = len(tfafiles)
+
+    if n_possible_lcs == 0:
+        raise AssertionError('need tfa LCs to exist to make plots of them')
+
+    # if you have fewer than `n_desired_lcs`, just plot as many as possible.
+    if n_possible_lcs > n_desired_lcs:
+        inds = np.random.randint(0, n_possible_lcs, n_desired_lcs)
+        sel_tfafiles = tfafiles[inds]
+    else:
+        sel_tfafiles = tfafiles
+
+    for tfafile in sel_tfafiles:
+
+        lcdata = lcs.read_tfa_lc(tfafile)
+
+        for ap in range(1,4):
+            rawap = 'RM{:d}'.format(ap)
+            epdap = 'EP{:d}'.format(ap)
+            tfaap = 'TF{:d}'.format(ap)
+
+            savdir = os.path.join(os.path.dirname(tfafile),'stats_files')
+            savpath = os.path.join(
+                savdir,
+                os.path.basename(tfafile).rstrip('.tfalc')+
+                '_AP{:d}'.format(ap)+'.png'
+            )
+
+            lcs.plot_raw_epd_tfa(lcdata[timename],
+                                 lcdata[rawap],
+                                 lcdata[epdap],
+                                 lcdata[tfaap],
+                                 ap,
+                                 savpath=savpath)
 
 def _plot_normalized_subtractedimg_histogram(
     subimg_normalized, rsubimgfile, zerooutnans=True):
