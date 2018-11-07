@@ -196,8 +196,8 @@ def whisker_MAD_stats_and_plots(statdir, outprefix, binned=False,
         medstr = 'med_'+apstr
         madstr = 'mad_'+apstr
 
-        minmag = np.floor(stats[medstr].min()).astype(int)
-        maxmag = np.ceil(stats[medstr].max()).astype(int)
+        minmag = np.floor(np.nanmin(stats[medstr])).astype(int)
+        maxmag = np.ceil(np.nanmax(stats[medstr])).astype(int)
         mag_bins = [
             (me, me+1) for me in np.arange(minmag, maxmag, 1)
         ]

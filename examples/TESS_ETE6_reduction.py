@@ -536,7 +536,7 @@ def run_detrending_on_raw_photometry():
 
 
 def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir,
-               projectid, field, camera, ccd,
+               projectid, field, camera, ccd, tfastatfile,
                binned=False, make_whisker_plot=True, whisker_xlim=[4,17],
                whisker_ylim=[1e-5,1e-1]):
     '''
@@ -569,10 +569,10 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir,
         'howlong_sec':howlong.to(units.second).value
     }
     summarydf = pd.DataFrame(SUMMARY, index=[0])
-    summarypath = statsdir+'timing_summary.csv'
+    summarypath = os.path.join(statsdir,'timing_summary.csv')
     summarydf.to_csv(summarypath, index=False)
 
-    whiskerfiles = glob(statsdir+'whisker_*png')
+    whiskerfiles = glob(os.path.join(statsdir,'whisker_*png'))
     if not whiskerfiles:
         lcs.whisker_MAD_stats_and_plots(statsdir, outprefix, binned=binned,
                                         make_whisker_plot=make_whisker_plot,
@@ -583,7 +583,7 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir,
 
     is_image_noise_gaussian(fitsdir, projectid, field, camera, ccd)
 
-    _plot_random_lightcurve_subsample(lcdirectory, tfastatfile, n_lcs=20)
+    _plot_random_lightcurve_subsample(lcdirectory, n_lcs=20)
 
 
 def _plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20,
@@ -593,7 +593,7 @@ def _plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20,
     rlcglob, epdglob, tfaglob = '*.grcollectilc', '*.epdlc', '*.tfalc'
     rlctail, epdtail, tfatail = '.grcollectilc', '.epdlc', '.tfalc'
 
-    tfafiles = glob(os.path.join(lcdirectory,tfaglob))
+    tfafiles = np.array(glob(os.path.join(lcdirectory,tfaglob)))
 
     n_possible_lcs = len(tfafiles)
 
@@ -893,7 +893,8 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
 
     statsdir = os.path.dirname(epdstatfile)+'/'
     assess_run(statsdir, lcdirectory, starttime, field, fitsdir, projectid,
-               field, camera, ccd, binned=False, make_whisker_plot=True)
+               field, camera, ccd, tfastatfile, binned=False,
+               make_whisker_plot=True)
 
     # TODO: maybe change the statsfile format, and include CDPP? or some
     # duration-aware RMS measure
