@@ -173,7 +173,7 @@ def whisker_MAD_stats_and_plots(statdir, outprefix, binned=False,
     '''
 
     # get and read the most complete stats file (the TFA one!)
-    tfastatfile = glob(statdir+'*.tfastats')
+    tfastatfile = glob(os.path.join(statdir,'*.tfastats'))
 
     if not tfastatfile:
         raise AssertionError('cannot assess run if there is no tfa statfile')
@@ -265,17 +265,17 @@ def whisker_MAD_stats_and_plots(statdir, outprefix, binned=False,
                            linewidth=1.0,
                            linestyle=':')
 
-            savname = (
-                statdir+'whisker_MAD_vs_med_mag_{:s}.png'.format(apstr.upper())
-            )
+            savname = ( os.path.join(
+                statdir,'whisker_MAD_vs_med_mag_{:s}.png'.format(apstr.upper())
+            ))
             fig.tight_layout()
             fig.savefig(savname, dpi=250)
             print('%sZ: made %s plot: %s' %
                   (datetime.utcnow().isoformat(), titlestr, savname))
 
-        csvname = (
-            statdir+'whisker_MAD_vs_med_mag_{:s}.csv'.format(apstr.upper())
-        )
+        csvname = ( os.path.join(
+            statdir,'whisker_MAD_vs_med_mag_{:s}.csv'.format(apstr.upper())
+        ))
         pctile_df.to_csv(csvname, index=False)
         print('%sZ: wrote %s' %
               (datetime.utcnow().isoformat(), csvname))
