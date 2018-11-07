@@ -4554,8 +4554,6 @@ def get_lc_statistics(lcfile,
     is used to derive the filenames of the tfalcs)
 
     rfcols are for the flux in aperture 1, 2, 3. used for ISM only
-
-
     '''
 
     tf1lc_check = os.path.exists(lcfile.replace('.epdlc','.tfalc.TF1'))
@@ -4582,13 +4580,10 @@ def get_lc_statistics(lcfile,
                                         usecols=tuple(rmcols + epcols),
                                         unpack=True)
 
-        #FIXME this would be less clunky if we had .tfalc
-        tf1 = np.genfromtxt(lcfile.replace('.epdlc','.tfalc.TF1'),
-                            usecols=(tfcols[0],), unpack=True)
-        tf2 = np.genfromtxt(lcfile.replace('.epdlc','.tfalc.TF2'),
-                            usecols=(tfcols[1],), unpack=True)
-        tf3 = np.genfromtxt(lcfile.replace('.epdlc','.tfalc.TF3'),
-                            usecols=(tfcols[2],), unpack=True)
+        tf1, tf2, tf3 = np.genfromtxt(
+            lcfile.replace('.epdlc','.tfalc'),
+            usecols=tfcols,
+            unpack=True)
 
         if rfcols and len(rfcols) == 3:
             rf1, rf2, rf3 = np.genfromtxt(lcfile,usecols=tuple(rfcols),
