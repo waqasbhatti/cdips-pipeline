@@ -3761,9 +3761,9 @@ def run_tfa_singlelc(epdlc,
             ap2_lines = ap2_handle.readlines()
             ap3_lines = ap3_handle.readlines()
 
-            if not len(ap3_lines) == len(ap2_lines) == len(ap1_lines):
-                print('%sZ: ERR! .tfalc.TF{1..3} files need equal number of '+
-                      'to make tfalc %s' % (datetime.utcnow().isoformat(), outfile)
+            if not (len(ap3_lines) == len(ap2_lines) == len(ap1_lines)):
+                print(('%sZ: ERR! .tfalc.TF{1..3} files need equal number of '+
+                      'to make tfalc %s') % (datetime.utcnow().isoformat(), outfile)
                      )
                 raise AssertionError
 
