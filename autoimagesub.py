@@ -712,7 +712,7 @@ def calibrated_frame_to_database(fitsfile,
                      "frameisok) values ("
                      "%s, %s, %s, %s, %s, %s, "
                      "%s) on conflict "
-                     "(fits, fistar, fiphot, wcs) do update "
+                     "(fits) do update "
                      "set fitsheader = %s,"
                      "photinfo = %s, entryts = current_timestamp")
             params = (fits, fistar, fiphot, wcs, fitsheaderjson, photinfojson,
@@ -852,7 +852,7 @@ def arefshifted_frame_to_database(
         astromref = dbget_astromref(frameinfo['projectid'], frameinfo['field'],
                                     frameinfo['ccd'])
 
-        areffistar = astromref['fistar']
+        #  areffistar = astromref['framepath'].replace('.fits', '.fistar')
 
     # get frame key for the original (calibrated) fits frame:
     originalfits = re.sub('-xtrns.fits', '.fits', arefshiftedframe)
@@ -861,6 +861,8 @@ def arefshifted_frame_to_database(
 
     cursor.execute(query)
     row = cursor.fetchone()
+    if row is None:
+        print(query)
 
     origframekey = row[0] # keeps long type
 
@@ -893,7 +895,7 @@ def arefshifted_frame_to_database(
                 query = ("insert into arefshiftedframes ("
                          "arefshiftedframe, "
                          "origframekey, "
-                         "astomref, "
+                         "astromref, "
                          "itrans, "
                          "shiftisok, "
                          "didwarpcheck, "
@@ -927,7 +929,7 @@ def arefshifted_frame_to_database(
                 query = ("insert into arefshiftedframes ("
                          "arefshiftedframe, "
                          "origframekey, "
-                         "astomref, "
+                         "astromref, "
                          "itrans, "
                          "shiftisok, "
                          "didwarpcheck "
@@ -1542,38 +1544,36 @@ def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
 
                     query = (
                         "insert into astromrefs ("
-                        "projectid, field, camera, ccd, isactive, entryts, "
-                        "framekey, fits, fistar, fiphot, jpeg, "
-                        "mediansval, mediandval, medianbgv, ngoodobj, "
+                        "projectid, field, camera, ccd, isactive, "
+                        "unixtime, "
+                        "framepath, jpegpath, "
+                        "sval, dval, bgv, ndet, "
                         "comment"
                         ") values ("
-                        "%s, %s, %s, %s, %s, current_timestamp, "
                         "%s, %s, %s, %s, %s, "
+                        "%s, "
+                        "%s, %s, "
                         "%s, %s, %s, %s, "
                         "%s"
                         ") on conflict on constraint astromrefs_pkey "
                         "do update set "
-                        "entryts = current_timestamp, "
-                        "framekey = %s, fits = %s, fistar = %s, fiphot = %s, "
-                        "jpeg = %s, mediansval = %s, mediandval = %s, "
-                        "medianbgv = %s, ngoodobj = %s, comment = %s"
+                        "unixtime = %s, "
+                        "framepath = %s, jpegpath = %s, "
+                        "sval = %s, dval = %s, bgv = %s, ndet = %s, "
+                        "comment = %s"
                     )
                     params = (
                         str(projectid), field, camera, ccd, int(makeactive),
-                        arefinfo['framekey'],
-                        os.path.join(REFBASEDIR, areftargetfits),
-                        os.path.join(REFBASEDIR, areftargetfistar),
-                        os.path.join(REFBASEDIR, areftargetfiphot),
-                        os.path.join(REFBASEDIR, areftargetjpeg),
+                        time.time(),
+                        os.path.join(refdir, areftargetfits),
+                        os.path.join(refdir, areftargetjpeg),
                         arefinfo['sval'], arefinfo['dval'],
                         arefinfo['bgv'],arefinfo['ndet'], arefinfo['comment'],
-                        arefinfo['framekey'],
-                        os.path.join(REFBASEDIR, areftargetfits),
-                        os.path.join(REFBASEDIR, areftargetfistar),
-                        os.path.join(REFBASEDIR, areftargetfiphot),
-                        os.path.join(REFBASEDIR, areftargetjpeg),
+                        time.time(),
+                        os.path.join(refdir, areftargetfits),
+                        os.path.join(refdir, areftargetjpeg),
                         arefinfo['sval'], arefinfo['dval'],
-                        arefinfo['bgv'],arefinfo['ndet'], arefinfo['comment'],
+                        arefinfo['bgv'],arefinfo['ndet'], arefinfo['comment']
                     )
 
                 elif not overwrite and (
@@ -1598,9 +1598,9 @@ def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
                     )
                     params = (
                         str(projectid), field, camera, ccd, int(makeactive),
-                        arefinfo['framekey'],
-                        os.path.join(REFBASEDIR, areftargetfits),
-                        os.path.join(REFBASEDIR, areftargetjpeg),
+                        time.time(),
+                        os.path.join(refdir, areftargetfits),
+                        os.path.join(refdir, areftargetjpeg),
                         arefinfo['sval'], arefinfo['dval'],
                         arefinfo['bgv'],arefinfo['ndet'], arefinfo['comment']
                     )
@@ -1871,7 +1871,6 @@ def dbget_astromref(projectid, field, ccd, database=None, camera=0):
         )
         params = (str(projectid), field, camera, ccd)
 
-        print(query)
         cursor.execute(query, params)
         row = cursor.fetchone()
 
@@ -1984,8 +1983,9 @@ def frames_astromref_worker(task):
 
         # figure out this frame's field, ccd, and projectid
         if observatory=='hatpi':
-            frameelems = get_header_keyword_list(frame, ['object', 'projid'])
-            felems = FRAMEREGEX.findall(os.path.basename(frame))
+            if fieldinfo is None:
+                frameelems = get_header_keyword_list(frame, ['object', 'projid'])
+                felems = FRAMEREGEX.findall(os.path.basename(frame))
 
         elif observatory=='tess':
             frameelems = {}
@@ -3231,11 +3231,17 @@ def xtrnsfits_convsub_worker(task, **kwargs):
 
         # first, figure out the input frame's projid, field, and ccd
         if observatory=='hatpi':
-            frameelems = get_header_keyword_list(frame, ['object', 'projid'])
-            felems = FRAMEREGEX.findall(os.path.basename(frame))
-            field, ccd, projectid = (frameelems['object'], int(felems[0][2]),
-                                     frameelems['projid'])
-            camera = 0
+            if fieldinfo is None:
+                frameelems = get_header_keyword_list(frame, ['object', 'projid'])
+                felems = FRAMEREGEX.findall(os.path.basename(frame))
+                field, ccd, projectid = (frameelems['object'], int(felems[0][2]),
+                                         frameelems['projid'])
+                camera = 0
+            else:
+                field, ccd, projectid, camera = (fieldinfo['field'],
+                                                 fieldinfo['ccd'],
+                                                 fieldinfo['projectid'],
+                                                 fieldinfo['camera'])
         elif observatory=='tess':
             camera = fieldinfo['camera']
             field = fieldinfo['field']
