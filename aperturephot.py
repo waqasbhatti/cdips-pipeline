@@ -5392,25 +5392,18 @@ def parallel_lc_statistics(lcdir,
                            dtype='S17,f8',
                            names=['objid','mag'])
 
+    # Using a dictionary leads to ~ 300x speedup
+    fovdict = dict(fovcat)
 
     for stat in results:
-
         if stat is not None:
-
             # find the catalog mag for this object
-            try:
-                catmag = fovcat['mag'][
-                    np.where(fovcat['objid'] == stat['lcobj'])
-                ]
-                if not catmag:
-                    print('no catalog mag for %s, using median TF3 mag' %
-                          stat['lcobj'])
-                    catmag = stat['median_tf3']
-            except Exception as e:
+            if stat['lcobj'] in fovdict:
+                catmag = fovdict[stat['lcobj']]
+            else:
                 print('no catalog mag for %s, using median TF3 mag' %
                       stat['lcobj'])
                 catmag = stat['median_tf3']
-
 
             # calculate the corrected mags if present
             if (correctioncoeffs and len(correctioncoeffs) == 3 and
@@ -6333,25 +6326,17 @@ def parallel_binnedlc_statistics(lcdir,
                            usecols=fovcatcols,
                            dtype='S17,f8',
                            names=['objid','mag'])
+    fovdict = dict(fovcat)
 
     for stat in results:
-
         if stat is not None:
-
             # find the catalog mag for this object
-            try:
-                catmag = fovcat['mag'][
-                    np.where(fovcat['objid'] == stat['lcobj'][:15])
-                    ]
-                if not catmag:
-                    print('no catalog mag for %s, using median TF3 mag' %
-                          stat['lcobj'])
-                    catmag = stat['median_tf3']
-            except Exception as e:
+            if stat['lcobj'] in fovdict:
+                catmag = fovdict[stat['lcobj']]
+            else:
                 print('no catalog mag for %s, using median TF3 mag' %
                       stat['lcobj'])
                 catmag = stat['median_tf3']
-
 
             # find the corrected mag for this source if possible
             if corrmaginfo is not None:

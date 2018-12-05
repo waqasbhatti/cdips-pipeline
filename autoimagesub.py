@@ -1885,6 +1885,9 @@ def dbget_astromref(projectid, field, ccd, database=None, camera=0):
 
             returnval = astromref
 
+        else:
+            returnval = None
+
     # if everything goes wrong, exit cleanly
     except Exception as e:
 
@@ -2189,7 +2192,7 @@ def framelist_make_xtrnsfits(fitsfiles,
 
     # check if astrometric translation was already done.
     existing = glob.glob(
-        fitsdir+fitsglob.replace('.fits', '-xtrns.fits')
+        os.path.join(fitsdir, fitsglob.replace('.fits', '-xtrns.fits'))
     )
 
     requested = list(map(os.path.basename, fitsfiles))
@@ -2730,19 +2733,28 @@ def generate_combined_photref(
     masterphotref = photrefinfo['masterphotref']
 
     if observatory=='hatpi':
-        frameelems = get_header_keyword_list(masterphotref,
-                                             ['object','projid'])
-        felems = FRAMEREGEX.findall(
-            os.path.basename(masterphotref)
-        )
+        if fieldinfo is not None:
+            cam = fieldinfo['camera']
+            ccd = fieldinfo['ccd']
+            masterphotrefinfo = {'field':fieldinfo['field'],
+                                 'ccd':fieldinfo['ccd'],
+                                 'cam':fieldinfo['camera'],
+                                 'projectid':fieldinfo['projectid']}
+        else:
+            # Infer field info
+            frameelems = get_header_keyword_list(masterphotref,
+                                                 ['object','projid'])
+            felems = FRAMEREGEX.findall(
+                os.path.basename(masterphotref)
+            )
 
-        if felems and felems[0]:
-            cam = 0
-            ccd = felems[0][2]
-            masterphotrefinfo = {'field':frameelems['object'],
-                                 'cam':cam,
-                                 'ccd':int(ccd),
-                                 'projectid':frameelems['projid']}
+            if felems and felems[0]:
+                cam = 0
+                ccd = felems[0][2]
+                masterphotrefinfo = {'field':frameelems['object'],
+                                     'cam':cam,
+                                     'ccd':int(ccd),
+                                     'projectid':frameelems['projid']}
 
     elif observatory=='tess':
         cam = fieldinfo['camera']
@@ -3301,8 +3313,8 @@ def parallel_xtrnsfits_convsub(xtrnsfits,
     # first, check if the convolved, subtracted frames already exist. if so,
     # and overwrite == False, then do not run them.
 
-    existingcsframes = glob.glob(
-        fitsdir+'rsub-????????-'+fitsglob.replace('.fits','-xtrns.fits'))
+    existingcsframes = glob.glob(os.path.join(
+        fitsdir, 'rsub-????????-'+fitsglob.replace('.fits','-xtrns.fits')))
 
     if len(existingcsframes) > 0 and not overwrite:
 
@@ -3397,12 +3409,19 @@ def convsubfits_staticphot_worker(task):
         )
 
         if observatory=='hatpi':
-            # first, figure out the input frame's projid, field, and ccd
             frameinfo = FRAMEREGEX.findall(os.path.basename(subframe))
-            frameelems = get_header_keyword_list(subframe, ['object', 'projid'])
-            field, ccd, projectid = (frameelems['object'], int(frameinfo[0][2]),
-                                     frameelems['projid'])
-            camera = 0
+            if fieldinfo is None:
+                # first, figure out the input frame's projid, field, and ccd
+                frameelems = get_header_keyword_list(subframe, ['object', 'projid'])
+                field, ccd, projectid = (frameelems['object'], int(frameinfo[0][2]),
+                                         frameelems['projid'])
+                camera = 0
+            else:
+                field = fieldinfo['field']
+                ccd = fieldinfo['ccd']
+                projectid = fieldinfo['projectid']
+                camera = fieldinfo['camera']
+
         elif observatory=='tess':
             field = fieldinfo['field']
             ccd = fieldinfo['ccd']
@@ -3519,8 +3538,8 @@ def parallel_convsubfits_staticphot(
     # check if the convolved, subtracted frames already have photometry. if so,
     # and overwrite == False, then do not re-run photometry.
 
-    existingiphot = glob.glob(fitsdir+'rsub-????????-'+
-                              fitsglob.replace('.fits','iphot'))
+    existingiphot = glob.glob(os.path.join(
+        fitsdir,'rsub-????????-'+ fitsglob.replace('.fits','iphot')))
 
     if len(existingiphot) > 0 and not overwrite:
 
