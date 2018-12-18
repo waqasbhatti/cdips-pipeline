@@ -2241,7 +2241,7 @@ def framelist_make_xtrnsfits(fitsfiles,
     if len(xtrns) != len(fitsn):
         raise AssertionError(
             'something wrong in astrometric shift.'+
-            '\nN_fits: {:d}'.format(len(fits))+
+            '\nN_fits: {:d}'.format(len(fitsn))+
             '\nN_xtrns: {:d}'.format(len(xtrns))
         )
 
