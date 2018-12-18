@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 '''
 run
-$ python TESS_ETE6_reduction.py --help
+$ python TESS_reduction.py --help
 '''
 from __future__ import division, print_function
 
@@ -18,6 +18,7 @@ from astropy.io import fits
 from astropy import units as units, constants as constants
 from datetime import datetime
 import argparse
+from parse import parse, search
 
 np.random.seed(42)
 
@@ -544,7 +545,7 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir,
 
     args:
         statsdir (str): e.g.,
-        '/nfs/phtess1/ar1/TESS/SIMFFI/LC/TUNE/orbit-10/ISP_1-2/stats_files/'
+        '/nfs/phtess1/ar1/TESS/SIMFFI/LC/TUNE/sector-10/ISP_1-2/stats_files/'
 
         lcdirectory (str): one level up from statsdir.
 
@@ -705,7 +706,7 @@ def is_image_noise_gaussian(
     imgglob = 'tess*-xtrns.fits'
     sciimgfiles = np.sort(glob(fitsdir+imgglob))
 
-    # e.g., proj43-orbit-10-cam1-ccd2-combinedphotref-onenight.fits
+    # e.g., proj43-sector-10-cam1-ccd2-combinedphotref-onenight.fits
     photrefglob = ('proj{:d}-{:s}-cam{:s}-ccd{:s}-*.fits'.format(
                    projectid,field,str(camera),str(ccd)))
     photreffile = np.sort(glob(photrefdir+photrefglob))
@@ -729,7 +730,8 @@ def is_image_noise_gaussian(
             subimg_normalized, rsubimgfile)
 
 
-def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
+def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
+         outdir=sv.REDPATH,
          lcdirectory=None, nworkers=1,
          aperturelist='1.45:7.0:6.0,1.95:7.0:6.0,2.45:7.0:6.0',
          kernelspec='b/4;i/4;d=4/4', convert_to_fitsh_compatible=True,
@@ -737,7 +739,7 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
          anetradius=30,
          zeropoint=11.82,
          epdsmooth=21, epdsigclip=10, photdisjointradius=2,
-         tuneparameters='true', is_ete6=True,
+         tuneparameters='true', is_ete6=False,
          catalog_faintrmag=13, fiphotfluxthreshold=1000,
          photreffluxthreshold=1000, extractsources=True, binlightcurves=False
          ):
@@ -778,21 +780,24 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
     # work with). trim images, and save to a single-extension fits file.
 
     if is_ete6:
-        ete6_reddir = '/nfs/phtess1/ar1/TESS/SIMFFI/RED/'
-        ete6_list = np.sort(
-            glob(ete6_reddir+fitsglob.replace('_cal_img.fits','-s_ffic.fits'))
+        RED_dir = '/nfs/phtess1/ar1/TESS/SIMFFI/ARCHIVAL/'
+        ffi_list = np.sort(
+            glob(RED_dir+fitsglob.replace('_cal_img.fits','-s_ffic.fits'))
         )
     else:
-        raise NotImplementedError('need path for real images')
+        RED_dir = '/nfs/phtess1/ar1/TESS/FFI/RED/'
+        ffi_list = np.sort(
+            glob(RED_dir+fitsglob.replace('_cal_img.fits','-s_ffic.fits'))
+        )
 
     if tuneparameters=='true':
         # select 150 sequential images for pipeline tuning
-        ete6_list = ete6_list[400:550]
+        ffi_list = ffi_list[300:450]
     else:
         pass
 
     if convert_to_fitsh_compatible:
-        tu.from_ete6_to_fitsh_compatible(ete6_list, outdir)
+        tu.from_CAL_to_fitsh_compatible(ffi_list, outdir)
 
     ###########################################################################
 
@@ -842,12 +847,21 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
         raise AssertionError('if initial wcs failed on majority of frames, '
                              'you need to fix that.')
 
+    # #FIXME
+    # rawphotpattern = fitsdir+fitsglob.replace('.fits','.fiphot')
+    # ism.dump_lightcurves_with_grcollect(
+    #     rawphotpattern, lcdirectory, '4g', lcextension='grcollectrawlc',
+    #     objectidcol=3, observatory='tess')
+    # import IPython; IPython.embed()
+    # assert 0
+    # #FIXME
+
     #############################################################
     # run image subtraction convolution, then do the photometry #
     #############################################################
 
-    camera = int(fitsglob.split('-')[1])
-    ccd = int(fitsglob.split('-')[2])
+    camera = int(camnum)
+    ccd = int(ccdnum)
 
     fieldinfo = {}
     fieldinfo['camera'] = camera
@@ -897,7 +911,7 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
                make_whisker_plot=True)
 
     # TODO: maybe change the statsfile format, and include CDPP? or some
-    # duration-aware RMS measure
+    # duration-aware RMS measure. because red noise exists.
 
 
 def check_args(args):
@@ -907,8 +921,10 @@ def check_args(args):
         print('fitsglob must not be null')
     if not args.field:
         print('field must not be null')
-    if not (args.tuneparameters=='true') or (args.tuneparameters=='false'):
+    if not ( (args.tuneparameters=='true') or (args.tuneparameters=='false') ):
         raise AssertionError('boolean tuneparameters must be set as string.')
+    if not (args.camnum in [1,2,3,4]) and (args.ccdnum in [1,2,3,4]):
+        print('camnum and ccdnum must be given')
 
 
 if __name__ == '__main__':
@@ -928,6 +944,11 @@ if __name__ == '__main__':
 
     parser.add_argument('--field', type=str, default=None,
         help=('field identifier string, e.g., "sector1"'))
+
+    parser.add_argument('--camnum', type=int, default=0,
+        help=('camera id number'))
+    parser.add_argument('--ccdnum', type=int, default=0,
+        help=('ccd id number'))
 
     parser.add_argument('--outdir', type=str, default=None,
         help=('e.g., /foo/FFI/RED'))
@@ -1072,6 +1093,7 @@ if __name__ == '__main__':
         extractsources = False
 
     main(args.fitsdir, args.fitsglob, args.projectid, args.field,
+         args.camnum, args.ccdnum,
          outdir=args.outdir, lcdirectory=args.lcdirectory,
          nworkers=args.nworkers, aperturelist=args.aperturelist,
          convert_to_fitsh_compatible=args.cfc, kernelspec=args.kernelspec,

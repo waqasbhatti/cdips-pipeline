@@ -27,3 +27,4 @@ GITREV
 .emailsettings
 *bin*
 examples/logs/
+scripts/log*
