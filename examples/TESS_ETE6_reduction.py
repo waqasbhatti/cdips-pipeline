@@ -18,6 +18,7 @@ from astropy.io import fits
 from astropy import units as units, constants as constants
 from datetime import datetime
 import argparse
+from parse import parse, search
 
 np.random.seed(42)
 
@@ -729,7 +730,8 @@ def is_image_noise_gaussian(
             subimg_normalized, rsubimgfile)
 
 
-def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
+def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
+         outdir=sv.REDPATH,
          lcdirectory=None, nworkers=1,
          aperturelist='1.45:7.0:6.0,1.95:7.0:6.0,2.45:7.0:6.0',
          kernelspec='b/4;i/4;d=4/4', convert_to_fitsh_compatible=True,
@@ -787,7 +789,9 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
 
     if tuneparameters=='true':
         # select 150 sequential images for pipeline tuning
-        ete6_list = ete6_list[400:550]
+        # NOTE: often needed
+        #ete6_list = ete6_list[400:550]
+        pass
     else:
         pass
 
@@ -846,8 +850,8 @@ def main(fitsdir, fitsglob, projectid, field, outdir=sv.REDPATH,
     # run image subtraction convolution, then do the photometry #
     #############################################################
 
-    camera = int(fitsglob.split('-')[1])
-    ccd = int(fitsglob.split('-')[2])
+    camera = int(camnum)
+    ccd = int(ccdnum)
 
     fieldinfo = {}
     fieldinfo['camera'] = camera
@@ -907,8 +911,10 @@ def check_args(args):
         print('fitsglob must not be null')
     if not args.field:
         print('field must not be null')
-    if not (args.tuneparameters=='true') or (args.tuneparameters=='false'):
+    if not ( (args.tuneparameters=='true') or (args.tuneparameters=='false') ):
         raise AssertionError('boolean tuneparameters must be set as string.')
+    if not (args.camnum in [1,2,3,4]) and (args.ccdnum in [1,2,3,4]):
+        print('camnum and ccdnum must be given')
 
 
 if __name__ == '__main__':
@@ -928,6 +934,11 @@ if __name__ == '__main__':
 
     parser.add_argument('--field', type=str, default=None,
         help=('field identifier string, e.g., "sector1"'))
+
+    parser.add_argument('--camnum', type=int, default=0,
+        help=('camera id number'))
+    parser.add_argument('--ccdnum', type=int, default=0,
+        help=('ccd id number'))
 
     parser.add_argument('--outdir', type=str, default=None,
         help=('e.g., /foo/FFI/RED'))
@@ -1072,6 +1083,7 @@ if __name__ == '__main__':
         extractsources = False
 
     main(args.fitsdir, args.fitsglob, args.projectid, args.field,
+         args.camnum, args.ccdnum,
          outdir=args.outdir, lcdirectory=args.lcdirectory,
          nworkers=args.nworkers, aperturelist=args.aperturelist,
          convert_to_fitsh_compatible=args.cfc, kernelspec=args.kernelspec,
