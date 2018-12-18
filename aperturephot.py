@@ -976,7 +976,7 @@ def make_fov_catalog(ra=None, dec=None, size=None,
                                                     catdec,
                                                     catbox)
     if outdir:
-        outfile = outdir + outfile
+        outfile = os.path.join(outdir, outfile)
 
     print('%sZ: making FOV catalog for '
           'center RA, DEC = %.5f, %.5f with size = %.5f deg' %
