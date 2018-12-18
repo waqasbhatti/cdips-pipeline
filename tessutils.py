@@ -19,14 +19,23 @@ from numpy import array as nparr, all as npall
 
 ##########################################
 
-def from_ete6_to_fitsh_compatible(fits_list, outdir):
+def from_CAL_to_fitsh_compatible(fits_list, outdir):
     '''
-    This function takes a list of ETE6 reduced images and turns them into
-    fitsh-compatible images.
+    This function takes a list of calibrated images from MAST and turns them
+    into fitsh-compatible images.
 
     This means:
         * single extension
         * trimmed to remove virtual columns
+
+    Args:
+        fits_list (np.ndarray): list of calibrated full frame images from MAST.
+        (Each image is a single CCD).
+
+        outdir (str): directory to write the files to.
+
+    Returns:
+        nothing.
     '''
 
     if not os.path.exists(outdir):
@@ -69,7 +78,8 @@ def from_ete6_to_fitsh_compatible(fits_list, outdir):
 
         data, hdr = iu.read_fits(fits_name, ext=1)
 
-        # the header is 1-based counting.
+        # FITS header is 1-based counting, but python is 0-based. To convert
+        # from FITS->python from slicing you need to subtract 1.
         rows = hdr['SCIROWS']-1 # row start.
         rowe = hdr['SCIROWE']-1+1 # row end (inclusive)
         cols = hdr['SCCSA']-1 # col start
@@ -87,6 +97,14 @@ def from_ete6_to_fitsh_compatible(fits_list, outdir):
             )
         )
 
+
+def from_ete6_to_fitsh_compatible(fits_list, outdir):
+    '''
+    This function takes a list of ETE6 reduced images and turns them into
+    fitsh-compatible images.
+    '''
+
+    from_CAL_to_fitsh_compatible(fits_list, outdir)
 
 ##############################
 # UNDER CONSTRUCTION
