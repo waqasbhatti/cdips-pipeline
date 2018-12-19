@@ -2385,9 +2385,13 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
            maxbackgroundmedian))
 
     # get nights with ngoodobjects > minngoodobjects (to possibly
-    # remove cloudy nights)
-    minngoodobjects = np.nanpercentile(frameinfo['ngoodobjects'],
-                                       minngoodobjectpctile)
+    # remove cloudy nights). minus 1 because for space-based data, you can
+    # sometimes have frame stacks with identical numbers of "good objects"
+    # parsed.
+    minngoodobjects = (
+        np.nanpercentile(frameinfo['ngoodobjects'], minngoodobjectpctile)
+        - 1
+    )
     ngoodobjectind = frameinfo['ngoodobjects'] > minngoodobjects
 
     print('%sZ: %s frames with ngoodobjects > %s' %
@@ -3463,8 +3467,11 @@ def convsubfits_staticphot_worker(task):
 
         if observatory=='tess':
 
-            namesub = re.findall('tess20.*?-0016_cal_img', subframe)
-            assert len(namesub) == 1, 'TESS ETE6 specific regex!'
+            namesub = re.findall('tess20.*?-[0-9][0-9][0-9][0-9]_cal_img', subframe)
+            if not len(namesub) == 1:
+                raise AssertionError(
+                    'expected only one subframe, got {:s}'.
+                    format(repr(namesub)))
             namesub = namesub[0]
 
             kernelf = '%s-%s-%s-xtrns.fits-kernel' % (photrefbit, convsubhash,

@@ -2186,9 +2186,12 @@ def subframe_photometry_worker(task):
                                                    frameinfo[0][1],
                                                    frameinfo[0][2])
         elif observatory=='tess':
-            name = re.findall('tess20.*?-0016_cal_img', subframe)
-            assert len(name) == 1, 'TESS ETE6 specific regex!'
-            name = name[0]
+            namesub = re.findall('tess20.*?-[0-9][0-9][0-9][0-9]_cal_img', subframe)
+            if not len(namesub) == 1:
+                raise AssertionError(
+                    'expected only one subframe, got {:s}'.
+                    format(repr(namesub)))
+            name = namesub[0]
             frameiphot = '%s-%s-%s.iphot' % (subtractionbit, outiphothash, name)
 
         if outdir:
@@ -2485,8 +2488,12 @@ def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
     for ix, photpath in enumerate(photpaths):
 
         if observatory=='tess':
-            framekey = re.findall('tess20.*?-0016_cal_img', photpath)
-            assert len(framekey) == 1, 'TESS ETE6 specific regex!'
+            framekey = re.findall('tess20.*?-[0-9][0-9][0-9][0-9]_cal_img',
+                                  photpath)
+            if not len(framekey) == 1:
+                raise AssertionError(
+                    'expected only one photframe, got {:s}'.
+                    format(repr(framekey)))
             originalframe = os.path.join(os.path.dirname(photpath),
                                          framekey[0]+'.fits')
         elif observatory=='hatpi':
