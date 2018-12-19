@@ -558,6 +558,19 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir,
         make_whisker_plot (bool)
     '''
 
+    whiskerfiles = glob(os.path.join(statsdir,'whisker_*png'))
+    if not whiskerfiles:
+        lcs.whisker_MAD_stats_and_plots(statsdir, outprefix, binned=binned,
+                                        make_whisker_plot=make_whisker_plot,
+                                        whisker_xlim=whisker_xlim,
+                                        whisker_ylim=whisker_ylim)
+    else:
+        print('found whisker plots')
+
+    is_image_noise_gaussian(fitsdir, projectid, field, camera, ccd)
+
+    _plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20)
+
     # how long did the pipeline take?
     endtime = datetime.utcnow()
     howlong = (endtime - starttime).total_seconds()*units.s
@@ -573,19 +586,7 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir,
     summarydf = pd.DataFrame(SUMMARY, index=[0])
     summarypath = os.path.join(statsdir,'timing_summary.csv')
     summarydf.to_csv(summarypath, index=False)
-
-    whiskerfiles = glob(os.path.join(statsdir,'whisker_*png'))
-    if not whiskerfiles:
-        lcs.whisker_MAD_stats_and_plots(statsdir, outprefix, binned=binned,
-                                        make_whisker_plot=make_whisker_plot,
-                                        whisker_xlim=whisker_xlim,
-                                        whisker_ylim=whisker_ylim)
-    else:
-        print('found whisker plots')
-
-    is_image_noise_gaussian(fitsdir, projectid, field, camera, ccd)
-
-    _plot_random_lightcurve_subsample(lcdirectory, n_lcs=20)
+    print('wrote {}'.format(summarypath))
 
 
 def _plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20,
@@ -625,6 +626,9 @@ def _plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20,
                 '_AP{:d}'.format(ap)+'.png'
             )
 
+            if os.path.exists(savpath):
+                continue
+
             lcs.plot_raw_epd_tfa(lcdata[timename],
                                  lcdata[rawap],
                                  lcdata[epdap],
@@ -635,6 +639,13 @@ def _plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20,
 def _plot_normalized_subtractedimg_histogram(
     subimg_normalized, rsubimgfile, zerooutnans=True):
     '''subimg_normalized: subtracted, normalized image.'''
+
+    savdir = os.path.dirname(rsubimgfile)
+    savname = (
+        os.path.basename(rsubimgfile).replace(
+            '.fits','-normalized_histogram.png')
+    )
+    savpath = os.path.join(savdir, savname)
 
     if zerooutnans:
         subimg_normalized[np.isnan(subimg_normalized)] = 0
@@ -673,13 +684,6 @@ def _plot_normalized_subtractedimg_histogram(
     ax.set_ylabel('number of pixels')
     plt.ticklabel_format(axis='y', style='sci', scilimits=(-1,1))
 
-    savdir = os.path.dirname(rsubimgfile)
-    savname = (
-        os.path.basename(rsubimgfile).replace(
-            '.fits','-normalized_histogram.png')
-    )
-    savpath = os.path.join(savdir, savname)
-
     f.tight_layout()
     f.savefig(savpath, dpi=200, bbox_inches='tight')
     print('%sZ: wrote %s' % (datetime.utcnow().isoformat(), savpath))
@@ -687,7 +691,8 @@ def _plot_normalized_subtractedimg_histogram(
 
 def is_image_noise_gaussian(
     fitsdir, projectid, field, camera, ccd,
-    photrefdir='/nfs/phtess1/ar1/TESS/SIMFFI/BASE/reference-frames/'):
+    photrefdir='/nfs/phtess1/ar1/TESS/SIMFFI/BASE/reference-frames/',
+    n_histograms_to_make=40):
     '''
     The noise in the differenced image should be gaussian.  Oelkers & Stassun
     (2018) suggest the following approach to check whether it is.
@@ -718,7 +723,17 @@ def is_image_noise_gaussian(
     photreffile = photreffile[0]
     photrefimg, _ = iu.read_fits(photreffile, ext=0)
 
-    for rsubimgfile, sciimgfile in zip(rsubfiles, sciimgfiles):
+    for rsubimgfile, sciimgfile in zip(rsubfiles[:n_histograms_to_make],
+                                       sciimgfiles[:n_histograms_to_make]):
+
+        savdir = os.path.dirname(rsubimgfile)
+        savname = (
+            os.path.basename(rsubimgfile).replace(
+                '.fits','-normalized_histogram.png')
+        )
+        savpath = os.path.join(savdir, savname)
+        if os.path.exists(savpath):
+            continue
 
         subimg, subhdr = iu.read_fits(rsubimgfile, ext=0)
         sciimg, scihdr = iu.read_fits(sciimgfile, ext=0)
@@ -729,6 +744,8 @@ def is_image_noise_gaussian(
 
         _plot_normalized_subtractedimg_histogram(
             subimg_normalized, rsubimgfile)
+
+
 
 
 def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
@@ -913,7 +930,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     statsdir = os.path.dirname(epdstatfile)+'/'
     assess_run(statsdir, lcdirectory, starttime, field, fitsdir, projectid,
                field, camera, ccd, tfastatfile, binned=False,
-               make_whisker_plot=True)
+               make_whisker_plot=True, whisker_xlim=[4,catalog_faintrmag])
 
     # TODO: maybe change the statsfile format, and include CDPP? or some
     # duration-aware RMS measure. because red noise exists.
