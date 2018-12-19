@@ -149,6 +149,12 @@ ZEROPOINTS = {3:17.11,
 # used to get the station ID, frame number, and CCD number from a FITS filename
 FRAMEREGEX = re.compile(r'(\d{1})\-(\d{6}\w{0,1})_(\d{1})')
 
+# command string to use gaia2read for specified FOV
+GAIADR2READCMD = ("gaia2read -r {ra:f} -d {dec:f} -s {boxlen:f} "
+                  "--mR {brightrmag:f} --MR {faintrmag:f} "
+                  "--xieta-coords --header --extra "
+                  "--idrequest HAT -o {outfile}")
+
 # command string to do a 2massread for a specified FOV
 TWOMASSREADCMD = ("2massread -r {ra:f} -d {dec:f} -s {boxlen:f} "
                   "--cat {catalogpath} -mr {brightrmag:f} -Mr {faintrmag:f} "
@@ -164,7 +170,9 @@ CATALOGS = {
     '2MASS':{'cmd':TWOMASSREADCMD,
              'path':sv.TWOMASSPATH},
     'UCAC4':{'cmd':UCAC4READCMD,
-             'path':sv.UCAC4PATH}
+             'path':sv.UCAC4PATH},
+    'GAIADR2': {'cmd':GAIADR2READCMD,
+                'path':sv.GAIADR2PATH}
     }
 
 # command string to run fistar
@@ -1031,6 +1039,39 @@ def make_fov_catalog(ra=None, dec=None, size=None,
 
         return None
 
+
+def reform_gaia_fov_catalog(incat, outcat,
+        columns='id,ra,dec,xi,eta,G,Rp,Bp,plx,pmra,pmdec,varflag'):
+    '''
+    THis convertes the output catalog for gaia2read to the format required
+    for magfit.
+
+    columns is a CSV string containing the required columns.
+    '''
+    allcolumns = ['id','ra','dec','raerr','decerr','plx','plxerr','pmra',
+                  'pmdec','pmraerr','pmdecerr','epoch','astexcnoise',
+                  'astexcnoisesig','astpriflag','G_nobs','G_flux',
+                  'G_fluxerr','G_fluxovererr','G','Bp_nobs','Bp_flux',
+                  'Bp_fluxerr','Bp_fluxovererr','Bp','Rp_nobs','Rp_flux',
+                  'Rp_fluxerr','Rp_fluxovererr','Rp','BpRp_excess','RV',
+                  'RV_err','varflag','Teff','Teff_lowq','Teff_highq',
+                  'extinction','extinction_lowq','extinction_highq',
+                  'reddening','reddening_lowq','reddening_highq',
+                  'Rstar','Rstar_lowq','Rstar_highq','L','L_lowq','L_highq',
+                  'xi','eta']
+
+    columns = columns.split(',')
+    colstoget = [allcolumns.index(x) for x in columns]
+
+    inf = open(incat,'rb')
+    outf = open(outcat,'wb')
+
+    for line in inf:
+        if '#' not in line:
+            sline = line.split()
+            outcols = [sline[x] for x in colstoget]
+            outline = ' '.join(outcols)
+            outf.write('%s\n' % outline)
 
 
 def reform_fov_catalog(incat,
