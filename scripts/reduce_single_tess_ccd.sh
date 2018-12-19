@@ -123,10 +123,10 @@ python -u TESS_reduction.py \
   --camnum $camnum --ccdnum $ccdnum \
   &> logs/$logname &
 
-
 ##########################################################
 # if desired, make movie of subtracted, convolved frames #
 ##########################################################
+wait
 if [ "$makesubconvmovie" = true ] ; then
   imgdir='/nfs/phtess1/ar1/TESS/FFI/RED_IMGSUB/FULL/'${sector}'/RED_'${camnum}'-'${ccdnum}'_ISP/'
   outdir='/nfs/phtess1/ar1/TESS/FFI/MOVIES/'
