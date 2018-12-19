@@ -2,25 +2,32 @@
 
 ##########################################
 #
-# USAGE:
-#   ./reduce_ete6_field.sh (log piping is automatic)
+# USAGE: change the parameters from the first two sections below. Then, from
+# shell:
+#
+#   ./reduce_single_tess_ccd.sh (log piping is automatic)
 #
 # PURPOSE:
 #   make lightcurves from images
 #
 ##########################################
 
-# data-specific parameters
+############################
+# data-specific parameters #
+############################
 camnum=1
 ccdnum=1
-projectid=9001
+projectid=9002        # increment this whenever new things go to PSQL database.
 sector='s0001'        # match SPOC syntax, zfill to 4.
 
-# reduction-specific parameters
-tuneparameters=true   # if true, does 150 images. otherwise, does all of em.
+#################################
+# reduction-specific parameters #
+#################################
+makesubconvmovie=true
+tuneparameters=false  # if true, does 150 images. if false, does all of them.
 nworkers=20
 aperturelist="1.95:7.0:6.0,2.95:7.0:6.0,3.95:7.0:6.0"
-epdsmooth=11    # 11*30min = 5.5 hour median smooth in EPD pre-processing.
+epdsmooth=11          # 11*30min = 5.5 hr median smooth in EPD pre-processing.
 epdsigclip=10
 photdisjointradius=2
 anetfluxthreshold=50000
@@ -33,6 +40,10 @@ fiphotfluxthreshold=3000  ## fiphotfluxthreshold=300
 photreffluxthreshold=3000 ## photreffluxthreshold=300
 extractsources=0
 binlightcurves=0
+
+##########################################
+##########################################
+##########################################
 
 #########################
 # interpret the options #
@@ -109,5 +120,21 @@ python -u TESS_reduction.py \
   --fiphotfluxthreshold $fiphotfluxthreshold \
   --photreffluxthreshold $photreffluxthreshold \
   --extractsources $extractsources --$binlcoption \
-  --camnum $camnum --ccdnum $ccdnum #\
-  #&> logs/$logname &
+  --camnum $camnum --ccdnum $ccdnum \
+  &> logs/$logname &
+
+
+##########################################################
+# if desired, make movie of subtracted, convolved frames #
+##########################################################
+if [ "$makesubconvmovie" = true ] ; then
+  imgdir='/nfs/phtess1/ar1/TESS/FFI/RED_IMGSUB/FULL/'${sector}'/RED_'${camnum}'-'${ccdnum}'_ISP/'
+  outdir='/nfs/phtess1/ar1/TESS/FFI/MOVIES/'
+
+  ffmpeg -framerate 24 \
+         -pattern_type \
+         glob -i $imgdir'JPEG-SUBTRACTEDCONV-*.jpg' \
+         -c:v libx264 \
+         -preset fast \
+         ${outdir}${sector}'_cam'${camnum}'_ccd'${ccdnum}'_SUBTRACTEDCONV.mp4'
+fi
