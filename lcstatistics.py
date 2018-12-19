@@ -193,92 +193,96 @@ def whisker_MAD_stats_and_plots(statdir, outprefix, binned=False,
                   'rm1','rm2','rm3',
                   'ep1','ep2','ep3']:
 
-        medstr = 'med_'+apstr
-        madstr = 'mad_'+apstr
+        try:
+            medstr = 'med_'+apstr
+            madstr = 'mad_'+apstr
 
-        minmag = np.floor(np.nanmin(stats[medstr])).astype(int)
-        maxmag = np.ceil(np.nanmax(stats[medstr])).astype(int)
-        mag_bins = [
-            (me, me+1) for me in np.arange(minmag, maxmag, 1)
-        ]
+            minmag = np.floor(np.nanmin(stats[medstr])).astype(int)
+            maxmag = np.ceil(np.nanmax(stats[medstr])).astype(int)
+            mag_bins = [
+                (me, me+1) for me in np.arange(minmag, maxmag, 1)
+            ]
 
-        percentile_dict = {}
-        for mag_bin in mag_bins:
+            percentile_dict = {}
+            for mag_bin in mag_bins:
 
-            thismagmean = np.round(np.mean(mag_bin),1)
-            percentile_dict[thismagmean] = {}
+                thismagmean = np.round(np.mean(mag_bin),1)
+                percentile_dict[thismagmean] = {}
 
-            thismin, thismax = min(mag_bin), max(mag_bin)
-            sel = (stats[medstr] > thismin) & (stats[medstr] <= thismax)
+                thismin, thismax = min(mag_bin), max(mag_bin)
+                sel = (stats[medstr] > thismin) & (stats[medstr] <= thismax)
 
-            for percentile in percentiles:
-                val = np.percentile(stats[sel][madstr], percentile)
-                percentile_dict[thismagmean][percentile] = np.round(val,7)
+                for percentile in percentiles:
+                    val = np.nanpercentile(stats[sel][madstr], percentile)
+                    percentile_dict[thismagmean][percentile] = np.round(val,7)
 
-        pctile_df = pd.DataFrame(percentile_dict)
+            pctile_df = pd.DataFrame(percentile_dict)
 
-        if make_whisker_plot:
+            if make_whisker_plot:
 
-            plt.close('all')
-            fig, ax = plt.subplots(figsize=(4,3))
+                plt.close('all')
+                fig, ax = plt.subplots(figsize=(4,3))
 
-            # whisker plot isn't aware of absolute x values, it just sees them
-            # as different columns. thus we need to pre-select the magnitude
-            # columns according to whisker_xlims that are passed.
-            if whisker_xlim:
-                sel_cols = (
-                    (pctile_df.columns < max(whisker_xlim)) &
-                    (pctile_df.columns > min(whisker_xlim))
+                # whisker plot isn't aware of absolute x values, it just sees them
+                # as different columns. thus we need to pre-select the magnitude
+                # columns according to whisker_xlims that are passed.
+                if whisker_xlim:
+                    sel_cols = (
+                        (pctile_df.columns < max(whisker_xlim)) &
+                        (pctile_df.columns > min(whisker_xlim))
+                    )
+                    # surprising that i couldn't figure out a smarter way ._.
+                    plotdf = pctile_df.transpose()[sel_cols].transpose()
+
+                boxdata = np.array(plotdf).T
+
+                b = _customized_box_plot(
+                    boxdata, ax, redraw=True, notch=0, vert=1, whis=1.5
                 )
-                # surprising that i couldn't figure out a smarter way ._.
-                plotdf = pctile_df.transpose()[sel_cols].transpose()
 
-            boxdata = np.array(plotdf).T
+                ax.set_yscale('log')
+                ax.set_xlabel('{:s} median instrument magnitude'.format(apstr.upper()))
+                ax.set_ylabel('{:s} median abs. dev.'.format(apstr.upper()))
+                xticklabels = []
+                for ix, m in enumerate(np.mean(mag_bins, axis=1)):
+                    if ix%2==0:
+                        xticklabels.append(m)
+                    else:
+                        xticklabels.append('')
+                ax.set_xticklabels(xticklabels)
+                if whisker_ylim:
+                    ax.set_ylim(whisker_ylim)
 
-            b = _customized_box_plot(
-                boxdata, ax, redraw=True, notch=0, vert=1, whis=1.5
-            )
+                titlestr = '{:s} - {:d} - {:s}'.format(
+                    outprefix,
+                    len(stats),
+                    '{:s} percentiles'.format(repr(percentiles))
+                )
+                ax.set_title(titlestr, fontsize='small')
 
-            ax.set_yscale('log')
-            ax.set_xlabel('{:s} median instrument magnitude'.format(apstr.upper()))
-            ax.set_ylabel('{:s} median abs. dev.'.format(apstr.upper()))
-            xticklabels = []
-            for ix, m in enumerate(np.mean(mag_bins, axis=1)):
-                if ix%2==0:
-                    xticklabels.append(m)
-                else:
-                    xticklabels.append('')
-            ax.set_xticklabels(xticklabels)
-            if whisker_ylim:
-                ax.set_ylim(whisker_ylim)
+                plt.gca().grid(color='#a9a9a9',
+                               alpha=0.9,
+                               zorder=0,
+                               linewidth=1.0,
+                               linestyle=':')
 
-            titlestr = '{:s} - {:d} - {:s}'.format(
-                outprefix,
-                len(stats),
-                '{:s} percentiles'.format(repr(percentiles))
-            )
-            ax.set_title(titlestr, fontsize='small')
+                savname = ( os.path.join(
+                    statdir,'whisker_MAD_vs_med_mag_{:s}.png'.format(apstr.upper())
+                ))
+                fig.tight_layout()
+                fig.savefig(savname, dpi=250)
+                print('%sZ: made %s plot: %s' %
+                      (datetime.utcnow().isoformat(), titlestr, savname))
 
-            plt.gca().grid(color='#a9a9a9',
-                           alpha=0.9,
-                           zorder=0,
-                           linewidth=1.0,
-                           linestyle=':')
-
-            savname = ( os.path.join(
-                statdir,'whisker_MAD_vs_med_mag_{:s}.png'.format(apstr.upper())
+            csvname = ( os.path.join(
+                statdir,'whisker_MAD_vs_med_mag_{:s}.csv'.format(apstr.upper())
             ))
-            fig.tight_layout()
-            fig.savefig(savname, dpi=250)
-            print('%sZ: made %s plot: %s' %
-                  (datetime.utcnow().isoformat(), titlestr, savname))
-
-        csvname = ( os.path.join(
-            statdir,'whisker_MAD_vs_med_mag_{:s}.csv'.format(apstr.upper())
-        ))
-        pctile_df.to_csv(csvname, index=False)
-        print('%sZ: wrote %s' %
-              (datetime.utcnow().isoformat(), csvname))
+            pctile_df.to_csv(csvname, index=False)
+            print('%sZ: wrote %s' %
+                  (datetime.utcnow().isoformat(), csvname))
+        except Exception as e:
+            print('%sZ: failed to make whisker for %s, err was %s' %
+                  (datetime.utcnow().isoformat(), apstr, e))
 
 
 def plot_raw_epd_tfa(time, rawmag, epdmag, tfamag, ap_index, savpath=None,
