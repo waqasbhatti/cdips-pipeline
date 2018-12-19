@@ -19,6 +19,7 @@ from astropy import units as units, constants as constants
 from datetime import datetime
 import argparse
 from parse import parse, search
+import re
 
 np.random.seed(42)
 
@@ -748,7 +749,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
 
         projectid (int): ...
 
-        field (str): ...
+        field (str): e.g., "s0001", for sector 1. This regex is checked.
 
     kwargs:
 
@@ -778,6 +779,9 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     ###########################################################################
     # get list of ete6 reduced images. (different format from images fitsh can
     # work with). trim images, and save to a single-extension fits file.
+    if not re.match("s[0-9][0-9][0-9][0-9]", field):
+        raise AssertionError('field must be in format "s0001" (case-aware)')
+    sectornum = int(field[1:])
 
     if is_ete6:
         RED_dir = '/nfs/phtess1/ar1/TESS/SIMFFI/ARCHIVAL/'
@@ -785,9 +789,9 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
             glob(RED_dir+fitsglob.replace('_cal_img.fits','-s_ffic.fits'))
         )
     else:
-        RED_dir = '/nfs/phtess1/ar1/TESS/FFI/RED/'
+        RED_dir = '/nfs/phtess1/ar1/TESS/FFI/RED/sector-{:d}'.format(sectornum)
         ffi_list = np.sort(
-            glob(RED_dir+fitsglob.replace('_cal_img.fits','-s_ffic.fits'))
+            glob(os.path.join(RED_dir,fitsglob.replace('_cal_img.fits','-s_ffic.fits')))
         )
 
     if tuneparameters=='true':
@@ -804,7 +808,8 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     # TESS specific variables.
     ccd_fov = 12 # degrees. 24/2.
 
-    fits_list = np.sort(glob(fitsdir + fitsglob))
+    fits_list = np.sort(glob(os.path.join(fitsdir, fitsglob)))
+    #import IPython; IPython.embed() #FIXME
 
     # get gain, ccdextent, zeropoint, exposure time from header.
     rand_fits = fits_list[np.random.randint(0, high=len(fits_list))]

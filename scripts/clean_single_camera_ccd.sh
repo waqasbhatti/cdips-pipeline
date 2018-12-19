@@ -10,7 +10,7 @@
 # clear out calibratedframes table.
 # clear frameinfo cache from past week. 
 camnum=1
-ccdnum=2
+ccdnum=1
 
 ##########
 
@@ -23,8 +23,8 @@ psql -U hpx -h xphtess1 hpx -c \
 ##########
 
 # data-specific parameters
-projectid=43
-orbit='orbit-10'
+projectid=9001
+sector='s0001'
 
 # reduction-specific parameters
 tuneparameters=true
@@ -38,16 +38,16 @@ else
 fi
 
 # get paths
-LOCAL_IMGBASE="/nfs/phtess1/ar1/TESS/SIMFFI/RED_IMGSUB/"${tunefullstr}
-orbitdir=$LOCAL_IMGBASE"/"${orbit}"/"
-fitsdir=$orbitdir"RED_"${camnum}"-"${ccdnum}"_ISP/"
+LOCAL_IMGBASE="/nfs/phtess1/ar1/TESS/FFI/RED_IMGSUB/"${tunefullstr}
+sectordir=$LOCAL_IMGBASE"/"${sector}"/"
+fitsdir=$sectordir"RED_"${camnum}"-"${ccdnum}"_ISP/"
 LOCAL_GLOBPATTERN="tess?????????????-"${camnum}"-"${ccdnum}
 LOCAL_GLOBPATTERN+="-0016_cal_img.fits"
 fitsglob=$LOCAL_GLOBPATTERN
-lcbase="/nfs/phtess1/ar1/TESS/SIMFFI/LC/"${tunefullstr}
-lcorbit=$lcbase"/"${orbit}"/"
-lcdir=${lcorbit}"ISP_"${camnum}"-"${ccdnum}"/"
-lcdirold=${lcorbit}"ISP_"${camnum}"-"${ccdnum}"_old/"
+lcbase="/nfs/phtess1/ar1/TESS/FFI/LC/"${tunefullstr}
+lcsector=$lcbase"/"${sector}"/"
+lcdir=${lcsector}"ISP_"${camnum}"-"${ccdnum}"/"
+lcdirold=${lcsector}"ISP_"${camnum}"-"${ccdnum}"_old/"
 
 echo "removing post-presubtraction files from "${fitsdir}
 
@@ -70,13 +70,13 @@ rm -rf ${lcdirold}
 # remove specific reference files (otherwise bad old cached files get collected)
 echo "removing all reference files"
 
-rm /nfs/phtess1/ar1/TESS/SIMFFI/BASE/reference-frames/*proj${projectid}-camera${camnum}-ccd${ccdnum}*
+rm /nfs/phtess1/ar1/TESS/FFI/BASE/reference-frames/*proj${projectid}-camera${camnum}-ccd${ccdnum}*
 
 # for the frameinfo-cache, the name is tricky. But if you're running this, it's
 # probably safe to remove everything from the past week.
 echo "removing frameinfo cache from past week"
 
-rm -rf `find /nfs/phtess1/ar1/TESS/SIMFFI/BASE/frameinfo-cache/* -mtime -7 -print`
+rm -rf `find /nfs/phtess1/ar1/TESS/FFI/BASE/frameinfo-cache/* -mtime -7 -print`
 
 # clean calibratedframes. regex reference:
 # https://www.postgresql.org/docs/9.5/static/functions-matching.html
@@ -86,6 +86,6 @@ psql -U hpx -h xphtess1 hpx -c \
 
 # clean cache
 echo "removing all reference files"
-rm /nfs/phtess1/ar1/TESS/SIMFFI/BASE/reference-frames/*cam${camnum}-ccd${ccdnum}*
-rm /nfs/phtess1/ar1/TESS/SIMFFI/BASE/reference-frames/*camera${camnum}-ccd${ccdnum}*
-rm -rf /nfs/phtess1/ar1/TESS/SIMFFI/BASE/frameinfo-cache/*
+rm /nfs/phtess1/ar1/TESS/FFI/BASE/reference-frames/*cam${camnum}-ccd${ccdnum}*
+rm /nfs/phtess1/ar1/TESS/FFI/BASE/reference-frames/*camera${camnum}-ccd${ccdnum}*
+rm -rf /nfs/phtess1/ar1/TESS/FFI/BASE/frameinfo-cache/*

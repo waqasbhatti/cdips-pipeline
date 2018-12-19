@@ -14,7 +14,7 @@
 camnum=1
 ccdnum=1
 projectid=9001
-sector='s0001'        # match SPOC syntax, zpad to 4.
+sector='s0001'        # match SPOC syntax, zfill to 4.
 
 # reduction-specific parameters
 tuneparameters=true   # if true, does 150 images. otherwise, does all of em.
@@ -34,11 +34,16 @@ photreffluxthreshold=3000 ## photreffluxthreshold=300
 extractsources=0
 binlightcurves=0
 
-scid=0121     # spacecraft configuration map used to produce CAL images.
-
 #########################
 # interpret the options #
 #########################
+# spacecraft configuration map used to produce CAL images.
+if [ "$sector" = 's0001' ] ; then
+  scid=0120
+elif [ "$sector" = 's0002' ] ; then
+  scid=0121
+fi
+
 if [ "$binlightcurves" = 1 ] ; then
   binlcoption=binlightcurves
 else
@@ -58,12 +63,8 @@ fi
 LOCAL_IMGBASE="/nfs/phtess1/ar1/TESS/FFI/RED_IMGSUB/"${tunefullstr}
 sectordir=$LOCAL_IMGBASE"/"${sector}"/"
 fitsdir=$sectordir"RED_"${camnum}"-"${ccdnum}"_ISP/"
-# archival: tess2018215215942-s0001-3-2-0120-s_ffic.fits
 LOCAL_GLOBPATTERN='tess?????????????-'${sector}'-'${camnum}'-'${ccdnum}'-'${scid}'_cal_img.fits'
-# ete6:
-# LOCAL_GLOBPATTERN='tess?????????????-'${camnum}'-'${ccdnum}'-0016_cal_img.fits'
 fitsglob=$LOCAL_GLOBPATTERN
-#lcbase="/nfs/phtess1/ar1/TESS/SIMFFI/LC/"${tunefullstr}
 lcbase="/nfs/phtess1/ar1/TESS/FFI/LC/"${tunefullstr}
 lcsector=$lcbase"/"${sector}"/"
 lcdir=${lcsector}"ISP_"${camnum}"-"${ccdnum}"/"
@@ -95,7 +96,7 @@ fi
 ################################
 logname=${sector}'-cam'${camnum}'-ccd'${ccdnum}'.log'
 
-python TESS_ETE6_reduction.py \
+python -u TESS_reduction.py \
   --projectid $projectid \
   --fitsdir $fitsdir --fitsglob $fitsglob --outdir $fitsdir --field $sector\
   --nworkers $nworkers --aperturelist $aperturelist --lcdirectory $lcdir \
@@ -108,5 +109,5 @@ python TESS_ETE6_reduction.py \
   --fiphotfluxthreshold $fiphotfluxthreshold \
   --photreffluxthreshold $photreffluxthreshold \
   --extractsources $extractsources --$binlcoption \
-  --camnum $camnum --ccdnum $ccdnum \
-  &> logs/$logname &
+  --camnum $camnum --ccdnum $ccdnum #\
+  #&> logs/$logname &
