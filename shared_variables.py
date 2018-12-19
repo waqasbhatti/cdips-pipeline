@@ -65,6 +65,7 @@ MASTERDARKCONF = os.path.join(CONFBASE, "MasterDarkCfg.cfg")
 TWOMASSPATH = "/nfs/phn12/ar0/H/CAT/2MASS/2MASS_JH_AP/data"
 # on LCO: "/nfs/lcohpsrv1/ar0/P/HP0/CAT/UCAC4"
 UCAC4PATH = "/nfs/phn12/ar0/H/HP0/CAT/UCAC4"
+GAIADR2PATH = "/nfs/phn15/ar0/H/CAT/GaiaDR2"
 
 #####################################
 # Postgres database credential info #
