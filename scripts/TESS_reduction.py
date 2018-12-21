@@ -156,7 +156,7 @@ def is_presubtraction_complete(outdir, fitsglob, lcdir, percentage_required=95,
 
     statsdir = lcdir+'stats_files'
     N_statsfiles_products = len(glob(statsdir+"*"))
-    if N_statsfiles_products >= 1:
+    if N_statsfiles_products > 1:
         print('found stats_files product. skipping to detrending.')
         return True
 
@@ -372,7 +372,7 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
         _ = ap.choose_tfa_template(epdstatfile, reformed_cat_file, lcdirectory,
                                    ignoretfamin=False, fovcat_idcol=0,
                                    fovcat_xicol=3, fovcat_etacol=4,
-                                   fovcat_magcol=9, min_ndet=100,
+                                   fovcat_magcol=9, min_ndet=70,
                                    min_nstars=50, max_nstars=1000,
                                    brightest_mag=8.5, faintest_mag=13.0,
                                    max_rms=0.1, max_sigma_above_rmscurve=5.0,
@@ -546,7 +546,7 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir,
 
     args:
         statsdir (str): e.g.,
-        '/nfs/phtess1/ar1/TESS/SIMFFI/LC/TUNE/sector-10/ISP_1-2/stats_files/'
+        '/nfs/phtess1/ar1/TESS/FFI/LC/TUNE/sector-10/ISP_1-2/stats_files/'
 
         lcdirectory (str): one level up from statsdir.
 
@@ -691,7 +691,7 @@ def _plot_normalized_subtractedimg_histogram(
 
 def is_image_noise_gaussian(
     fitsdir, projectid, field, camera, ccd,
-    photrefdir='/nfs/phtess1/ar1/TESS/SIMFFI/BASE/reference-frames/',
+    photrefdir='/nfs/phtess1/ar1/TESS/FFI/BASE/reference-frames/',
     n_histograms_to_make=40):
     '''
     The noise in the differenced image should be gaussian.  Oelkers & Stassun
@@ -820,7 +820,8 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
         pass
 
     if convert_to_fitsh_compatible:
-        tu.parallel_trim_get_single_extension(mast_calibrated_ffi_list, outdir,
+        tu.parallel_trim_get_single_extension(mast_calibrated_ffi_list,
+                                              outdir, projectid,
                                               nworkers=nworkers)
 
     fits_list = np.sort(glob(os.path.join(fitsdir, fitsglob)))
