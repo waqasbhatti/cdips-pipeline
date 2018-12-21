@@ -17,35 +17,174 @@ from astroquery.mast import Catalogs
 
 from numpy import array as nparr, all as npall
 
+from datetime import datetime
+import multiprocessing as mp
+
 ##########################################
 
-def from_CAL_to_fitsh_compatible(fits_list, outdir):
+DEBUG = False
+
+SATURATIONMASKCMD = ('fiign {fitsfile} -o {outfitsfile} '
+                     '-s {saturationlevel} --an')
+
+DQUALITYMASKCMD = ('fiign {fitsfile} -o {outfitsfile} '
+                   '-s {minimumreadout} --ignore-nonpositive')
+
+def mask_saturated_stars_worker(task):
+    """
+    Mask the saturated stars using the calibrated images. Overwrites image with
+    fitsh-aware mask in the header. Note the mask is not actually applied to
+    the pixel values until we need to visualize; the mask is metadata.
+
+    At first thought, it would be better to do this with raw images because
+    once the flat-field is applied, saturated stars do not have a constant
+    value.  However inspection of the raw images shows that the saturated stars
+    do not have constant values there either. So it's easier to first trim, and
+    then apply this.
+    """
+
+    fitsname, saturationlevel = task
+
+    cmdtorun = SATURATIONMASKCMD.format(fitsfile=fitsname, outfitsfile=fitsname,
+                                        saturationlevel=saturationlevel)
+
+    returncode = os.system(cmdtorun)
+
+    if DEBUG:
+        print(cmdtorun)
+
+    if returncode == 0:
+        print('%sZ: appended saturated stars mask %s' %
+              (datetime.utcnow().isoformat(), fitsname))
+        return fitsname
+    else:
+        print('ERR! %sZ: saturated star mask construction failed for %s' %
+              (datetime.utcnow().isoformat(), fitsname))
+        return None
+
+
+def parallel_mask_saturated_stars(fitslist, saturationlevel=65535, nworkers=16,
+                                  maxworkertasks=1000):
     '''
-    This function takes a list of calibrated images from MAST and turns them
-    into fitsh-compatible images.
+    Append mask of saturated stars to fits header using the calibrated TESS
+    images, by applying a constant saturation level.
 
-    This means:
-        * single extension
-        * trimmed to remove virtual columns
-
-    Args:
-        fits_list (np.ndarray): list of calibrated full frame images from MAST.
-        (Each image is a single CCD).
-
-        outdir (str): directory to write the files to.
-
-    Returns:
-        nothing.
+    Kwargs:
+        saturationlevel (int): 2**16 - 1 = 65535 is a common choice. This is
+        the number that is used to mask out cores of saturated stars.
     '''
+
+    print('%sZ: %s files to mask saturated stars in' %
+          (datetime.utcnow().isoformat(), len(fitslist)))
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+    tasks = [(x, saturationlevel) for x in fitslist]
+
+    # fire up the pool of workers
+    results = pool.map(mask_saturated_stars_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    return {result for result in results}
+
+
+def mask_dquality_flag_frame(task):
+    """
+    Mask the entire frame if dquality flag from SPOC is raised. Overwrites
+    image with fitsh-aware mask in the header. Note the mask is not
+    actually applied to the pixel values until we need to visualize; the
+    mask is metadata.
+    """
+
+    fitsname, flagvalue = task
+
+    # open the header, check if the quality flag matches the passed value.
+    data, hdr = iu.read_fits(fitsname, ext=0)
+
+    # if it matches, mask out everything. otherwise, do nothing.
+    if hdr['DQUALITY'] == flagvalue:
+
+        # if you pass `fiign` "0" as the saturation value, you don't get a
+        # correct mask. so we mask out non-positive values, and set the
+        # saturation value below the lowest positive value.
+        minabsdata = np.min(np.abs(data))
+        minimumreadout = minabsdata - minabsdata/2
+
+        cmdtorun = DQUALITYMASKCMD.format(fitsfile=fitsname, outfitsfile=fitsname,
+                                          minimumreadout=minimumreadout)
+
+        returncode = os.system(cmdtorun)
+
+        if returncode == 0:
+            print('%sZ: appended DQUALITY=%d mask to %s' %
+                  (datetime.utcnow().isoformat(), flagvalue, fitsname))
+            return fitsname
+        else:
+            print('ERR! %sZ: DQUALITY mask construction failed for %s' %
+                  (datetime.utcnow().isoformat(), fitsname))
+            return None
+
+    else:
+        return 1
+
+
+
+def parallel_mask_dquality_flag_frames(fitslist, flagvalue=32,
+                                       nworkers=16, maxworkertasks=1000):
+    '''
+    Append mask to fits header of an ENTIRE CALIBRATED FRAME if it matches the
+    passed data quality flag value.
+
+    See e.g., EXP-TESS-ARC-ICD-TM-0014 for a description of the flag values.
+
+    Kwargs:
+        flagvalue (int): integer that tells you something about the data
+        quality. E.g., "32" is a "reaction wheel desaturation event", AKA a
+        "momentum dump".
+    '''
+
+    print('%sZ: %s files to check for DQUALITY=%d in' %
+          (datetime.utcnow().isoformat(), len(fitslist), flagvalue))
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+    tasks = [(x, flagvalue) for x in fitslist]
+
+    # fire up the pool of workers
+    results = pool.map(mask_dquality_flag_frame, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    print('%sZ: finished checking for DQUALITY=%d' %
+          (datetime.utcnow().isoformat(), flagvalue))
+
+    return {result for result in results}
+
+
+def parallel_trim_get_single_extension(fitslist, outdir,
+                                       nworkers=16, maxworkertasks=1000):
+    '''
+    see docstring for from_CAL_to_fitsh_compatible
+    '''
+
+    print('%sZ: %s files to trim and get single extension' %
+          (datetime.utcnow().isoformat(), len(fitslist)))
 
     if not os.path.exists(outdir):
         os.mkdir(outdir)
 
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
     path_exists = []
-    for ix, fits_name in enumerate(fits_list):
+    for ix, fitsname in enumerate(fitslist):
         outname = (
             outdir + os.path.basename(
-                fits_name.replace('-s_ffic.fits', '_cal_img.fits'))
+                fitsname.replace('-s_ffic.fits', '_cal_img.fits'))
         )
         if os.path.exists(outname):
             path_exists.append(1)
@@ -61,50 +200,75 @@ def from_CAL_to_fitsh_compatible(fits_list, outdir):
         )
         return 0
 
-    for ix, fits_name in enumerate(fits_list):
+    else:
+        tasks = [(x, outdir) for x in fitslist]
 
-        outname = (
-            outdir + os.path.basename(
-                fits_name.replace('-s_ffic.fits', '_cal_img.fits'))
-        )
+        # fire up the pool of workers
+        results = pool.map(from_CAL_to_fitsh_compatible, tasks)
 
-        if os.path.exists(outname):
-            print(
-                '{:d}/{:d}. Found {:s}, continuing.'.format(
-                    ix, len(fits_list), outname
-                )
-            )
-            continue
+        # wait for the processes to complete work
+        pool.close()
+        pool.join()
 
-        data, hdr = iu.read_fits(fits_name, ext=1)
-
-        # FITS header is 1-based counting, but python is 0-based. To convert
-        # from FITS->python from slicing you need to subtract 1.
-        rows = hdr['SCIROWS']-1 # row start.
-        rowe = hdr['SCIROWE']-1+1 # row end (inclusive)
-        cols = hdr['SCCSA']-1 # col start
-        cole = hdr['SCCED']-1+1 # col end (inclusive)
-
-        trim = data[slice(rows,rowe),slice(cols,cole)]
-
-        assert trim.shape == (2048, 2048)
-
-        fits.writeto(outname, trim, header=hdr)
-
-        print(
-            '{:d}/{:d}. Wrote to {:s} to {:s}'.format(
-                ix, len(fits_list), fits_name, outname
-            )
-        )
+        return 1
 
 
-def from_ete6_to_fitsh_compatible(fits_list, outdir):
+def from_CAL_to_fitsh_compatible(task):
+    '''
+    This function takes a calibrated image from MAST and turns it into a
+    fitsh-compatible image. This is done BEFORE constructing a mask for the
+    image using tessutils.mask_saturated_stars
+
+    This means:
+        * get single extension (omit the uncertainty map, for now).
+        * trim to remove virtual columns
+
+    Arg:
+        task: tuple of (fitspath, outdir), where `fitspath` is a calibrated
+        full frame image from MAST. This means its filename should end with
+        "-s_ffic.fits".  (Each image is a single CCD, with 4 subarrays).
+        outdir (str): directory to write the files to.
+
+    Returns:
+        nothing.
+    '''
+    fitsname, outdir = task
+
+    if fitsname.split('-')[-1] != 's_ffic.fits':
+        raise AssertionError('expected calibrated FFI from MAST.')
+
+    outname = (
+        outdir + os.path.basename(
+            fitsname.replace('-s_ffic.fits', '_cal_img.fits'))
+    )
+
+    data, hdr = iu.read_fits(fitsname, ext=1)
+
+    # FITS header is 1-based counting, but python is 0-based. To convert
+    # from FITS->python from slicing you need to subtract 1.
+    rows = hdr['SCIROWS']-1 # row start.
+    rowe = hdr['SCIROWE']-1+1 # row end (inclusive)
+    cols = hdr['SCCSA']-1 # col start
+    cole = hdr['SCCED']-1+1 # col end (inclusive)
+
+    trim = data[slice(rows,rowe),slice(cols,cole)]
+
+    assert trim.shape == (2048, 2048)
+
+    fits.writeto(outname, trim, header=hdr)
+
+    print('Wrote {:s} to {:s}'.format(fitsname, outname))
+
+
+def from_ete6_to_fitsh_compatible(fitslist, outdir):
     '''
     This function takes a list of ETE6 reduced images and turns them into
-    fitsh-compatible images.
+    fitsh-compatible images.  Using it is a bad idea, because you shouldn't be
+    using ETE6 any more anyway.
     '''
 
-    from_CAL_to_fitsh_compatible(fits_list, outdir)
+    for fitsname in fitslist:
+        from_CAL_to_fitsh_compatible((fitsname, outdir))
 
 ##############################
 # UNDER CONSTRUCTION
