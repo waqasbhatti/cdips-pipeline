@@ -81,7 +81,7 @@ except:
 ## CONFIG ##
 ############
 
-DEBUG = False
+DEBUG = True
 
 # used to get the station ID, frame number, and CCD number from a FITS filename
 FRAMEREGEX = re.compile(r'(\d{1})\-(\d{6}\w{0,1})_(\d{1})')
@@ -618,8 +618,9 @@ def calibrated_frame_to_database(fitsfile,
                            'DEWPT','FOCUS', 'COMMENT']
 
         elif observatory == 'tess':
-            header_list = ['CAMERA', 'CCD', 'TSTART', 'TSTOP', 'CRVAL1',
-                           'CRVAL2', 'RA_NOM', 'DEC_NOM', 'ROLL_NOM']
+            header_list = ['PROJID', 'CAMERA', 'CCD', 'TSTART', 'TSTOP',
+                           'CRVAL1', 'CRVAL2', 'RA_NOM', 'DEC_NOM', 'ROLL_NOM',
+                           'DQUALITY']
 
         else:
             raise ValueError('observatory must be tess or hatpi')
@@ -1227,6 +1228,10 @@ def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
         field, and ccd (if HATPI), or camera and ccd (if TESS).
 
     '''
+
+    if not os.path.exists(refdir):
+        os.mkdir(refdir)
+
     # open a database connection
     if database:
         cursor = database.cursor()
@@ -1282,11 +1287,12 @@ def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
                      "photinfo->'meddval', photinfo->'medsrcbgv', "
                      "photinfo->'ngoodobjects' "
                      "from calibratedframes where "
+                     "(fitsheader->'PROJID' = %s) and "
                      "(fitsheader->'CAMERA' = %s) and "
                      "(fitsheader->'CCD' = %s) and "
                      "(frameisok = true)")
 
-            params = (str(camera), str(ccd))
+            params = (str(projectid), str(camera), str(ccd))
 
             if DEBUG:
                 print('query: {:s}\nparams: {:s}'.format(query,params))
@@ -2236,12 +2242,12 @@ def framelist_make_xtrnsfits(fitsfiles,
           (datetime.utcnow().isoformat()))
 
     xtrns = glob.glob(fitsdir+ fitsglob.replace('.fits','-xtrns.fits'))
-    fitsn = glob.glob(fitsdir+ fitsglob)
+    wcsfiles = glob.glob(fitsdir+ fitsglob.replace('.fits','.wcs'))
 
-    if len(xtrns) != len(fitsn):
+    if len(xtrns) != len(wcsfiles):
         raise AssertionError(
             'something wrong in astrometric shift.'+
-            '\nN_fits: {:d}'.format(len(fitsn))+
+            '\nN_WCS: {:d}'.format(len(wcsfiles))+
             '\nN_xtrns: {:d}'.format(len(xtrns))
         )
 
@@ -2295,7 +2301,8 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
 
         maxbackgroundmedianpctile: percentile (given in %) from array of
         background medians from each frame. For example, `10.0` would give the
-        top 10% of frames with small background medians (good for few clouds).
+        top 10% of frames with small background medians (good for few clouds,
+        or if moon/earth in TESS FoV).
 
         minngoodobjectpctile: if ndetpercentile=90, will select frames from the
         top 90% of "ngoodobjects". If there are clouds, there won't be many
@@ -2308,6 +2315,9 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
         photrefinfo, a dictionary with information about chosen photometric
         reference frames.
     '''
+
+    if not os.path.exists(FRAMEINFOCACHEDIR):
+        os.mkdir(FRAMEINFOCACHEDIR)
 
     # first, get all the info from these fits files.
     frameinfo = fitslist_frameinfo(fitsfiles,
@@ -2376,7 +2386,8 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
            maxbackgroundstdev))
 
     # get nights with background median < maxbackgroundmedian (to possibly
-    # remove bad frames)
+    # remove cloudy frames, or frames with lots of scattered light from the
+    # moon or other very bright objects)
     maxbackgroundmedian = np.nanpercentile(frameinfo['medsrcbgv'],
                                            maxbackgroundmedianpctile)
     backgroundmedind = frameinfo['medsrcbgv'] < maxbackgroundmedian
@@ -2404,7 +2415,7 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
     if observatory=='hatpi':
         selectind = haind & moonind & zenithind & backgroundstdevind & ngoodobjectind
     elif observatory=='tess':
-        selectind = backgroundstdevind & ngoodobjectind
+        selectind = backgroundstdevind & ngoodobjectind & backgroundmedind
     else:
         raise NotImplementedError
 
@@ -2675,7 +2686,7 @@ def generate_combined_photref(
         overwrite=False):
     '''
     This generates a combined photref from photref target and candidates and
-    updates the TM-refinfo.sqlite database.
+    updates the sqlite or postgres database.
 
     Use this after reviewing the results from
     generate_photref_candidates_from_xtrns function above. Amend the
