@@ -759,7 +759,8 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
          epdsmooth=21, epdsigclip=10, photdisjointradius=2,
          tuneparameters='true', is_ete6=False,
          catalog_faintrmag=13, fiphotfluxthreshold=1000,
-         photreffluxthreshold=1000, extractsources=True, binlightcurves=False
+         photreffluxthreshold=1000, extractsources=True, binlightcurves=False,
+         get_masks=1
          ):
     '''
     args:
@@ -802,31 +803,40 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
 
     if is_ete6:
         RED_dir = '/nfs/phtess1/ar1/TESS/SIMFFI/ARCHIVAL/'
-        ffi_list = np.sort(
+        mast_calibrated_ffi_list = np.sort(
             glob(RED_dir+fitsglob.replace('_cal_img.fits','-s_ffic.fits'))
         )
     else:
         RED_dir = '/nfs/phtess1/ar1/TESS/FFI/RED/sector-{:d}'.format(sectornum)
-        ffi_list = np.sort(
-            glob(os.path.join(RED_dir,fitsglob.replace('_cal_img.fits','-s_ffic.fits')))
+        mast_calibrated_ffi_list = np.sort(
+            glob(os.path.join(
+                RED_dir,fitsglob.replace('_cal_img.fits','-s_ffic.fits')))
         )
 
     if tuneparameters=='true':
         # select 150 sequential images for pipeline tuning
-        ffi_list = ffi_list[300:450]
+        mast_calibrated_ffi_list = mast_calibrated_ffi_list[300:450]
     else:
         pass
 
     if convert_to_fitsh_compatible:
-        tu.from_CAL_to_fitsh_compatible(ffi_list, outdir)
+        tu.parallel_trim_get_single_extension(mast_calibrated_ffi_list, outdir,
+                                              nworkers=nworkers)
+
+    fits_list = np.sort(glob(os.path.join(fitsdir, fitsglob)))
+
+    if get_masks:
+        # get mask for pixels greater than 2^16 - 1
+        tu.parallel_mask_saturated_stars(fits_list, saturationlevel=65535,
+                                         nworkers=nworkers)
+        # get mask for frames tagged as momentum dumps
+        tu.parallel_mask_dquality_flag_frames(fits_list, flagvalue=32,
+                                              nworkers=nworkers)
 
     ###########################################################################
 
     # TESS specific variables.
     ccd_fov = 12 # degrees. 24/2.
-
-    fits_list = np.sort(glob(os.path.join(fitsdir, fitsglob)))
-    #import IPython; IPython.embed() #FIXME
 
     # get gain, ccdextent, zeropoint, exposure time from header.
     rand_fits = fits_list[np.random.randint(0, high=len(fits_list))]
@@ -868,15 +878,6 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     if not initial_wcs_worked_well_enough(outdir, fitsglob):
         raise AssertionError('if initial wcs failed on majority of frames, '
                              'you need to fix that.')
-
-    # #FIXME
-    # rawphotpattern = fitsdir+fitsglob.replace('.fits','.fiphot')
-    # ism.dump_lightcurves_with_grcollect(
-    #     rawphotpattern, lcdirectory, '4g', lcextension='grcollectrawlc',
-    #     objectidcol=3, observatory='tess')
-    # import IPython; IPython.embed()
-    # assert 0
-    # #FIXME
 
     #############################################################
     # run image subtraction convolution, then do the photometry #
