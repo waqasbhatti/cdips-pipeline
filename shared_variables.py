@@ -9,7 +9,7 @@ import re, os
 ############################################################
 
 # LOCAL_IMGBASE and LOCAL_GLOBPATTERN define the local image directories.
-LOCAL_IMGBASE = "/nfs/phtess1/ar1/TESS/SIMFFI/" # tess ete6 data is here
+LOCAL_IMGBASE = "/nfs/phtess1/ar1/TESS/FFI/" # tess data is here
 #LOCAL_IMGBASE = "/nfs/phtess1/ar1/HATPI/HP0/"  # some hatpi data is here
 LOCAL_GLOBPATTERN = "tess?????????????-1-1-0016_cal_img.fits"
 
