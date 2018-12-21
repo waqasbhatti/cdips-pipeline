@@ -23,8 +23,7 @@ sector='s0001'        # match SPOC syntax, zfill to 4.
 #################################
 # reduction-specific parameters #
 #################################
-makesubconvmovie=true
-tuneparameters=false  # if true, does 150 images. if false, does all of them.
+tuneparameters=true # if true, does 150 images. if false, does all of them.
 nworkers=20
 aperturelist="1.45:7.0:6.0,2.2:7.0:6.0,2.95:7.0:6.0"
 epdsmooth=11          # 11*30min = 5.5 hr median smooth in EPD pre-processing.
@@ -76,12 +75,12 @@ fi
 
 LOCAL_IMGBASE="/nfs/phtess1/ar1/TESS/FFI/RED_IMGSUB/"${tunefullstr}
 sectordir=$LOCAL_IMGBASE"/"${sector}"/"
-fitsdir=$sectordir"RED_"${camnum}"-"${ccdnum}"_ISP/"
+fitsdir=$sectordir"RED_"${camnum}"-"${ccdnum}"-"${projectid}"_ISP/"
 LOCAL_GLOBPATTERN='tess?????????????-'${sector}'-'${camnum}'-'${ccdnum}'-'${scid}'_cal_img.fits'
 fitsglob=$LOCAL_GLOBPATTERN
 lcbase="/nfs/phtess1/ar1/TESS/FFI/LC/"${tunefullstr}
 lcsector=$lcbase"/"${sector}"/"
-lcdir=${lcsector}"ISP_"${camnum}"-"${ccdnum}"/"
+lcdir=${lcsector}"ISP_"${camnum}"-"${ccdnum}"-"${projectid}"/"
 
 ####################
 # make directories #
@@ -108,7 +107,7 @@ fi
 ################################
 # turn images into lightcurves #
 ################################
-logname=${sector}'-cam'${camnum}'-ccd'${ccdnum}'.log'
+logname=${sector}'-cam'${camnum}'-ccd'${ccdnum}'-'${projectid}'.log'
 
 python -u TESS_reduction.py \
   --projectid $projectid \
@@ -125,19 +124,3 @@ python -u TESS_reduction.py \
   --extractsources $extractsources --$binlcoption \
   --camnum $camnum --ccdnum $ccdnum \
   &> logs/$logname &
-
-##########################################################
-# if desired, make movie of subtracted, convolved frames #
-##########################################################
-wait
-if [ "$makesubconvmovie" = true ] ; then
-  imgdir='/nfs/phtess1/ar1/TESS/FFI/RED_IMGSUB/FULL/'${sector}'/RED_'${camnum}'-'${ccdnum}'_ISP/'
-  outdir='/nfs/phtess1/ar1/TESS/FFI/MOVIES/'
-
-  ffmpeg -framerate 24 \
-         -pattern_type \
-         glob -i $imgdir'JPEG-SUBTRACTEDCONV-*.jpg' \
-         -c:v libx264 \
-         -preset fast \
-         ${outdir}${sector}'_cam'${camnum}'_ccd'${ccdnum}'_SUBTRACTEDCONV.mp4'
-fi
