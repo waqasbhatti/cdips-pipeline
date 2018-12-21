@@ -166,8 +166,8 @@ def parallel_mask_dquality_flag_frames(fitslist, flagvalue=32,
     return {result for result in results}
 
 
-def parallel_trim_get_single_extension(fitslist, outdir,
-                                       nworkers=16, maxworkertasks=1000):
+def parallel_trim_get_single_extension(fitslist, outdir, projid, nworkers=16,
+                                       maxworkertasks=1000):
     '''
     see docstring for from_CAL_to_fitsh_compatible
     '''
@@ -201,7 +201,7 @@ def parallel_trim_get_single_extension(fitslist, outdir,
         return 0
 
     else:
-        tasks = [(x, outdir) for x in fitslist]
+        tasks = [(x, outdir, projid) for x in fitslist]
 
         # fire up the pool of workers
         results = pool.map(from_CAL_to_fitsh_compatible, tasks)
@@ -222,6 +222,7 @@ def from_CAL_to_fitsh_compatible(task):
     This means:
         * get single extension (omit the uncertainty map, for now).
         * trim to remove virtual columns
+        * append "PROJID" header keywork.
 
     Arg:
         task: tuple of (fitspath, outdir), where `fitspath` is a calibrated
@@ -232,7 +233,7 @@ def from_CAL_to_fitsh_compatible(task):
     Returns:
         nothing.
     '''
-    fitsname, outdir = task
+    fitsname, outdir, projid = task
 
     if fitsname.split('-')[-1] != 's_ffic.fits':
         raise AssertionError('expected calibrated FFI from MAST.')
@@ -253,6 +254,8 @@ def from_CAL_to_fitsh_compatible(task):
 
     trim = data[slice(rows,rowe),slice(cols,cole)]
 
+    hdr['PROJID'] = projid
+
     assert trim.shape == (2048, 2048)
 
     fits.writeto(outname, trim, header=hdr)
@@ -260,7 +263,7 @@ def from_CAL_to_fitsh_compatible(task):
     print('Wrote {:s} to {:s}'.format(fitsname, outname))
 
 
-def from_ete6_to_fitsh_compatible(fitslist, outdir):
+def from_ete6_to_fitsh_compatible(fitslist, outdir, projid=42):
     '''
     This function takes a list of ETE6 reduced images and turns them into
     fitsh-compatible images.  Using it is a bad idea, because you shouldn't be
@@ -268,7 +271,7 @@ def from_ete6_to_fitsh_compatible(fitslist, outdir):
     '''
 
     for fitsname in fitslist:
-        from_CAL_to_fitsh_compatible((fitsname, outdir))
+        from_CAL_to_fitsh_compatible((fitsname, outdir, projid))
 
 ##############################
 # UNDER CONSTRUCTION
