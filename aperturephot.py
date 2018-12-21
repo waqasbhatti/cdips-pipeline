@@ -342,15 +342,20 @@ def fistarfile_to_xy(fistarfile):
                      names=['ident','x','y','bg','amp','s','d','k','flux','s/n'],
                      delimiter=r"\s*", engine='python')
 
-    col1 = fits.Column(name='ximage', format='D', array=np.array(df['x']))
-    col2 = fits.Column(name='yimage', format='D', array=np.array(df['y']))
-    coldefs = fits.ColDefs([col1, col2])
-    hdu = fits.BinTableHDU.from_columns(coldefs)
+    if not len(df) > 1:
+        print('skipping %s, did not get any sources' % fistarfile)
+        return 0
 
-    outfname = fistarfile.replace('.fistar','.fistar-fits-xy')
-    hdu.writeto(outfname, overwrite=True)
+    else:
+        col1 = fits.Column(name='ximage', format='D', array=np.array(df['x']))
+        col2 = fits.Column(name='yimage', format='D', array=np.array(df['y']))
+        coldefs = fits.ColDefs([col1, col2])
+        hdu = fits.BinTableHDU.from_columns(coldefs)
 
-    print('%s -> %s' % (fistarfile, outfname))
+        outfname = fistarfile.replace('.fistar','.fistar-fits-xy')
+        hdu.writeto(outfname, overwrite=True)
+
+        print('%s -> %s' % (fistarfile, outfname))
 
 
 def fistardir_to_xy(fistardir, fistarglob='1-*_?.fistar'):
