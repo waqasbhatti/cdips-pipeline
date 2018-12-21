@@ -9,8 +9,11 @@
 # clear out astromrefs and photrefs table.
 # clear out calibratedframes table.
 # clear frameinfo cache from past week. 
-camnum=1
-ccdnum=1
+camnum=2
+ccdnum=2
+projectid=1000
+sector='s0001'
+tuneparameters=true
 
 ##########
 
@@ -21,13 +24,6 @@ psql -U hpx -h xphtess1 hpx -c \
   "delete from photrefs where camera = "${camnum}" and ccd = "${ccdnum}";"
 
 ##########
-
-# data-specific parameters
-projectid=9001
-sector='s0001'
-
-# reduction-specific parameters
-tuneparameters=true
 
 # define paths to remove
 
@@ -40,14 +36,13 @@ fi
 # get paths
 LOCAL_IMGBASE="/nfs/phtess1/ar1/TESS/FFI/RED_IMGSUB/"${tunefullstr}
 sectordir=$LOCAL_IMGBASE"/"${sector}"/"
-fitsdir=$sectordir"RED_"${camnum}"-"${ccdnum}"_ISP/"
-LOCAL_GLOBPATTERN="tess?????????????-"${camnum}"-"${ccdnum}
-LOCAL_GLOBPATTERN+="-0016_cal_img.fits"
+fitsdir=$sectordir"RED_"${camnum}"-"${ccdnum}"-"${projectid}"_ISP/"
+LOCAL_GLOBPATTERN='tess?????????????-'${sector}'-'${camnum}'-'${ccdnum}'-'${scid}'_cal_img.fits'
 fitsglob=$LOCAL_GLOBPATTERN
 lcbase="/nfs/phtess1/ar1/TESS/FFI/LC/"${tunefullstr}
 lcsector=$lcbase"/"${sector}"/"
-lcdir=${lcsector}"ISP_"${camnum}"-"${ccdnum}"/"
-lcdirold=${lcsector}"ISP_"${camnum}"-"${ccdnum}"_old/"
+lcdir=${lcsector}"ISP_"${camnum}"-"${ccdnum}"-"${projectid}"/"
+lcdirold=${lcsector}"ISP_"${camnum}"-"${ccdnum}"-"${projectid}"_old/"
 
 echo "removing post-presubtraction files from "${fitsdir}
 
