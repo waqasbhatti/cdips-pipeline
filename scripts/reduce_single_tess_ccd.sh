@@ -15,9 +15,9 @@
 ############################
 # data-specific parameters #
 ############################
-camnum=1
-ccdnum=1
-projectid=9002        # increment this whenever new things go to PSQL database.
+camnum=2
+ccdnum=2
+projectid=1000        # increment this whenever new things go to PSQL database.
 sector='s0001'        # match SPOC syntax, zfill to 4.
 
 #################################
@@ -26,7 +26,7 @@ sector='s0001'        # match SPOC syntax, zfill to 4.
 makesubconvmovie=true
 tuneparameters=false  # if true, does 150 images. if false, does all of them.
 nworkers=20
-aperturelist="1.95:7.0:6.0,2.95:7.0:6.0,3.95:7.0:6.0"
+aperturelist="1.45:7.0:6.0,2.2:7.0:6.0,2.95:7.0:6.0"
 epdsmooth=11          # 11*30min = 5.5 hr median smooth in EPD pre-processing.
 epdsigclip=10
 photdisjointradius=2
@@ -53,6 +53,9 @@ if [ "$sector" = 's0001' ] ; then
   scid=0120
 elif [ "$sector" = 's0002' ] ; then
   scid=0121
+else
+  echo 'error: need to hard-code in scid for sector s000X'
+  exit 42
 fi
 
 if [ "$binlightcurves" = 1 ] ; then
