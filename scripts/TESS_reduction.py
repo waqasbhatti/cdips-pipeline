@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-'''
+"""
 run
 $ python TESS_reduction.py --help
-'''
+"""
 from __future__ import division, print_function
 
 import os, time
@@ -39,7 +39,7 @@ def get_files_needed_before_image_subtraction(
         useimagenotfistar=True,
         extractsources=True
     ):
-    '''
+    """
     get .fistar, .fiphot, and .wcs files needed before image subtraction
 
     1. run parallel_extract_sources on all frames with threshold ~ 10000 to get
@@ -50,7 +50,7 @@ def get_files_needed_before_image_subtraction(
     only.
     5. run parallel_fitsdir_photometry for photometry on all frames (via
     fistar)
-    '''
+    """
 
     ap.parallel_extract_sources(fitsdir, outdir, ccdextent=initccdextent,
                                 ccdgain=ccdgain,
@@ -134,11 +134,11 @@ def initial_wcs_worked_well_enough(outdir, fitsglob):
 
 def is_presubtraction_complete(outdir, fitsglob, lcdir, percentage_required=95,
                                extractsources=False):
-    '''
+    """
     require at least e.g., 95% of the initial astrometry, photometry, etc to
     exist to return True. in that case, or if any stats_files products are
     found, move on to image subtraction.  else, returns False.
-    '''
+    """
 
     N_fitsfiles = len(glob(outdir+fitsglob))
     N_fistarfiles = len(glob(outdir+fitsglob.replace('.fits','.fistar')))
@@ -331,14 +331,14 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
 def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
                    reformed_cat_file, statsdir, field, epdsmooth=11,
                    epdsigclip=10, nworkers=10, binlightcurves=False):
-    '''
+    """
     Step ISP11: do EPD on all the LCs, and collect stats on the results.
     for ISP LCs, use lcmagcols=([27,28,29],[30,],[30,],[30,])
 
     Step ISP12: do TFA on all the LCs. First, choose TFA template stars using the
     .epdlc stats. Then run TFA, to get .tfalc.TF{1,2,3} files. Turn them into
     single .tfalc files. Then collect statistics.
-    '''
+    """
 
     if not os.path.exists(epdstatfile):
 
@@ -457,7 +457,7 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
 
 
 def run_detrending_on_raw_photometry():
-    '''
+    """
     run detrending on raw photometry, to compare vs. image subtracted
 
     Steps [1-5] of raw photometry (source extraction, astrometry, creation of a
@@ -498,50 +498,16 @@ def run_detrending_on_raw_photometry():
 
     20. run plot_stats_file to make MAD vs. mag plots for all unbinned and
     binned LCs.
-    '''
+    """
 
     raise NotImplementedError
-
-    mfdict = ap.get_magfit_frames(fitsdir, sv.LOCAL_GLOBPATTERN, fitsdir,
-                                  selectreference=True, linkfiles=False,
-                                  framestats=False, observatory='tess')
-
-    # note: magnitude fitting is probably not needed for space data.
-    # what should our comparison case be here?
-
-    # ap.make_magfit_config()
-
-    # ap.make_fiphot_list()
-
-    # ap.run_magfit()
-
-    # ap.get_master_photref()
-
-    # ap.run_magfit()
-
-    # ap.parallel_collect_aperturephot_lightcurves(fitsdir, lcdirectory,
-    #                                              photext='fiphot',
-    #                                              skipcollectedlcs=False,
-    #                                              nworkers=nworkers)
-
-    # ap.parallel_run_epd()
-
-    # ap.parallel_lc_statistics()
-
-    # ap.choose_tfa_template()
-
-    # ap.parallel_run_tfa()
-
-    # ap.parallel_lc_statistics()
-
-    # ap.plot_stats_file()
 
 
 def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir,
                projectid, field, camera, ccd, tfastatfile,
                binned=False, make_whisker_plot=True, whisker_xlim=[4,17],
                whisker_ylim=[1e-5,1e-1]):
-    '''
+    """
     write files with summary statistics of run.
 
     args:
@@ -556,7 +522,7 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir,
         is statfile binned?
 
         make_whisker_plot (bool)
-    '''
+    """
 
     whiskerfiles = glob(os.path.join(statsdir,'whisker_*png'))
     if not whiskerfiles:
@@ -638,7 +604,7 @@ def _plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20,
 
 def _plot_normalized_subtractedimg_histogram(
     subimg_normalized, rsubimgfile, zerooutnans=True):
-    '''subimg_normalized: subtracted, normalized image.'''
+    """subimg_normalized: subtracted, normalized image."""
 
     savdir = os.path.dirname(rsubimgfile)
     savname = (
@@ -693,7 +659,7 @@ def is_image_noise_gaussian(
     fitsdir, projectid, field, camera, ccd,
     photrefdir='/nfs/phtess1/ar1/TESS/FFI/BASE/reference-frames/',
     n_histograms_to_make=40):
-    '''
+    """
     The noise in the differenced image should be gaussian.  Oelkers & Stassun
     (2018) suggest the following approach to check whether it is.
 
@@ -704,7 +670,7 @@ def is_image_noise_gaussian(
 
     The normalized pixels should be a gaussian centered at zero, with a std
     devn of 1.
-    '''
+    """
 
     rsubglob = 'rsub-*-tess*-xtrns.fits'
     rsubfiles = np.sort(glob(fitsdir+rsubglob))
@@ -818,7 +784,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
          photreffluxthreshold=1000, extractsources=True, binlightcurves=False,
          get_masks=1
          ):
-    '''
+    """
     args:
 
         projectid (int): ...
@@ -846,7 +812,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
         (with the fiphotfluxthreshold). if False, uses the background catalog
         (e.g., 2MASS), projected onto the frame with WCS, and the
         catalog_faintrmag cutoff to make the list of sources.
-    '''
+    """
 
     record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
                                 ccdnum, outdir, lcdirectory, nworkers,
