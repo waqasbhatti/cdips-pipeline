@@ -19,7 +19,7 @@ from astropy import units as units, constants as constants
 from datetime import datetime
 import argparse
 from parse import parse, search
-import re
+import re, pickle
 
 np.random.seed(42)
 
@@ -746,6 +746,62 @@ def is_image_noise_gaussian(
             subimg_normalized, rsubimgfile)
 
 
+def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
+                                ccdnum, outdir, lcdirectory, nworkers,
+                                aperturelist, kernelspec,
+                                convert_to_fitsh_compatible, anetfluxthreshold,
+                                anettweak, initccdextent, anetradius,
+                                zeropoint, epdsmooth, epdsigclip,
+                                photdisjointradius, tuneparameters, is_ete6,
+                                catalog_faintrmag, fiphotfluxthreshold,
+                                photreffluxthreshold, extractsources,
+                                binlightcurves, get_masks):
+    """
+    each "reduction version" is identified by a project ID. the parameters
+    corresponding to each project ID are written in a pickle file, so that we
+    can easily translate from project IDs to the parameters that are associated
+    with them.
+    """
+
+    outd = {
+        "fitsdir":fitsdir,
+        "fitsglob":fitsglob,
+        "projectid":projectid,
+        "field":field,
+        "camnum":camnum,
+        "ccdnum":ccdnum,
+        "outdir":outdir,
+        "lcdirectory":lcdirectory,
+        "nworkers":nworkers,
+        "aperturelist":aperturelist,
+        "kernelspec":kernelspec,
+        "convert_to_fitsh_compatible":convert_to_fitsh_compatible,
+        "anetfluxthreshold":anetfluxthreshold,
+        "anettweak":anettweak,
+        "initccdextent":initccdextent,
+        "anetradius":anetradius,
+        "zeropoint":zeropoint,
+        "epdsmooth":epdsmooth,
+        "epdsigclip":epdsigclip,
+        "photdisjointradius":photdisjointradius,
+        "tuneparameters":tuneparameters,
+        "is_ete6":is_ete6,
+        "catalog_faintrmag":catalog_faintrmag,
+        "fiphotfluxthreshold":fiphotfluxthreshold,
+        "photreffluxthreshold":photreffluxthreshold,
+        "extractsources":extractsources,
+        "binlightcurves":binlightcurves,
+        "get_masks":get_masks
+    }
+
+    outpicklename = "projid_{:s}.pickle".format(repr(projectid))
+    outpickledir = '/nfs/phtess1/ar1/TESS/FFI/PROJ/REDUCTION_PARAM_PICKLES/'
+    outpath = os.path.join(outpickledir, outpicklename)
+
+    with open(outpath, 'w') as f:
+        pickle.dump(outd, f, pickle.HIGHEST_PROTOCOL)
+    print('wrote {}'.format(outpath))
+
 
 
 def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
@@ -791,6 +847,17 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
         (e.g., 2MASS), projected onto the frame with WCS, and the
         catalog_faintrmag cutoff to make the list of sources.
     '''
+
+    record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
+                                ccdnum, outdir, lcdirectory, nworkers,
+                                aperturelist, kernelspec,
+                                convert_to_fitsh_compatible, anetfluxthreshold,
+                                anettweak, initccdextent, anetradius,
+                                zeropoint, epdsmooth, epdsigclip,
+                                photdisjointradius, tuneparameters, is_ete6,
+                                catalog_faintrmag, fiphotfluxthreshold,
+                                photreffluxthreshold, extractsources,
+                                binlightcurves, get_masks)
 
     starttime = datetime.utcnow()
 
