@@ -17,7 +17,7 @@
 ############################
 camnum=2
 ccdnum=2
-projectid=1000        # increment this whenever new things go to PSQL database.
+projectid=1001        # increment this whenever new things go to PSQL database.
 sector='s0001'        # match SPOC syntax, zfill to 4.
 
 #################################
@@ -33,7 +33,7 @@ anetfluxthreshold=50000
 anettweak=6
 anetradius=30
 initccdextent="0:2048,0:2048"
-kernelspec="b/4;i/4;d=4/4"
+kernelspec="b/4;i/4;d=5/2"
 catalog_faintrmag=13      ## catalog_faintrmag=16
 fiphotfluxthreshold=3000  ## fiphotfluxthreshold=300
 photreffluxthreshold=3000 ## photreffluxthreshold=300
@@ -107,7 +107,7 @@ fi
 ################################
 # turn images into lightcurves #
 ################################
-logname=${sector}'-cam'${camnum}'-ccd'${ccdnum}'-'${projectid}'.log'
+logname=${sector}'-cam'${camnum}'-ccd'${ccdnum}'-projid'${projectid}'.log'
 
 python -u TESS_reduction.py \
   --projectid $projectid \
