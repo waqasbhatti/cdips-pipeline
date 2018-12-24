@@ -503,10 +503,44 @@ def run_detrending_on_raw_photometry():
     raise NotImplementedError
 
 
-def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir,
-               projectid, field, camera, ccd, tfastatfile,
-               binned=False, make_whisker_plot=True, whisker_xlim=[4,17],
-               whisker_ylim=[1e-5,1e-1]):
+def _get_random_tfa_lcs(lcdirectory, n_desired_lcs=100):
+
+    tfafiles = np.array(glob(os.path.join(lcdirectory,'*.tfalc')))
+    n_possible_lcs = len(tfafiles)
+
+    # if you have fewer than `n_desired_lcs`, just get as many as possible.
+    if n_possible_lcs == 0:
+        raise AssertionError('need tfa LCs to exist to get any of them')
+    if n_possible_lcs > n_desired_lcs:
+        inds = np.random.randint(0, n_possible_lcs, n_desired_lcs)
+        sel_tfafiles = tfafiles[inds]
+    else:
+        sel_tfafiles = tfafiles
+
+    return sel_tfafiles
+
+
+def _get_random_acf_pkls(pkldir, n_desired=10):
+
+    pklfiles = np.array(glob(os.path.join(pkldir,'*.pickle')))
+    n_possible = len(pklfiles)
+
+    # if you have fewer than `n_desired_lcs`, just get as many as possible.
+    if n_possible == 0:
+        raise AssertionError('need pkls to exist to get any of them')
+    if n_possible > n_desired:
+        inds = np.random.randint(0, n_possible, n_desired)
+        sel_files = pklfiles[inds]
+    else:
+        sel_files = pklfiles
+
+    return sel_files
+
+
+def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
+               field, camera, ccd, tfastatfile, binned=False,
+               make_percentiles_plot=True, percentiles_xlim=[4,17],
+               percentiles_ylim=[1e-5,1e-1], nworkers=16):
     """
     write files with summary statistics of run.
 
@@ -521,21 +555,34 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir,
     kwargs:
         is statfile binned?
 
-        make_whisker_plot (bool)
+        make_percentiles_plot (bool)
     """
 
-    whiskerfiles = glob(os.path.join(statsdir,'whisker_*png'))
-    if not whiskerfiles:
-        lcs.whisker_MAD_stats_and_plots(statsdir, outprefix, binned=binned,
-                                        make_whisker_plot=make_whisker_plot,
-                                        whisker_xlim=whisker_xlim,
-                                        whisker_ylim=whisker_ylim)
+    percentilesfiles = glob(os.path.join(statsdir,'percentiles_*png'))
+    if not percentilesfiles:
+        lcs.percentiles_MAD_stats_and_plots(statsdir, outprefix, binned=binned,
+                                            make_percentiles_plot=make_percentiles_plot,
+                                            percentiles_xlim=percentiles_xlim,
+                                            percentiles_ylim=percentiles_ylim)
     else:
-        print('found whisker plots')
+        print('found percentiles plots')
 
+    # do ACF statistics for say 100 lightcurves NOTE: might want more...
+    acf_lcs = _get_random_tfa_lcs(lcdirectory, n_desired_lcs=100)
+    outdir = os.path.join(statsdir,'acf_stats')
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+    lcs.parallel_compute_acf_statistics(acf_lcs, outdir, nworkers=nworkers)
+
+    # plot some lightcurves and their ACFs
+    pickledir = os.path.join(statsdir, 'acf_stats')
+    plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=10)
+
+    # check if image noise is gaussian
     is_image_noise_gaussian(fitsdir, projectid, field, camera, ccd)
 
-    _plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20)
+    # just make some lightcurve plots to look at them
+    plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20)
 
     # how long did the pipeline take?
     endtime = datetime.utcnow()
@@ -555,26 +602,50 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir,
     print('wrote {}'.format(summarypath))
 
 
-def _plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20,
-                                      timename='btjd'):
-    # make sequential RAW, EPD, TFA plots for `n_desired_lcs`
+def plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=10):
+    """
+    make sequential (6 row?) RAW, EPD, TFA plots with ACFs., for n_desired
+    total files.
+    """
 
-    rlcglob, epdglob, tfaglob = '*.grcollectilc', '*.epdlc', '*.tfalc'
-    rlctail, epdtail, tfatail = '.grcollectilc', '.epdlc', '.tfalc'
+    sel_acffiles = _get_random_acf_pkls(pickledir, n_desired=n_desired)
 
-    tfafiles = np.array(glob(os.path.join(lcdirectory,tfaglob)))
+    for acffile in sel_acffiles:
 
-    n_possible_lcs = len(tfafiles)
+        d = pickle.load(open(acffile, 'rb'))
 
-    if n_possible_lcs == 0:
-        raise AssertionError('need tfa LCs to exist to make plots of them')
+        for ap in range(1,len(d)+1):
 
-    # if you have fewer than `n_desired_lcs`, just plot as many as possible.
-    if n_possible_lcs > n_desired_lcs:
-        inds = np.random.randint(0, n_possible_lcs, n_desired_lcs)
-        sel_tfafiles = tfafiles[inds]
-    else:
-        sel_tfafiles = tfafiles
+            key = 'AP{}'.format(ap)
+
+            savdir = statsdir
+            savpath = os.path.join(
+                savdir,
+                os.path.basename(acffile).rstrip('.pickle')+
+                '_AP{:d}'.format(ap)+'.png'
+            )
+
+            if os.path.exists(savpath):
+                continue
+
+            lcs.plot_lightcurve_and_ACF(
+                d[key]['lag_time_raw'], d[key]['acf_raw'],
+                d[key]['lag_time_epd'], d[key]['acf_epd'],
+                d[key]['lag_time_tfa'], d[key]['acf_tfa'],
+                d[key]['itimes_raw'], d[key]['ifluxs_raw'],
+                d[key]['itimes_epd'], d[key]['ifluxs_epd'],
+                d[key]['itimes_tfa'], d[key]['ifluxs_tfa'],
+                ap, savpath=savpath
+            )
+
+def plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20,
+                                     timename='btjd'):
+    """
+    make sequential RAW, EPD, TFA plots for `n_desired_lcs`
+    """
+
+    sel_tfafiles = _get_random_tfa_lcs(lcdirectory,
+                                       n_desired_lcs=n_desired_lcs)
 
     for tfafile in sel_tfafiles:
 
@@ -852,20 +923,28 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     else:
         pass
 
-    if convert_to_fitsh_compatible:
+    fits_list = np.sort(glob(os.path.join(fitsdir, fitsglob)))
+    exists = np.array(list(os.path.exists(f) for f in fits_list))
+    allexist = np.all(exists)
+
+    if convert_to_fitsh_compatible and get_masks and ~allexist:
+
         tu.parallel_trim_get_single_extension(mast_calibrated_ffi_list,
                                               outdir, projectid,
                                               nworkers=nworkers)
 
-    fits_list = np.sort(glob(os.path.join(fitsdir, fitsglob)))
-
-    if get_masks:
         # get mask for pixels greater than 2^16 - 1
         tu.parallel_mask_saturated_stars(fits_list, saturationlevel=65535,
                                          nworkers=nworkers)
+
         # get mask for frames tagged as momentum dumps
         tu.parallel_mask_dquality_flag_frames(fits_list, flagvalue=32,
                                               nworkers=nworkers)
+
+    elif convert_to_fitsh_compatible and get_masks and allexist:
+        pass
+    else:
+        raise NotImplementedError
 
     ###########################################################################
 
@@ -963,9 +1042,11 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                    binlightcurves=binlightcurves)
 
     statsdir = os.path.dirname(epdstatfile)+'/'
-    assess_run(statsdir, lcdirectory, starttime, field, fitsdir, projectid,
-               field, camera, ccd, tfastatfile, binned=False,
-               make_whisker_plot=True, whisker_xlim=[4,catalog_faintrmag])
+    outprefix = str(field)+'-'+str(projectid)
+    assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir,
+               projectid, field, camera, ccd, tfastatfile, binned=False,
+               make_percentiles_plot=True, percentiles_xlim=None,
+               nworkers=nworkers)
 
     # TODO: maybe change the statsfile format, and include CDPP? or some
     # duration-aware RMS measure. because red noise exists.
