@@ -36,13 +36,28 @@ def read_tfa_lc(tfafile,
                 timename='btjd',
                 rmcols=[14,19,24],
                 epcols=[27,28,29],
-                tfcols=[30,31,32]):
-    '''
+                tfcols=[30,31,32],
+                recols=[15,20,25]):
+    """
     Get the times and mags from a .tfalc file. For speed, don't read any of the
     rest. The full contents of a .tfalc file are written below.
 
+    If error columns are None, they are not read.
+
     Args:
-        column ids for RAW, EPD, and TFA columns.
+        tfafile (str): path to TFA lightcurve file
+
+        jdcol (int): integer index of time column
+
+        timename (str): name to assign time column
+
+        rmcols (list of ints): integer indices of RAW magnitude columns.
+        epcols (list of ints): integer indices of EPD magnitude columns.
+        tfcols (list of ints): integer indices of TFA magnitude columns.
+
+        recols (list of ints, or None): indices of RAW magnitude error columns.
+        (EPD and TFA magnitudes currently do not have errors; they are
+        presumably inherited from RAW magnitudes).
 
     Returns:
         np.ndarray of times and magnitudes.
