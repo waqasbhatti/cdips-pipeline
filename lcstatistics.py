@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function
-'''
+"""
 functions for assessing statistics of lightcurves you've made.
 
 percentiles_MAD_stats_and_plots:
@@ -16,9 +16,9 @@ FIXME: break these out into their own module
 4. binned LC versions of these plots, using 10, 30, and 60 minute binning
 
 
-'''
+"""
 
-import os
+import os, pickle
 import numpy as np, pandas as pd, matplotlib.pyplot as plt
 import aperturephot as ap
 from glob import glob
@@ -26,6 +26,13 @@ from astropy import units as units, constants as constants
 from datetime import datetime
 
 from numpy import array as nparr
+
+from astrobase.periodbase import macf
+from astrobase.varbase.autocorr import autocorr_magseries
+
+from datetime import datetime
+import multiprocessing as mp
+
 
 ################################
 # LIGHTCURVE READING FUNCTIONS #
@@ -103,15 +110,170 @@ def read_tfa_lc(tfafile,
     31 ep2    TFA magnitude for aperture 2
     32 ep3    TFA magnitude for aperture 3
     ------------------------------------------
-    '''
+    """
 
-    lcmagcols = [pre+str(ix) for pre in ['RM','EP','TF'] for ix in range(1,4)]
+    lcmagcols = [pre+str(ix)
+                 for pre in ['RM','EP','TF'] for ix in range(1,4)]
+    lcerrcols = [pre+'ERR'+str(ix)
+                 for pre in ['RM'] for ix in range(1,4)]
 
-    lcdata = np.genfromtxt(tfafile,
-                           usecols=tuple([jdcol] + rmcols + epcols + tfcols),
-                           names=[timename] + lcmagcols)
+    if (
+        not isinstance(recols,list)
+    ):
+        lcdata = np.genfromtxt(tfafile,
+                               usecols=tuple(
+                                   [jdcol] + rmcols + epcols + tfcols),
+                               names=[timename] + lcmagcols)
+    elif (
+        isinstance(recols,list)
+    ):
+        lcdata = np.genfromtxt(tfafile,
+                               usecols=tuple(
+                                   [jdcol]
+                                   + rmcols + epcols + tfcols
+                                   + recols),
+                               names=[timename] + lcmagcols + lcerrcols)
+
+    else:
+        raise ValueError(
+            'Make consistent choice of including or not including errors')
 
     return lcdata
+
+
+#####################################
+# FUNCTIONS TO CALCULATE STATISTICS #
+#####################################
+
+def compute_acf_statistics_worker(task, n_apertures=3, timename='btjd',
+                                  filterwindow=7, istessffi=True):
+
+    #NOTE : might want to check a couple smoothing values ("filterwindows")...
+
+    if not istessffi:
+        raise NotImplementedError(
+        'this function assumes an ffi cadence of 30 minutes to evaluate ACFs. '
+        'to generalize this you just need to interpolate, but I am lazy.'
+        )
+
+    tfafile, outdir, eval_times_hr = task
+
+    lcdata = read_tfa_lc(tfafile)
+
+    outpickle = os.path.join(
+        outdir,
+        os.path.basename(tfafile).replace('.tfalc','_acf_stats.pickle')
+    )
+    outcsv = os.path.join(
+        outdir,
+        os.path.basename(tfafile).replace('.tfalc','_acf_stats.csv')
+    )
+
+    d_pkl, outdf = {}, pd.DataFrame({})
+    for ap in range(1,n_apertures+1):
+
+        rawap = 'RM{:d}'.format(ap)
+        epdap = 'EP{:d}'.format(ap)
+        tfaap = 'TF{:d}'.format(ap)
+        errap = 'RMERR{:d}'.format(ap)
+
+        time = lcdata[timename]
+        flux_raw = lcdata[rawap]
+        flux_epd = lcdata[epdap]
+        flux_tfa = lcdata[tfaap]
+        err = lcdata[errap]
+
+        acf_raw = autocorr_magseries(time, flux_raw, err, maxlags=None,
+                                     fillgaps='noiselevel', sigclip=5,
+                                     magsarefluxes=True,
+                                     filterwindow=filterwindow)
+        acf_epd = autocorr_magseries(time, flux_epd, err, maxlags=None,
+                                     fillgaps='noiselevel', sigclip=5,
+                                     magsarefluxes=True,
+                                     filterwindow=filterwindow)
+        acf_tfa = autocorr_magseries(time, flux_tfa, err, maxlags=None,
+                                     fillgaps='noiselevel', sigclip=5,
+                                     magsarefluxes=True,
+                                     filterwindow=filterwindow)
+
+        if not np.isclose(acf_raw['cadence']*24*60, 30, atol=1e-3):
+            raise NotImplementedError(
+            'this function assumes an ffi cadence of 30 minutes to evaluate ACFs. '
+            'to generalize this you just need to interpolate, but I am lazy.'
+            )
+
+        apstr = 'AP{}'.format(ap)
+        d_pkl[apstr] = {}
+        for acf, dtr in zip([acf_raw, acf_epd, acf_tfa],['raw','epd','tfa']):
+
+            d_pkl[apstr]['acf_{}'.format(dtr)] = acf['acf']
+            d_pkl[apstr]['lag_time_{}'.format(dtr)] = acf['lags']*acf['cadence']
+            d_pkl[apstr]['itimes_{}'.format(dtr)] = acf['itimes']
+            d_pkl[apstr]['ifluxs_{}'.format(dtr)] = acf['imags']
+            d_pkl[apstr]['ierrs_{}'.format(dtr)] = acf['ierrs']
+            d_pkl[apstr]['cadence'] = acf['cadence']
+
+        # assuming FFI cadence of 30 minutes, evalute ACF at desired lags.
+        eval_times_hr = nparr(eval_times_hr)
+        outdf['LAG_TIME_HR'] = eval_times_hr
+        for acf, colstr in zip(
+            [acf_raw, acf_epd, acf_tfa],
+            ['RAW{:d}'.format(ap),'EPD{:d}'.format(ap),'TFA{:d}'.format(ap)]
+        ):
+            # wonky indexing scheme. 30 minute cadence -> e.g., 1hr lag is
+            # index number 2.
+            these_acf_vals = acf['acf'][2*eval_times_hr]
+
+            outdf[colstr+"_ACF"] = these_acf_vals
+
+    with open(outpickle, 'w') as f:
+        pickle.dump(d_pkl, f, pickle.HIGHEST_PROTOCOL)
+    print('wrote {}'.format(outpickle))
+
+    outdf.to_csv(outcsv, index=False)
+    print('wrote {}'.format(outcsv))
+
+    return 1
+
+
+def parallel_compute_acf_statistics(
+    tfafiles, outdir, eval_times_hr=[1,2,6,12,24,48,96,120,144,192],
+    nworkers=16, maxworkertasks=1000
+):
+    """
+    Given list of TFA lightcurves, calculate autocorrelation functions and
+    evaluate them at specific times, e.g., 1hr, 2hr, 6hr, 24hr.
+
+    Gives two outputs:
+        1) a pickle file with the autocorrelation function results.
+        2) a csv file with the summarized ACF values at the desired lag times.
+
+    Args:
+        tfafiles (list of strs): list of paths to TFA files
+
+        outdir (str): directory where output csv files with ACF statistics
+        are written.
+
+        eval_times_hr (list of ints): times at which to evaluate the
+        autocorrelation functions, in hours.
+    """
+
+    print('%sZ: %s files to compute ACF statistics for' %
+          (datetime.utcnow().isoformat(), len(tfafiles)))
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+    tasks = [(x, outdir, eval_times_hr) for x in tfafiles]
+
+    # fire up the pool of workers
+    results = pool.map(compute_acf_statistics_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    return {result for result in results}
+
 
 
 ######################
@@ -123,10 +285,10 @@ def percentiles_MAD_stats_and_plots(statdir, outprefix, binned=False,
                                     percentiles_xlim=[4,17],
                                     percentiles_ylim=[1e-5,1e-1],
                                     percentiles=[2,25,50,75,98]):
-    '''
+    """
     make csv files and (optionally) plots of MAD vs magnitude statistics,
     evaluated at percentiles.
-    '''
+    """
 
     # get and read the most complete stats file (the TFA one!)
     tfastatfile = glob(os.path.join(statdir,'*.tfastats'))
@@ -206,7 +368,7 @@ def percentiles_MAD_stats_and_plots(statdir, outprefix, binned=False,
                 if percentiles_ylim:
                     ax.set_ylim(percentiles_ylim)
 
-                titlestr = '{:s} - {:d} - {:s}'.format(
+                titlestr = '{:s} - {:d} LCs - {:s}'.format(
                     outprefix,
                     len(stats),
                     '{:s} percentiles'.format(repr(percentiles))
@@ -240,7 +402,7 @@ def percentiles_MAD_stats_and_plots(statdir, outprefix, binned=False,
 
 def plot_raw_epd_tfa(time, rawmag, epdmag, tfamag, ap_index, savpath=None,
                      xlabel='BTJD = BJD - 2457000'):
-    '''
+    """
     Plot a 3 row, 1 column plot with rows of:
         * raw mags vs time
         * EPD mags vs time
@@ -250,7 +412,7 @@ def plot_raw_epd_tfa(time, rawmag, epdmag, tfamag, ap_index, savpath=None,
         time, rawmag, epdmag, tfamag (np.ndarray)
 
         ap_index (int): integer, e.g., "2" for aperture #2.
-    '''
+    """
 
     from matplotlib.ticker import FormatStrFormatter
 
@@ -293,5 +455,95 @@ def plot_raw_epd_tfa(time, rawmag, epdmag, tfamag, ap_index, savpath=None,
         savpath = 'temp_{:s}.png'.format(apstr)
 
     fig.tight_layout(h_pad=-0.5)
+    fig.savefig(savpath, dpi=250, bbox_inches='tight')
+    print('%sZ: made plot: %s' % (datetime.utcnow().isoformat(), savpath))
+
+
+def plot_lightcurve_and_ACF(
+    rawlags, rawacf, epdlags, epdacf, tfalags, tfaacf,
+    rawtime, rawflux, epdtime, epdflux, tfatime, tfaflux,
+    ap, savpath=None,
+    xlabeltime='BJD - 2457000',xlabelacf='ACF lag [days]'):
+    """
+    Plot a 3 row, 2 column plot with rows of:
+        * raw mags vs time (and ACF)
+        * EPD mags vs time (and ACF)
+        * TFA mags vs time. (and ACF)
+
+    Args:
+        lags and ACF: computed with e.g., `compute_acf_statistics_worker`, or
+        `autocorr_magseries`.
+
+        ap (int): integer identifying aperture size
+    """
+
+    from matplotlib.ticker import FormatStrFormatter
+
+    plt.close('all')
+    fig, axs = plt.subplots(nrows=3, ncols=2, figsize=(7,4),
+                            gridspec_kw= {'width_ratios':[4,1],
+                                          'height_ratios':[1,1,1]})
+    a0,a1,a2,a3,a4,a5 = axs.flatten()
+
+    apstr = 'AP{:d}'.format(ap)
+    stagestrs = ['RM{:d}'.format(ap),
+                 'EP{:d}'.format(ap),
+                 'TF{:d}'.format(ap)]
+
+    for ax, mag, time, txt in zip(
+        (a0,a2,a4), [rawflux,epdflux,tfaflux], [rawtime,epdtime,tfatime],
+        stagestrs
+    ):
+        ax.plot(time, mag, c='k', linestyle='-', marker='o',
+                markerfacecolor='k', markeredgecolor='k', ms=3, lw=0.,
+                zorder=1, rasterized=True)
+        ax.plot(time, mag, c='orange', linestyle='-', marker='o',
+                markerfacecolor='orange', markeredgecolor='orange', ms=1.5,
+                lw=0., zorder=2, rasterized=True)
+        txt_x, txt_y = 0.99, 0.98
+        t = ax.text(txt_x, txt_y, txt, horizontalalignment='right',
+                verticalalignment='top', fontsize='small', zorder=3,
+                transform=ax.transAxes)
+        ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
+        ax.get_yaxis().set_tick_params(which='both', direction='in',
+                                       labelsize='x-small')
+        ax.get_xaxis().set_tick_params(which='both', direction='in',
+                                       labelsize='x-small')
+
+    for ax, acf, lag, txt in zip(
+        (a1,a3,a5),
+        [rawacf, epdacf, tfaacf],
+        [rawlags, epdlags, tfalags],
+        stagestrs
+    ):
+
+        ax.plot(lag, acf, c='k', linestyle='-', marker='o',
+                markerfacecolor='k', markeredgecolor='k', ms=1, lw=0.5,
+                zorder=1, rasterized=True)
+
+        ax.set_xscale('log')
+        ax.yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
+        ax.get_yaxis().set_tick_params(which='both', direction='in',
+                                       labelsize='x-small')
+        ax.get_xaxis().set_tick_params(which='both', direction='in',
+                                       labelsize='x-small')
+
+    for ax in (a0,a2,a1,a3):
+        ax.set_xticklabels([])
+
+    fig.text(0.45,0.05, xlabeltime, ha='center')
+    fig.text(0.88,0.05, xlabelacf, ha='center')
+
+    # make the y label
+    ax_hidden = fig.add_subplot(111, frameon=False)
+    ax_hidden.tick_params(labelcolor='none', top=False, bottom=False,
+                          left=False, right=False)
+    ax_hidden.set_ylabel('instrument mag (left), ACF (right)',
+                         fontsize='small', labelpad=3)
+
+    if not savpath:
+        savpath = 'temp_{:s}.png'.format(apstr)
+
+    fig.tight_layout(h_pad=0., w_pad=0)
     fig.savefig(savpath, dpi=250, bbox_inches='tight')
     print('%sZ: made plot: %s' % (datetime.utcnow().isoformat(), savpath))
