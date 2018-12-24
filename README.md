@@ -39,14 +39,18 @@ Change directories to $TREX, and install everything pip can find:
   (trex_27) pip install -r requirements.txt
   ```
 
-This will take some time.  Then, ensure pyeebls and astrobase are installed
-(they are commented out by default because they require a number of
+This will take some time.  Then, ensure pyeebls and bleeding-edge astrobase are
+installed (they are commented out by default because they require a number of
 dependencies):
 
   ```
   (trex_27) pip install pyeebls
-  (trex_27) pip install astrobase
+  (trex_27) cd $ASTROBASE_DIR
+  (trex_27) python setup.py develop
   ```
+
+where I have assumed you may want to make contributions to astrobase as you
+develop, which you should!
 
 ### anet and astrometry.net dependencies
 
