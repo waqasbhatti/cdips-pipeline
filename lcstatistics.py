@@ -3,22 +3,43 @@ from __future__ import division, print_function
 """
 functions for assessing statistics of lightcurves you've made.
 
+read_tfa_lc:
+    read TFA lightcurve
+
+read_acf_stat_files:
+    read stack of csv files with autocorrelation functions evaluated at
+    selected time lags.
+
+compute_acf_statistics_worker:
+    worker to compute autocorrelation function statistics
+
+parallel_compute_acf_statistics:
+    compute autocorrelation function stats for many lightcurves
+
 percentiles_MAD_stats_and_plots:
     make csv files and (optionally) percentiles plots of MAD vs magnitude.
+
+acf_percentiles_stats_and_plots:
+    make csv files & plots summarizing ACF statistics for many stars
+
+plot_raw_epd_tfa:
+    Plot a 3 row, 1 column plot with rows of:
+        * raw mags vs time
+        * EPD mags vs time
+        * TFA mags vs time.
+
+plot_lightcurve_and_ACF:
+    Plot a 3 row, 2 column plot with rows of:
+        * raw mags vs time (and ACF)
+        * EPD mags vs time (and ACF)
+        * TFA mags vs time. (and ACF)
 
 TODO:
 move items from aperturephot.py here, and update all respective calls.
 
-FIXME: break these out into their own module
-1. RMS vs. MAG plot for EPD and TFA lightcurves
-2. MAD vs. MAG plot for EPD and TFA lightcurves
-3. ratios of RMS and MAD vs. MAG for CCD 6,7,8 to that of CCD 5
-4. binned LC versions of these plots, using 10, 30, and 60 minute binning
-
-
 """
 
-import os, pickle
+import os, pickle, itertools
 import numpy as np, pandas as pd, matplotlib.pyplot as plt
 import aperturephot as ap
 from glob import glob
@@ -34,9 +55,9 @@ from datetime import datetime
 import multiprocessing as mp
 
 
-################################
-# LIGHTCURVE READING FUNCTIONS #
-################################
+#####################
+# READING FUNCTIONS #
+#####################
 
 def read_tfa_lc(tfafile,
                 jdcol=0,
@@ -141,6 +162,25 @@ def read_tfa_lc(tfafile,
     return lcdata
 
 
+def read_acf_stat_files(acfstatfiles, N_acf_types=9):
+    """
+    return dataframe of length (N_stars*N_lag_times per star) with evaluated
+    autocorrelation functions for each aperure and detrending step.
+    """
+
+    if not acfstatfiles:
+        raise AssertionError('cannot assess run if there are no ACF statfiles')
+
+    iscsvs = nparr([f.endswith('.csv') for f in acfstatfiles])
+    if not np.all(iscsvs):
+        raise ValueError('expected only csv files')
+
+    # read acf files
+    df = pd.concat([pd.read_csv(f) for f in acfstatfiles],
+                   ignore_index = True)
+
+    return df
+
 #####################################
 # FUNCTIONS TO CALCULATE STATISTICS #
 #####################################
@@ -237,9 +277,8 @@ def compute_acf_statistics_worker(task, n_apertures=3, timename='btjd',
 
 
 def parallel_compute_acf_statistics(
-    tfafiles, outdir, eval_times_hr=[1,2,6,12,24,48,96,120,144,192],
-    nworkers=16, maxworkertasks=1000
-):
+    tfafiles, outdir, eval_times_hr=[1,2,6,12,24,48,60,96,120,144,192],
+    nworkers=16, maxworkertasks=1000):
     """
     Given list of TFA lightcurves, calculate autocorrelation functions and
     evaluate them at specific times, e.g., 1hr, 2hr, 6hr, 24hr.
@@ -279,6 +318,97 @@ def parallel_compute_acf_statistics(
 ######################
 # PLOTTING FUNCTIONS #
 ######################
+def acf_percentiles_stats_and_plots(statdir, outprefix, make_plot=True,
+                                    percentiles=[2,25,50,75,98]):
+    """
+    make csv files and (optionally) plots of ACF values at various time lags,
+    evaluated at percentiles.
+    """
+
+    # get and read ACF files
+    acfdir = os.path.join(statdir,'acf_stats')
+    acfstatfiles = glob(os.path.join(acfdir,'*_acf_stats.csv'))
+
+    df = read_acf_stat_files(acfstatfiles)
+
+    # ACF vs time-lag statistics, summarized as percentiles at 2%, 25%, 50%,
+    # 75%, and 98% percentiles.
+    for apstr in ['TFA1','TFA2','TFA3',
+                  'EPD1','EPD2','EPD3',
+                  'RAW1','RAW2','RAW3']:
+        try:
+            timelags = np.sort(np.unique(df['LAG_TIME_HR']))
+
+            percentile_dict = {}
+            for timelag in timelags:
+
+                percentile_dict[timelag] = {}
+
+                sel = df['LAG_TIME_HR']==timelag
+
+                for percentile in percentiles:
+                    val = np.nanpercentile(df[sel][apstr+'_ACF'], percentile)
+                    percentile_dict[timelag][percentile] = np.round(val,7)
+
+            pctile_df = pd.DataFrame(percentile_dict)
+
+            if make_plot:
+
+                plt.close('all')
+                fig, ax = plt.subplots(figsize=(4,3))
+
+                markers = itertools.cycle(('o', 'v', '>', 'D', 's', 'P'))
+
+                for ix, row in pctile_df.iterrows():
+                    pctile = row.name
+                    label = '{}%'.format(str(pctile))
+
+                    timelags = nparr(row.index)
+                    vals = nparr(row)
+
+                    ax.plot(timelags, vals, label=label, marker=next(markers))
+
+                ax.legend(loc='best', fontsize='xx-small')
+
+                ax.set_yscale('linear')
+                ax.set_xscale('log')
+                ax.set_xlabel('ACF time lag [hr]')
+                ax.set_ylabel('{:s} ACF value'.format(apstr.upper()))
+
+                titlestr = '{:s} - {:d} ACFs - {:s}'.format(
+                    outprefix,
+                    len(acfstatfiles),
+                    '{:s} percentiles'.format(repr(percentiles))
+                )
+                ax.set_title(titlestr, fontsize='small')
+
+                plt.gca().grid(color='#a9a9a9',
+                               alpha=0.9,
+                               zorder=0,
+                               linewidth=1.0,
+                               linestyle=':')
+
+                savname = ( os.path.join(
+                    statdir,'acf_percentiles_stats_{:s}.png'.format(apstr.upper())
+                ))
+                fig.tight_layout()
+                fig.savefig(savname, dpi=250)
+                print('%sZ: made %s plot: %s' %
+                      (datetime.utcnow().isoformat(), titlestr, savname))
+
+            csvname = ( os.path.join(
+                statdir,'acf_percentiles_stats_{:s}.csv'.format(apstr.upper())
+            ))
+            outdf = pctile_df.T
+            outdf.index.name='lag_time_hr'
+            outdf.to_csv(csvname)
+            print('%sZ: wrote %s' %
+                  (datetime.utcnow().isoformat(), csvname))
+
+        except Exception as e:
+            print('%sZ: failed to make percentiles for %s, err was %s' %
+                  (datetime.utcnow().isoformat(), apstr, e))
+
 
 def percentiles_MAD_stats_and_plots(statdir, outprefix, binned=False,
                                     make_percentiles_plot=True,
@@ -337,7 +467,6 @@ def percentiles_MAD_stats_and_plots(statdir, outprefix, binned=False,
             pctile_df = pd.DataFrame(percentile_dict)
 
             if make_percentiles_plot:
-                import itertools
 
                 plt.close('all')
                 fig, ax = plt.subplots(figsize=(4,3))
