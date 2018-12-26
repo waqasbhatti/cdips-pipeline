@@ -572,11 +572,15 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
     outdir = os.path.join(statsdir,'acf_stats')
     if not os.path.exists(outdir):
         os.mkdir(outdir)
-    lcs.parallel_compute_acf_statistics(acf_lcs, outdir, nworkers=nworkers)
+    lcs.parallel_compute_acf_statistics(
+        acf_lcs, outdir, nworkers=nworkers,
+        eval_times_hr=[1,2,6,12,24,48,60,96,120,144,192])
 
     # plot some lightcurves and their ACFs
     pickledir = os.path.join(statsdir, 'acf_stats')
     plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=10)
+
+    lcs.acf_percentiles_stats_and_plots(statsdir, outprefix, make_plot=True)
 
     # check if image noise is gaussian
     is_image_noise_gaussian(fitsdir, projectid, field, camera, ccd)

@@ -14,14 +14,14 @@
 ############################
 camnum=4
 ccdnum=4
-projectid=1002
+projectid=1003
 sector='s0002'
 
 #################################
 # reduction-specific parameters #
 #################################
-tuneparameters=true
-nworkers=20
+tuneparameters=false
+nworkers=30
 aperturelist="1.45:7.0:6.0,2.2:7.0:6.0,2.95:7.0:6.0"
 epdsmooth=11
 epdsigclip=10
@@ -121,5 +121,5 @@ python -u TESS_reduction.py \
   --fiphotfluxthreshold $fiphotfluxthreshold \
   --photreffluxthreshold $photreffluxthreshold \
   --extractsources $extractsources --$binlcoption \
-  --camnum $camnum --ccdnum $ccdnum #\
-  #&> logs/$logname &
+  --camnum $camnum --ccdnum $ccdnum \
+  &> logs/$logname &
