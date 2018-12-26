@@ -1,5 +1,18 @@
 '''
-functions specific to wrangling TESS data
+functions specific to wrangling TESS data.
+
+contents:
+
+mask_saturated_stars_worker
+parallel_mask_saturated_stars
+mask_dquality_flag_frame
+parallel_mask_dquality_flag_frames
+parallel_trim_get_single_extension
+from_CAL_to_fitsh_compatible
+    (deprecated) from_ete6_to_fitsh_compatible
+
+read_tess_lightcurve
+read_object_catalog
 '''
 
 ##########################################
@@ -19,6 +32,10 @@ from numpy import array as nparr, all as npall
 
 from datetime import datetime
 import multiprocessing as mp
+
+from astropy.coordinates import SkyCoord
+from astropy import units as u
+from astropy.io import ascii
 
 ##########################################
 
@@ -272,6 +289,228 @@ def from_ete6_to_fitsh_compatible(fitslist, outdir, projid=42):
 
     for fitsname in fitslist:
         from_CAL_to_fitsh_compatible((fitsname, outdir, projid))
+
+
+def are_known_HJs_in_field(ra_center, dec_center, outname):
+    """
+    Given a field center, find which known hot Jupiters are on chip.
+    Dependencies: tessmaps, astropy, astroquery
+
+    Args:
+        ra_center, dec_center (floats): coordinate of field center in degrees
+
+        outname (str): path to which csv file with details of HJs on chip will
+        be written
+
+    Returns:
+        True if any HJs on chip, else False.
+    """
+
+    from tessmaps import get_time_on_silicon as gts
+    from astroquery.nasa_exoplanet_archive import NasaExoplanetArchive
+
+    eatab = NasaExoplanetArchive.get_confirmed_planets_table()
+
+    cam_dirn = SkyCoord(ra_center*u.deg, dec_center*u.deg, frame='icrs')
+    cam_tuple = (cam_dirn.barycentrictrueecliptic.lat.value,
+                 cam_dirn.barycentrictrueecliptic.lon.value)
+
+    is_jup = (eatab['pl_radj'] > 0.4*u.Rjup)
+    is_hot = (eatab['pl_orbper'] < 10*u.day)
+
+    is_hj = is_jup & is_hot
+
+    hj_coords = eatab[is_hj]['sky_coord']
+
+    hj_onchip = gts.given_one_camera_get_stars_on_silicon(
+        hj_coords, cam_tuple, withgaps=False)
+
+    if np.any(hj_onchip):
+        desiredcols = ['pl_hostname', 'pl_letter', 'pl_name', 'pl_orbper',
+                       'pl_radj', 'st_optmag', 'gaia_gmag','sky_coord']
+
+        outtab = eatab[is_hj][desiredcols]
+        outtab = outtab[hj_onchip.astype(bool)]
+
+        ascii.write(outtab, output=outname, format='ecsv',
+                    overwrite=True)
+        print('wrote {}'.format(outname))
+
+        return True
+
+    else:
+        return False
+
+
+def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory,
+                         minxmatchsep=3):
+    """
+    Args:
+
+        hjonchippath (str): path to csv that tells you which HJs are expected
+        to be on (or near) chip.
+
+        projcatalogpath (str): path to projected catalog (from e.g., 2MASS or
+        GAIA).
+
+        lcdirectory (str): path to directory with lightcurves. Globs are
+        constructed to search for LCs of the HJ matches.
+
+        minxmatchsep (float): minimum separation, in arcseconds, for
+        crossmatching of hot Jupiter exoarchive catalog positions to 2mass
+        projected plate positions.
+    """
+
+    minxmatchsep = minxmatchsep*u.arcsec
+
+    # read HJ information table from `tessutils.are_known_HJs_in_field`
+    tab = ascii.read(hjonchippath)
+
+    # if it's not HAT/WASP/KELT, it's probably not a HJ that this tuning test
+    # cares about. if so, scrap it.
+    wantstrs = ['HAT','WASP','KELT']
+    is_wanted = []
+    for hn in nparr(tab['pl_hostname']):
+        want = False
+        for wantstr in wantstrs:
+            if wantstr in hn:
+                want = True
+                break
+            else:
+                pass
+        is_wanted.append(want)
+    is_wanted = nparr(is_wanted)
+
+    tab = tab[is_wanted]
+
+    # get the HATIDs that correspond to the HJs on-chip
+    projcat = read_object_catalog(projcatalogpath)
+
+    proj_ra, proj_dec = projcat['ra']*u.deg, projcat['dec']*u.deg
+
+    proj_coords = SkyCoord(proj_ra, proj_dec, frame='icrs')
+    hj_coords = tab['sky_coord']
+
+    for colname in [
+        'match_proj_ra','match_proj_dec','match_sep_arcsec'
+    ]:
+        tab[colname] = np.nan
+
+    hatids = []
+    for hj_coord, name in zip(hj_coords, tab['pl_name']):
+
+        seps = hj_coord.separation(proj_coords)
+        projsorted = proj_coords[np.argsort(seps)]
+        sepssorted = proj_coords[np.argsort(seps)]
+
+        # now get the HATIDs of the match
+        if np.any(seps < minxmatchsep):
+            sel = (seps < minxmatchsep)
+
+            if len(sel[sel]) > 1:
+                raise NotImplementedError('expected a single HJ HATID match')
+
+            projcatmatch = projcat[np.argmin(seps)]
+
+            thispl = (tab['pl_name']==name)
+            hatids.append(projcatmatch[0].encode('ascii'))
+            tab[thispl]['match_proj_ra'] = projcatmatch[1]
+            tab[thispl]['match_proj_dec'] = projcatmatch[2]
+            match_sep = np.min(seps).to(u.arcsec).value
+            tab[thispl]['match_sep_arcsec'] = match_sep
+
+            print('{}: got projcatalog match with separation {} arcsec'.
+                  format(name, match_sep))
+
+        else:
+            hatids.append(np.nan)
+            print('{}: did not get projcatalog match with separation < {}'.
+                  format(name, minxmatchsep))
+            continue
+
+    tab['hatids'] = hatids
+
+    # check if the HJs on chip with known HATIDs have lightcurves
+    rle, ele, tle, rlcs, elcs, tlcs = [],[],[],[],[],[]
+    for hatid in tab['hatids']:
+
+        if hatid=='nan':
+            rawlc = str(np.nan)
+            epdlc = str(np.nan)
+            tfalc = str(np.nan)
+        else:
+            rawlc = glob(os.path.join(lcdirectory, hatid+'.grcollectilc'))
+            epdlc = glob(os.path.join(lcdirectory, hatid+'.epdlc'))
+            tfalc = glob(os.path.join(lcdirectory, hatid+'.tfalc'))
+
+            for lc in [rawlc, epdlc, tfalc]:
+                if len(lc) > 1:
+                    raise ValueError('expected at most 1 lightcurve match')
+
+            rawlc = rawlc[0] if len(rawlc)==1 else str(np.nan)
+            epdlc = epdlc[0] if len(epdlc)==1 else str(np.nan)
+            tfalc = tfalc[0] if len(tfalc)==1 else str(np.nan)
+
+        rawlcexists = os.path.exists(rawlc)
+        epdlcexists = os.path.exists(epdlc)
+        tfalcexists = os.path.exists(tfalc)
+
+        rle.append(rawlcexists)
+        ele.append(epdlcexists)
+        tle.append(tfalcexists)
+        rlcs.append(rawlc)
+        elcs.append(epdlc)
+        tlcs.append(tfalc)
+
+    tab['rawlcexists'] = nparr(rle)
+    tab['epdlcexists'] = nparr(ele)
+    tab['tfalcexists'] = nparr(tle)
+    tab['rawlc'] = nparr(rlcs)
+    tab['epdlc'] = nparr(elcs)
+    tab['tfalc'] = nparr(tlcs)
+
+    print(tab['pl_name', 'hatids', 'rawlcexists', 'epdlcexists',
+              'tfalcexists'])
+    print(tab['rawlc'])
+
+    if not np.any(tab['tfalcexists']):
+
+        print('WRN! did not find any known hot jupiters that had TFA '
+              'lightcurves')
+
+        return 0
+
+    elif not np.any(tab['tfalcexists']) and np.any(tab['epdlcexists']):
+
+        print('WRN! but found EPD lcs for some HJs. Perhaps TFA is failing.')
+
+        return 0
+
+    elif not np.any(tab['tfalcexists']) and not np.any(tab['epdlcexists']):
+        print('WRN! and did not find any EPD lightcurves either.')
+
+        return 0
+
+    # otherwise, continue to by measuring the HJ's SNR
+    for tfalc in tab['tfalc'][tab['tfalcexists']]:
+        _measure_hj_snr(tfalc)
+
+def _measure_hj_snr(tfalc):
+
+    #FIXME: implement
+    raise NotImplementedError
+    pass
+    # read the lc
+
+    # BLS
+
+    # fit trapezoidal model
+
+    # use standard model fitting to get the SNR
+
+    # probably make a plot
+
+
 
 ##############################
 # UNDER CONSTRUCTION
