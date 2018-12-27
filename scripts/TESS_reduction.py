@@ -597,7 +597,8 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
     # measure S/N of known HJ transits
     hjonchippath = os.path.join(statsdir,'hjs_onchip.csv')
     if tu.are_known_HJs_in_field(ra_nom, dec_nom, hjonchippath):
-        tu.measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory)
+        tu.measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory,
+                                statsdir)
     else:
         print('did not find any known HJs on this field')
 
@@ -944,10 +945,12 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
         pass
 
     fits_list = np.sort(glob(os.path.join(fitsdir, fitsglob)))
-    exists = np.array(list(os.path.exists(f) for f in fits_list))
-    allexist = np.all(exists) and len(exists)!=0
+    exists = np.array(list(os.path.exists(f) for f in fits_list)).astype(bool)
+    mostexist = len(exists)!=0
+    if len(exists)>0:
+        mostexist &= len(exists[exists])/len(exists)>0.8
 
-    if convert_to_fitsh_compatible and get_masks and ~allexist:
+    if convert_to_fitsh_compatible and get_masks and not mostexist:
 
         tu.parallel_trim_get_single_extension(mast_calibrated_ffi_list,
                                               outdir, projectid,
@@ -963,7 +966,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
         tu.parallel_mask_dquality_flag_frames(fits_list, flagvalue=32,
                                               nworkers=nworkers)
 
-    elif convert_to_fitsh_compatible and get_masks and allexist:
+    elif convert_to_fitsh_compatible and get_masks and mostexist:
         pass
     else:
         raise NotImplementedError
