@@ -330,7 +330,8 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
 
 def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
                    reformed_cat_file, statsdir, field, epdsmooth=11,
-                   epdsigclip=10, nworkers=10, binlightcurves=False):
+                   epdsigclip=10, nworkers=10, binlightcurves=False,
+                   tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0):
     """
     Step ISP11: do EPD on all the LCs, and collect stats on the results.
     for ISP LCs, use lcmagcols=([27,28,29],[30,],[30,],[30,])
@@ -381,9 +382,10 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
     if not os.path.exists(tfastatfile):
         templatefiles = glob(lcdirectory+'aperture-?-tfa-template.list')
         ism.parallel_run_tfa(lcdirectory, templatefiles, epdlc_glob='*.epdlc',
-                            epdlc_jdcol=0, epdlc_magcol=(27,28,29),
-                            template_sigclip=5.0, epdlc_sigclip=5.0, nworkers=nworkers,
-                            workerntasks=1000)
+                             epdlc_jdcol=0, epdlc_magcol=(27,28,29),
+                             template_sigclip=tfa_template_sigclip,
+                             epdlc_sigclip=tfa_epdlc_sigclip,
+                             nworkers=nworkers, workerntasks=1000)
 
         ap.parallel_lc_statistics(lcdirectory, '*.epdlc', reformed_cat_file,
                                   tfalcrequired=True,
@@ -813,7 +815,8 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
                                 photdisjointradius, tuneparameters, is_ete6,
                                 catalog_faintrmag, fiphotfluxthreshold,
                                 photreffluxthreshold, extractsources,
-                                binlightcurves, get_masks):
+                                binlightcurves, get_masks,
+                                tfa_template_sigclip, tfa_epdlc_sigclip):
     """
     each "reduction version" is identified by a project ID. the parameters
     corresponding to each project ID are written in a pickle file, so that we
@@ -849,7 +852,9 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
         "photreffluxthreshold":photreffluxthreshold,
         "extractsources":extractsources,
         "binlightcurves":binlightcurves,
-        "get_masks":get_masks
+        "get_masks":get_masks,
+        "tfa_template_sigclip":tfa_template_sigclip,
+        "tfa_epdlc_sigclip":tfa_epdlc_sigclip
     }
 
     outpicklename = "projid_{:s}.pickle".format(repr(projectid))
@@ -874,7 +879,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
          tuneparameters='true', is_ete6=False,
          catalog_faintrmag=13, fiphotfluxthreshold=1000,
          photreffluxthreshold=1000, extractsources=True, binlightcurves=False,
-         get_masks=1
+         get_masks=1, tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0
          ):
     """
     args:
@@ -915,7 +920,8 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                                 photdisjointradius, tuneparameters, is_ete6,
                                 catalog_faintrmag, fiphotfluxthreshold,
                                 photreffluxthreshold, extractsources,
-                                binlightcurves, get_masks)
+                                binlightcurves, get_masks,
+                                tfa_template_sigclip, tfa_epdlc_sigclip)
 
     starttime = datetime.utcnow()
 
@@ -1064,7 +1070,9 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
                    reformed_cat_file, statsdir, field, epdsmooth=epdsmooth,
                    epdsigclip=epdsigclip, nworkers=nworkers,
-                   binlightcurves=binlightcurves)
+                   binlightcurves=binlightcurves,
+                   tfa_template_sigclip=tfa_template_sigclip,
+                   tfa_epdlc_sigclip=tfa_epdlc_sigclip)
 
     statsdir = os.path.dirname(epdstatfile)+'/'
     outprefix = str(field)+'-'+str(projectid)
@@ -1250,6 +1258,13 @@ if __name__ == '__main__':
             'catalog_faintrmag cutoff to make the list of sources. ')
          )
 
+    parser.add_argument('--tfa_template_sigclip', type=float, default=5.,
+        help=('sigclip tfa templates by this much'))
+    parser.add_argument('--tfa_epdlc_sigclip', type=float, default=10000.,
+        help=('sigclip EPD lightcurves by this much before applying TFA. '
+              'using this option is probably always a bad idea.'))
+
+
     args = parser.parse_args()
 
     check_args(args)
@@ -1276,5 +1291,7 @@ if __name__ == '__main__':
          fiphotfluxthreshold=args.fiphotfluxthreshold,
          photreffluxthreshold=args.photreffluxthreshold,
          extractsources=extractsources,
-         binlightcurves=args.binlcs
+         binlightcurves=args.binlcs,
+         tfa_template_sigclip=args.tfa_template_sigclip,
+         tfa_epdlc_sigclip=args.tfa_epdlc_sigclip
     )
