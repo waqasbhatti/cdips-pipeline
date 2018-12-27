@@ -538,9 +538,10 @@ def _get_random_acf_pkls(pkldir, n_desired=10):
 
 
 def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
-               field, camera, ccd, tfastatfile, binned=False,
-               make_percentiles_plot=True, percentiles_xlim=[4,17],
-               percentiles_ylim=[1e-5,1e-1], nworkers=16):
+               field, camera, ccd, tfastatfile, ra_nom, dec_nom,
+               projcatalogpath, binned=False, make_percentiles_plot=True,
+               percentiles_xlim=[4,17], percentiles_ylim=[1e-5,1e-1],
+               nworkers=16):
     """
     write files with summary statistics of run.
 
@@ -588,7 +589,19 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
     # just make some lightcurve plots to look at them
     plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20)
 
-    # how long did the pipeline take?
+    # count numbers of lightcurves
+    n_rawlc = len(glob(os.path.join(lcdirectory,'*.grcollectilc')))
+    n_epdlc = len(glob(os.path.join(lcdirectory,'*.epdlc')))
+    n_tfalc = len(glob(os.path.join(lcdirectory,'*.tfalc')))
+
+    # measure S/N of known HJ transits
+    hjonchippath = os.path.join(statsdir,'hjs_onchip.csv')
+    if tu.are_known_HJs_in_field(ra_nom, dec_nom, hjonchippath):
+        tu.measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory)
+    else:
+        print('did not find any known HJs on this field')
+
+    # how long did the pipeline take? how many lightcurves did it produce?
     endtime = datetime.utcnow()
     howlong = (endtime - starttime).total_seconds()*units.s
 
@@ -598,10 +611,13 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
         'howlong_day':howlong.to(units.day).value,
         'howlong_hr':howlong.to(units.hr).value,
         'howlong_min':howlong.to(units.minute).value,
-        'howlong_sec':howlong.to(units.second).value
+        'howlong_sec':howlong.to(units.second).value,
+        'n_rawlc':n_rawlc,
+        'n_epdlc':n_epdlc,
+        'n_tfalc':n_tfalc
     }
     summarydf = pd.DataFrame(SUMMARY, index=[0])
-    summarypath = os.path.join(statsdir,'timing_summary.csv')
+    summarypath = os.path.join(statsdir,'run_summary.csv')
     summarydf.to_csv(summarypath, index=False)
     print('wrote {}'.format(summarypath))
 
@@ -964,7 +980,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
 
     ccdgain = hdr['GAINA'] # electrons/count, from CCD output A. (there are four!)
     exptime = int(np.round(hdr['TELAPSE']*24*60*60)) # in seconds, 1800
-    ra_nom = hdr['CRVAL1']  # RA at CRPIX1, CRPIX2. Not "camera boresight".
+    ra_nom = hdr['CRVAL1']  # RA at CRPIX1, CRPIX2. Roughly "camera boresight".
     dec_nom = hdr['CRVAL2'] # DEC at CRPIX1, CRPIX2
 
     catalog, catra, catdec, catbox = '2MASS', ra_nom, dec_nom, ccd_fov
@@ -1049,10 +1065,16 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
 
     statsdir = os.path.dirname(epdstatfile)+'/'
     outprefix = str(field)+'-'+str(projectid)
-    assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir,
-               projectid, field, camera, ccd, tfastatfile, binned=False,
-               make_percentiles_plot=True, percentiles_xlim=None,
-               nworkers=nworkers)
+    refdir = sv.REFBASEDIR
+    projcatalogpath = os.path.join(
+        refdir,
+        'proj{:d}-{:s}-cam{:s}-ccd{:s}-combinedphotref-{:s}.projcatalog'.
+        format(projectid, str(field), str(camera), str(ccd), photreftype)
+    )
+    assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
+               field, camera, ccd, tfastatfile, ra_nom, dec_nom,
+               projcatalogpath, binned=False, make_percentiles_plot=True,
+               percentiles_xlim=None, nworkers=nworkers)
 
     # TODO: maybe change the statsfile format, and include CDPP? or some
     # duration-aware RMS measure. because red noise exists.
