@@ -929,13 +929,15 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
 
     fits_list = np.sort(glob(os.path.join(fitsdir, fitsglob)))
     exists = np.array(list(os.path.exists(f) for f in fits_list))
-    allexist = np.all(exists)
+    allexist = np.all(exists) and len(exists)!=0
 
     if convert_to_fitsh_compatible and get_masks and ~allexist:
 
         tu.parallel_trim_get_single_extension(mast_calibrated_ffi_list,
                                               outdir, projectid,
                                               nworkers=nworkers)
+
+        fits_list = np.sort(glob(os.path.join(fitsdir, fitsglob)))
 
         # get mask for pixels greater than 2^16 - 1
         tu.parallel_mask_saturated_stars(fits_list, saturationlevel=65535,
