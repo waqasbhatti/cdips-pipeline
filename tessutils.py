@@ -652,19 +652,29 @@ def _measure_hj_snr(plname, tfalc, statsdir, sectornum, timename='btjd',
         sel_flux = np.array(in_fluxs)
         windowinds = np.bitwise_or.reduce( np.array(windowinds), axis=0 )
 
-        subtractedrms = np.std(flux[windowinds][~intra] -
-                               fitflux[windowinds][~intra] )
+        try:
+            subtractedrms = np.std(flux[windowinds][~intra] -
+                                   fitflux[windowinds][~intra] )
 
-        ntransits = len(t_starts)
-        trapz_snr = (
-            np.sqrt(npoints_in_transit*ntransits) *
-            transitdepth/subtractedrms
-        )
+            ntransits = len(t_starts)
+            trapz_snr = (
+                np.sqrt(npoints_in_transit*ntransits) *
+                transitdepth/subtractedrms
+            )
 
-        outdf = pd.DataFrame({'plname':plname, 'trapz_snr':trapz_snr,
-                              'tfalc':tfalc}, index=[0])
-        outdf.to_csv(snrfit_savfile, index=False)
-        print('made {}'.format(snrfit_savfile))
+            outdf = pd.DataFrame({'plname':plname, 'trapz_snr':trapz_snr,
+                                  'tfalc':tfalc}, index=[0])
+            outdf.to_csv(snrfit_savfile, index=False)
+            print('made {}'.format(snrfit_savfile))
+
+        except IndexError:
+
+            outdf = pd.DataFrame({'plname':plname, 'trapz_snr':np.nan,
+                                  'tfalc':tfalc}, index=[0])
+            outdf.to_csv(snrfit_savfile, index=False)
+            print('WRN! SNR calculation failed, but made {} anyway with nan'.
+                  format(snrfit_savfile))
+            print('made {}'.format(snrfit_savfile))
 
     return 1
 
