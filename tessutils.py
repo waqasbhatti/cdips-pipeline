@@ -21,12 +21,13 @@ import aperturephot as ap
 import imageutils as iu
 import shared_variables as sv
 
-import os
-import numpy as np
+import os, pickle
+import numpy as np, pandas as pd, matplotlib.pyplot as plt
 from glob import glob
 
 from astropy.io import fits
 from astroquery.mast import Catalogs
+from astroquery.nasa_exoplanet_archive import NasaExoplanetArchive
 
 from numpy import array as nparr, all as npall
 
@@ -34,8 +35,14 @@ from datetime import datetime
 import multiprocessing as mp
 
 from astropy.coordinates import SkyCoord
-from astropy import units as u
+from astropy import units as u, constants as const
 from astropy.io import ascii
+
+from lcstatistics import read_tfa_lc, plot_raw_epd_tfa
+
+from astrobase.periodbase import kbls
+from astrobase.varbase import lcfit
+from astrobase.varbase.transits import get_transit_times
 
 ##########################################
 
@@ -307,7 +314,6 @@ def are_known_HJs_in_field(ra_center, dec_center, outname):
     """
 
     from tessmaps import get_time_on_silicon as gts
-    from astroquery.nasa_exoplanet_archive import NasaExoplanetArchive
 
     eatab = NasaExoplanetArchive.get_confirmed_planets_table()
 
@@ -342,8 +348,8 @@ def are_known_HJs_in_field(ra_center, dec_center, outname):
         return False
 
 
-def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory,
-                         minxmatchsep=3):
+def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory, statsdir,
+                         sectornum, minxmatchsep=3, nworkers=20):
     """
     Args:
 
@@ -492,24 +498,175 @@ def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory,
         return 0
 
     # otherwise, continue to by measuring the HJ's SNR
-    for tfalc in tab['tfalc'][tab['tfalcexists']]:
-        _measure_hj_snr(tfalc)
+    for tfalc, plname in zip(
+        tab['tfalc'][tab['tfalcexists']], tab['pl_name'][tab['tfalcexists']]
+    ):
+        _measure_hj_snr(plname, tfalc, statsdir, sectornum, nworkers=nworkers)
 
-def _measure_hj_snr(tfalc):
 
-    #FIXME: implement
-    raise NotImplementedError
-    pass
+def _measure_hj_snr(plname, tfalc, statsdir, sectornum, timename='btjd',
+                    nworkers=20,
+                    n_transit_durations=4):
+
+    plname = plname.replace(' ','')
+
+    eatab = NasaExoplanetArchive.get_confirmed_planets_table()
+    earow = eatab[eatab['NAME_LOWERCASE']==plname.lower()]
+    if not len(earow)==1:
+        raise AssertionError('exoplanet archive query must have failed.')
+
+    teff = float(earow['st_teff'].value)
+    logg = float(np.log10( (const.G * earow['st_mass'] /
+                      (earow['st_rad'])**2).cgs.value ))
+    metallicity = 0.
+
+    # we only care about TFA lightcurves for planet SNR measurements.
+    dtrstages = ['TF']
+    aps = [str(r) for r in range(1,4)]
+    magnames = [dtrstage+ap for dtrstage in dtrstages for ap in aps]
+    errnames = ['RMERR'+ap for dtrstage in dtrstages for ap in aps]
+
     # read the lc
+    lc = read_tfa_lc(tfalc)
 
-    # BLS
+    time = lc[timename]
 
-    # fit trapezoidal model
+    plotpath = os.path.join(statsdir, str(plname)+'_AP1_lightcurve.png')
+    plot_raw_epd_tfa(time, lc['RM1'], lc['EP1'], lc['TF1'], 1,
+                     savpath=plotpath, xlabel='BTJD = BJD - 2457000')
 
-    # use standard model fitting to get the SNR
+    outdir = os.path.join(statsdir, plname)
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
 
-    # probably make a plot
+    for magname, errname in zip(magnames, errnames):
 
+        blsfit_savfile = os.path.join(
+            outdir, str(plname)+'_'+str(magname)+'_BLS_fit.png')
+        trapfit_savfile = os.path.join(
+            outdir, str(plname)+'_'+str(magname)+'_trapezoidal_fit.png')
+        snrfit_savfile = os.path.join(
+            outdir, str(plname)+'_'+str(magname)+'_snr_of_fit.csv')
+
+        mag = lc[magname]
+        err_mag = lc[errname]
+
+        mag_0 = 10  # these numbers do not matter; we care about relative flux
+        flux_0 = 1000
+        flux = flux_0 * 10**(-0.4 * (mag - mag_0))
+        # sigma_flux = dg/d(mag) * sigma_mag, for g=f0 * 10**(-0.4*(mag-mag0)).
+        err_flux = np.abs(
+            -0.4 * np.log(10) * flux_0 * 10**(-0.4*(mag-mag_0)) * err_mag
+        )
+
+        fluxmedian = np.nanmedian(flux)
+        flux /= fluxmedian
+        err_flux /= fluxmedian
+
+        # fit BLS model; plot resulting phased LC.
+        endp = 1.05*(np.nanmax(time) - np.nanmin(time))/2
+        blsdict = kbls.bls_parallel_pfind(time, flux, err_flux,
+                                          magsarefluxes=True, startp=0.1,
+                                          endp=endp, maxtransitduration=0.15,
+                                          nworkers=nworkers, sigclip=None)
+        fitd = kbls.bls_stats_singleperiod(time, flux, err_flux,
+                                           blsdict['bestperiod'],
+                                           maxtransitduration=0.15,
+                                           magsarefluxes=True, sigclip=None,
+                                           perioddeltapercent=5)
+        bls_period = fitd['period']
+        lcfit._make_fit_plot(fitd['phases'], fitd['phasedmags'], None,
+                             fitd['blsmodel'], fitd['period'], fitd['epoch'],
+                             fitd['epoch'], blsfit_savfile, magsarefluxes=True)
+        ingduration_guess = fitd['transitduration']*0.2
+        transitparams = [fitd['period'], fitd['epoch'], fitd['transitdepth'],
+                         fitd['transitduration'], ingduration_guess ]
+
+        # fit initial trapezoidal model; plot resulting phased LC.
+        trapfit = lcfit.traptransit_fit_magseries(time, flux, err_flux,
+                                                  transitparams,
+                                                  magsarefluxes=True,
+                                                  sigclip=None,
+                                                  plotfit=trapfit_savfile)
+
+        # isolate each transit to within +/- n_transit_durations
+        tmids, t_starts, t_ends = (
+            get_transit_times(fitd, time, n_transit_durations, trapd=trapfit)
+        )
+
+        rp = np.sqrt(trapfit['fitinfo']['finalparams'][2])
+
+        # period, a/Rstar, inclination used as initial guesses
+        ea_sma = ((const.G * earow['st_mass'] / (4*np.pi**2) *
+                  earow['pl_orbper']**2)**(1/3.)).to(u.AU)
+        litparams = tuple(map(float,
+            [earow['pl_orbper'].value,
+             (ea_sma/earow['st_rad']).cgs.value,
+             earow['pl_orbincl'].value])
+        )
+
+        fitmags = trapfit['fitinfo']['fitmags']
+        fitflux = fitmags
+
+        # estimate snr direct from the trapezoidal fit
+        t_full_durn_phase = trapfit['fitinfo']['finalparams'][3]
+        t_ing_durn_phase = trapfit['fitinfo']['finalparams'][4]
+        period = trapfit['fitinfo']['finalparams'][0]
+
+        t_full_durn = t_full_durn_phase * period
+        t_ing_dur = t_ing_durn_phase * period
+
+        per_point_cadence=30.*u.min
+
+        npoints_in_transit = (
+            float(((t_full_durn*u.day)/per_point_cadence).cgs.value)
+        )
+
+        transitdepth = np.abs(trapfit['fitinfo']['finalparams'][2])
+
+        # get the indices in transit, for RMS measurement
+        (in_fluxs, time_list,
+         intra_inds_list, windowinds ) = [], [], [], []
+        for t_start,t_end in zip(t_starts, t_ends):
+            this_window_inds = (time > t_start) & (time < t_end)
+            tmid = t_start + (t_end-t_start)/2
+            # flag out slightly more than expected "in transit" points
+            prefactor = 1.05
+            transit_start = tmid - prefactor*t_full_durn/2
+            transit_end = tmid + prefactor*t_full_durn/2
+
+            this_window_intra = (
+                (time[this_window_inds] > transit_start) &
+                (time[this_window_inds] < transit_end)
+            )
+            this_window_oot = ~this_window_intra
+
+            windowinds.append(this_window_inds)
+            time_list.append( time[this_window_inds] )
+            in_fluxs.append( flux[this_window_inds] )
+            intra_inds_list.append( (time[this_window_inds]>transit_start) &
+                                    (time[this_window_inds]<transit_end) )
+
+        intra = np.hstack(np.array(intra_inds_list))
+        sel_time = np.array(time_list)
+        sel_flux = np.array(in_fluxs)
+        windowinds = np.bitwise_or.reduce( np.array(windowinds), axis=0 )
+
+        subtractedrms = np.std(flux[windowinds][~intra] -
+                               fitflux[windowinds][~intra] )
+
+        ntransits = len(t_starts)
+        trapz_snr = (
+            np.sqrt(npoints_in_transit*ntransits) *
+            transitdepth/subtractedrms
+        )
+
+        outdf = pd.DataFrame({'plname':plname, 'trapz_snr':trapz_snr,
+                              'tfalc':tfalc}, index=[0])
+        outdf.to_csv(snrfit_savfile, index=False)
+        print('made {}'.format(snrfit_savfile))
+
+    return 1
 
 
 ##############################
