@@ -2,13 +2,10 @@
 
 ##########################################
 #
-# USAGE: change the parameters from the first two sections below. Then, from
-# shell:
-#
-#   ./reduce_single_tess_ccd.sh (log piping is automatic)
+# USAGE: execute from within /pipe-trex/scripts/tess_tuning_scripts/
 #
 # PURPOSE:
-#   make lightcurves from images
+#     Tune the pipeline to get "best" lightcurves (by various metrics).
 #
 ##########################################
 
@@ -16,29 +13,29 @@
 # data-specific parameters #
 ############################
 camnum=2
-ccdnum=2
-projectid=1001        # increment this whenever new things go to PSQL database.
-sector='s0001'        # match SPOC syntax, zfill to 4.
+ccdnum=4
+projectid=1006
+sector='s0002'
 
 #################################
 # reduction-specific parameters #
 #################################
-tuneparameters=true # if true, does 150 images. if false, does all of them.
-nworkers=20
+tuneparameters=false
+nworkers=30
 aperturelist="1.45:7.0:6.0,2.2:7.0:6.0,2.95:7.0:6.0"
-epdsmooth=11          # 11*30min = 5.5 hr median smooth in EPD pre-processing.
-epdsigclip=10
+epdsmooth=11
+epdsigclip=10000
 photdisjointradius=2
 anetfluxthreshold=50000
 anettweak=6
 anetradius=30
 initccdextent="0:2048,0:2048"
-kernelspec="b/4;i/4;d=5/2"
-catalog_faintrmag=13      ## catalog_faintrmag=16
-fiphotfluxthreshold=3000  ## fiphotfluxthreshold=300
-photreffluxthreshold=3000 ## photreffluxthreshold=300
+kernelspec="b/4;i/4"
+catalog_faintrmag=13
+fiphotfluxthreshold=3000
+photreffluxthreshold=3000
 extractsources=0
-binlightcurves=0      # bins LCs to 1 & 6hr. expensive & pointless; dont do.
+binlightcurves=0
 
 ##########################################
 ##########################################
@@ -109,6 +106,8 @@ fi
 ################################
 logname=${sector}'-cam'${camnum}'-ccd'${ccdnum}'-projid'${projectid}'.log'
 
+cd ../
+
 python -u TESS_reduction.py \
   --projectid $projectid \
   --fitsdir $fitsdir --fitsglob $fitsglob --outdir $fitsdir --field $sector\
@@ -122,5 +121,5 @@ python -u TESS_reduction.py \
   --fiphotfluxthreshold $fiphotfluxthreshold \
   --photreffluxthreshold $photreffluxthreshold \
   --extractsources $extractsources --$binlcoption \
-  --camnum $camnum --ccdnum $ccdnum \
-  &> logs/$logname &
+  --camnum $camnum --ccdnum $ccdnum #\
+  #&> logs/$logname &
