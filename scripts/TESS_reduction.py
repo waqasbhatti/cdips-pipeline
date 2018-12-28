@@ -5,7 +5,7 @@ $ python TESS_reduction.py --help
 """
 from __future__ import division, print_function
 
-import os, time
+import os, time, warnings
 import matplotlib as mpl
 mpl.use('AGG')
 import numpy as np, pandas as pd, matplotlib.pyplot as plt
@@ -16,10 +16,14 @@ from glob import glob
 from tqdm import tqdm
 from astropy.io import fits
 from astropy import units as units, constants as constants
+from astropy import wcs
 from datetime import datetime
 import argparse
 from parse import parse, search
 import re, pickle
+
+from numpy import array as nparr
+from astropy.coordinates import SkyCoord
 
 def get_files_needed_before_image_subtraction(
         fitsdir, fitsglob, outdir, initccdextent, ccdgain, zeropoint, exptime,
@@ -539,7 +543,7 @@ def _get_random_acf_pkls(pkldir, n_desired=10):
 
 def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
                field, camera, ccd, tfastatfile, ra_nom, dec_nom,
-               projcatalogpath, sectornum, binned=False,
+               projcatalogpath, astromrefpath, sectornum, binned=False,
                make_percentiles_plot=True, percentiles_xlim=[4,17],
                percentiles_ylim=[1e-5,1e-1], nworkers=16):
     """
@@ -587,7 +591,7 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
     is_image_noise_gaussian(fitsdir, projectid, field, camera, ccd)
 
     # just make some lightcurve plots to look at them
-    plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20)
+    plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=10)
 
     # count numbers of lightcurves
     n_rawlc = len(glob(os.path.join(lcdirectory,'*.grcollectilc')))
@@ -601,6 +605,9 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
                                 statsdir, sectornum, nworkers=nworkers)
     else:
         print('did not find any known HJs on this field')
+
+    # plot and examine size of astrometric shifts
+    examine_astrometric_shifts(fitsdir, astromrefpath, statsdir)
 
     # how long did the pipeline take? how many lightcurves did it produce?
     endtime = datetime.utcnow()
@@ -621,6 +628,140 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
     summarypath = os.path.join(statsdir,'run_summary.csv')
     summarydf.to_csv(summarypath, index=False)
     print('wrote {}'.format(summarypath))
+
+
+def examine_astrometric_shifts(fitsdir, astromref, statsdir,
+                               wcsglob='*.wcs',
+                               fitsglob='-xtrns.fits'):
+    """
+    compute, then plot, astrometric shifts. look at both the astrometry.net
+    results, as well as the POC's astrometry.
+    """
+
+    pklpath = os.path.join(statsdir, 'examine_astrometric_shifts.pickle')
+
+    if not os.path.exists(pklpath):
+        # get wcs files from this run
+        wcsfiles = glob(os.path.join(fitsdir,wcsglob))
+        assert len(wcsfiles) > 1
+
+        # using fits headers, get corresponding timestamps from this run
+        xtrnsfits = [w.replace('.wcs','-xtrns.fits') for w in wcsfiles]
+        hdrs = [iu.read_fits_header(f, ext=0) for f in xtrnsfits]
+        tstarts = nparr([h['TSTART'] for h in hdrs])
+        tstops = nparr([h['TSTOP'] for h in hdrs])
+        tmids = tstarts + (tstops - tstarts)/2.
+
+        # get astromref wcs file
+        parsearef = search('{}-astromref-{}_cal_img.fits',
+                           os.path.basename(astromref))
+        arefid = parsearef[1]
+        arefwcsfile = os.path.join(fitsdir, arefid+'_cal_img.wcs')
+        print('matching against astromref {}'.format(arefwcsfile))
+
+        if not os.path.exists(arefwcsfile):
+            raise AssertionError('need astromref wcs to exist')
+
+        # my WCS := WCS computed using astrometry.net
+        # compute distances between ra="CRVAL1" dec="CRVAL2" and the astrometric
+        # references.
+        my_arefwcs = wcs.WCS(fits.open(arefwcsfile)[0].header)
+        my_aref_crval = my_arefwcs.wcs.crval
+        my_aref_crpix = my_arefwcs.wcs.crpix
+        my_aref_crval_c = SkyCoord(my_aref_crval.reshape((1,2))*units.deg,
+                                   frame='icrs')
+
+        my_crvals = []
+        for ix, f in enumerate(wcsfiles):
+            print('{:d}/{:d} for wcs hdr read'.format(ix,len(wcsfiles)))
+            this_wcs = wcs.WCS(iu.read_fits_header(f, ext=0))
+
+            # given wcs, compute the sky coordinate at the astromref CRPIX.
+            # this is needed b/c astrometry.net lets the CRPIX float.
+            # for each frame, we're computing the WCS solution, and asking
+            # "what position on-sky does the xy-coordinate 'my_aref_crpix'
+            # correspond to?" for my_astromref, that's the CRVAL; for the
+            # others, it's the value computed from the full WCS
+            # solution as follows:
+            my_crvals.append(this_wcs.wcs_pix2world(
+                my_aref_crpix.reshape((1,2)), 1 )
+            )
+
+        my_crvals = nparr(my_crvals)
+        my_crval_c = SkyCoord(my_crvals.squeeze()*units.deg, frame='icrs')
+
+        # SPOC/POC WCS
+        poc_arefwcs = wcs.WCS(fits.open(
+            arefwcsfile.replace('.wcs','-xtrns.fits'))[0].header)
+        poc_aref_crval = poc_arefwcs.wcs.crval
+        poc_aref_crval_c = SkyCoord(poc_aref_crval.reshape((1,2))*units.deg,
+                                    frame='icrs')
+
+        poc_wcss = []
+        from astropy.utils.exceptions import AstropyWarning
+        for ix, f in enumerate(xtrnsfits):
+            print('{:d}/{:d} for poc wcs hdr read'.format(ix,len(xtrnsfits)))
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore', AstropyWarning)
+                poc_wcss.append(wcs.WCS(iu.read_fits_header(f, ext=0)))
+        poc_crvals = nparr([ w.wcs.crval for w in poc_wcss ])
+        poc_crval_c = SkyCoord(poc_crvals*units.deg, frame='icrs')
+
+        d = {}
+        d['my_aref_crpix'] = my_aref_crpix
+        d['my_aref_crval_c'] = my_aref_crval_c
+        d['my_crval_c'] = my_crval_c
+        d['poc_aref_crval_c'] = poc_aref_crval_c
+        d['poc_crval_c'] = poc_crval_c
+        d['tmids'] = tmids
+
+        with open(pklpath, 'w') as f:
+            pickle.dump(d, f, pickle.HIGHEST_PROTOCOL)
+        print('made {}'.format(pklpath))
+
+    else:
+        d = pickle.load(open(pklpath, 'rb'))
+
+    # now plot them
+    my_aref_crval_c = d['my_aref_crval_c']
+    my_crval_c = d['my_crval_c']
+
+    poc_aref_crval_c = d['poc_aref_crval_c']
+    poc_crval_c = d['poc_crval_c']
+
+    my_diffs = my_aref_crval_c.separation(my_crval_c).to(units.arcsec)
+    poc_diffs = poc_aref_crval_c.separation(poc_crval_c).to(units.arcsec)
+
+    # first, scatter plot difference vs time
+    scatterpath = os.path.join(statsdir, 'scatter_astrometric_shifts.png')
+    histpath = os.path.join(statsdir, 'histogram_astrometric_shifts.png')
+
+    fig,ax = plt.subplots(figsize=(4,3))
+    ax.scatter(d['tmids'], my_diffs.value, label='TREX', rasterized=True)
+    ax.scatter(d['tmids'], poc_diffs.value, label='POC', rasterized=True)
+    ax.legend(loc='best')
+    ax.set_xlabel('BTJD = BJD - 2457000', fontsize='x-small')
+    ax.set_ylabel('distance from astromref CRVAL [arcsec]', fontsize='x-small')
+    ax.get_yaxis().set_tick_params(which='both', direction='in')
+    ax.get_xaxis().set_tick_params(which='both', direction='in')
+    fig.tight_layout()
+    fig.savefig(scatterpath, bbox_inches='tight', dpi=300)
+    print('saved {}'.format(scatterpath))
+    plt.close('all')
+
+    # then, histogram plot of differences
+    fig,ax = plt.subplots(figsize=(4,3))
+    ax.hist(my_diffs.value, label='TREX', bins=20)
+    ax.hist(poc_diffs.value, label='POC', bins=20)
+    ax.legend(loc='best')
+    ax.set_ylabel('count', fontsize='x-small')
+    ax.set_xlabel('distance from astromref CRVAL [arcsec]', fontsize='x-small')
+    ax.get_yaxis().set_tick_params(which='both', direction='in')
+    ax.get_xaxis().set_tick_params(which='both', direction='in')
+    fig.tight_layout()
+    fig.savefig(histpath, bbox_inches='tight', dpi=300)
+    print('saved {}'.format(histpath))
+    plt.close('all')
 
 
 def plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=10):
@@ -1080,9 +1221,19 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
         'proj{:d}-{:s}-cam{:s}-ccd{:s}-combinedphotref-{:s}.projcatalog'.
         format(projectid, str(field), str(camera), str(ccd), photreftype)
     )
+    astromrefglob = os.path.join(
+        refdir,
+        'proj{:d}-camera{:s}-ccd{:s}-astromref-tess*-{:s}-{:s}-{:s}-*.fits'.
+        format(projectid, str(camera), str(ccd), str(field), str(camera),
+               str(ccd))
+    )
+    astromrefpath = glob(astromrefglob)
+    if not len(astromrefpath)==1:
+        raise AssertionError('astromrefglob wrong for run assessment')
+    astromrefpath = astromrefpath[0]
     assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
                field, camera, ccd, tfastatfile, ra_nom, dec_nom,
-               projcatalogpath, sectornum, binned=False,
+               projcatalogpath, astromrefpath, sectornum, binned=False,
                make_percentiles_plot=True, percentiles_xlim=None,
                nworkers=nworkers)
 
