@@ -21,8 +21,6 @@ import argparse
 from parse import parse, search
 import re, pickle
 
-np.random.seed(42)
-
 def get_files_needed_before_image_subtraction(
         fitsdir, fitsglob, outdir, initccdextent, ccdgain, zeropoint, exptime,
         ra_nom, dec_nom,
@@ -541,9 +539,9 @@ def _get_random_acf_pkls(pkldir, n_desired=10):
 
 def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
                field, camera, ccd, tfastatfile, ra_nom, dec_nom,
-               projcatalogpath, binned=False, make_percentiles_plot=True,
-               percentiles_xlim=[4,17], percentiles_ylim=[1e-5,1e-1],
-               nworkers=16):
+               projcatalogpath, sectornum, binned=False,
+               make_percentiles_plot=True, percentiles_xlim=[4,17],
+               percentiles_ylim=[1e-5,1e-1], nworkers=16):
     """
     write files with summary statistics of run.
 
@@ -600,7 +598,7 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
     hjonchippath = os.path.join(statsdir,'hjs_onchip.csv')
     if tu.are_known_HJs_in_field(ra_nom, dec_nom, hjonchippath):
         tu.measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory,
-                                statsdir)
+                                statsdir, sectornum, nworkers=nworkers)
     else:
         print('did not find any known HJs on this field')
 
@@ -1084,8 +1082,9 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     )
     assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
                field, camera, ccd, tfastatfile, ra_nom, dec_nom,
-               projcatalogpath, binned=False, make_percentiles_plot=True,
-               percentiles_xlim=None, nworkers=nworkers)
+               projcatalogpath, sectornum, binned=False,
+               make_percentiles_plot=True, percentiles_xlim=None,
+               nworkers=nworkers)
 
     # TODO: maybe change the statsfile format, and include CDPP? or some
     # duration-aware RMS measure. because red noise exists.
@@ -1275,6 +1274,8 @@ if __name__ == '__main__':
         extractsources = True
     else:
         extractsources = False
+
+    np.random.seed(42)
 
     main(args.fitsdir, args.fitsglob, args.projectid, args.field,
          args.camnum, args.ccdnum,
