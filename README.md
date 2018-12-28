@@ -52,6 +52,16 @@ dependencies):
 where I have assumed you may want to make contributions to astrobase as you
 develop, which you should!
 
+For transit-fitting, you wlil want `batman`, `corner`, and `emcee` installed:
+  ```
+  (trex_27) pip install batman-package
+  (trex_27) pip corner
+  (trex_27) cd $SOME_DIR
+  (trex_27) git clone https://github.com/dfm/emcee
+  (trex_27) cd emcee
+  (trex_27) python setup.py install
+  ```
+
 ### anet and astrometry.net dependencies
 
 You must use either `anet` or `astrometry.net`. I recommend the later, since
