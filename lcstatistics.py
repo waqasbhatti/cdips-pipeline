@@ -208,6 +208,8 @@ def compute_acf_statistics_worker(task, n_apertures=3, timename='btjd',
         outdir,
         os.path.basename(tfafile).replace('.tfalc','_acf_stats.csv')
     )
+    if os.path.exists(outpickle) and os.path.exists(outcsv):
+        return 1
 
     d_pkl, outdf = {}, pd.DataFrame({})
     for ap in range(1,n_apertures+1):
@@ -337,6 +339,12 @@ def acf_percentiles_stats_and_plots(statdir, outprefix, make_plot=True,
                   'EPD1','EPD2','EPD3',
                   'RAW1','RAW2','RAW3']:
         try:
+            csvname = ( os.path.join(
+                statdir,'acf_percentiles_stats_{:s}.csv'.format(apstr.upper())
+            ))
+            if os.path.exists(csvname):
+                continue
+
             timelags = np.sort(np.unique(df['LAG_TIME_HR']))
 
             percentile_dict = {}
@@ -396,9 +404,6 @@ def acf_percentiles_stats_and_plots(statdir, outprefix, make_plot=True,
                 print('%sZ: made %s plot: %s' %
                       (datetime.utcnow().isoformat(), titlestr, savname))
 
-            csvname = ( os.path.join(
-                statdir,'acf_percentiles_stats_{:s}.csv'.format(apstr.upper())
-            ))
             outdf = pctile_df.T
             outdf.index.name='lag_time_hr'
             outdf.to_csv(csvname)
