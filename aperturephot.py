@@ -41,8 +41,8 @@ The usual sequence is:
 
 15. run choose_tfa_template to choose TFA template stars using the .epdlc stats.
 
-16. run parallel_run_tfa for TFA to get .tfalc.TF{1,2,3} files (FIXME: still
-    need to collect into single .tfalc files for all apertures)
+16. run parallel_run_tfa for TFA to get .tfalc files (and .tfalc.TF{1,2,3}
+    files).
 
 17. run parallel_lc_statistics to collect stats on .tfalc files.
 
@@ -153,7 +153,7 @@ FRAMEREGEX = re.compile(r'(\d{1})\-(\d{6}\w{0,1})_(\d{1})')
 GAIADR2READCMD = ("gaia2read -r {ra:f} -d {dec:f} -s {boxlen:f} "
                   "--mR {brightrmag:f} --MR {faintrmag:f} "
                   "--xieta-coords --header --extra "
-                  "--idrequest HAT -o {outfile}")
+                  "--idrequest {idrequest:s} -o {outfile}")
 
 # command string to do a 2massread for a specified FOV
 TWOMASSREADCMD = ("2massread -r {ra:f} -d {dec:f} -s {boxlen:f} "
@@ -940,20 +940,44 @@ def make_fov_catalog(ra=None, dec=None, size=None,
                      catalog='2MASS',
                      catalogpath=None,
                      columns=None,
-                     observatory='hatpi'):
+                     observatory='hatpi',
+                     gaiaidrequest='HAT'):
     '''
     This function gets all the sources in the field of view of the frame, given
     its central pointing coordinates and plate-scale from either 2MASS or
-    UCAC4. Makes a catalog file that can then be used as input to
-    make_source_list below.
-
-    catalog = 'UCAC4' or '2MASS'
+    UCAC4. Makes a catalog file that can then be used as input to project
+    catalog (ra,dec) to frame (x,y).
 
     if ra, dec, size are None, fits must not be None. fits is the filename of
     the FITS file to get the center RA, DEC, and platescale values from.
 
-    Returns the path of the catalog file produced.
+    Kwargs:
+        ra, dec (float): field center, in degrees
 
+        size (float): size of box, in degrees
+
+        brightrmag (float): bright cutoff from catalog. If 2MASS is used,
+        "rmag" is 2MASS r. If GAIADR2 is used, it's Gaia R.
+
+        faintrmag (float): faint cutoff from catalog
+
+        fits (str): path to fits file containing center RA, DEC, and
+        platescale (see preamble).
+
+        outfile (str): path to write the output catalog
+
+        catalog (str): 'UCAC4', '2MASS', or 'GAIADR2'. You should usually use
+        GAIADR2.
+
+        gaiaidrequest (str): if catalog is GAIADR2, then you can request
+        either "GAIA", "HAT", or "TMASS" identifiers. These are collected from
+        a crossmatch; if you request "HAT" identifiers, the output catalog may
+        not include exclusively HAT-XXX-XXXXXXX ID's (there may also be some
+        GAIA ID's). The default is set to "HAT".
+
+    Returns:
+
+        path of the catalog file produced.
     '''
 
     if ra and dec and size:
@@ -996,16 +1020,30 @@ def make_fov_catalog(ra=None, dec=None, size=None,
           (datetime.utcnow().isoformat(),
            catra, catdec, catbox))
 
-
-    catalogcmd = CATALOGS[catalog]['cmd'].format(
-        ra=catra,
-        dec=catdec,
-        boxlen=catbox,
-        catalogpath=catalogpath if catalogpath else CATALOGS[catalog]['path'],
-        brightrmag=brightrmag,
-        faintrmag=faintrmag,
-        outfile=outfile
-        )
+    if catalog == 'GAIADR2':
+        if gaiaidrequest not in ['GAIA','HAT','TMASS']:
+            raise ValueError(
+                'expected gaiaidrequest one of "GAIA", "HAT", "TMASS"')
+        catalogcmd = CATALOGS[catalog]['cmd'].format(
+            ra=catra,
+            dec=catdec,
+            boxlen=catbox,
+            catalogpath=catalogpath if catalogpath else CATALOGS[catalog]['path'],
+            brightrmag=brightrmag,
+            faintrmag=faintrmag,
+            outfile=outfile,
+            idrequest=gaiaidrequest)
+    elif catalog in ['2MASS', 'UCAC4']:
+        catalogcmd = CATALOGS[catalog]['cmd'].format(
+            ra=catra,
+            dec=catdec,
+            boxlen=catbox,
+            catalogpath=catalogpath if catalogpath else CATALOGS[catalog]['path'],
+            brightrmag=brightrmag,
+            faintrmag=faintrmag,
+            outfile=outfile)
+    else:
+        raise ValueError('catalog must be one of GAIADR2,2MASS,UCAC4')
 
     if DEBUG:
         print(catalogcmd)
@@ -1048,7 +1086,7 @@ def make_fov_catalog(ra=None, dec=None, size=None,
 def reform_gaia_fov_catalog(incat, outcat,
         columns='id,ra,dec,xi,eta,G,Rp,Bp,plx,pmra,pmdec,varflag'):
     '''
-    THis convertes the output catalog for gaia2read to the format required
+    This converts the output catalog for gaia2read to the format required
     for magfit.
 
     columns is a CSV string containing the required columns.
@@ -4018,10 +4056,11 @@ def choose_tfa_template(statsfile,
                         fovcat_idcol=0,
                         fovcat_xicol=3,
                         fovcat_etacol=4,
+                        fovcathasgaiaids=False,
                         fovcat_magcol=9,
-                        min_ndet=100,
-                        min_nstars=50,
                         max_nstars=1000,
+                        min_nstars=20,
+                        target_nstars=None,
                         brightest_mag=8.5,
                         faintest_mag=12.0,
                         max_rms=0.1,
@@ -4043,20 +4082,34 @@ def choose_tfa_template(statsfile,
     '''
 
     # read in the stats file
-    stats = read_stats_file(statsfile)
+    stats = read_stats_file(statsfile, fovcathasgaiaids=fovcathasgaiaids)
 
     # read in the fovcatalog
-    fovcat = np.genfromtxt(fovcatalog,
-                           usecols=(fovcat_idcol,
-                                    fovcat_xicol,
-                                    fovcat_etacol,
-                                    fovcat_magcol),
-                           dtype='S17,f8,f8,f8',
-                           names=['objid','xi','eta','mag'])
+    if not fovcathasgaiaids:
+        # assume HAT-IDs, HAT-123-4567890, 17 character strings
+        fovcat = np.genfromtxt(fovcatalog,
+                               usecols=(fovcat_idcol,
+                                        fovcat_xicol,
+                                        fovcat_etacol,
+                                        fovcat_magcol),
+                               dtype='S17,f8,f8,f8',
+                               names=['objid','xi','eta','mag'])
+        staridstr = 'HAT-'
+    else:
+        # assume GAIA-IDs. From gaia2read, with "GAIA" id option, this is just
+        # 19 character integers. The (xi,eta) and mag precision also change.
+        fovcat = np.genfromtxt(fovcatalog,
+                               usecols=(fovcat_idcol,
+                                        fovcat_xicol,
+                                        fovcat_etacol,
+                                        fovcat_magcol),
+                               dtype='S19,f8,f8,f8',
+                               names=['objid','xi','eta','mag'])
+        staridstr = '' # no pre-identifier for Gaia IDs.
+
 
     # figure out the number of stars to use in the initial TFA template
     # number of stars = TFA_TEMPLATE_FRACTION * median ndet
-    TFA_TEMPLATE_FRACTION = 0.1
 
     # 1. ndet >= median_ndet
     # 2. max rms <= 0.1
@@ -4067,7 +4120,8 @@ def choose_tfa_template(statsfile,
 
     outdict = {'statsfile':os.path.abspath(statsfile),
                'fovcat':os.path.abspath(fovcatalog),
-               'lcdir':os.path.abspath(epdlcdir)}
+               'lcdir':os.path.abspath(epdlcdir),
+               'staridstr':staridstr}
 
     # do this per aperture
     for aperture in [1,2,3]:
@@ -4098,11 +4152,17 @@ def choose_tfa_template(statsfile,
                                                         len(objectid)))
 
         median_ndet = np.nanmedian(obj_ndet)
+        if not target_nstars:
+            TFA_TEMPLATE_FRACTION = 0.1
+            target_nstars = TFA_TEMPLATE_FRACTION * median_ndet
+        else:
+            pass
+
         print('aperture %s: median ndet = %s' % (aperture, median_ndet))
         print('aperture %s: target TFA template size = %s' %
-              (aperture, int(median_ndet*TFA_TEMPLATE_FRACTION)))
+              (aperture, int(target_nstars)))
         outdict[aperture]['target_tfa_nstars'] = (
-            median_ndet*TFA_TEMPLATE_FRACTION
+            target_nstars
         )
 
         stars_ndet_condition = obj_ndet >= median_ndet
@@ -4163,28 +4223,39 @@ def choose_tfa_template(statsfile,
         # put this initial list into the outdict
         outdict[aperture]['tfa_suitable_objects'] = good_tfa_objects
 
-        # selection 3: pick up to 1000 random objects for TFA. we need at least
-        # TFA_TEMPLATE_FRACTION * median ndet number of objects
-        if ((len(good_tfa_objects) > 1000) and
-            (len(good_tfa_objects) > TFA_TEMPLATE_FRACTION*median_ndet)):
-            tfa_stars = nprand.choice(good_tfa_objects,
-                                      replace=False,
-                                      size=500)
-        elif (TFA_TEMPLATE_FRACTION*median_ndet <= len(good_tfa_objects) <= 1000):
-            tfa_stars = good_tfa_objects
-        else:
-            print("aperture %s: not enough stars suitable for TFA!" %
-                  aperture)
-
-            if not ignoretfamin:
-                tfa_stars = None
-            else:
+        # selection 3: pick the target number of stars for TFA. Note
+        # target_nstars can be larger than max_nstars, in which case max_nstars
+        # template stars are chosen.
+        if target_nstars > max_nstars:
+            if len(good_tfa_objects) > max_nstars:
+                tfa_stars = nprand.choice(good_tfa_objects, replace=False,
+                                          size=max_nstars)
+            elif len(good_tfa_objects) > min_nstars:
                 tfa_stars = good_tfa_objects
+            else:
+                print("aperture %s: not enough stars suitable for TFA!" %
+                      aperture)
+                if not ignoretfamin:
+                    tfa_stars = None
+                else:
+                    tfa_stars = good_tfa_objects
+        else:
+            if len(good_tfa_objects) > target_nstars:
+                tfa_stars = nprand.choice(good_tfa_objects, replace=False,
+                                          size=target_nstars)
+            elif len(good_tfa_objects) > min_nstars:
+                tfa_stars = good_tfa_objects
+            else:
+                print("aperture %s: not enough stars suitable for TFA!" %
+                      aperture)
+                if not ignoretfamin:
+                    tfa_stars = None
+                else:
+                    tfa_stars = good_tfa_objects
 
-        # now get these stars IDs, LC fnames, xis, etas, and other things needed
-        # for the first stage of TFA (this will choose exactly
-        # TFA_TEMPLATE_FRACTION*median_ndet stars to use as the template for the
-        # final stage of TFA)
+        # now get these stars IDs, LC fnames, xis, etas, and other things
+        # needed for the first stage of TFA (this will choose exactly
+        # target_nstars to use as the template for the final stage of TFA)
         if tfa_stars is not None:
 
             print('aperture %s: %s objects chosen as TFA templates for stage 1' %
@@ -4282,8 +4353,8 @@ def choose_tfa_template(statsfile,
                 outdict[aperture]['tfa_chosen_xi'],
                 outdict[aperture]['tfa_chosen_eta']
         ):
-
             outf.write(outline % (objid, lcf, mag, rms, ndet, xi, eta))
+
         outf.close()
         print('aperture %s: wrote object info to %s' %
               (aperture, outfile))
@@ -4348,6 +4419,7 @@ def run_tfa_stage1(tfainfo):
 
     '''
 
+    staridstr = tfainfo['staridstr']
     tfa_stage1_results = {}
 
     for aperture in [1,2,3]:
@@ -4374,10 +4446,12 @@ def run_tfa_stage1(tfainfo):
 
         tfa_stdout, tfa_stderr = tfaproc.communicate()
 
-        # get results if succeeded, log outcome, and return path of outfile
+        # get results if succeeded, log outcome, and return path of outfile.
+        # (note: this suppresses errors...)
         if tfaproc.returncode == 0 or tfa_stdout:
             tfaobjects = tfa_stdout.split('\n')
-            tfaobjects = [x for x in tfaobjects if x.startswith('HAT-')]
+            tfaobjects = [x for x in tfaobjects
+                          if x.startswith(staridstr) and x != '']
             print('aperture %s: TFA stage 1 completed, %s templates selected' %
                   (aperture, len(tfaobjects)))
             tfa_stage1_results[aperture] = tfaobjects
@@ -5293,6 +5367,7 @@ def lc_statistics_worker(task):
 def parallel_lc_statistics(lcdir,
                            lcglob,
                            fovcatalog,
+                           fovcathasgaiaids=False,
                            tfalcrequired=False,
                            fovcatcols=(0,9), # objectid, magcol to use
                            fovcatmaglabel='r',
@@ -5316,6 +5391,10 @@ def parallel_lc_statistics(lcdir,
 
         fovcatalog (str): path to the REFORMED fov catalog, which gets the
         catalog magnitude corresponding to canonical magnitude for any star.
+
+        fovcathasgaiaids (bool): if the reformed FOV catalog has Gaia ids, set
+        this to be true. The default is to assume HAT-IDs, which have different
+        string lengths & and are read differently.
 
     Output:
 
@@ -5433,10 +5512,19 @@ def parallel_lc_statistics(lcdir,
     outf.write(outcolumnkey)
 
     # open the fovcatalog and read in the column magnitudes and hatids
-    fovcat = np.genfromtxt(fovcatalog,
-                           usecols=fovcatcols,
-                           dtype='S17,f8',
-                           names=['objid','mag'])
+    if not fovcathasgaiaids:
+        # assume HAT-IDs, HAT-123-4567890, 17 character strings
+        fovcat = np.genfromtxt(fovcatalog,
+                               usecols=fovcatcols,
+                               dtype='S17,f8',
+                               names=['objid','mag'])
+    else:
+        # assume GAIA-IDs. From gaia2read, with "GAIA" id option, this is just
+        # 19 character integers.
+        fovcat = np.genfromtxt(fovcatalog,
+                               usecols=fovcatcols,
+                               dtype='S19,f8',
+                               names=['objid','mag'])
 
     # Using a dictionary leads to ~ 300x speedup
     fovdict = dict(fovcat)
@@ -5621,17 +5709,22 @@ def parallel_lc_statistics(lcdir,
     return results
 
 
-def read_stats_file(statsfile):
+def read_stats_file(statsfile, fovcathasgaiaids=False):
     '''
     Reads the stats file into a numpy recarray.
 
     '''
 
+    if fovcathasgaiaids:
+        idstrlength = 19
+    else:
+        idstrlength = 17
+
     # open the statfile and read all the columns
     stats = np.genfromtxt(
         statsfile,
         dtype=(
-            'S17,f8,'
+            'S{:d},f8,'
             'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM1
             'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM2
             'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM3
@@ -5644,7 +5737,7 @@ def read_stats_file(statsfile):
             'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RF1
             'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RF2
             'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RF3
-            'f8,f8,f8'                        # corrmags
+            'f8,f8,f8'.format(idstrlength)    # corrmags
         ),
         names=[
             'lcobj','cat_mag',
@@ -5803,7 +5896,7 @@ def time_bin_lightcurve(lcprefix,
 
     # write everything to a file. This is a pickled file because we might have
     # different row numbers for each column and I don't feel like handling this
-    # right now. (FIXME)
+    # right now.
     if not outfile:
 
         outfile = lcprefix + '.binned-%ssec-lc.pkl' % binsize
@@ -6258,6 +6351,7 @@ def binnedlc_statistics_worker(task):
 def parallel_binnedlc_statistics(lcdir,
                                  lcglob,
                                  fovcatalog,
+                                 fovcathasgaiaids=False,
                                  fovcatcols=(0,9), # objectid, magcol to use
                                  fovcatmaglabel='r',
                                  corrmagsource=None,
@@ -6368,10 +6462,19 @@ def parallel_binnedlc_statistics(lcdir,
     outf.write(outcolumnkey)
 
     # open the fovcatalog and read in the column magnitudes and hatids
-    fovcat = np.genfromtxt(fovcatalog,
-                           usecols=fovcatcols,
-                           dtype='S17,f8',
-                           names=['objid','mag'])
+    if not fovcathasgaiaids:
+        # assume HAT-IDs, HAT-123-4567890, 17 character strings
+        fovcat = np.genfromtxt(fovcatalog,
+                               usecols=fovcatcols,
+                               dtype='S17,f8',
+                               names=['objid','mag'])
+    else:
+        # assume GAIA-IDs. From gaia2read, with "GAIA" id option, this is just
+        # 19 character integers.
+        fovcat = np.genfromtxt(fovcatalog,
+                               usecols=fovcatcols,
+                               dtype='S19,f8',
+                               names=['objid','mag'])
     fovdict = dict(fovcat)
 
     for stat in results:
@@ -6770,7 +6873,8 @@ def plot_stats_file(statsfile, outdir, outprefix,
                     logx=False,
                     correctmagsafter=None,
                     rangex=(5.9,14.1),
-                    observatory='hatpi'):
+                    observatory='hatpi',
+                    fovcathasgaiaids=False):
     '''This plots MAD vs magnitude for RAW, EPD, TFA for all apertures.
 
     args:
@@ -6799,7 +6903,7 @@ def plot_stats_file(statsfile, outdir, outprefix,
     if binned:
         stats = read_binnedlc_stats_file(statsfile)
     else:
-        stats = read_stats_file(statsfile)
+        stats = read_stats_file(statsfile, fovcathasgaiaids=fovcathasgaiaids)
 
     for plot in STATS_PLOTS:
 
