@@ -5,10 +5,6 @@ data, and real TESS data.
 
 ## Install
 
-TODO FOR INSTALL INSTRUCTIONS:
-* figure out `2massread` substitute (or how to make it free)
-
-
 ### Environment basics
 
 First, clone this repo into a working directory, that we will call $TREX.
@@ -52,7 +48,7 @@ dependencies):
 where I have assumed you may want to make contributions to astrobase as you
 develop, which you should!
 
-For transit-fitting, you wlil want `batman`, `corner`, and `emcee` installed:
+For transit-fitting, you will want `batman`, `corner`, and `emcee` installed:
   ```
   (trex_27) pip install batman-package
   (trex_27) pip corner
@@ -61,6 +57,36 @@ For transit-fitting, you wlil want `batman`, `corner`, and `emcee` installed:
   (trex_27) cd emcee
   (trex_27) python setup.py install
   ```
+
+## catalog reading dependencies
+
+At various stages in the photometry process, we project known-star catalogs
+onto images in order to know where the stars are. (This is more reliable than
+source extraction.)
+
+The best catalog in town is Gaia DR2. To access it quickly, `gaia2read` is a
+useful program. Jason Kim wrote it for his junior thesis, and his source is
+[available here](https://github.com/jkim117/gaia2read).
+Sam Yee added an important piece of functionality: cutting on different
+magnitudes, his fork is [available
+here](https://github.com/samuelyeewl/gaia2read).
+
+To install `gaia2read`, you will want to do the following:
+  ```
+  (trex_27) cd $SOME_DIRECTORY
+  (trex_27) git clone https://github.com/samuelyeewl/gaia2read
+  (trex_27) cd gaia2read/gaialib2
+  (trex_27) make
+  (trex_27) mv gaia2read $BINARY_DIRECTORY_ON_YOUR_PATH
+  (trex_27) echo "/nfs/phn15/ar0/H/CAT/GaiaDR2" > ~/.gaia2readrc
+  ```
+where `$BINARY_DIRECTORY_ON_YOUR_PATH$` is for example `~/bin/`, or some other
+directory from which your path can read binaries.
+
+The assumption of the last line is that you are doing this on the
+`phn`/`phs`/`phtess` NFS filesystem, where the "DataPreparation" steps have
+already been performed to download and sort the Gaia DR2 catalog.
+
 
 ### anet and astrometry.net dependencies
 
