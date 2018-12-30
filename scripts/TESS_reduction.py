@@ -33,7 +33,7 @@ def get_files_needed_before_image_subtraction(
         fnamestr='*-1-1-0016_cal_img.fits', anetfluxthreshold=20000,
         fistarglob='*.fistar',
         width=13, anettweak=6, anetradius=30, xpix=2048, ypix=2048, cols=(2,3),
-        brightrmag=6.0, faintrmag=13.0,
+        brightrmag=5.0, faintrmag=13.0,
         fiphotfluxthreshold=1000,
         aperturelist='1.45:7.0:6.0,1.95:7.0:6.0,2.45:7.0:6.0',
         nworkers=20,
@@ -48,8 +48,8 @@ def get_files_needed_before_image_subtraction(
     bright stars for astrometry.
     2. run parallel_anet to get precise WCS headers for all frames.
     3. run make_fov_catalog to get a FOV source catalog for the field.
-    4. run reform_fov_catalog to cut this down to the columns needed for magfit
-    only.
+    4. run reform_gaia_fov_catalog to cut this down to the columns needed for
+    magfit only.
     5. run parallel_fitsdir_photometry for photometry on all frames (via
     fistar)
     """
@@ -91,11 +91,16 @@ def get_files_needed_before_image_subtraction(
                             brightrmag=brightrmag, faintrmag=faintrmag,
                             fits=None, outfile=None, outdir=outdir,
                             catalog=catalog, catalogpath=None,
-                            columns=None, observatory='tess')
+                            columns=None, observatory='tess',
+                            gaiaidrequest='GAIA')
 
     # This converts the full output catalog from 2massread, etc. to the format
     # required for magfit. Also useful for general reforming of the columns.
-    ap.reform_fov_catalog(catalog_file, reformed_cat_file)
+    if catalog=='GAIADR2':
+        ap.reform_gaia_fov_catalog(catalog_file, reformed_cat_file)
+    else:
+        # you could use ap.reform_fov_catalog, but you should be using Gaia.
+        raise ValueError
 
     if extractsources==True:
         fiphot_xycols = '7,8'
@@ -353,13 +358,13 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
 
         ap.parallel_lc_statistics(lcdirectory, epdlcglob,
                                   reformed_cat_file, tfalcrequired=False,
-                                  fovcatcols=(0,9), # objectid, magcol to use
+                                  fovcatcols=(0,6), # objectid, magcol to use
                                   fovcatmaglabel='r', outfile=epdstatfile,
                                   nworkers=nworkers,
                                   workerntasks=500, rmcols=[14,19,24],
                                   epcols=[27,28,29], tfcols=[30,31,32],
                                   rfcols=None, correctioncoeffs=None,
-                                  sigclip=5.0)
+                                  sigclip=5.0, fovcathasgaiaids=True)
     else:
         print('already made EPD LC stats file')
 
@@ -367,19 +372,28 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
     if not epdmadplot:
         ap.plot_stats_file(epdstatfile, statsdir, field, binned=False,
                            logy=True, logx=False, correctmagsafter=None,
-                           rangex=(5.9,16), observatory='tess')
+                           rangex=(5.9,16), observatory='tess',
+                           fovcathasgaiaids=True)
     else:
         print('already made EPD LC plots')
 
     if not os.path.exists(lcdirectory+'aperture-1-tfa-template.list'):
+        if 'TUNE' in statsdir:
+            target_nstars, max_nstars = 40, 42
+        elif 'FULL' in statsdir:
+            target_nstars, max_nstars = 500, 502
+        else:
+            raise NotImplementedError
         _ = ap.choose_tfa_template(epdstatfile, reformed_cat_file, lcdirectory,
                                    ignoretfamin=False, fovcat_idcol=0,
                                    fovcat_xicol=3, fovcat_etacol=4,
-                                   fovcat_magcol=9, min_ndet=70,
-                                   min_nstars=50, max_nstars=1000,
+                                   fovcat_magcol=6,
+                                   target_nstars=target_nstars,
+                                   max_nstars=max_nstars,
                                    brightest_mag=8.5, faintest_mag=13.0,
-                                   max_rms=0.1, max_sigma_above_rmscurve=5.0,
-                                   outprefix=statsdir, tfastage1=True)
+                                   max_rms=0.1, max_sigma_above_rmscurve=4.0,
+                                   outprefix=statsdir, tfastage1=True,
+                                   fovcathasgaiaids=True)
 
     if not os.path.exists(tfastatfile):
         templatefiles = glob(lcdirectory+'aperture-?-tfa-template.list')
@@ -389,9 +403,10 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
                              epdlc_sigclip=tfa_epdlc_sigclip,
                              nworkers=nworkers, workerntasks=1000)
 
+        # for Gaia DR2, catalog mag col corresponds to G_Rp (Gaia "R" band).
         ap.parallel_lc_statistics(lcdirectory, '*.epdlc', reformed_cat_file,
                                   tfalcrequired=True,
-                                  fovcatcols=(0,9), # objectid, magcol from fovcat
+                                  fovcatcols=(0,6), # objectid, magcol from fovcat
                                   fovcatmaglabel='r',
                                   outfile=tfastatfile,
                                   nworkers=nworkers,
@@ -401,7 +416,7 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
                                   tfcols=[30,31,32],
                                   rfcols=None,
                                   correctioncoeffs=None,
-                                  sigclip=5.0)
+                                  sigclip=5.0, fovcathasgaiaids=True)
     else:
         print('already made TFA LC stats file')
 
@@ -409,7 +424,8 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
     if not os.path.exists(tfaboolstatusfile):
         ap.plot_stats_file(tfastatfile, statsdir, field, binned=False,
                            logy=True, logx=False, correctmagsafter=None,
-                           rangex=(5.9,16), observatory='tess')
+                           rangex=(5.9,16), observatory='tess',
+                           fovcathasgaiaids=True)
         with open(tfaboolstatusfile+'','w') as f:
             f.write('1\n')
     else:
@@ -444,7 +460,7 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
 
             if not os.path.exists(binstatfile):
                 ap.parallel_binnedlc_statistics(
-                    lcdirectory, binglob, reformed_cat_file, fovcatcols=(0,9),
+                    lcdirectory, binglob, reformed_cat_file, fovcatcols=(0,6),
                     fovcatmaglabel='r', corrmagsource=None, corrmag_idcol=0,
                     corrmag_magcols=[122,123,124], outfile=binstatfile,
                     nworkers=nworkers, workerntasks=500, sigclip=5)
@@ -1131,7 +1147,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     ra_nom = hdr['CRVAL1']  # RA at CRPIX1, CRPIX2. Roughly "camera boresight".
     dec_nom = hdr['CRVAL2'] # DEC at CRPIX1, CRPIX2
 
-    catalog, catra, catdec, catbox = '2MASS', ra_nom, dec_nom, ccd_fov
+    catalog, catra, catdec, catbox = 'GAIADR2', ra_nom, dec_nom, ccd_fov
     catalog_file = (
         '%s-RA%s-DEC%s-SIZE%s.catalog' % (catalog, catra, catdec, catbox)
     )
