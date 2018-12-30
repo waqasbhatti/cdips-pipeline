@@ -3558,7 +3558,6 @@ def parallel_epd_worker(task):
     task[2] = smooth
     task[3] = sigmaclip
     task[4] = minndet
-
     '''
 
     try:
@@ -3836,7 +3835,8 @@ def parallel_run_tfa(lcdir,
                      epdlc_sigclip=5.0,
                      nworkers=16,
                      overwrite=False,
-                     workerntasks=1000):
+                     workerntasks=1000,
+                     tfalc_glob='*.tfalc'):
     '''
     This runs TFA on the EPD lightcurves.
     '''
@@ -3848,7 +3848,7 @@ def parallel_run_tfa(lcdir,
         epdlcfiles = glob.glob(os.path.join(lcdir, epdlc_glob))
 
     # only run TFA on lightcurves that need it
-    existing = glob.glob(lcdir+'HAT-???-???????.tfalc*')
+    existing = glob.glob(os.path.join(lcdir, tfalc_glob))
 
     if len(existing) > 0 and not overwrite:
 
