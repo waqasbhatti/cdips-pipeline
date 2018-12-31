@@ -190,92 +190,108 @@ def compute_acf_statistics_worker(task, n_apertures=3, timename='btjd',
 
     #NOTE : might want to check a couple smoothing values ("filterwindows")...
 
-    if not istessffi:
-        raise NotImplementedError(
-        'this function assumes an ffi cadence of 30 minutes to evaluate ACFs. '
-        'to generalize this you just need to interpolate, but I am lazy.'
-        )
-
-    tfafile, outdir, eval_times_hr = task
-
-    lcdata = read_tfa_lc(tfafile)
-
-    outpickle = os.path.join(
-        outdir,
-        os.path.basename(tfafile).replace('.tfalc','_acf_stats.pickle')
-    )
-    outcsv = os.path.join(
-        outdir,
-        os.path.basename(tfafile).replace('.tfalc','_acf_stats.csv')
-    )
-    if os.path.exists(outpickle) and os.path.exists(outcsv):
-        return 1
-
-    d_pkl, outdf = {}, pd.DataFrame({})
-    for ap in range(1,n_apertures+1):
-
-        rawap = 'RM{:d}'.format(ap)
-        epdap = 'EP{:d}'.format(ap)
-        tfaap = 'TF{:d}'.format(ap)
-        errap = 'RMERR{:d}'.format(ap)
-
-        time = lcdata[timename]
-        flux_raw = lcdata[rawap]
-        flux_epd = lcdata[epdap]
-        flux_tfa = lcdata[tfaap]
-        err = lcdata[errap]
-
-        acf_raw = autocorr_magseries(time, flux_raw, err, maxlags=None,
-                                     fillgaps='noiselevel', sigclip=5,
-                                     magsarefluxes=True,
-                                     filterwindow=filterwindow)
-        acf_epd = autocorr_magseries(time, flux_epd, err, maxlags=None,
-                                     fillgaps='noiselevel', sigclip=5,
-                                     magsarefluxes=True,
-                                     filterwindow=filterwindow)
-        acf_tfa = autocorr_magseries(time, flux_tfa, err, maxlags=None,
-                                     fillgaps='noiselevel', sigclip=5,
-                                     magsarefluxes=True,
-                                     filterwindow=filterwindow)
-
-        if not np.isclose(acf_raw['cadence']*24*60, 30, atol=1e-3):
+    try:
+        if not istessffi:
             raise NotImplementedError(
             'this function assumes an ffi cadence of 30 minutes to evaluate ACFs. '
             'to generalize this you just need to interpolate, but I am lazy.'
             )
 
-        apstr = 'AP{}'.format(ap)
-        d_pkl[apstr] = {}
-        for acf, dtr in zip([acf_raw, acf_epd, acf_tfa],['raw','epd','tfa']):
+        tfafile, outdir, eval_times_hr = task
 
-            d_pkl[apstr]['acf_{}'.format(dtr)] = acf['acf']
-            d_pkl[apstr]['lag_time_{}'.format(dtr)] = acf['lags']*acf['cadence']
-            d_pkl[apstr]['itimes_{}'.format(dtr)] = acf['itimes']
-            d_pkl[apstr]['ifluxs_{}'.format(dtr)] = acf['imags']
-            d_pkl[apstr]['ierrs_{}'.format(dtr)] = acf['ierrs']
-            d_pkl[apstr]['cadence'] = acf['cadence']
+        lcdata = read_tfa_lc(tfafile)
 
-        # assuming FFI cadence of 30 minutes, evalute ACF at desired lags.
-        eval_times_hr = nparr(eval_times_hr)
-        outdf['LAG_TIME_HR'] = eval_times_hr
-        for acf, colstr in zip(
-            [acf_raw, acf_epd, acf_tfa],
-            ['RAW{:d}'.format(ap),'EPD{:d}'.format(ap),'TFA{:d}'.format(ap)]
-        ):
-            # wonky indexing scheme. 30 minute cadence -> e.g., 1hr lag is
-            # index number 2.
-            these_acf_vals = acf['acf'][2*eval_times_hr]
+        outpickle = os.path.join(
+            outdir,
+            os.path.basename(tfafile).replace('.tfalc','_acf_stats.pickle')
+        )
+        outcsv = os.path.join(
+            outdir,
+            os.path.basename(tfafile).replace('.tfalc','_acf_stats.csv')
+        )
+        if os.path.exists(outpickle) and os.path.exists(outcsv):
+            return 1
 
-            outdf[colstr+"_ACF"] = these_acf_vals
+        d_pkl, outdf = {}, pd.DataFrame({})
+        for ap in range(1,n_apertures+1):
 
-    with open(outpickle, 'w') as f:
-        pickle.dump(d_pkl, f, pickle.HIGHEST_PROTOCOL)
-    print('wrote {}'.format(outpickle))
+            rawap = 'RM{:d}'.format(ap)
+            epdap = 'EP{:d}'.format(ap)
+            tfaap = 'TF{:d}'.format(ap)
+            errap = 'RMERR{:d}'.format(ap)
 
-    outdf.to_csv(outcsv, index=False)
-    print('wrote {}'.format(outcsv))
+            time = lcdata[timename]
+            flux_raw = lcdata[rawap]
+            flux_epd = lcdata[epdap]
+            flux_tfa = lcdata[tfaap]
+            err = lcdata[errap]
 
-    return 1
+            acf_raw = autocorr_magseries(time, flux_raw, err, maxlags=None,
+                                         fillgaps='noiselevel', sigclip=5,
+                                         magsarefluxes=True,
+                                         filterwindow=filterwindow)
+            acf_epd = autocorr_magseries(time, flux_epd, err, maxlags=None,
+                                         fillgaps='noiselevel', sigclip=5,
+                                         magsarefluxes=True,
+                                         filterwindow=filterwindow)
+            acf_tfa = autocorr_magseries(time, flux_tfa, err, maxlags=None,
+                                         fillgaps='noiselevel', sigclip=5,
+                                         magsarefluxes=True,
+                                         filterwindow=filterwindow)
+
+            if not np.isclose(acf_raw['cadence']*24*60, 30, atol=1e-3):
+                raise NotImplementedError(
+                'this function assumes an ffi cadence of 30 minutes to evaluate ACFs. '
+                'to generalize this you just need to interpolate, but I am lazy.'
+                )
+
+            apstr = 'AP{}'.format(ap)
+            d_pkl[apstr] = {}
+            for acf, dtr in zip([acf_raw, acf_epd, acf_tfa],['raw','epd','tfa']):
+
+                d_pkl[apstr]['acf_{}'.format(dtr)] = acf['acf']
+                d_pkl[apstr]['lag_time_{}'.format(dtr)] = acf['lags']*acf['cadence']
+                d_pkl[apstr]['itimes_{}'.format(dtr)] = acf['itimes']
+                d_pkl[apstr]['ifluxs_{}'.format(dtr)] = acf['imags']
+                d_pkl[apstr]['ierrs_{}'.format(dtr)] = acf['ierrs']
+                d_pkl[apstr]['cadence'] = acf['cadence']
+
+            # assuming FFI cadence of 30 minutes, evalute ACF at desired lags.
+            n_acf_vals = len(acf_tfa['acf'])
+
+            # in "TUNE" mode, might want short-timescale ACFs (otherwise,
+            # fails)
+            if max(2*eval_times_hr)>n_acf_vals:
+                eval_times_hr = np.array([1,2,6,12])
+            else:
+                pass
+
+            eval_times_hr = nparr(eval_times_hr)
+            outdf['LAG_TIME_HR'] = eval_times_hr
+
+
+            for acf, colstr in zip(
+                [acf_raw, acf_epd, acf_tfa],
+                ['RAW{:d}'.format(ap),'EPD{:d}'.format(ap),'TFA{:d}'.format(ap)]
+            ):
+
+                # wonky indexing scheme. 30 minute cadence -> e.g., 1hr lag is
+                # index number 2.
+                these_acf_vals = acf['acf'][2*eval_times_hr]
+
+                outdf[colstr+"_ACF"] = these_acf_vals
+
+        with open(outpickle, 'w') as f:
+            pickle.dump(d_pkl, f, pickle.HIGHEST_PROTOCOL)
+        print('wrote {}'.format(outpickle))
+
+        outdf.to_csv(outcsv, index=False)
+        print('wrote {}'.format(outcsv))
+
+        return 1
+
+    except Exception as e:
+        print('{} failed, error was {}'.format(repr(task), repr(e)))
 
 
 def parallel_compute_acf_statistics(
