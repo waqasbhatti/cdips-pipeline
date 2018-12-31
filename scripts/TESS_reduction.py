@@ -25,503 +25,9 @@ import re, pickle
 from numpy import array as nparr
 from astropy.coordinates import SkyCoord
 
-def get_files_needed_before_image_subtraction(
-        fitsdir, fitsglob, outdir, initccdextent, ccdgain, zeropoint, exptime,
-        ra_nom, dec_nom,
-        catra, catdec, ccd_fov,
-        catalog, catalog_file, reformed_cat_file,
-        fnamestr='*-1-1-0016_cal_img.fits', anetfluxthreshold=20000,
-        fistarglob='*.fistar',
-        width=13, anettweak=6, anetradius=30, xpix=2048, ypix=2048, cols=(2,3),
-        brightrmag=5.0, faintrmag=13.0,
-        fiphotfluxthreshold=1000,
-        aperturelist='1.45:7.0:6.0,1.95:7.0:6.0,2.45:7.0:6.0',
-        nworkers=20,
-        useastrometrydotnet=True,
-        useimagenotfistar=True,
-        extractsources=True
-    ):
-    """
-    get .fistar, .fiphot, and .wcs files needed before image subtraction
-
-    1. run parallel_extract_sources on all frames with threshold ~ 10000 to get
-    bright stars for astrometry.
-    2. run parallel_anet to get precise WCS headers for all frames.
-    3. run make_fov_catalog to get a FOV source catalog for the field.
-    4. run reform_gaia_fov_catalog to cut this down to the columns needed for
-    magfit only.
-    5. run parallel_fitsdir_photometry for photometry on all frames (via
-    fistar)
-    """
-
-    ap.parallel_extract_sources(fitsdir, outdir, ccdextent=initccdextent,
-                                ccdgain=ccdgain,
-                                fluxthreshold=anetfluxthreshold,
-                                zeropoint=zeropoint, exptime=exptime,
-                                tailstr='.fits',
-                                fnamestr=fnamestr)
-
-    if useastrometrydotnet:
-
-        ap.fistardir_to_xy(fitsdir, fistarglob=fistarglob)
-
-        ap.parallel_astrometrydotnet(
-            fitsdir, outdir, ra_nom, dec_nom,
-            fistarfitsxyglob=fistarglob.replace('.fistar','.fistar-fits-xy'),
-            tweakorder=anettweak, radius=anetradius, xpix=xpix, ypix=ypix,
-            nworkers=nworkers, scalelow=10, scalehigh=30,
-            scaleunits='arcsecperpix', nobjs=200, xcolname='ximage',
-            ycolname='yimage', useimagenotfistar=useimagenotfistar,
-            downsample=4
-        )
-
-    else:
-        ap.parallel_anet(fitsdir, outdir, ra_nom, dec_nom,
-                         fistarglob=fistarglob,
-                         infofromframe=False, width=width, tweak=anettweak,
-                         radius=anetradius,
-                         xpix=xpix, ypix=ypix,
-                         cols=cols # columns with x,y in fistar file.
-        )
-
-    # This function gets all the sources in the field of view of the frame, given
-    # its central pointing coordinates and plate-scale from 2MASS. This catalog
-    # file is then be used as input to make_source_list below.
-    _ = ap.make_fov_catalog(ra=catra, dec=catdec, size=ccd_fov,
-                            brightrmag=brightrmag, faintrmag=faintrmag,
-                            fits=None, outfile=None, outdir=outdir,
-                            catalog=catalog, catalogpath=None,
-                            columns=None, observatory='tess',
-                            gaiaidrequest='GAIA')
-
-    # This converts the full output catalog from 2massread, etc. to the format
-    # required for magfit. Also useful for general reforming of the columns.
-    if catalog=='GAIADR2':
-        ap.reform_gaia_fov_catalog(catalog_file, reformed_cat_file)
-    else:
-        # you could use ap.reform_fov_catalog, but you should be using Gaia.
-        raise ValueError
-
-    if extractsources==True:
-        fiphot_xycols = '7,8'
-    else:
-        fiphot_xycols = '13,14'
-    ap.parallel_fitsdir_photometry(fitsdir, outdir, reformed_cat_file,
-                                   fluxthreshold=fiphotfluxthreshold,
-                                   ccdextent={'x':[0.,2048.],'y':[0.,2048.]},
-                                   pixborders=0.0,
-                                   aperturelist=aperturelist,
-                                   removesourcetemp=True,
-                                   removesourcelist=False, binaryoutput=False,
-                                   nworkers=nworkers, maxtasksperworker=1000,
-                                   saveresults=True, rejectbadframes=True,
-                                   minsrcbgv=200.0, maxmadbgv=150.0,
-                                   maxframebgv=2000.0, minnstars=500,
-                                   fitsglob=fitsglob, ccdgain=ccdgain,
-                                   ccdexptime=exptime, zeropoint=zeropoint,
-                                   extractsources=extractsources,
-                                   fovcat_xycols=(12,13),
-                                   projcat_xycols=(24,25),
-                                   fiphot_xycols=fiphot_xycols,
-                                   observatory='tess'
-                                  )
-
-
-def initial_wcs_worked_well_enough(outdir, fitsglob):
-    # check whether initial anet converged on over half of frames.
-
-    N_fitsfiles = len(glob(outdir+fitsglob))
-    N_wcsfiles = len(glob(outdir+fitsglob.replace('.fits','.wcs')))
-
-    if N_wcsfiles < N_fitsfiles/2:
-        return False
-    else:
-        return True
-
-
-def is_presubtraction_complete(outdir, fitsglob, lcdir, percentage_required=95,
-                               extractsources=False):
-    """
-    require at least e.g., 95% of the initial astrometry, photometry, etc to
-    exist to return True. in that case, or if any stats_files products are
-    found, move on to image subtraction.  else, returns False.
-    """
-
-    N_fitsfiles = len(glob(outdir+fitsglob))
-    N_fistarfiles = len(glob(outdir+fitsglob.replace('.fits','.fistar')))
-    N_wcsfiles = len(glob(outdir+fitsglob.replace('.fits','.wcs')))
-    N_projcatalog = len(glob(outdir+fitsglob.replace('.fits','.projcatalog')))
-    N_sourcelistfiles = len(glob(outdir+fitsglob.replace('.fits','.sourcelist')))
-    N_fiphotfiles = len(glob(outdir+fitsglob.replace('.fits','.fiphot')))
-
-    if extractsources:
-        N_files = [N_fitsfiles, N_fistarfiles, N_wcsfiles, N_fiphotfiles,
-                   N_sourcelistfiles, N_projcatalog]
-    else:
-        N_files = [N_fitsfiles, N_fistarfiles, N_wcsfiles, N_fiphotfiles,
-                   N_projcatalog]
-
-    statsdir = lcdir+'stats_files'
-    N_statsfiles_products = len(glob(statsdir+"*"))
-    if N_statsfiles_products > 1:
-        print('found stats_files product. skipping to detrending.')
-        return True
-
-    elif (np.any( np.abs(np.diff(N_files)/N_fitsfiles)>(1-percentage_required/100) )
-        or
-        np.any( np.array(N_files)==0 )
-    ):
-        print('did not find {:d}% completed source extraction, astrometry, '.
-              format(percentage_required)+
-              'and initial photometry')
-        return False
-
-    else:
-        print('found {:d}% completed source extraction, astrometry, '.
-              format(percentage_required)+
-              'and initial photometry. skipping presubtraction steps.')
-        return True
-
-
-def is_imagesubtraction_complete(fitsdir, fitsglob, lcdir):
-
-    N_subfitslist = len(glob(
-        fitsdir+'rsub-????????-'+fitsglob.replace('.fits','-xtrns.fits')))
-    N_iphotlist = len(glob(
-        fitsdir+'rsub-????????-'+fitsglob.replace('.fits','.iphot')))
-    N_kernellist = len(glob(
-        fitsdir+'rsub-????????-'+
-        fitsglob.replace('.fits','-xtrns.fits-kernel')))
-    N_subconvjpglist = len(glob(
-        fitsdir+'JPEG-SUBTRACTEDCONV-rsub-*-tess*.jpg'))
-    N_lcs = len(glob(
-        lcdir+'*.grcollectilc'))
-
-    N_files = [N_subfitslist, N_iphotlist, N_kernellist, N_subconvjpglist]
-    full_N_files = [N_subfitslist, N_iphotlist, N_kernellist, N_subconvjpglist,
-                    N_lcs]
-
-    statsdir = lcdir+'stats_files/'
-    N_statsfiles_products = len(glob(statsdir+"*"))
-
-    if N_statsfiles_products >= 1:
-        print('found stats_files product. skipping to detrending.')
-        return True
-
-    elif np.any( np.diff(N_files) ) or np.any( np.array(full_N_files)==0 ):
-        print('did not find completed image-subtracted photometry products '
-              'including photometry, images, and lightcurves.')
-        return False
-
-    else:
-        return True
-
-
-def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
-                         photreftype, dbtype, reformed_cat_file, xtrnsglob,
-                         iphotpattern, lcdirectory, kernelspec='b/4;i/4;d=4/4',
-                         refdir=sv.REFBASEDIR, nworkers=1,
-                         aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
-                         photdisjointradius=2, colorscheme='bwr',
-                         photreffluxthreshold=30000, extractsources=True):
-
-    ccdgain = photparams['ccdgain']
-    exptime = photparams['ccdexptime']
-    zeropoint = photparams['zeropoint']
-
-    # Step ISP0.
-    _ = ais.parallel_frames_to_database(fitsdir, 'calibratedframes',
-                                        observatory='tess', fitsglob=fitsglob,
-                                        overwrite=False,
-                                        badframetag='badframes',
-                                        nonwcsframes_are_ok=False,
-                                        nworkers=nworkers, maxworkertasks=1000)
-
-    # Step ISP1.
-    arefinfo = ais.dbgen_get_astromref(fieldinfo, makeactive=True,
-                                       observatory='tess', overwrite=False,
-                                       refdir=sv.REFBASEDIR, database=None)
-    if arefinfo == None:
-        raise AssertionError('you need an astrometric reference!!')
-
-    # Step ISP2. Takes ~1 sec per 20-30 frames.
-    _ = ism.get_smoothed_xysdk_coeffs(fitsdir, fistarglob='*.fistar',
-                                      nworkers=nworkers, maxworkertasks=1000)
-
-    # Step ISP3. ~600 in 5 minutes --> 2 frames per second, running over 20 workers.
-    # If called with warpcheck=True and warpthreshold=2000, many things will be
-    # moved to badframes that are not in fact badframes. The warpthreshold is a bad
-    # empirical thing that should be avoided.
-    _ = ais.framelist_make_xtrnsfits(fits_list, fitsdir, fitsglob, outdir=None,
-                                     refinfo='foobar', warpcheck=False,
-                                     warpthreshold=15000.0, warpmargins=100,
-                                     nworkers=nworkers, observatory='tess',
-                                     maxworkertasks=1000, fieldinfo=fieldinfo)
-
-    # # Optional Step ISP3.5: parallelized move of astrometry ref shifted frames to database
-    # out = ais.parallel_frames_to_database(fitsdir, 'arefshifted_frames',
-    #                                       fitsglob='1-???????_?-xtrns.fits',
-    #                                       network='HP', overwrite=False,
-    #                                       badframetag='badframes',
-    #                                       nonwcsframes_are_ok=False, nworkers=nworkers,
-    #                                       maxworkertasks=1000)
-    # 
-
-    # Step ISP4: the next thing to do is to select a bunch of frames that can serve
-    # as photometric reference frames (photrefs).
-
-    xtrnsfiles = glob(fitsdir+xtrnsglob)
-    photrefinfo = ais.generate_photref_candidates_from_xtrns(
-        xtrnsfiles, minframes=50, observatory='tess',
-        maxbackgroundstdevpctile=100., maxbackgroundmedianpctile=70.,
-        minngoodobjectpctile=70., forcecollectinfo=False, nworkers=nworkers,
-        maxworkertasks=1000)
-
-    # Optional Step ISP5: amend the list, if needed.
-    # photrefinfo = ais.amend_candidate_photrefs(photrefinfo)
-
-    # Step ISP6: make a photometric reference frame
-    _ = ais.generate_combined_photref(
-        photrefinfo, photreftype, dbtype,
-        photref_reformedfovcat=reformed_cat_file, makeactive=True, field=None,
-        ccd=None, projectid=None, combinemethod='median',
-        kernelspec=kernelspec, ccdgain=ccdgain, zeropoint=zeropoint,
-        ccdexptime=exptime, extractsources=extractsources,
-        apertures=aperturelist, framewidth=None, searchradius=8.0,
-        nworkers=nworkers, maxworkertasks=1000, observatory='tess',
-        fieldinfo=fieldinfo, photreffluxthreshold=photreffluxthreshold)
-
-    # Step ISP7: convolve and subtract all FITS files in the xtrnsfits list from the
-    # photometric reference.  With 30 workers, at best process ~few frames per
-    # second.
-
-    _ = ais.parallel_xtrnsfits_convsub(
-        xtrnsfiles, photreftype, fitsdir=fitsdir, fitsglob=fitsglob,
-        outdir=None, observatory='tess', fieldinfo=fieldinfo,
-        reversesubtract=True, kernelspec=kernelspec, nworkers=nworkers,
-        maxworkertasks=1000, colorscheme=colorscheme)
-
-    # Step ISP8: do photometry on your subtracted frames to produce .iphot files.
-    # With 30 workers, at best process ~few frames per second.
-
-    subfitslist = glob(fitsdir+'rsub-????????-'+
-                       fitsglob.replace('.fits','-xtrns.fits'))
-    _ = ais.parallel_convsubfits_staticphot(
-        subfitslist, fitsdir=fitsdir, fitsglob=fitsglob,
-        photreftype=photreftype, kernelspec=kernelspec,
-        lcapertures=aperturelist, photdisjointradius=photdisjointradius,
-        outdir=None, fieldinfo=fieldinfo, observatory='tess',
-        nworkers=nworkers, maxworkertasks=1000, photparams=photparams)
-
-    # Step ISP9 + 10 : dump lightcurves.
-    ism.dump_lightcurves_with_grcollect(
-        iphotpattern, lcdirectory, '4g', lcextension='grcollectilc',
-        objectidcol=3, observatory='tess')
-
-    # # Alternative Step 9 + 10: add the .iphot files to postgres database. Collect
-    # # LCs from postgres, and then make difference image lightcurve (*.ilc) files in
-    # # lcdirectory. AKA "light curve dump", or "the transposition problem".
-    # # Surprisingly computationally expensive.  An alternative approach is
-    # # fitsh's `grcollect`, which skips the database architecture entirely.
-    # 
-    # print('beginning insert_phots_into_database')
-    # ais.insert_phots_into_database(sv.REDPATH, frameglob='rsub-*-xtrns.fits',
-    #                                photdir=None, photglob='rsub-*-%s.iphot',
-    #                                maxframes=None, overwrite=False, database=None)
-    # 
-    # hatidlist = ais.get_hatidlist_from_cmrawphot(projectid, field, ccd, photreftype)
-    # 
-    # print('beginning lightcurve dump')
-    # ais.parallel_dbphot_lightcurves_hatidlist(hatidlist, lcdirectory)
-
-
-def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
-                   reformed_cat_file, statsdir, field, epdsmooth=11,
-                   epdsigclip=10, nworkers=10, binlightcurves=False,
-                   tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0):
-    """
-    Step ISP11: do EPD on all the LCs, and collect stats on the results.
-    for ISP LCs, use lcmagcols=([27,28,29],[30,],[30,],[30,])
-
-    Step ISP12: do TFA on all the LCs. First, choose TFA template stars using the
-    .epdlc stats. Then run TFA, to get .tfalc.TF{1,2,3} files. Turn them into
-    single .tfalc files. Then collect statistics.
-    """
-
-    if not os.path.exists(epdstatfile):
-
-        _ = ism.parallel_run_epd_imagesub(lcdirectory,
-                                          ilcglob='*.grcollectilc',
-                                          outdir=None, smooth=epdsmooth,
-                                          sigmaclip=epdsigclip, nworkers=nworkers,
-                                          maxworkertasks=1000, minndet=100)
-
-        ap.parallel_lc_statistics(lcdirectory, epdlcglob,
-                                  reformed_cat_file, tfalcrequired=False,
-                                  fovcatcols=(0,6), # objectid, magcol to use
-                                  fovcatmaglabel='r', outfile=epdstatfile,
-                                  nworkers=nworkers,
-                                  workerntasks=500, rmcols=[14,19,24],
-                                  epcols=[27,28,29], tfcols=[30,31,32],
-                                  rfcols=None, correctioncoeffs=None,
-                                  sigclip=5.0, fovcathasgaiaids=True)
-    else:
-        print('already made EPD LC stats file')
-
-    epdmadplot = glob(os.path.join(statsdir, '*median-EP1-vs-mad-*png'))
-    if not epdmadplot:
-        ap.plot_stats_file(epdstatfile, statsdir, field, binned=False,
-                           logy=True, logx=False, correctmagsafter=None,
-                           rangex=(5.9,16), observatory='tess',
-                           fovcathasgaiaids=True)
-    else:
-        print('already made EPD LC plots')
-
-    if not os.path.exists(lcdirectory+'aperture-1-tfa-template.list'):
-        if 'TUNE' in statsdir:
-            target_nstars, max_nstars = 40, 42
-        elif 'FULL' in statsdir:
-            target_nstars, max_nstars = 500, 502
-        else:
-            raise NotImplementedError
-        _ = ap.choose_tfa_template(epdstatfile, reformed_cat_file, lcdirectory,
-                                   ignoretfamin=False, fovcat_idcol=0,
-                                   fovcat_xicol=3, fovcat_etacol=4,
-                                   fovcat_magcol=6,
-                                   target_nstars=target_nstars,
-                                   max_nstars=max_nstars,
-                                   brightest_mag=8.5, faintest_mag=13.0,
-                                   max_rms=0.1, max_sigma_above_rmscurve=4.0,
-                                   outprefix=statsdir, tfastage1=True,
-                                   fovcathasgaiaids=True)
-
-    if not os.path.exists(tfastatfile):
-        templatefiles = glob(lcdirectory+'aperture-?-tfa-template.list')
-        ism.parallel_run_tfa(lcdirectory, templatefiles, epdlc_glob='*.epdlc',
-                             epdlc_jdcol=0, epdlc_magcol=(27,28,29),
-                             template_sigclip=tfa_template_sigclip,
-                             epdlc_sigclip=tfa_epdlc_sigclip,
-                             nworkers=nworkers, workerntasks=1000)
-
-        # for Gaia DR2, catalog mag col corresponds to G_Rp (Gaia "R" band).
-        ap.parallel_lc_statistics(lcdirectory, '*.epdlc', reformed_cat_file,
-                                  tfalcrequired=True,
-                                  fovcatcols=(0,6), # objectid, magcol from fovcat
-                                  fovcatmaglabel='r',
-                                  outfile=tfastatfile,
-                                  nworkers=nworkers,
-                                  workerntasks=500,
-                                  rmcols=[14,19,24],
-                                  epcols=[27,28,29],
-                                  tfcols=[30,31,32],
-                                  rfcols=None,
-                                  correctioncoeffs=None,
-                                  sigclip=5.0, fovcathasgaiaids=True)
-    else:
-        print('already made TFA LC stats file')
-
-    tfaboolstatusfile = os.path.join(statsdir,'are_tfa_plots_done.txt')
-    if not os.path.exists(tfaboolstatusfile):
-        ap.plot_stats_file(tfastatfile, statsdir, field, binned=False,
-                           logy=True, logx=False, correctmagsafter=None,
-                           rangex=(5.9,16), observatory='tess',
-                           fovcathasgaiaids=True)
-        with open(tfaboolstatusfile+'','w') as f:
-            f.write('1\n')
-    else:
-        print('found done TFA plots (unbinned) through {:s}. continuing.'.
-              format(tfaboolstatusfile))
-
-    if binlightcurves:
-
-        binsizes = [3600,21600]
-
-        binnedlcfiles = glob(lcdirectory+'*.binned-*sec-lc.pkl')
-        if len(binnedlcfiles) == 0:
-            ap.parallel_bin_lightcurves(
-                lcdirectory, '*epdlc', binsizes=binsizes,
-                lcexts=('epdlc', 'tfalc'),
-                lcmagcols=([27,28,29],[30,31,32]),
-                jdcol=0, nworkers=nworkers, workerntasks=1000)
-        else:
-            print('found >=1 binned lightcurve. continuing.')
-
-        onehr_binstatfile = (
-            os.path.join(statsdir,'onehr-binned-lightcurve-statistics.txt'))
-        onehrglob = '*.binned-3600sec-lc.pkl'
-        sixhr_binstatfile = (
-            os.path.join(statsdir,'sixhr-binned-lightcurve-statistics.txt'))
-        sixhrglob = '*.binned-21600sec-lc.pkl'
-
-        # make statfiles and MAD vs. mag plots for all binned LCs.
-        for binstatfile, binglob, cadence in zip(
-            [onehr_binstatfile, sixhr_binstatfile], [onehrglob, sixhrglob],
-            binsizes):
-
-            if not os.path.exists(binstatfile):
-                ap.parallel_binnedlc_statistics(
-                    lcdirectory, binglob, reformed_cat_file, fovcatcols=(0,6),
-                    fovcatmaglabel='r', corrmagsource=None, corrmag_idcol=0,
-                    corrmag_magcols=[122,123,124], outfile=binstatfile,
-                    nworkers=nworkers, workerntasks=500, sigclip=5)
-            else:
-                print('found {:s}, continue'.format(binstatfile))
-
-            outprefix = field+'-'+str(cadence)
-            ap.plot_stats_file(binstatfile, statsdir, outprefix,
-                               binned=cadence, logy=True, logx=False,
-                               correctmagsafter=None, rangex=(5.9,16),
-                               observatory='tess')
-    else:
-        print('will not bin lightcurves or make assoiated statplots')
-
-
-def run_detrending_on_raw_photometry():
-    """
-    run detrending on raw photometry, to compare vs. image subtracted
-
-    Steps [1-5] of raw photometry (source extraction, astrometry, creation of a
-    source catalog, reforming the source catalog, and raw photometry) have been
-    performed.  To detrend, we first "magnitude fit" (see Sec 5.5 of Zhang,
-    Bakos et al 2016).  This procedure empirically fits magnitude differences
-    (vs. a reference) for each star in each frame, using on-camera position,
-    catalog magnitude, catalog color, and subpixel position. Then we run EPD
-    and TFA. Procedurally:
-
-    6. run get_magfit_frames to select a single magfit photometry reference and
-    set up per-CCD work directories, symlinks, etc. for the next steps.
-
-    7. run make_magfit_config to generate magfit config files for
-    MagnitudeFitting.py
-
-    8. run make_fiphot_list to make lists of fiphot files for each CCD.
-
-    9. run MagnitudeFitting.py in single reference mode.
-
-    10. run do_masterphotref.py to get the master mag fit reference.
-
-    11. run MagnitudeFitting.py in master reference mode.
-
-    12. run parallel_collect_lightcurves to collect all lightcurves into .rlc
-    files.
-
-    13. run serial_run_epd or parallel_run_epd to do EPD on all LCs.
-
-    14. run parallel_lc_statistics to collect stats on .epdlc files.
-
-    15. run choose_tfa_template to choose TFA template stars using the .epdlc
-    stats.
-
-    16. run parallel_run_tfa for TFA to get .tfalc files
-
-    17. run parallel_lc_statistics to collect stats on .tfalc files.
-
-    20. run plot_stats_file to make MAD vs. mag plots for all unbinned and
-    binned LCs.
-    """
-
-    raise NotImplementedError
-
+####################
+# HELPER FUNCTIONS #
+####################
 
 def _get_random_tfa_lcs(lcdirectory, n_desired_lcs=100):
 
@@ -592,106 +98,152 @@ def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid):
         moviedir,
         '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_XTRNS.mp4'.
         format(field, typestr, int(camera), int(ccd), int(projectid)))
-    if not os.path.exists(outmp4path):
+    if not os.path.exists(outmp4path) and len(glob(jpgglob))>10:
         iu.make_mp4_from_jpegs(jpgglob, outmp4path)
     else:
-        print('found {}'.format(outmp4path))
+        print('found (or skipped) {}'.format(outmp4path))
 
 
+def make_fake_xtrnsfits(fitsdir, fitsglob, fieldinfo):
 
-def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
-               field, camera, ccd, tfastatfile, ra_nom, dec_nom,
-               projcatalogpath, astromrefpath, sectornum, binned=False,
-               make_percentiles_plot=True, percentiles_xlim=[4,17],
-               percentiles_ylim=[1e-5,1e-1], nworkers=16,
-               moviedir='/nfs/phtess1/ar1/TESS/FFI/MOVIES/'):
-    """
-    write files with summary statistics of run. also, make movies.
+    wcsfiles = glob(os.path.join(
+        fitsdir, fitsglob.replace('.fits','.wcs')))
 
-    args:
-        statsdir (str): e.g.,
-        '/nfs/phtess1/ar1/TESS/FFI/LC/TUNE/sector-10/ISP_1-2/stats_files/'
+    fitstoshift = [w.replace('.wcs','.fits') for w in wcsfiles]
+    outpaths = [f.replace('.fits','-xtrns.fits') for f in fitstoshift]
 
-        lcdirectory (str): one level up from statsdir.
+    print('making SYMLINKS to FAKE "xtrnsfits" files...')
 
-        starttime (datetime obj)
+    for src, dst in zip(fitstoshift, outpaths):
+        os.symlink(src, dst)
+        print('{} --> {}'.format(src, dst))
 
-    kwargs:
-        is statfile binned?
 
-        make_percentiles_plot (bool)
-    """
+    # make identity *.itrans files
 
-    _make_movies(fitsdir, moviedir, field, camera, ccd, projectid)
+    # find this frame's associated active astromref
+    framearef = ais.dbget_astromref(fieldinfo['projectid'],
+                                    fieldinfo['field'],
+                                    fieldinfo['ccd'],
+                                    camera=fieldinfo['camera'])
+    areffistar = framearef['framepath'].replace('.fits','.fistar')
 
-    percentilesfiles = glob(os.path.join(statsdir,'percentiles_*png'))
-    if not percentilesfiles:
-        lcs.percentiles_MAD_stats_and_plots(statsdir, outprefix, binned=binned,
-                                            make_percentiles_plot=make_percentiles_plot,
-                                            percentiles_xlim=percentiles_xlim,
-                                            percentiles_ylim=percentiles_ylim)
+    # calculate the shift for the astrometric reference fistar only, since it
+    # should be the identity
+    areffname = os.path.basename(areffistar)
+
+    parsearef = search('{}-astromref-{}_cal_img.fistar', areffistar)
+    arefid = parsearef[1]
+    areforiginalfistar = os.path.join(fitsdir, arefid+'_cal_img.fistar')
+
+    outdir = fitsdir
+    shifted_fistar, shifted_itrans = ism.astromref_shift_worker(
+        (areforiginalfistar, areffistar, outdir)
+    )
+
+    # then make symlinks for all the other itrans files
+    print('making SYMLINKS to FAKE (identity) "itrans" files...')
+
+    outpaths = [f.replace('.fits','.itrans') for f in fitstoshift
+                if arefid not in f]
+    src = shifted_itrans
+    for dst in outpaths:
+        os.symlink(src, dst)
+        print('{} --> {}'.format(src, dst))
+
+
+def initial_wcs_worked_well_enough(outdir, fitsglob):
+    # check whether initial anet converged on over half of frames.
+
+    N_fitsfiles = len(glob(outdir+fitsglob))
+    N_wcsfiles = len(glob(outdir+fitsglob.replace('.fits','.wcs')))
+
+    if N_wcsfiles < N_fitsfiles/2:
+        return False
     else:
-        print('found percentiles plots')
+        return True
 
-    # do ACF statistics for say 100 lightcurves NOTE: might want more...
-    acf_lcs = _get_random_tfa_lcs(lcdirectory, n_desired_lcs=100)
-    outdir = os.path.join(statsdir,'acf_stats')
-    if not os.path.exists(outdir):
-        os.mkdir(outdir)
-    lcs.parallel_compute_acf_statistics(
-        acf_lcs, outdir, nworkers=nworkers,
-        eval_times_hr=[1,2,6,12,24,48,60,96,120,144,192])
 
-    # plot some lightcurves and their ACFs
-    pickledir = os.path.join(statsdir, 'acf_stats')
-    plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=10)
+def is_presubtraction_complete(outdir, fitsglob, lcdir, percentage_required=95,
+                               extractsources=False):
+    """
+    require at least e.g., 95% of the initial astrometry, photometry, etc to
+    exist to return True. in that case, or if any stats_files products are
+    found, move on to image subtraction.  else, returns False.
+    """
 
-    lcs.acf_percentiles_stats_and_plots(statsdir, outprefix, make_plot=True)
+    N_fitsfiles = len(glob(outdir+fitsglob))
+    N_fistarfiles = len(glob(outdir+fitsglob.replace('.fits','.fistar')))
+    N_wcsfiles = len(glob(outdir+fitsglob.replace('.fits','.wcs')))
+    N_projcatalog = len(glob(outdir+fitsglob.replace('.fits','.projcatalog')))
+    N_sourcelistfiles = len(glob(outdir+fitsglob.replace('.fits','.sourcelist')))
+    N_fiphotfiles = len(glob(outdir+fitsglob.replace('.fits','.fiphot')))
 
-    # check if image noise is gaussian
-    is_image_noise_gaussian(fitsdir, projectid, field, camera, ccd)
-
-    # just make some lightcurve plots to look at them
-    plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=10)
-
-    # count numbers of lightcurves
-    n_rawlc = len(glob(os.path.join(lcdirectory,'*.grcollectilc')))
-    n_epdlc = len(glob(os.path.join(lcdirectory,'*.epdlc')))
-    n_tfalc = len(glob(os.path.join(lcdirectory,'*.tfalc')))
-
-    # measure S/N of known HJ transits
-    hjonchippath = os.path.join(statsdir,'hjs_onchip.csv')
-    if tu.are_known_HJs_in_field(ra_nom, dec_nom, hjonchippath):
-        tu.measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory,
-                                statsdir, sectornum, nworkers=nworkers)
+    if extractsources:
+        N_files = [N_fitsfiles, N_fistarfiles, N_wcsfiles, N_fiphotfiles,
+                   N_sourcelistfiles, N_projcatalog]
     else:
-        print('did not find any known HJs on this field')
+        N_files = [N_fitsfiles, N_fistarfiles, N_wcsfiles, N_fiphotfiles,
+                   N_projcatalog]
 
-    # plot and examine size of astrometric shifts
-    if not os.path.exists(os.path.join(
-        statsdir, 'examine_astrometric_shifts.pickle')
+    statsdir = lcdir+'stats_files'
+    N_statsfiles_products = len(glob(statsdir+"*"))
+    if N_statsfiles_products > 1:
+        print('found stats_files product. skipping to detrending.')
+        return True
+
+    elif (np.any( np.abs(np.diff(N_files)/N_fitsfiles)>(1-percentage_required/100) )
+        or
+        np.any( np.array(N_files)==0 )
     ):
-        examine_astrometric_shifts(fitsdir, astromrefpath, statsdir)
+        print('did not find {:d}% completed source extraction, astrometry, '.
+              format(percentage_required)+
+              'and initial photometry')
+        return False
 
-    # how long did the pipeline take? how many lightcurves did it produce?
-    endtime = datetime.utcnow()
-    howlong = (endtime - starttime).total_seconds()*units.s
+    else:
+        print('found {:d}% completed source extraction, astrometry, '.
+              format(percentage_required)+
+              'and initial photometry. skipping presubtraction steps.')
+        return True
 
-    SUMMARY={
-        'starttime': starttime.isoformat(),
-        'endttime': endtime.isoformat(),
-        'howlong_day':howlong.to(units.day).value,
-        'howlong_hr':howlong.to(units.hr).value,
-        'howlong_min':howlong.to(units.minute).value,
-        'howlong_sec':howlong.to(units.second).value,
-        'n_rawlc':n_rawlc,
-        'n_epdlc':n_epdlc,
-        'n_tfalc':n_tfalc
-    }
-    summarydf = pd.DataFrame(SUMMARY, index=[0])
-    summarypath = os.path.join(statsdir,'run_summary.csv')
-    summarydf.to_csv(summarypath, index=False)
-    print('wrote {}'.format(summarypath))
+
+def is_imagesubtraction_complete(fitsdir, fitsglob, lcdir):
+
+    N_subfitslist = len(glob(
+        fitsdir+'rsub-????????-'+fitsglob.replace('.fits','-xtrns.fits')))
+    N_iphotlist = len(glob(
+        fitsdir+'rsub-????????-'+fitsglob.replace('.fits','.iphot')))
+    N_itranslist = len(glob(
+        fitsdir+'rsub-????????-'+fitsglob.replace('.fits','.itrans')))
+    N_kernellist = len(glob(
+        fitsdir+'rsub-????????-'+
+        fitsglob.replace('.fits','-xtrns.fits-kernel')))
+    N_subconvjpglist = len(glob(
+        fitsdir+'JPEG-SUBTRACTEDCONV-rsub-*-tess*.jpg'))
+    N_lcs = len(glob(
+        lcdir+'*.grcollectilc'))
+
+    N_files = [N_subfitslist, N_iphotlist, N_itranslist, N_kernellist,
+               N_subconvjpglist]
+
+    full_N_files = [N_subfitslist, N_iphotlist, N_itranslist, N_kernellist,
+                    N_subconvjpglist, N_lcs]
+
+    statsdir = lcdir+'stats_files/'
+    N_statsfiles_products = len(glob(statsdir+"*"))
+
+    if N_statsfiles_products >= 1:
+        print('found stats_files product. skipping to detrending.')
+        return True
+
+    elif np.any( np.diff(N_files) ) or np.any( np.array(full_N_files)==0 ):
+        print('did not find completed image-subtracted photometry products '
+              'including photometry, images, and lightcurves.')
+        return False
+
+    else:
+        return True
 
 
 def examine_astrometric_shifts(fitsdir, astromref, statsdir,
@@ -1019,7 +571,8 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
                                 catalog_faintrmag, fiphotfluxthreshold,
                                 photreffluxthreshold, extractsources,
                                 binlightcurves, get_masks,
-                                tfa_template_sigclip, tfa_epdlc_sigclip):
+                                tfa_template_sigclip, tfa_epdlc_sigclip,
+                                translateimages):
     """
     each "reduction version" is identified by a project ID. the parameters
     corresponding to each project ID are written in a pickle file, so that we
@@ -1057,7 +610,8 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
         "binlightcurves":binlightcurves,
         "get_masks":get_masks,
         "tfa_template_sigclip":tfa_template_sigclip,
-        "tfa_epdlc_sigclip":tfa_epdlc_sigclip
+        "tfa_epdlc_sigclip":tfa_epdlc_sigclip,
+        "translateimages":translateimages
     }
 
     outpicklename = "projid_{:s}.pickle".format(repr(projectid))
@@ -1068,6 +622,517 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
         pickle.dump(outd, f, pickle.HIGHEST_PROTOCOL)
     print('wrote {}'.format(outpath))
 
+
+
+##################################################
+# WRAPPER FUNCTIONS FOR MAJOR STEPS IN REDUCTION #
+##################################################
+
+def get_files_needed_before_image_subtraction(
+        fitsdir, fitsglob, outdir, initccdextent, ccdgain, zeropoint, exptime,
+        ra_nom, dec_nom,
+        catra, catdec, ccd_fov,
+        catalog, catalog_file, reformed_cat_file,
+        fnamestr='*-1-1-0016_cal_img.fits', anetfluxthreshold=20000,
+        fistarglob='*.fistar',
+        width=13, anettweak=6, anetradius=30, xpix=2048, ypix=2048, cols=(2,3),
+        brightrmag=5.0, faintrmag=13.0,
+        fiphotfluxthreshold=1000,
+        aperturelist='1.45:7.0:6.0,1.95:7.0:6.0,2.45:7.0:6.0',
+        nworkers=20,
+        useastrometrydotnet=True,
+        useimagenotfistar=True,
+        extractsources=True
+    ):
+    """
+    get .fistar, .fiphot, and .wcs files needed before image subtraction
+
+    1. run parallel_extract_sources on all frames with threshold ~ 10000 to get
+    bright stars for astrometry.
+    2. run parallel_anet to get precise WCS headers for all frames.
+    3. run make_fov_catalog to get a FOV source catalog for the field.
+    4. run reform_gaia_fov_catalog to cut this down to the columns needed for
+    magfit only.
+    5. run parallel_fitsdir_photometry for photometry on all frames (via
+    fistar)
+    """
+
+    ap.parallel_extract_sources(fitsdir, outdir, ccdextent=initccdextent,
+                                ccdgain=ccdgain,
+                                fluxthreshold=anetfluxthreshold,
+                                zeropoint=zeropoint, exptime=exptime,
+                                tailstr='.fits',
+                                fnamestr=fnamestr)
+
+    if useastrometrydotnet:
+
+        ap.fistardir_to_xy(fitsdir, fistarglob=fistarglob)
+
+        ap.parallel_astrometrydotnet(
+            fitsdir, outdir, ra_nom, dec_nom,
+            fistarfitsxyglob=fistarglob.replace('.fistar','.fistar-fits-xy'),
+            tweakorder=anettweak, radius=anetradius, xpix=xpix, ypix=ypix,
+            nworkers=nworkers, scalelow=10, scalehigh=30,
+            scaleunits='arcsecperpix', nobjs=200, xcolname='ximage',
+            ycolname='yimage', useimagenotfistar=useimagenotfistar,
+            downsample=4
+        )
+
+    else:
+        ap.parallel_anet(fitsdir, outdir, ra_nom, dec_nom,
+                         fistarglob=fistarglob,
+                         infofromframe=False, width=width, tweak=anettweak,
+                         radius=anetradius,
+                         xpix=xpix, ypix=ypix,
+                         cols=cols # columns with x,y in fistar file.
+        )
+
+    # This function gets all the sources in the field of view of the frame, given
+    # its central pointing coordinates and plate-scale from 2MASS. This catalog
+    # file is then be used as input to make_source_list below.
+    _ = ap.make_fov_catalog(ra=catra, dec=catdec, size=ccd_fov,
+                            brightrmag=brightrmag, faintrmag=faintrmag,
+                            fits=None, outfile=None, outdir=outdir,
+                            catalog=catalog, catalogpath=None,
+                            columns=None, observatory='tess',
+                            gaiaidrequest='GAIA')
+
+    # This converts the full output catalog from 2massread, etc. to the format
+    # required for magfit. Also useful for general reforming of the columns.
+    if catalog=='GAIADR2':
+        ap.reform_gaia_fov_catalog(catalog_file, reformed_cat_file)
+    else:
+        # you could use ap.reform_fov_catalog, but you should be using Gaia.
+        raise ValueError
+
+    if extractsources==True:
+        fiphot_xycols = '7,8'
+    else:
+        fiphot_xycols = '13,14'
+    ap.parallel_fitsdir_photometry(fitsdir, outdir, reformed_cat_file,
+                                   fluxthreshold=fiphotfluxthreshold,
+                                   ccdextent={'x':[0.,2048.],'y':[0.,2048.]},
+                                   pixborders=0.0,
+                                   aperturelist=aperturelist,
+                                   removesourcetemp=True,
+                                   removesourcelist=False, binaryoutput=False,
+                                   nworkers=nworkers, maxtasksperworker=1000,
+                                   saveresults=True, rejectbadframes=True,
+                                   minsrcbgv=200.0, maxmadbgv=150.0,
+                                   maxframebgv=2000.0, minnstars=500,
+                                   fitsglob=fitsglob, ccdgain=ccdgain,
+                                   ccdexptime=exptime, zeropoint=zeropoint,
+                                   extractsources=extractsources,
+                                   fovcat_xycols=(12,13),
+                                   projcat_xycols=(24,25),
+                                   fiphot_xycols=fiphot_xycols,
+                                   observatory='tess'
+                                  )
+
+
+def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
+                         photreftype, dbtype, reformed_cat_file, xtrnsglob,
+                         iphotpattern, lcdirectory, kernelspec='b/4;i/4;d=4/4',
+                         refdir=sv.REFBASEDIR, nworkers=1,
+                         aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
+                         photdisjointradius=2, colorscheme='bwr',
+                         photreffluxthreshold=30000, extractsources=True,
+                         translateimages=True):
+
+    ccdgain = photparams['ccdgain']
+    exptime = photparams['ccdexptime']
+    zeropoint = photparams['zeropoint']
+
+    # Step ISP0.
+    _ = ais.parallel_frames_to_database(fitsdir, 'calibratedframes',
+                                        observatory='tess', fitsglob=fitsglob,
+                                        overwrite=False,
+                                        badframetag='badframes',
+                                        nonwcsframes_are_ok=False,
+                                        nworkers=nworkers, maxworkertasks=1000)
+
+    # Step ISP1.
+    arefinfo = ais.dbgen_get_astromref(fieldinfo, makeactive=True,
+                                       observatory='tess', overwrite=False,
+                                       refdir=sv.REFBASEDIR, database=None)
+    if arefinfo == None:
+        raise AssertionError('you need an astrometric reference!!')
+
+    # Step ISP2. Takes ~1 sec per 20-30 frames.
+    _ = ism.get_smoothed_xysdk_coeffs(fitsdir, fistarglob='*.fistar',
+                                      nworkers=nworkers, maxworkertasks=1000)
+
+    # Step ISP3. ~600 in 5 minutes --> 2 frames per second, running over 20 workers.
+    # If called with warpcheck=True and warpthreshold=2000, many things will be
+    # moved to badframes that are not in fact badframes. The warpthreshold is a bad
+    # empirical thing that should be avoided.
+    if translateimages:
+        _ = ais.framelist_make_xtrnsfits(fits_list, fitsdir, fitsglob, outdir=None,
+                                         refinfo='foobar', warpcheck=False,
+                                         warpthreshold=15000.0, warpmargins=100,
+                                         nworkers=nworkers, observatory='tess',
+                                         maxworkertasks=1000, fieldinfo=fieldinfo)
+    else:
+        make_fake_xtrnsfits(fitsdir, fitsglob, fieldinfo)
+
+    # # Optional Step ISP3.5: parallelized move of astrometry ref shifted frames to database
+    # out = ais.parallel_frames_to_database(fitsdir, 'arefshifted_frames',
+    #                                       fitsglob='1-???????_?-xtrns.fits',
+    #                                       network='HP', overwrite=False,
+    #                                       badframetag='badframes',
+    #                                       nonwcsframes_are_ok=False, nworkers=nworkers,
+    #                                       maxworkertasks=1000)
+    # 
+
+    # Step ISP4: the next thing to do is to select a bunch of frames that can serve
+    # as photometric reference frames (photrefs).
+
+    xtrnsfiles = glob(fitsdir+xtrnsglob)
+    photrefinfo = ais.generate_photref_candidates_from_xtrns(
+        xtrnsfiles, minframes=50, observatory='tess',
+        maxbackgroundstdevpctile=100., maxbackgroundmedianpctile=70.,
+        minngoodobjectpctile=70., forcecollectinfo=False, nworkers=nworkers,
+        maxworkertasks=1000)
+
+    # Optional Step ISP5: amend the list, if needed.
+    # photrefinfo = ais.amend_candidate_photrefs(photrefinfo)
+
+    # Step ISP6: make a photometric reference frame
+    _ = ais.generate_combined_photref(
+        photrefinfo, photreftype, dbtype,
+        photref_reformedfovcat=reformed_cat_file, makeactive=True, field=None,
+        ccd=None, projectid=None, combinemethod='median',
+        kernelspec=kernelspec, ccdgain=ccdgain, zeropoint=zeropoint,
+        ccdexptime=exptime, extractsources=extractsources,
+        apertures=aperturelist, framewidth=None, searchradius=8.0,
+        nworkers=nworkers, maxworkertasks=1000, observatory='tess',
+        fieldinfo=fieldinfo, photreffluxthreshold=photreffluxthreshold)
+
+    # Step ISP7: convolve and subtract all FITS files in the xtrnsfits list from the
+    # photometric reference.  With 30 workers, at best process ~few frames per
+    # second.
+
+    _ = ais.parallel_xtrnsfits_convsub(
+        xtrnsfiles, photreftype, fitsdir=fitsdir, fitsglob=fitsglob,
+        outdir=None, observatory='tess', fieldinfo=fieldinfo,
+        reversesubtract=True, kernelspec=kernelspec, nworkers=nworkers,
+        maxworkertasks=1000, colorscheme=colorscheme)
+
+    # Step ISP8: do photometry on your subtracted frames to produce .iphot files.
+    # With 30 workers, at best process ~few frames per second.
+
+    subfitslist = glob(fitsdir+'rsub-????????-'+
+                       fitsglob.replace('.fits','-xtrns.fits'))
+    _ = ais.parallel_convsubfits_staticphot(
+        subfitslist, fitsdir=fitsdir, fitsglob=fitsglob,
+        photreftype=photreftype, kernelspec=kernelspec,
+        lcapertures=aperturelist, photdisjointradius=photdisjointradius,
+        outdir=None, fieldinfo=fieldinfo, observatory='tess',
+        nworkers=nworkers, maxworkertasks=1000, photparams=photparams)
+
+    # Step ISP9 + 10 : dump lightcurves.
+    ism.dump_lightcurves_with_grcollect(
+        iphotpattern, lcdirectory, '4g', lcextension='grcollectilc',
+        objectidcol=3, observatory='tess')
+
+    # # Alternative Step 9 + 10: add the .iphot files to postgres database. Collect
+    # # LCs from postgres, and then make difference image lightcurve (*.ilc) files in
+    # # lcdirectory. AKA "light curve dump", or "the transposition problem".
+    # # Surprisingly computationally expensive.  An alternative approach is
+    # # fitsh's `grcollect`, which skips the database architecture entirely.
+    # 
+    # print('beginning insert_phots_into_database')
+    # ais.insert_phots_into_database(sv.REDPATH, frameglob='rsub-*-xtrns.fits',
+    #                                photdir=None, photglob='rsub-*-%s.iphot',
+    #                                maxframes=None, overwrite=False, database=None)
+    # 
+    # hatidlist = ais.get_hatidlist_from_cmrawphot(projectid, field, ccd, photreftype)
+    # 
+    # print('beginning lightcurve dump')
+    # ais.parallel_dbphot_lightcurves_hatidlist(hatidlist, lcdirectory)
+
+
+def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
+                   reformed_cat_file, statsdir, field, epdsmooth=11,
+                   epdsigclip=10, nworkers=10, binlightcurves=False,
+                   tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0):
+    """
+    Step ISP11: do EPD on all the LCs, and collect stats on the results.
+    for ISP LCs, use lcmagcols=([27,28,29],[30,],[30,],[30,])
+
+    Step ISP12: do TFA on all the LCs. First, choose TFA template stars using the
+    .epdlc stats. Then run TFA, to get .tfalc.TF{1,2,3} files. Turn them into
+    single .tfalc files. Then collect statistics.
+    """
+
+    if not os.path.exists(epdstatfile):
+
+        _ = ism.parallel_run_epd_imagesub(lcdirectory,
+                                          ilcglob='*.grcollectilc',
+                                          outdir=None, smooth=epdsmooth,
+                                          sigmaclip=epdsigclip, nworkers=nworkers,
+                                          maxworkertasks=1000, minndet=100)
+
+        ap.parallel_lc_statistics(lcdirectory, epdlcglob,
+                                  reformed_cat_file, tfalcrequired=False,
+                                  fovcatcols=(0,6), # objectid, magcol to use
+                                  fovcatmaglabel='r', outfile=epdstatfile,
+                                  nworkers=nworkers,
+                                  workerntasks=500, rmcols=[14,19,24],
+                                  epcols=[27,28,29], tfcols=[30,31,32],
+                                  rfcols=None, correctioncoeffs=None,
+                                  sigclip=5.0, fovcathasgaiaids=True)
+    else:
+        print('already made EPD LC stats file')
+
+    epdmadplot = glob(os.path.join(statsdir, '*median-EP1-vs-mad-*png'))
+    if not epdmadplot:
+        ap.plot_stats_file(epdstatfile, statsdir, field, binned=False,
+                           logy=True, logx=False, correctmagsafter=None,
+                           rangex=(5.9,16), observatory='tess',
+                           fovcathasgaiaids=True)
+    else:
+        print('already made EPD LC plots')
+
+    if not os.path.exists(lcdirectory+'aperture-1-tfa-template.list'):
+        if 'TUNE' in statsdir:
+            target_nstars, max_nstars = 40, 42
+        elif 'FULL' in statsdir:
+            target_nstars, max_nstars = 500, 502
+        else:
+            raise NotImplementedError
+        _ = ap.choose_tfa_template(epdstatfile, reformed_cat_file, lcdirectory,
+                                   ignoretfamin=False, fovcat_idcol=0,
+                                   fovcat_xicol=3, fovcat_etacol=4,
+                                   fovcat_magcol=6,
+                                   target_nstars=target_nstars,
+                                   max_nstars=max_nstars,
+                                   brightest_mag=8.5, faintest_mag=13.0,
+                                   max_rms=0.1, max_sigma_above_rmscurve=4.0,
+                                   outprefix=statsdir, tfastage1=True,
+                                   fovcathasgaiaids=True)
+
+    if not os.path.exists(tfastatfile):
+        templatefiles = glob(lcdirectory+'aperture-?-tfa-template.list')
+        ism.parallel_run_tfa(lcdirectory, templatefiles, epdlc_glob='*.epdlc',
+                             epdlc_jdcol=0, epdlc_magcol=(27,28,29),
+                             template_sigclip=tfa_template_sigclip,
+                             epdlc_sigclip=tfa_epdlc_sigclip,
+                             nworkers=nworkers, workerntasks=1000)
+
+        # for Gaia DR2, catalog mag col corresponds to G_Rp (Gaia "R" band).
+        ap.parallel_lc_statistics(lcdirectory, '*.epdlc', reformed_cat_file,
+                                  tfalcrequired=True,
+                                  fovcatcols=(0,6), # objectid, magcol from fovcat
+                                  fovcatmaglabel='r',
+                                  outfile=tfastatfile,
+                                  nworkers=nworkers,
+                                  workerntasks=500,
+                                  rmcols=[14,19,24],
+                                  epcols=[27,28,29],
+                                  tfcols=[30,31,32],
+                                  rfcols=None,
+                                  correctioncoeffs=None,
+                                  sigclip=5.0, fovcathasgaiaids=True)
+    else:
+        print('already made TFA LC stats file')
+
+    tfaboolstatusfile = os.path.join(statsdir,'are_tfa_plots_done.txt')
+    if not os.path.exists(tfaboolstatusfile):
+        ap.plot_stats_file(tfastatfile, statsdir, field, binned=False,
+                           logy=True, logx=False, correctmagsafter=None,
+                           rangex=(5.9,16), observatory='tess',
+                           fovcathasgaiaids=True)
+        with open(tfaboolstatusfile+'','w') as f:
+            f.write('1\n')
+    else:
+        print('found done TFA plots (unbinned) through {:s}. continuing.'.
+              format(tfaboolstatusfile))
+
+    if binlightcurves:
+
+        binsizes = [3600,21600]
+
+        binnedlcfiles = glob(lcdirectory+'*.binned-*sec-lc.pkl')
+        if len(binnedlcfiles) == 0:
+            ap.parallel_bin_lightcurves(
+                lcdirectory, '*epdlc', binsizes=binsizes,
+                lcexts=('epdlc', 'tfalc'),
+                lcmagcols=([27,28,29],[30,31,32]),
+                jdcol=0, nworkers=nworkers, workerntasks=1000)
+        else:
+            print('found >=1 binned lightcurve. continuing.')
+
+        onehr_binstatfile = (
+            os.path.join(statsdir,'onehr-binned-lightcurve-statistics.txt'))
+        onehrglob = '*.binned-3600sec-lc.pkl'
+        sixhr_binstatfile = (
+            os.path.join(statsdir,'sixhr-binned-lightcurve-statistics.txt'))
+        sixhrglob = '*.binned-21600sec-lc.pkl'
+
+        # make statfiles and MAD vs. mag plots for all binned LCs.
+        for binstatfile, binglob, cadence in zip(
+            [onehr_binstatfile, sixhr_binstatfile], [onehrglob, sixhrglob],
+            binsizes):
+
+            if not os.path.exists(binstatfile):
+                ap.parallel_binnedlc_statistics(
+                    lcdirectory, binglob, reformed_cat_file, fovcatcols=(0,6),
+                    fovcatmaglabel='r', corrmagsource=None, corrmag_idcol=0,
+                    corrmag_magcols=[122,123,124], outfile=binstatfile,
+                    nworkers=nworkers, workerntasks=500, sigclip=5)
+            else:
+                print('found {:s}, continue'.format(binstatfile))
+
+            outprefix = field+'-'+str(cadence)
+            ap.plot_stats_file(binstatfile, statsdir, outprefix,
+                               binned=cadence, logy=True, logx=False,
+                               correctmagsafter=None, rangex=(5.9,16),
+                               observatory='tess')
+    else:
+        print('will not bin lightcurves or make assoiated statplots')
+
+
+def run_detrending_on_raw_photometry():
+    """
+    run detrending on raw photometry, to compare vs. image subtracted
+
+    Steps [1-5] of raw photometry (source extraction, astrometry, creation of a
+    source catalog, reforming the source catalog, and raw photometry) have been
+    performed.  To detrend, we first "magnitude fit" (see Sec 5.5 of Zhang,
+    Bakos et al 2016).  This procedure empirically fits magnitude differences
+    (vs. a reference) for each star in each frame, using on-camera position,
+    catalog magnitude, catalog color, and subpixel position. Then we run EPD
+    and TFA. Procedurally:
+
+    6. run get_magfit_frames to select a single magfit photometry reference and
+    set up per-CCD work directories, symlinks, etc. for the next steps.
+
+    7. run make_magfit_config to generate magfit config files for
+    MagnitudeFitting.py
+
+    8. run make_fiphot_list to make lists of fiphot files for each CCD.
+
+    9. run MagnitudeFitting.py in single reference mode.
+
+    10. run do_masterphotref.py to get the master mag fit reference.
+
+    11. run MagnitudeFitting.py in master reference mode.
+
+    12. run parallel_collect_lightcurves to collect all lightcurves into .rlc
+    files.
+
+    13. run serial_run_epd or parallel_run_epd to do EPD on all LCs.
+
+    14. run parallel_lc_statistics to collect stats on .epdlc files.
+
+    15. run choose_tfa_template to choose TFA template stars using the .epdlc
+    stats.
+
+    16. run parallel_run_tfa for TFA to get .tfalc files
+
+    17. run parallel_lc_statistics to collect stats on .tfalc files.
+
+    20. run plot_stats_file to make MAD vs. mag plots for all unbinned and
+    binned LCs.
+    """
+
+    raise NotImplementedError
+
+
+def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
+               field, camera, ccd, tfastatfile, ra_nom, dec_nom,
+               projcatalogpath, astromrefpath, sectornum, binned=False,
+               make_percentiles_plot=True, percentiles_xlim=[4,17],
+               percentiles_ylim=[1e-5,1e-1], nworkers=16,
+               moviedir='/nfs/phtess1/ar1/TESS/FFI/MOVIES/'):
+    """
+    write files with summary statistics of run. also, make movies.
+
+    args:
+        statsdir (str): e.g.,
+        '/nfs/phtess1/ar1/TESS/FFI/LC/TUNE/sector-10/ISP_1-2/stats_files/'
+
+        lcdirectory (str): one level up from statsdir.
+
+        starttime (datetime obj)
+
+    kwargs:
+        is statfile binned?
+
+        make_percentiles_plot (bool)
+    """
+
+    _make_movies(fitsdir, moviedir, field, camera, ccd, projectid)
+
+    percentilesfiles = glob(os.path.join(statsdir,'percentiles_*png'))
+    if not percentilesfiles:
+        lcs.percentiles_MAD_stats_and_plots(statsdir, outprefix, binned=binned,
+                                            make_percentiles_plot=make_percentiles_plot,
+                                            percentiles_xlim=percentiles_xlim,
+                                            percentiles_ylim=percentiles_ylim)
+    else:
+        print('found percentiles plots')
+
+    # do ACF statistics for say 100 lightcurves NOTE: might want more...
+    acf_lcs = _get_random_tfa_lcs(lcdirectory, n_desired_lcs=100)
+    outdir = os.path.join(statsdir,'acf_stats')
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+    lcs.parallel_compute_acf_statistics(
+        acf_lcs, outdir, nworkers=nworkers,
+        eval_times_hr=[1,2,6,12,24,48,60,96,120,144,192])
+
+    # plot some lightcurves and their ACFs
+    pickledir = os.path.join(statsdir, 'acf_stats')
+    plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=10)
+
+    lcs.acf_percentiles_stats_and_plots(statsdir, outprefix, make_plot=True)
+
+    # check if image noise is gaussian
+    is_image_noise_gaussian(fitsdir, projectid, field, camera, ccd)
+
+    # just make some lightcurve plots to look at them
+    plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=10)
+
+    # count numbers of lightcurves
+    n_rawlc = len(glob(os.path.join(lcdirectory,'*.grcollectilc')))
+    n_epdlc = len(glob(os.path.join(lcdirectory,'*.epdlc')))
+    n_tfalc = len(glob(os.path.join(lcdirectory,'*.tfalc')))
+
+    # measure S/N of known HJ transits
+    hjonchippath = os.path.join(statsdir,'hjs_onchip.csv')
+    if tu.are_known_HJs_in_field(ra_nom, dec_nom, hjonchippath):
+        tu.measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory,
+                                statsdir, sectornum, nworkers=nworkers)
+    else:
+        print('did not find any known HJs on this field')
+
+    # plot and examine size of astrometric shifts
+    if not os.path.exists(os.path.join(
+        statsdir, 'examine_astrometric_shifts.pickle')
+    ):
+        examine_astrometric_shifts(fitsdir, astromrefpath, statsdir)
+
+    # how long did the pipeline take? how many lightcurves did it produce?
+    endtime = datetime.utcnow()
+    howlong = (endtime - starttime).total_seconds()*units.s
+
+    SUMMARY={
+        'starttime': starttime.isoformat(),
+        'endttime': endtime.isoformat(),
+        'howlong_day':howlong.to(units.day).value,
+        'howlong_hr':howlong.to(units.hr).value,
+        'howlong_min':howlong.to(units.minute).value,
+        'howlong_sec':howlong.to(units.second).value,
+        'n_rawlc':n_rawlc,
+        'n_epdlc':n_epdlc,
+        'n_tfalc':n_tfalc
+    }
+    summarydf = pd.DataFrame(SUMMARY, index=[0])
+    summarypath = os.path.join(statsdir,'run_summary.csv')
+    summarydf.to_csv(summarypath, index=False)
+    print('wrote {}'.format(summarypath))
 
 
 def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
@@ -1082,7 +1147,8 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
          tuneparameters='true', is_ete6=False,
          catalog_faintrmag=13, fiphotfluxthreshold=1000,
          photreffluxthreshold=1000, extractsources=True, binlightcurves=False,
-         get_masks=1, tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0
+         get_masks=1, tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0,
+         translateimages=True
          ):
     """
     args:
@@ -1124,7 +1190,8 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                                 catalog_faintrmag, fiphotfluxthreshold,
                                 photreffluxthreshold, extractsources,
                                 binlightcurves, get_masks,
-                                tfa_template_sigclip, tfa_epdlc_sigclip)
+                                tfa_template_sigclip, tfa_epdlc_sigclip,
+                                translateimages)
 
     starttime = datetime.utcnow()
 
@@ -1266,7 +1333,8 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                              photdisjointradius=photdisjointradius,
                              colorscheme='bwr',
                              photreffluxthreshold=photreffluxthreshold,
-                             extractsources=extractsources)
+                             extractsources=extractsources,
+                             translateimages=translateimages)
     else:
         print('found that image subtraction is complete.')
 
@@ -1475,6 +1543,15 @@ if __name__ == '__main__':
         help=('sigclip EPD lightcurves by this much before applying TFA. '
               'using this option is probably always a bad idea.'))
 
+    parser.add_argument(
+        '--translateimages', dest='trnsimgs', action='store_true',
+        help=('translate images to the astrometric reference.')
+    )
+    parser.add_argument(
+        '--no-translateimages', dest='trnsimgs', action='store_false',
+        help=('do not translate images to astrometric reference.')
+    )
+    parser.set_defaults(trnsimgs=True)
 
     args = parser.parse_args()
 
@@ -1506,5 +1583,6 @@ if __name__ == '__main__':
          extractsources=extractsources,
          binlightcurves=args.binlcs,
          tfa_template_sigclip=args.tfa_template_sigclip,
-         tfa_epdlc_sigclip=args.tfa_epdlc_sigclip
+         tfa_epdlc_sigclip=args.tfa_epdlc_sigclip,
+         translateimages=args.trnsimgs
     )
