@@ -36,6 +36,7 @@ fiphotfluxthreshold=3000
 photreffluxthreshold=3000
 extractsources=0
 binlightcurves=0
+translateimages=1
 
 ##########################################
 ##########################################
@@ -59,6 +60,13 @@ if [ "$binlightcurves" = 1 ] ; then
 else
   binlcoption=no-binlightcurves
 fi
+
+if [ "$translateimages" = 1 ] ; then
+  translateoption=translateimages
+else
+  translateoption=no-translateimages
+fi
+
 
 ###############################################################################
 # define paths. trimmed, single-extension fits images get worked on in fitsdir.
@@ -121,5 +129,5 @@ python -u TESS_reduction.py \
   --fiphotfluxthreshold $fiphotfluxthreshold \
   --photreffluxthreshold $photreffluxthreshold \
   --extractsources $extractsources --$binlcoption \
-  --camnum $camnum --ccdnum $ccdnum \
+  --camnum $camnum --ccdnum $ccdnum --$translateoption \
   &> logs/$logname &
