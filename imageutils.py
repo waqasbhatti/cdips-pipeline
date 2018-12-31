@@ -34,6 +34,9 @@ image-sectioning and image-writing functions:
     fitscoords_to_jpeg
     nparr_to_full_jpeg
     check_frame_warping
+
+movie-making functions:
+    make_mp4_from_jpegs
 ====================
 '''
 
@@ -41,7 +44,8 @@ import os
 import os.path
 import sys
 import logging
-import glob
+from glob import glob
+from datetime import datetime
 
 import numpy as np
 np.seterr(all='ignore')
@@ -208,7 +212,7 @@ def make_superflat(image_glob,
 
     '''
 
-    image_flist = sorted(glob.glob(image_glob))
+    image_flist = sorted(glob(image_glob))
 
     # go through the images and find all the flats
 
@@ -1308,3 +1312,42 @@ def check_frame_warping(frame,
         return False, warpinfo
     else:
         return True, warpinfo
+
+
+def make_mp4_from_jpegs(jpgglob, outmp4path):
+    """
+    Args:
+        jpgglob: e.g.,
+        /nfs/phtess1/ar1/TESS/FFI/RED_IMGSUB/FULL/s0001/RED_3-2-1011_ISP/JPEG-SUBTRACTEDCONV-rsub-9ab2774b-tess*cal_img-xtrns.jpg
+
+        outmp4path: e.g.,
+        /nfs/phtess1/ar1/TESS/FFI/MOVIES/s0001_full_cam3_ccd2_projid1011_SUBTRACTEDCONV.mp4
+    """
+
+    returncode = os.system('which ffmpeg')
+    if not returncode==0:
+        raise AssertionError(
+            '`ffmpeg` must be installed to use make_mp4_from_jpegs')
+
+    FFMPEGCMD = (
+        "ffmpeg -framerate 24 "
+        "-pattern_type "
+        "glob -i '{jpgglob}' "
+        "-c:v libx264 "
+        "-preset fast "
+        "{outmp4path}"
+    )
+
+    cmdtorun = FFMPEGCMD.format(jpgglob=jpgglob, outmp4path=outmp4path)
+
+    returncode = os.system(cmdtorun)
+
+    if returncode == 0:
+        print('%sZ: made movie %s' %
+              (datetime.utcnow().isoformat(), outmp4path))
+        return 0
+    else:
+        print('ERR! %sZ: failed to make movie %s' %
+              (datetime.utcnow().isoformat(), outmp4path))
+        print('ERR! command was %s' % cmdtorun)
+        return 256
