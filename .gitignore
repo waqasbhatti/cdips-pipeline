@@ -28,3 +28,4 @@ GITREV
 *bin*
 examples/logs/
 scripts/log*
+scripts/tess_tuning_scripts/projid_????.sh
