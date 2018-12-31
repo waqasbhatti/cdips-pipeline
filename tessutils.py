@@ -408,7 +408,7 @@ def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory, statsdir,
     tab = tab[is_wanted]
 
     # get the starids that correspond to the HJs on-chip
-    projcat = read_object_catalog(projcatalogpath)
+    projcat = read_object_catalog(projcatalogpath, isgaiaid=True)
 
     proj_ra, proj_dec = projcat['ra']*u.deg, projcat['dec']*u.deg
 
@@ -771,20 +771,29 @@ def read_tess_lightcurve(
     return lcdict
 
 
-def read_object_catalog(catalogfile):
+def read_object_catalog(catalogfile, isgaiaid=False):
     # you often need an objectid, ra, dec, and a magnitude.
     # get these from the 2mass catalog.
 
     columns='id,ra,dec,xi,eta,2massJ,2massK,2massqlt,2massI,2massr,2massi,2massz'
     columns = columns.split(',')
 
-    catarr = np.genfromtxt(catalogfile,
-                           comments='#',
-                           usecols=list(range(len(columns))),
-                           names=columns,
-                           dtype='U15,f8,f8,f8,f8,f8,f8,U3,f8,f8,f8,f8',
-                           delimiter=' '
-                           )
+    if not isgaiaid:
+        catarr = np.genfromtxt(catalogfile,
+                               comments='#',
+                               usecols=list(range(len(columns))),
+                               names=columns,
+                               dtype='U15,f8,f8,f8,f8,f8,f8,U3,f8,f8,f8,f8',
+                               delimiter=' '
+                               )
+    else:
+        catarr = np.genfromtxt(catalogfile,
+                               comments='#',
+                               usecols=list(range(len(columns))),
+                               names=columns,
+                               dtype='S19,f8,f8,f8,f8,f8,f8,U3,f8,f8,f8,f8',
+                               delimiter=' '
+                               )
 
     return catarr
 
