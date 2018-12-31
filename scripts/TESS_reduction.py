@@ -525,6 +525,8 @@ def run_detrending_on_raw_photometry():
 
 def _get_random_tfa_lcs(lcdirectory, n_desired_lcs=100):
 
+    np.random.seed(42)
+
     tfafiles = np.array(glob(os.path.join(lcdirectory,'*.tfalc')))
     n_possible_lcs = len(tfafiles)
 
@@ -542,6 +544,8 @@ def _get_random_tfa_lcs(lcdirectory, n_desired_lcs=100):
 
 def _get_random_acf_pkls(pkldir, n_desired=10):
 
+    np.random.seed(42)
+
     pklfiles = np.array(glob(os.path.join(pkldir,'*.pickle')))
     n_possible = len(pklfiles)
 
@@ -557,13 +561,52 @@ def _get_random_acf_pkls(pkldir, n_desired=10):
     return sel_files
 
 
+def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid):
+    typestr = 'full' if 'FULL' in fitsdir else 'tune'
+
+    # subtracted frame movies
+    jpgglob = os.path.join(fitsdir, 'JPEG-SUB*CONV-*tess*cal_img-xtrns.jpg')
+    outmp4path = os.path.join(
+        moviedir,
+        '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_SUBTRACTEDCONV.mp4'.
+        format(field, typestr, int(camera), int(ccd), int(projectid)))
+    if not os.path.exists(outmp4path):
+        iu.make_mp4_from_jpegs(jpgglob, outmp4path)
+    else:
+        print('found {}'.format(outmp4path))
+
+    # NGC-labelled stars; astrometry.net zscale
+    jpgglob = os.path.join(fitsdir, 'tess*_cal_img-ngc.png')
+    outmp4path = os.path.join(
+        moviedir,
+        '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_NGC.mp4'.
+        format(field, typestr, int(camera), int(ccd), int(projectid)))
+    if not os.path.exists(outmp4path):
+        iu.make_mp4_from_jpegs(jpgglob, outmp4path)
+    else:
+        print('found {}'.format(outmp4path))
+
+    # regular old translated (xtrns) frames, pre-subtraction, but masked
+    jpgglob = os.path.join(fitsdir, 'JPEG-XTRNS-tess*_cal_img-xtrns.jpg')
+    outmp4path = os.path.join(
+        moviedir,
+        '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_XTRNS.mp4'.
+        format(field, typestr, int(camera), int(ccd), int(projectid)))
+    if not os.path.exists(outmp4path):
+        iu.make_mp4_from_jpegs(jpgglob, outmp4path)
+    else:
+        print('found {}'.format(outmp4path))
+
+
+
 def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
                field, camera, ccd, tfastatfile, ra_nom, dec_nom,
                projcatalogpath, astromrefpath, sectornum, binned=False,
                make_percentiles_plot=True, percentiles_xlim=[4,17],
-               percentiles_ylim=[1e-5,1e-1], nworkers=16):
+               percentiles_ylim=[1e-5,1e-1], nworkers=16,
+               moviedir='/nfs/phtess1/ar1/TESS/FFI/MOVIES/'):
     """
-    write files with summary statistics of run.
+    write files with summary statistics of run. also, make movies.
 
     args:
         statsdir (str): e.g.,
@@ -578,6 +621,8 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
 
         make_percentiles_plot (bool)
     """
+
+    _make_movies(fitsdir, moviedir, field, camera, ccd, projectid)
 
     percentilesfiles = glob(os.path.join(statsdir,'percentiles_*png'))
     if not percentilesfiles:
@@ -623,7 +668,10 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
         print('did not find any known HJs on this field')
 
     # plot and examine size of astrometric shifts
-    examine_astrometric_shifts(fitsdir, astromrefpath, statsdir)
+    if not os.path.exists(os.path.join(
+        statsdir, 'examine_astrometric_shifts.pickle')
+    ):
+        examine_astrometric_shifts(fitsdir, astromrefpath, statsdir)
 
     # how long did the pipeline take? how many lightcurves did it produce?
     endtime = datetime.utcnow()
@@ -1252,9 +1300,6 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                projcatalogpath, astromrefpath, sectornum, binned=False,
                make_percentiles_plot=True, percentiles_xlim=None,
                nworkers=nworkers)
-
-    # TODO: maybe change the statsfile format, and include CDPP? or some
-    # duration-aware RMS measure. because red noise exists.
 
 
 def check_args(args):
