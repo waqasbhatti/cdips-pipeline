@@ -1,18 +1,36 @@
 '''
-functions specific to wrangling TESS data.
+functions for reducing TESS data.  contents are as follows, where "sub-tasks"
+in a conceptual sense are listed below the main task:
+------------------------------------------
 
-contents:
+parallel_mask_saturated_stars: mask saturated stars given saturation level
 
-mask_saturated_stars_worker
-parallel_mask_saturated_stars
-mask_dquality_flag_frame
-parallel_mask_dquality_flag_frames
-parallel_trim_get_single_extension
-from_CAL_to_fitsh_compatible
+    mask_saturated_stars_worker
+
+parallel_mask_dquality_flag_frames: mask entire frames based on DQUALITY flag
+
+    mask_dquality_flag_frame
+
+parallel_trim_get_single_extension: get single extension image, trim to remove
+virtual columns, append "PROJID" header keywork.
+
+    from_CAL_to_fitsh_compatible
     (deprecated) from_ete6_to_fitsh_compatible
 
-read_tess_lightcurve
-read_object_catalog
+are_known_HJs_in_field: precursor to measuring HJ properties is knowing if
+there are any.
+
+measure_known_HJ_SNR: if there are known HJs in this frame, estimate their SNR
+through a max-likelihood trapezoidal transit model.
+
+    _measure_hj_snr
+
+------------------------------------------
+under construction:
+
+    read_tess_lightcurve
+
+    read_object_catalog
 '''
 
 ##########################################
@@ -389,7 +407,7 @@ def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory, statsdir,
 
     tab = tab[is_wanted]
 
-    # get the HATIDs that correspond to the HJs on-chip
+    # get the starids that correspond to the HJs on-chip
     projcat = read_object_catalog(projcatalogpath)
 
     proj_ra, proj_dec = projcat['ra']*u.deg, projcat['dec']*u.deg
@@ -402,24 +420,24 @@ def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory, statsdir,
     ]:
         tab[colname] = np.nan
 
-    hatids = []
+    starids = []
     for hj_coord, name in zip(hj_coords, tab['pl_name']):
 
         seps = hj_coord.separation(proj_coords)
         projsorted = proj_coords[np.argsort(seps)]
         sepssorted = proj_coords[np.argsort(seps)]
 
-        # now get the HATIDs of the match
+        # now get the starids of the match
         if np.any(seps < minxmatchsep):
             sel = (seps < minxmatchsep)
 
             if len(sel[sel]) > 1:
-                raise NotImplementedError('expected a single HJ HATID match')
+                raise NotImplementedError('expected a single HJ STARID match')
 
             projcatmatch = projcat[np.argmin(seps)]
 
             thispl = (tab['pl_name']==name)
-            hatids.append(projcatmatch[0].encode('ascii'))
+            starids.append(projcatmatch[0].encode('ascii'))
             tab[thispl]['match_proj_ra'] = projcatmatch[1]
             tab[thispl]['match_proj_dec'] = projcatmatch[2]
             match_sep = np.min(seps).to(u.arcsec).value
@@ -429,25 +447,25 @@ def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory, statsdir,
                   format(name, match_sep))
 
         else:
-            hatids.append(np.nan)
+            starids.append(np.nan)
             print('{}: did not get projcatalog match with separation < {}'.
                   format(name, minxmatchsep))
             continue
 
-    tab['hatids'] = hatids
+    tab['starids'] = starids
 
-    # check if the HJs on chip with known HATIDs have lightcurves
+    # check if the HJs on chip with known starids have lightcurves
     rle, ele, tle, rlcs, elcs, tlcs = [],[],[],[],[],[]
-    for hatid in tab['hatids']:
+    for starid in tab['starids']:
 
-        if hatid=='nan':
+        if starid=='nan':
             rawlc = str(np.nan)
             epdlc = str(np.nan)
             tfalc = str(np.nan)
         else:
-            rawlc = glob(os.path.join(lcdirectory, hatid+'.grcollectilc'))
-            epdlc = glob(os.path.join(lcdirectory, hatid+'.epdlc'))
-            tfalc = glob(os.path.join(lcdirectory, hatid+'.tfalc'))
+            rawlc = glob(os.path.join(lcdirectory, starid+'.grcollectilc'))
+            epdlc = glob(os.path.join(lcdirectory, starid+'.epdlc'))
+            tfalc = glob(os.path.join(lcdirectory, starid+'.tfalc'))
 
             for lc in [rawlc, epdlc, tfalc]:
                 if len(lc) > 1:
@@ -475,7 +493,7 @@ def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory, statsdir,
     tab['epdlc'] = nparr(elcs)
     tab['tfalc'] = nparr(tlcs)
 
-    print(tab['pl_name', 'hatids', 'rawlcexists', 'epdlcexists',
+    print(tab['pl_name', 'starids', 'rawlcexists', 'epdlcexists',
               'tfalcexists'])
     print(tab['rawlc'])
 
