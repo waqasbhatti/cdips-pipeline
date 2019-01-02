@@ -6663,7 +6663,7 @@ def read_binnedlc_stats_file(statsfile):
 ########################
 
 # lists all plots to make plus columns to use and metadata
-STATS_PLOTS = {
+MAD_STATS_PLOTS = {
     'median-rm1-vs-mad-rm1':{
         'xcol':'med_rm1',
         'ycol':'mad_rm1',
@@ -6867,6 +6867,139 @@ STATS_PLOTS = {
 }
 
 
+RMS_STATS_PLOTS = {
+    'median-rm1-vs-rms-rm1':{
+        'xcol':'med_rm1',
+        'ycol':'stdev_rm1',
+        'title':'RM1 median mag vs. RM1 std dev (RMS)',
+        'xlabel':'RM1 median magnitude',
+        'ylabel':'RM1 std dev (RMS)',
+        'binned':False
+    },
+    'median-rm2-vs-rms-rm2':{
+        'xcol':'med_rm2',
+        'ycol':'stdev_rm2',
+        'title':'RM2 median mag vs. RM2 std dev (RMS)',
+        'xlabel':'RM2 median magnitude',
+        'ylabel':'RM2 std dev (RMS)',
+        'binned':False
+    },
+    'median-rm3-vs-rms-rm3':{
+        'xcol':'med_rm3',
+        'ycol':'stdev_rm3',
+        'title':'RM3 median mag vs. RM3 std dev (RMS)',
+        'xlabel':'RM3 median magnitude',
+        'ylabel':'RM3 std dev (RMS)',
+        'binned':False
+    },
+    'median-EP1-vs-rms-EP1':{
+        'xcol':'med_ep1',
+        'ycol':'stdev_ep1',
+        'title':'EP1 median mag vs. EP1 std dev (RMS)',
+        'xlabel':'EP1 median magnitude',
+        'ylabel':'EP1 std dev (RMS)',
+        'binned':True
+    },
+    'median-EP2-vs-rms-EP2':{
+        'xcol':'med_ep2',
+        'ycol':'stdev_ep2',
+        'title':'EP2 median mag vs. EP2 std dev (RMS)',
+        'xlabel':'EP2 median magnitude',
+        'ylabel':'EP2 std dev (RMS)',
+        'binned':True
+    },
+    'median-EP3-vs-rms-EP3':{
+        'xcol':'med_ep3',
+        'ycol':'stdev_ep3',
+        'title':'EP3 median mag vs. EP3 std dev (RMS)',
+        'xlabel':'EP3 median magnitude',
+        'ylabel':'EP3 std dev (RMS)',
+        'binned':True
+    },
+    'median-TF1-vs-rms-TF1':{
+        'xcol':'med_tf1',
+        'ycol':'stdev_tf1',
+        'title':'TF1 median mag vs. TF1 std dev (RMS)',
+        'xlabel':'TF1 median magnitude',
+        'ylabel':'TF1 std dev (RMS)',
+        'binned':True
+    },
+    'median-TF2-vs-rms-TF2':{
+        'xcol':'med_tf2',
+        'ycol':'stdev_tf2',
+        'title':'TF2 median mag vs. TF2 std dev (RMS)',
+        'xlabel':'TF2 median magnitude',
+        'ylabel':'TF2 std dev (RMS)',
+        'binned':True
+    },
+    'median-TF3-vs-rms-TF3':{
+        'xcol':'med_tf3',
+        'ycol':'stdev_tf3',
+        'title':'TF3 median mag vs. TF3 std dev (RMS)',
+        'xlabel':'TF3 median magnitude',
+        'ylabel':'TF3 std dev (RMS)',
+        'binned':True
+    },
+    'catalog-r-mag-vs-rms-TF1':{
+        'xcol':'cat_mag',
+        'ycol':'stdev_tf1',
+        'title':'catalog Gaia Rp mag vs. TF1 std dev (RMS)',
+        'xlabel':'catalog Gaia Rp mag',
+        'ylabel':'TF1 std dev (RMS)',
+        'binned':True
+    },
+    'catalog-r-mag-vs-rms-TF2':{
+        'xcol':'cat_mag',
+        'ycol':'stdev_tf2',
+        'title':'catalog Gaia Rp mag vs. TF2 std dev (RMS)',
+        'xlabel':'catalog Gaia Rp mag',
+        'ylabel':'TF2 std dev (RMS)',
+        'binned':True
+    },
+    'catalog-r-mag-vs-rms-TF3':{
+        'xcol':'cat_mag',
+        'ycol':'stdev_tf3',
+        'title':'catalog Gaia Rp mag vs. TF3 std dev (RMS)',
+        'xlabel':'catalog Gaia Rp mag',
+        'ylabel':'TF3 std dev (RMS)',
+        'binned':True
+    },
+    'corr-r-ap1-mag-vs-rms-bestap':{
+        'xcol':'corr_mag_ap1',
+        'ycol':('stdev_tf1','stdev_tf2','stdev_tf3'),
+        'title':'catalog Gaia Rp mag vs. TFA bestap rms',
+        'xlabel':'catalog Gaia Rp mag',
+        'ylabel':'TFA best aperture std. dev. (RMS)',
+        'binned':True
+    },
+    'corr-r-ap2-mag-vs-rms-bestap':{
+        'xcol':'corr_mag_ap2',
+        'ycol':('stdev_tf1','stdev_tf2','stdev_tf3'),
+        'title':'catalog Gaia Rp mag vs. TFA bestap rms',
+        'xlabel':'catalog Gaia Rp mag',
+        'ylabel':'TFA best aperture std. dev. (RMS)',
+        'binned':True
+    },
+    'corr-r-ap3-mag-vs-rms-bestap':{
+        'xcol':'corr_mag_ap3',
+        'ycol':('stdev_tf1','stdev_tf2','stdev_tf3'),
+        'title':'catalog Gaia Rp mag vs. TFA bestap rms',
+        'xlabel':'catalog Gaia Rp mag',
+        'ylabel':'TFA best aperture std. dev. (RMS)',
+        'binned':True
+    },
+    'catalog-r-mag-vs-rms-bestap':{
+        'xcol':'cat_mag',
+        'ycol':('stdev_tf1','stdev_tf2','stdev_tf3'),
+        'title':'catalog Gaia Rp mag vs. TFA bestap rms',
+        'xlabel':'catalog Gaia Rp mag',
+        'ylabel':'TFA best aperture std. dev. (RMS)',
+        'binned':True
+    },
+}
+
+
+
 def plot_stats_file(statsfile, outdir, outprefix,
                     binned=False,
                     logy=False,
@@ -6874,7 +7007,8 @@ def plot_stats_file(statsfile, outdir, outprefix,
                     correctmagsafter=None,
                     rangex=(5.9,14.1),
                     observatory='hatpi',
-                    fovcathasgaiaids=False):
+                    fovcathasgaiaids=False,
+                    yaxisval='MAD'):
     '''This plots MAD vs magnitude for RAW, EPD, TFA for all apertures.
 
     args:
@@ -6886,6 +7020,8 @@ def plot_stats_file(statsfile, outdir, outprefix,
         outprefix (str): string to prefix on plots
 
     kwargs:
+
+        yaxisval (str): "MAD" or "RMS".
 
         binned (bool, or int): whether the passed statsfile is binned, or not.
         If an integer is passed, it is assumed to be the bin cadence in
@@ -6904,6 +7040,13 @@ def plot_stats_file(statsfile, outdir, outprefix,
         stats = read_binnedlc_stats_file(statsfile)
     else:
         stats = read_stats_file(statsfile, fovcathasgaiaids=fovcathasgaiaids)
+
+    if yaxisval=='MAD':
+        STATS_PLOTS = MAD_STATS_PLOTS
+    elif yaxisval=='RMS':
+        STATS_PLOTS = RMS_STATS_PLOTS
+    else:
+        raise ValueError('yaxisval must be MAD or RMS')
 
     for plot in STATS_PLOTS:
 
@@ -7015,7 +7158,7 @@ def plot_stats_file(statsfile, outdir, outprefix,
                                xmin=rangex[0],xmax=rangex[1],colors='b')
                     plt.hlines([0.0005],
                                xmin=rangex[0],xmax=rangex[1],colors='r')
-                elif observatory=='tess':
+                elif observatory=='tess' and yaxisval=='RMS':
                     plt.ylim((0.00001,1.0))
 
                     # overplot toy tess noise model
@@ -7044,7 +7187,7 @@ def plot_stats_file(statsfile, outdir, outprefix,
                     plt.hlines([0.001, 0.002, 0.003, 0.004, 0.005],
                                xmin=rangex[0],xmax=rangex[1],colors='b')
 
-                elif observatory=='tess':
+                elif observatory=='tess' and yaxisval=='RMS':
                     plt.ylim((0.00009,1.0))
 
                     # overplot tess noise model
@@ -7055,12 +7198,16 @@ def plot_stats_file(statsfile, outdir, outprefix,
                     D = 0.039590832137
                     E = -0.00223080159
                     F = 4.73508403525e-5
-                    ln_sigma_1hr = lnA + B*Tmag + C*Tmag**2 + D*Tmag**3 + \
-                                   E*Tmag**4 + F*Tmag**5
+                    ln_sigma_1hr = (
+                        lnA + B*Tmag + C*Tmag**2 + D*Tmag**3 +
+                        E*Tmag**4 + F*Tmag**5
+                    )
                     sigma_1hr = np.exp(ln_sigma_1hr)
                     sigma_30min = sigma_1hr * np.sqrt(2)
 
-                    plt.plot(Tmag, sigma_30min/1e6, 'k-', zorder=3, lw=2)
+                    plt.plot(Tmag, sigma_30min/1e6, 'k-', zorder=3, lw=2,
+                             label='toy model $\sigma_{\mathrm{30\,min}}$')
+                    plt.legend(loc='best', fontsize='xx-small')
 
             # put the grid on the plot
             plt.gca().grid(color='#a9a9a9',

@@ -431,14 +431,15 @@ def acf_percentiles_stats_and_plots(statdir, outprefix, make_plot=True,
                   (datetime.utcnow().isoformat(), apstr, e))
 
 
-def percentiles_MAD_stats_and_plots(statdir, outprefix, binned=False,
-                                    make_percentiles_plot=True,
-                                    percentiles_xlim=[4,17],
-                                    percentiles_ylim=[1e-5,1e-1],
-                                    percentiles=[2,25,50,75,98]):
+def percentiles_RMSorMAD_stats_and_plots(statdir, outprefix, binned=False,
+                                         make_percentiles_plot=True,
+                                         percentiles_xlim=[4,17],
+                                         percentiles_ylim=[1e-5,1e-1],
+                                         percentiles=[2,25,50,75,98],
+                                         yaxisval='RMS'):
     """
-    make csv files and (optionally) plots of MAD vs magnitude statistics,
-    evaluated at percentiles.
+    make csv files and (optionally) plots of RMS (or MAD) vs magnitude
+    statistics, evaluated at percentiles.
     """
 
     # get and read the most complete stats file (the TFA one!)
@@ -456,7 +457,14 @@ def percentiles_MAD_stats_and_plots(statdir, outprefix, binned=False,
     else:
         stats = ap.read_stats_file(tfastatfile)
 
-    # MAD vs magnitude statistics, at 1-mag differences, summarized as percentiles
+    if yaxisval=='RMS':
+        yaxisstr='stdev_'
+    elif yaxisval=='MAD':
+        yaxisstr='mad_'
+    else:
+        raise ValueError('yaxisval must be RMS or MAD')
+
+    # RMS vs magnitude statistics, at 1-mag differences, summarized as percentiles
     # at 2%, 25%, 50%, 75%, and 98% percentiles.
     for apstr in ['tf1','tf2','tf3',
                   'rm1','rm2','rm3',
@@ -464,7 +472,7 @@ def percentiles_MAD_stats_and_plots(statdir, outprefix, binned=False,
 
         try:
             medstr = 'med_'+apstr
-            madstr = 'mad_'+apstr
+            yvalstr = yaxisstr+apstr
 
             minmag = np.floor(np.nanmin(stats[medstr])).astype(int)
             maxmag = np.ceil(np.nanmax(stats[medstr])).astype(int)
@@ -482,7 +490,7 @@ def percentiles_MAD_stats_and_plots(statdir, outprefix, binned=False,
                 sel = (stats[medstr] > thismin) & (stats[medstr] <= thismax)
 
                 for percentile in percentiles:
-                    val = np.nanpercentile(stats[sel][madstr], percentile)
+                    val = np.nanpercentile(stats[sel][yvalstr], percentile)
                     percentile_dict[thismagmean][percentile] = np.round(val,7)
 
             pctile_df = pd.DataFrame(percentile_dict)
@@ -492,11 +500,8 @@ def percentiles_MAD_stats_and_plots(statdir, outprefix, binned=False,
                 plt.close('all')
                 fig, ax = plt.subplots(figsize=(4,3))
 
-                # this was originally a bonafide percentiles plot. however getting
-                # it to look right was surprisingly annoying.
-                # this plot is therefore just lines for each percentile in
-                # [2,25,50,75,98], binned for every magnitude interval.
-
+                # this plot is lines for each percentile in [2,25,50,75,98],
+                # binned for every magnitude interval.
                 markers = itertools.cycle(('o', 'v', '>', 'D', 's', 'P'))
 
                 for ix, row in pctile_df.iterrows():
@@ -508,11 +513,33 @@ def percentiles_MAD_stats_and_plots(statdir, outprefix, binned=False,
 
                     ax.plot(midbins, vals, label=label, marker=next(markers))
 
+                # show the sullivan+2015 interpolated model
+                if yaxisval=='RMS':
+                    # overplot toy model I interpolated from that paper
+                    Tmag = np.linspace(6, 13, num=200)
+                    lnA = 3.29685004771
+                    B = 0.8500214657
+                    C = -0.2850416324
+                    D = 0.039590832137
+                    E = -0.00223080159
+                    F = 4.73508403525e-5
+                    ln_sigma_1hr = (
+                        lnA + B*Tmag + C*Tmag**2 + D*Tmag**3 +
+                        E*Tmag**4 + F*Tmag**5
+                    )
+                    sigma_1hr = np.exp(ln_sigma_1hr)
+                    sigma_30min = sigma_1hr * np.sqrt(2)
+
+                    ax.plot(Tmag, sigma_30min/1e6, 'k-', zorder=3, lw=2,
+                            label='S+15 $\sigma_{\mathrm{30\,min}}$ (interp)')
+
                 ax.legend(loc='best', fontsize='xx-small')
 
                 ax.set_yscale('log')
-                ax.set_xlabel('{:s} median instrument magnitude'.format(apstr.upper()))
-                ax.set_ylabel('{:s} median abs. dev.'.format(apstr.upper()))
+                ax.set_xlabel('{:s} median instrument magnitude'.
+                              format(apstr.upper()))
+                ax.set_ylabel('{:s} {:s}'.
+                              format(apstr.upper(), yaxisval))
                 if percentiles_xlim:
                     ax.set_xlim(percentiles_xlim)
                 if percentiles_ylim:
@@ -532,7 +559,8 @@ def percentiles_MAD_stats_and_plots(statdir, outprefix, binned=False,
                                linestyle=':')
 
                 savname = ( os.path.join(
-                    statdir,'percentiles_MAD_vs_med_mag_{:s}.png'.format(apstr.upper())
+                    statdir,'percentiles_{:s}_vs_med_mag_{:s}.png'.
+                    format(yaxisval, apstr.upper())
                 ))
                 fig.tight_layout()
                 fig.savefig(savname, dpi=250)
@@ -540,7 +568,8 @@ def percentiles_MAD_stats_and_plots(statdir, outprefix, binned=False,
                       (datetime.utcnow().isoformat(), titlestr, savname))
 
             csvname = ( os.path.join(
-                statdir,'percentiles_MAD_vs_med_mag_{:s}.csv'.format(apstr.upper())
+                statdir,'percentiles_{:s}_vs_med_mag_{:s}.csv'.
+                format(yaxisval, apstr.upper())
             ))
             pctile_df.to_csv(csvname, index=False)
             print('%sZ: wrote %s' %

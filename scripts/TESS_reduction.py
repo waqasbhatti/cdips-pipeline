@@ -890,7 +890,7 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
         ap.plot_stats_file(epdstatfile, statsdir, field, binned=False,
                            logy=True, logx=False, correctmagsafter=None,
                            rangex=(5.9,16), observatory='tess',
-                           fovcathasgaiaids=True)
+                           fovcathasgaiaids=True, yaxisval='RMS')
     else:
         print('already made EPD LC plots')
 
@@ -942,7 +942,7 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
         ap.plot_stats_file(tfastatfile, statsdir, field, binned=False,
                            logy=True, logx=False, correctmagsafter=None,
                            rangex=(5.9,16), observatory='tess',
-                           fovcathasgaiaids=True)
+                           fovcathasgaiaids=True, yaxisval='RMS')
         with open(tfaboolstatusfile+'','w') as f:
             f.write('1\n')
     else:
@@ -988,7 +988,7 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
             ap.plot_stats_file(binstatfile, statsdir, outprefix,
                                binned=cadence, logy=True, logx=False,
                                correctmagsafter=None, rangex=(5.9,16),
-                               observatory='tess')
+                               observatory='tess', yaxisval='RMS')
     else:
         print('will not bin lightcurves or make assoiated statplots')
 
@@ -1067,10 +1067,11 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
 
     percentilesfiles = glob(os.path.join(statsdir,'percentiles_*png'))
     if not percentilesfiles:
-        lcs.percentiles_MAD_stats_and_plots(statsdir, outprefix, binned=binned,
-                                            make_percentiles_plot=make_percentiles_plot,
-                                            percentiles_xlim=percentiles_xlim,
-                                            percentiles_ylim=percentiles_ylim)
+        lcs.percentiles_RMSorMAD_stats_and_plots(
+            statsdir, outprefix, binned=binned,
+            make_percentiles_plot=make_percentiles_plot,
+            percentiles_xlim=percentiles_xlim,
+            percentiles_ylim=percentiles_ylim, yaxisval='RMS')
     else:
         print('found percentiles plots')
 
