@@ -319,7 +319,7 @@ def from_ete6_to_fitsh_compatible(fitslist, outdir, projid=42):
 def are_known_HJs_in_field(ra_center, dec_center, outname):
     """
     Given a field center, find which known hot Jupiters are on chip.
-    Dependencies: tessmaps, astropy, astroquery
+    Dependencies: tessmaps, astroquery
 
     Args:
         ra_center, dec_center (floats): coordinate of field center in degrees
@@ -364,6 +364,238 @@ def are_known_HJs_in_field(ra_center, dec_center, outname):
 
     else:
         return False
+
+
+def are_clusters_in_field(ra_center, dec_center, outname, dist_cut=2000,
+                          sectornum=1):
+    """
+    Given a field center, find which clusters from Kharchenko+ 2013 are on chip.
+    Limit to clusters within some distance, say 2kpc.
+    Dependencies: tessmaps
+
+    Args:
+        ra_center, dec_center (floats): coordinate of field center in degrees
+
+        outname (str): path to which csv file with details of HJs on chip will
+        be written
+
+    Kwargs:
+
+        dist_cut (float): number of parsecs beyond which we are not interested
+
+        sectornum (int): 1-based "science sector" count.
+
+    Returns:
+        True if any HJs on chip, else False.
+    """
+
+    from tessmaps import get_time_on_silicon as gts
+
+    # get the coordinates and properties of the clusters
+    k13path = ('/home/lbouma/proj/pipe-trex/data/'
+               'Kharchenko_2013_MWSC_tess_sectors.csv')
+    k13 = pd.read_csv(k13path)
+
+    sel_clusters = (k13['sector_{:d}'.format(sectornum-1)]==1)
+    sel_clusters &= (k13['d'] < dist_cut)
+
+    df = k13[sel_clusters]
+    desiredcols = ['MWSC', 'Name', 'Type', 'n_Type', 'RAJ2000', 'DEJ2000',
+                   'r0', 'r1', 'r2', 'N1sr0', 'N1sr1', 'N1sr2', 'd', 'logt',
+                   'ra', 'dec']
+    df = df[desiredcols]
+
+    # get coordinates
+    cluster_coords = SkyCoord(nparr(df['ra'])*u.deg, nparr(df['dec'])*u.deg,
+                              frame='icrs')
+
+    ##########################################
+    cam_dirn = SkyCoord(ra_center*u.deg, dec_center*u.deg, frame='icrs')
+    cam_tuple = (cam_dirn.barycentrictrueecliptic.lat.value,
+                 cam_dirn.barycentrictrueecliptic.lon.value)
+
+    ##########################################
+    cluster_onchip = gts.given_one_camera_get_stars_on_silicon(
+        cluster_coords, cam_tuple, withgaps=False)
+
+    if np.any(cluster_onchip):
+
+        outdf = df
+        outdf = outdf[cluster_onchip.astype(bool)]
+
+        outdf.to_csv(outname, index=False)
+        print('wrote {}'.format(outname))
+
+        return True
+
+    else:
+        return False
+
+
+def cluster_cutout_jpg_worker(task):
+
+    (calfitsimage, subfitsimage, wcsfile, fitsdir, cname, ctype, nstar, dist,
+     logt, ra, dec, angrad, clusterdistancecutoff ) = task
+
+    outcalpath = os.path.join(
+        fitsdir, 'CUT-{}_{}_CAL.jpg'.
+        format(cname,
+               os.path.basename(calfitsimage.replace('.fits','')))
+    )
+    outsubpath = os.path.join(
+        fitsdir, 'CUT-{}_{}_SUB.jpg'.
+        format(cname,
+               os.path.basename(subfitsimage.replace('.fits','')))
+    )
+
+    if dist > clusterdistancecutoff:
+        print('skipping {}, d>{}pc'.
+              format(cname, clusterdistancecutoff))
+        return 1
+
+    if os.path.exists(outcalpath) and os.path.exists(outsubpath):
+        return 1
+
+    thisctype, thisnstar, thislogt = str(ctype), int(nstar), float(dist)
+
+    ra, dec = float(ra), float(dec)
+    clusterangradius = (float(angrad)*u.deg).value
+    boxwidth, boxheight = 5*clusterangradius, 5*clusterangradius
+
+    radeccenter = [ra, dec, boxwidth, boxheight]
+
+    annotatestr = '{:s}-{:s}, {:s}*, logt={:s}, d={:.1f}'.format(
+        cname, ctype, repr(int(nstar)),
+        '{:.1f}'.format(logt), dist/1000
+    )
+
+    try:
+        iu.frame_radecbox_to_jpeg(calfitsimage, wcsfrom=wcsfile,
+                                  radeccenter=radeccenter,
+                                  out_fname=outcalpath,
+                                  annotatejd=False,
+                                  annotate=annotatestr,
+                                  forcesquare=True,
+                                  overplotscalebar=True,
+                                  rescaleimage=True,
+                                  scale_func=iu.clipped_logscale_img,
+                                  scale_func_params={
+                                      'cap':255.0, 'lomult':2.0,
+                                      'himult':2.0, 'coeff':1000.0},
+                                  verbose=False
+                                 )
+        iu.frame_radecbox_to_jpeg(subfitsimage, wcsfrom=wcsfile,
+                                  radeccenter=radeccenter,
+                                  out_fname=outsubpath.replace('.jpg','_grayscale.jpg'),
+                                  annotatejd=False,
+                                  annotate=annotatestr,
+                                  forcesquare=True,
+                                  overplotscalebar=True,
+                                  rescaleimage=True,
+                                  verbose=False)
+        iu.frame_radecbox_to_jpeg(subfitsimage, wcsfrom=wcsfile,
+                                  radeccenter=radeccenter,
+                                  out_fname=outsubpath.replace('.jpg','_bwr.jpg'),
+                                  annotatejd=False,
+                                  annotate=annotatestr,
+                                  forcesquare=True,
+                                  overplotscalebar=True,
+                                  rescaleimage=True,
+                                  colorscheme='bwr',
+                                  verbose=False)
+    except Exception as e:
+        print(e)
+        print('{}, {}'.format(cname, repr(radeccenter)))
+        print('failed to cut for {}, {}'.format(outcalpath, outsubpath))
+        return -1
+
+    return 1
+
+
+def parallel_cluster_cutout_jpgs(calfitsimages, subfitsimages, wcsfiles,
+                                 fitsdir, cname, ctype, nstar, dist, logt,
+                                 ra, dec, angrad, clusterdistancecutoff,
+                                 nworkers=16, maxworkertasks=1000):
+
+    print('%sZ: %s files to make cluster cutouts for %s' %
+          (datetime.utcnow().isoformat(), len(wcsfiles), cname))
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+    tasks = [(x, y, z, fitsdir, cname, ctype, nstar, dist, logt, ra, dec,
+              angrad, clusterdistancecutoff)
+             for x,y,z in zip(calfitsimages, subfitsimages, wcsfiles)
+            ]
+
+    # fire up the pool of workers
+    try:
+        results = pool.map(cluster_cutout_jpg_worker, tasks)
+    except TypeError:
+        import IPython; IPython.embed()
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    return {result for result in results}
+
+
+
+
+def make_cluster_cutout_jpgs(sectornum, fitsdir, racenter, deccenter, field,
+                             camera, ccd, statsdir,
+                             clusterdistancecutoff=2000, nworkers=16):
+    """
+    (kw)args:
+        clusterdistancecutoff (float): distance beyond which you are not making
+        cutouts for clusters.
+    """
+
+    wcsfiles = glob(os.path.join(fitsdir,'*.wcs'))
+    calfitsimages = [w.replace('.wcs','.fits') for w in wcsfiles]
+    subfitsimages = glob(os.path.join(fitsdir,'rsub-*-tess*-xtrns.fits'))
+
+    if not len(wcsfiles)==len(subfitsimages)==len(calfitsimages):
+        raise AssertionError
+
+    outcsv = os.path.join(
+        statsdir, '{:s}_cam{:d}_ccd{:d}_kharchenko13_clusters.csv'.
+        format(field, camera, ccd)
+    )
+
+    if are_clusters_in_field(racenter, deccenter, outcsv, sectornum=sectornum):
+        pass
+    else:
+        return -1
+
+    # columns: Index([u'MWSC', u'Name', u'Type', u'n_Type', u'RAJ2000', u'DEJ2000',
+    # u'r0', u'r1', u'r2', u'N1sr0', u'N1sr1', u'N1sr2', u'd', u'logt', u'ra',
+    # u'dec'], dtype='object')
+    df = pd.read_csv(outcsv)
+
+    names = np.array(df['Name'])
+    ctype = np.array(df['Type'].fillna(''))
+    nstar = np.array(df['N1sr2'])
+    dist = np.array(df['d'])
+    logt = np.array(df['logt'])
+    ras = np.array(df['ra'])
+    decs = np.array(df['dec'])
+    angrads = np.array(df['r2'])
+
+    for name, ct, ns, d, age, ra, dec, r2 in zip(names, ctype, nstar, dist,
+                                                 logt, ras, decs, angrads):
+
+        outcalmatches = glob(os.path.join(
+            fitsdir, 'CUT-{}*_CAL.jpg'.format(name) ))
+        if len(outcalmatches) > 10:
+            print('found cuts for {}, continue'.format(name))
+            continue
+
+        parallel_cluster_cutout_jpgs(calfitsimages, subfitsimages, wcsfiles,
+                                     fitsdir, name, ct, ns, d, age, ra, dec,
+                                     r2, clusterdistancecutoff,
+                                     nworkers=nworkers)
+
 
 
 def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory, statsdir,
