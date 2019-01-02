@@ -1,7 +1,29 @@
 # -*- coding: utf-8 -*-
 """
-run
 $ python TESS_reduction.py --help
+
+contents:
+
+main
+    get_files_needed_before_image_subtraction
+    run_imagesubtraction
+    run_detrending
+    assess_run
+
+wrapper functions:
+    record_reduction_parameters
+    is_image_noise_gaussian
+    _plot_normalized_subtractedimg_histogram
+    plot_random_lightcurve_subsample
+    plot_random_lightcurves_and_ACFs
+    examine_astrometric_shifts
+    is_imagesubtraction_complete
+    is_presubtraction_complete
+    initial_wcs_worked_well_enough
+    make_fake_xtrnsfits
+    _make_movies
+    _get_random_acf_pkls
+    _get_random_tfa_lcs
 """
 from __future__ import division, print_function
 
@@ -1108,6 +1130,11 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
                                 statsdir, sectornum, nworkers=nworkers)
     else:
         print('did not find any known HJs on this field')
+
+    # make cutouts jpgs of clusters
+    tu.make_cluster_cutout_jpgs(sectornum, fitsdir, ra_nom, dec_nom, field,
+                                camera, ccd, statsdir,
+                                clusterdistancecutoff=2000, nworkers=nworkers)
 
     # plot and examine size of astrometric shifts
     if not os.path.exists(os.path.join(
