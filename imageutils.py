@@ -81,6 +81,8 @@ fontpath = os.path.join(os.path.dirname(__file__), 'DejaVuSans.ttf')
 
 # load the font
 if os.path.exists(fontpath):
+    fontxxsmall = ImageFont.truetype(fontpath, 4)
+    fontxsmall = ImageFont.truetype(fontpath, 8)
     fontsmall = ImageFont.truetype(fontpath, 12)
     fontnormal = ImageFont.truetype(fontpath, 20)
     fontlarge = ImageFont.truetype(fontpath, 28)
@@ -898,11 +900,17 @@ def frame_radecbox_to_jpeg(
         ext=None,
         flip=True,
         annotatejd=True,
+        annotate=True,
         jdsrc=None,
+        forcesquare=False,
+        overplotscalebar=False,
+        rescaleimage=False,
         scale_func=clipped_linscale_img,
         scale_func_params={'cap':255.0,
                            'lomult':2,
-                           'himult':2.5}):
+                           'himult':2.5},
+        colorscheme=None,
+        verbose=True):
     '''This cuts out a box centered at RA/DEC and width from the FITS to JPEG.
 
     wcsfrom indicates that the frame WCS should be taken from the specified file
@@ -917,6 +925,13 @@ def frame_radecbox_to_jpeg(
     else:
         do nothing, since we can't have both at the same time
 
+    Other options:
+
+        forcesquare (bool): forces output image to be square.
+
+        overplotscalebar (bool):
+
+        rescaleimage (bool):
     '''
     compressed_ext = compressed_fits_ext(fits_image)
 
@@ -949,7 +964,8 @@ def frame_radecbox_to_jpeg(
                        [radecbox[1], radecbox[3]]])
 
         # we use 0 here for the origin because we'll be cutting using np.arrays
-        print('requested coords = %s' % repr(rd))
+        if verbose:
+            print('requested coords = %s' % repr(rd))
         pix = w.all_world2pix(rd,0)
 
     # otherwise, convert the radeccenter into pixcenter
@@ -965,7 +981,8 @@ def frame_radecbox_to_jpeg(
             ]
         )
 
-        print('requested coords = %s' % repr(rd))
+        if verbose:
+            print('requested coords = %s' % repr(rd))
         pix = w.all_world2pix(rd,0)
 
     else:
@@ -1009,6 +1026,18 @@ def frame_radecbox_to_jpeg(
     if ymax >= img.shape[0]:
         ymax = img.shape[0] - 1
 
+    if forcesquare:
+
+        ydelta = ymax-ymin
+        xdelta = xmax-xmin
+        sqdelta = max((xdelta, ydelta))
+
+        ymid = ymin + ydelta/2
+        xmid = xmin + xdelta/2
+
+        ymin, ymax = ymid - sqdelta/2, ymid + sqdelta/2
+        xmin, xmax = xmid - sqdelta/2, xmid + sqdelta/2
+
     # numpy is y,x so make sure to reverse the order
     trimmed_img = trimmed_img[ymin:ymax, xmin:xmax]
 
@@ -1042,12 +1071,20 @@ def frame_radecbox_to_jpeg(
                 radeccenter[2], radeccenter[3]
             )
 
-    # save the image
-
     if flip:
         scaled_img = np.flipud(scaled_img)
 
     scipy.misc.imsave(out_fname, scaled_img)
+
+    if colorscheme:
+        cm = mplcm.get_cmap(colorscheme)
+        outimg = Image.open(out_fname)
+        im = np.array(outimg)
+        im = cm(im)
+        im = np.uint8( im*255.0 )
+        outimg = Image.fromarray(im)
+        rgb_outimg = outimg.convert('RGB')
+        rgb_outimg.save(out_fname)
 
     # annotate the image if told to do so
     if annotatejd and jdsrc and os.path.exists(jdsrc):
@@ -1066,9 +1103,59 @@ def frame_radecbox_to_jpeg(
         del draw
         outimg.save(out_fname)
 
+    if annotate:
+        outimg = Image.open(out_fname)
+        draw = ImageDraw.Draw(outimg)
+        if not isinstance(annotate, str):
+            annotation = "%s: %s - %s - %s - PR%s - %s" % (
+                os.path.basename(fits_image).rstrip('.fits.fz'),
+                hdr['IMAGETYP'].lower() if 'IMAGETYP' in hdr else 'typeunknown',
+                hdr['EXPTIME'] if 'EXPTIME' in hdr else 'expunknown',
+                (hdr['FILTERS'].replace('+','') if
+                 'FILTERS' in hdr else 'filtunknown'),
+                hdr['PROJID'] if 'PROJID' in hdr else 'unknown',
+                hdr['OBJECT'] if 'OBJECT' in hdr else 'objectunknown'
+            )
+        else:
+            annotation = annotate
+        draw.text((10,10),
+                  annotation,
+                  font=fontxsmall,
+                  fill=255)
+
+        del draw
+        outimg.save(out_fname)
+
+    if overplotscalebar:
+        outimg = Image.open(out_fname)
+        draw = ImageDraw.Draw(outimg)
+
+        linelength = 15 # pixels. for TESS-> ~=5 arcminutes.
+        if not forcesquare:
+            raise AssertionError
+        refpx = int(0.95*np.array(outimg.size)[0])
+
+        x1, x2 = refpx-linelength, refpx
+        y1, y2 = refpx, refpx
+
+        draw.line( [(x1,y1),(x2,y2)], fill=255, width=2)
+        del draw
+        outimg.save(out_fname)
+
+    if rescaleimage:
+        outimg = Image.open(out_fname)
+
+        if isinstance(rescaleimage, tuple):
+            size = rescaleimage
+        else:
+            size = (512, 512)
+
+        outimg = outimg.resize(size, resample=Image.BILINEAR)
+
+        outimg.save(out_fname)
+
+
     return out_fname
-
-
 
 def fitscoords_to_jpeg(fits_image,
                        out_fname=None,
@@ -1316,6 +1403,8 @@ def check_frame_warping(frame,
 
 def make_mp4_from_jpegs(jpgglob, outmp4path):
     """
+    note: some duplication of functionality with framecalib.make_frame_movie
+
     Args:
         jpgglob: e.g.,
         /nfs/phtess1/ar1/TESS/FFI/RED_IMGSUB/FULL/s0001/RED_3-2-1011_ISP/JPEG-SUBTRACTEDCONV-rsub-9ab2774b-tess*cal_img-xtrns.jpg
