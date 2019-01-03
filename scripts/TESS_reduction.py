@@ -125,6 +125,53 @@ def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid):
     else:
         print('found (or skipped) {}'.format(outmp4path))
 
+    # cluster cut movies: (subtracted & grayscale), (subtracted & bwr), (CAL &
+    # grayscale). first, get unique cluster names.  the pattern we're matching
+    # is:
+    # CUT-NGC_2516_rsub-9ab2774b-tess2018232225941-s0001-4-3-0120_cal_img-xtrns_SUB_grayscale.jpg
+    clusterjpgs = glob(os.path.join(
+        fitsdir, 'CUT-*_rsub-*-tess2*_cal_img*_SUB_grayscale.jpg'))
+    if len(clusterjpgs)>1:
+
+        clusternames = nparr(
+            [search('CUT-{}_rsub-{}-{}',c)[0] for c in clusterjpgs]
+        )
+        uclusternames = np.sort(np.unique(clusternames))
+
+        # iterate over clusters
+        for uclustername in uclusternames:
+
+            # iterate over movie formats
+            for jpgstr, outstr in zip(
+                ['CUT-{:s}_rsub-*-tess2*SUB_grayscale.jpg'.
+                 format(uclustername),
+                 'CUT-{:s}_rsub-*-tess2*SUB_bwr.jpg'.
+                 format(uclustername),
+                 'CUT-{:s}_tess2*CAL.jpg'.
+                 format(uclustername)
+                ],
+                ['{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_SUB_grayscale.mp4'.
+                 format(field, typestr, int(camera), int(ccd), int(projectid),
+                        uclustername),
+                '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_SUB_bwr.mp4'.
+                 format(field, typestr, int(camera), int(ccd), int(projectid),
+                        uclustername),
+                '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_CAL.mp4'.
+                 format(field, typestr, int(camera), int(ccd), int(projectid),
+                        uclustername)
+                ]
+            ):
+
+                jpgglob = os.path.join(fitsdir, jpgstr)
+                outmp4path = os.path.join(moviedir, outstr)
+                if not os.path.exists(outmp4path) and len(glob(jpgglob))>10:
+                    iu.make_mp4_from_jpegs(jpgglob, outmp4path)
+                else:
+                    print('found (or skipped) {}'.format(outmp4path))
+
+    else:
+        print('WRN! did not make CUT movies, because did not find jpg matches')
+
 
 def make_fake_xtrnsfits(fitsdir, fitsglob, fieldinfo):
 
