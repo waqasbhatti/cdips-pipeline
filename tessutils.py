@@ -690,7 +690,7 @@ def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory, statsdir,
     rle, ele, tle, rlcs, elcs, tlcs = [],[],[],[],[],[]
     for starid in tab['starids']:
 
-        if starid=='nan' or np.isnan(starid):
+        if starid=='nan' or pd.isnull(starid):
             rawlc = str(np.nan)
             epdlc = str(np.nan)
             tfalc = str(np.nan)
