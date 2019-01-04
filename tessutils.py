@@ -42,6 +42,7 @@ import shared_variables as sv
 import os, pickle
 import numpy as np, pandas as pd, matplotlib.pyplot as plt
 from glob import glob
+from parse import search
 
 from astropy.io import fits
 from astroquery.mast import Catalogs
@@ -297,6 +298,7 @@ def from_CAL_to_fitsh_compatible(task):
     trim = data[slice(rows,rowe),slice(cols,cole)]
 
     hdr['PROJID'] = projid
+    hdr.comments['PROJID'] = 'trex identifier for parameters in this run'
 
     assert trim.shape == (2048, 2048)
 
@@ -927,6 +929,250 @@ def _measure_hj_snr(plname, tfalc, statsdir, sectornum, timename='btjd',
             print('made {}'.format(snrfit_savfile))
 
     return 1
+
+
+def explore_ccd_temperature_timeseries():
+    """
+    This is a one-off exploration to understand the engineering files below
+    better. Some take-aways:
+
+        * 'tess2018331094053_sector01-eng.fits' and
+        'tess2018323111417_sector01-eng.fits' have identical temperature time
+        series. It's unclear why there are two of these data files, but it
+        doesn't matter for our purposes. This was confirmed by email from Scott
+        Fleming (2019/01/04).
+
+        * We can extract the time-series of on-chip CCD temperature using the
+        S_CAM{:d}_ALCU_sensor_CCD{:d} pattern.
+
+        * The cadence of the above time-series is different from FFIs, and will
+        need to be binned to match the FFI cadence and assign an average
+        temperature to each FFI.
+
+        * There is one other type of CCD-specific temperature available:
+            * Board temperature S_CAM[1-4]_CCD[1-4]_board_temp
+
+        * There are also a variety of camera-specific temperatures (see TESS
+        Instrument Handbook, Appendix A.5 Engineering Data).
+    """
+
+    engdatadir = '/nfs/phtess1/ar1/TESS/FFI/ENGINEERING/'
+    s01_first = 'tess2018331094053_sector01-eng.fits'
+    s01_second = 'tess2018323111417_sector01-eng.fits'
+    s02 = 'tess2018330083923_sector02-eng.fits'
+
+    d = {}
+    for dfile in [s01_first, s01_second, s02]:
+
+        d[dfile] = {}
+
+        hdulist = fits.open(os.path.join(engdatadir, dfile))
+
+        ccds, cams = list(range(1,5)), list(range(1,5))
+
+        # NOTE: unclear if "COOKED" is actually the temperature... plausible
+        # but unclear.
+        for cam in cams:
+            for ccd in ccds:
+                TEMPERATURE_HDR_NAME = 'S_CAM{:d}_ALCU_sensor_CCD{:d}'.format(cam, ccd)
+                this_time = hdulist[TEMPERATURE_HDR_NAME].data['TIME']
+                this_temperature = hdulist[TEMPERATURE_HDR_NAME].data['COOKED']
+
+                d[dfile][TEMPERATURE_HDR_NAME] = {}
+                d[dfile][TEMPERATURE_HDR_NAME]['time'] = this_time
+                d[dfile][TEMPERATURE_HDR_NAME]['temperature'] = this_temperature
+
+
+    temperature_hdr_names = ['S_CAM{:d}_ALCU_sensor_CCD{:d}'.format(cam, ccd)
+                             for cam in cams for ccd in ccds]
+
+    times = [d[k][thn]['time'] for k in d.keys() for thn in
+             temperature_hdr_names]
+
+    temperatures = [d[k][thn]['temperature'] for k in d.keys() for thn in
+                    temperature_hdr_names]
+
+    f,ax = plt.subplots()
+    for k in d.keys():
+        for temperature_hdr_name in temperature_hdr_names:
+            if 'S_CAM1_ALCU_sensor_CCD1' not in temperature_hdr_name:
+                continue
+            if 'tess2018331094053_sector01-eng.fits' in k:
+                ax.plot(d[k][temperature_hdr_name]['time'],
+                        d[k][temperature_hdr_name]['temperature']+3,
+                        label='{:s}_{:s}'.format(k, temperature_hdr_name))
+            else:
+                ax.plot(d[k][temperature_hdr_name]['time'],
+                        d[k][temperature_hdr_name]['temperature'],
+                        label='{:s}_{:s}'.format(k, temperature_hdr_name))
+
+    ax.set_xlabel('BTJD', fontsize='small')
+    ax.set_ylabel('On-chip CCD temperature sensor ("COOKED") [deg C]',
+                  fontsize='small')
+
+    ax.legend(loc='best',fontsize='xx-small')
+
+    f.savefig('temperature_sanity_check.png', dpi=300)
+
+    # ok, now check if they're actually THE SAME, for every single ccd. If so,
+    # then having these two engineering files for sector 1 is pointless.
+    for temperature_hdr_name in temperature_hdr_names:
+        temperature_1 = d[s01_first][temperature_hdr_name]['temperature']
+        temperature_2 = d[s01_second][temperature_hdr_name]['temperature']
+
+        time_1 = d[s01_first][temperature_hdr_name]['time']
+        time_2 = d[s01_second][temperature_hdr_name]['time']
+
+        np.testing.assert_array_almost_equal(temperature_1, temperature_2,
+                                             decimal=6)
+        np.testing.assert_array_almost_equal(time_1, time_2,
+                                             decimal=6)
+
+    print('Test passed: {:s} and {:s} have identical temperature timeseries'.
+          format(s01_first, s01_second))
+
+
+
+def append_ccd_temperature_to_hdr_worker(task):
+
+    fitsname, d = task
+
+    # get the temperature time series appropriate for this CAM/CCD pair using
+    # the file name.  match: tess2018206192942-s0001-4-3-0120_cal_img.fits
+    sr = search('{}/tess2{}-{}-{}-{}-{}_cal_img.fits', fitsname)
+    cam = sr[3]
+    ccd = sr[4]
+
+    thiskey = 'S_CAM{:d}_ALCU_sensor_CCD{:d}'.format(int(cam), int(ccd))
+
+    time = d[thiskey]['time'] # engineering data time in "TJD = BJD-2457000".
+    temperature = d[thiskey]['temperature'] # ditto, for CCD temperature
+
+
+    # take the mean of the temperature values within this time window. append
+    # it to the header.
+    data, hdr = iu.read_fits(fitsname, ext=0)
+    tstart = hdr['TSTART'] # start as BTJD = BJD-2457000.
+    tstop = hdr['TSTOP'] # stop in BTJD, ditto.
+
+    sel_times = (time>=tstart) & (time<tstop)
+
+    mean_temp = np.mean( temperature[sel_times] )
+    n_temps = len(temperature[sel_times])
+
+    if n_temps >= 1:
+        hdr['CCDTEMP'] = mean_temp
+        hdr['NTEMPS'] = n_temps
+    else:
+        hdr['CCDTEMP'] = np.nan
+        hdr['NTEMPS'] = 0
+
+    hdr.comments['CCDTEMP'] = (
+        'mean temperature (S_CAM{:d}_ALCU_sensor_CCD{:d})'.
+        format(int(cam), int(ccd))
+    )
+    hdr.comments['NTEMPS'] = (
+        'number of temperatures avgd for CCDTEMP'
+    )
+
+    fits.writeto(fitsname, data, header=hdr, output_verify='silentfix+ignore',
+                 overwrite=True)
+
+    if n_temps>=1:
+        print('Wrote CCDTEMP to {:s}'.format(fitsname))
+    else:
+        print('WRN! Wrote NAN CCDTEMP to {:s}'.format(fitsname))
+
+
+def parallel_append_ccd_temperature_to_hdr(fitslist, temperaturepklpath,
+                                           nworkers=16, maxworkertasks=1000):
+    # pass a list of trim, cut cal images:
+    # tess2018206195942-s0001-4-3-0120_cal_img.fits
+
+    d = pickle.load(open(temperaturepklpath, 'rb'))
+
+    print('%sZ: %s files to append CCD temperature to header' %
+          (datetime.utcnow().isoformat(), len(fitslist)))
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+    tasks = [(x, d) for x in fitslist]
+
+    # fire up the pool of workers
+    results = pool.map(append_ccd_temperature_to_hdr_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    print('%sZ: finished appending CCD temperatures to headers' %
+          (datetime.utcnow().isoformat()))
+
+    return {result for result in results}
+
+
+
+    #IMPLEMENT
+
+
+def make_ccd_temperature_timeseries_pickle(sectornum):
+    """
+    convert the engineering data on MAST to a pickled time-series of on-chip
+    CCD temperature.
+
+    outputs:
+        '/nfs/phtess1/ar1/TESS/FFI/ENGINEERING/sector0001_ccd_temperature_timeseries.pickle'
+
+        which contains a dictionary, with keys 'S_CAM{:d}_ALCU_sensor_CCD{:d}',
+        each of which contains a dictionary of time and temperature.
+    """
+
+    engdatadir = '/nfs/phtess1/ar1/TESS/FFI/ENGINEERING/'
+    if sectornum==1:
+        # identical to the other one on mast. LGB tested this in
+        # explore_ccd_temperature_timeseries
+        fname = os.path.join(engdatadir,'tess2018323111417_sector01-eng.fits')
+    elif sectornum>1:
+        fnames = glob(os.path.join(
+            engdatadir,'tess2*_sector{:s}-eng.fits'.
+            format(str(sectornum).zfill(2))
+        ))
+        if len(fnames) > 1:
+            raise AssertionError('expected one engineering file per sector')
+        fname = fnames[0]
+    else:
+        raise NotImplementedError
+
+    hdulist = fits.open(fname)
+    ccds, cams = list(range(1,5)), list(range(1,5))
+
+    # NOTE: unclear if "COOKED" is actually the temperature... plausible
+    # but unclear.
+    d = {}
+    temperature_hdr_names = ['S_CAM{:d}_ALCU_sensor_CCD{:d}'.format(cam, ccd)
+                             for cam in cams for ccd in ccds]
+
+    for temperature_hdr_name in temperature_hdr_names:
+        this_time = hdulist[temperature_hdr_name].data['TIME']
+        this_temperature = hdulist[temperature_hdr_name].data['COOKED']
+        d[temperature_hdr_name] = {}
+        d[temperature_hdr_name]['time'] = this_time
+        d[temperature_hdr_name]['temperature'] = this_temperature
+
+    # note: the read out times on each camera are not identical. therefore we
+    # can't make this extremely simple as just temperatures in the 16 readouts,
+    # vs time. it needs to be: for each readout, what is the temperature
+    # time-series?
+
+    pklpath = os.path.join(
+        engdatadir,
+        'sector{:s}_ccd_temperature_timeseries.pickle'.
+        format(str(sectornum).zfill(4))
+    )
+    with open(pklpath, 'w') as f:
+        pickle.dump(d, f, pickle.HIGHEST_PROTOCOL)
+    print('made {}'.format(pklpath))
+
 
 
 ##############################

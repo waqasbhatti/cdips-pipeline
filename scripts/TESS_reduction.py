@@ -1317,6 +1317,20 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
         tu.parallel_mask_dquality_flag_frames(fits_list, flagvalue=32,
                                               nworkers=nworkers)
 
+        # append CCD temperature information to headers
+        engdatadir = '/nfs/phtess1/ar1/TESS/FFI/ENGINEERING/'
+        temperaturepklpath = os.path.join(
+            engdatadir,
+            'sector{:s}_ccd_temperature_timeseries.pickle'.
+            format(str(sectornum).zfill(4))
+        )
+        if not os.path.exists(temperaturepklpath):
+            tu.make_ccd_temperature_timeseries_pickle(sectornum)
+
+        tu.parallel_append_ccd_temperature_to_hdr(
+            fits_list, temperaturepklpath
+        )
+
     elif convert_to_fitsh_compatible and get_masks and mostexist:
         pass
     else:
