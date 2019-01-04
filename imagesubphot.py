@@ -3163,7 +3163,9 @@ def parallel_concatenate_lightcurves(baselcdir,
 ## SPECIAL EPD FUNCTIONS FOR IMAGESUB LCS ##
 ############################################
 
-def epd_diffmags_imagesub(coeff, fsv, fdv, fkv, xcc, ycc, mag):
+def epd_diffmags_imagesub(coeff, fsv, fdv, fkv, xcc, ycc, mag,
+                          temperatures=None,
+                          observatory='hatpi'):
 
     '''
     This calculates the difference in mags after EPD coefficients are calculated
@@ -3174,54 +3176,116 @@ def epd_diffmags_imagesub(coeff, fsv, fdv, fkv, xcc, ycc, mag):
 
     '''
 
-    return -(coeff[0]*fsv**2. +
-             coeff[1]*fsv +
-             coeff[2]*fdv**2. +
-             coeff[3]*fdv +
-             coeff[4]*fkv**2. +
-             coeff[5]*fkv +
-             coeff[6] +
-             coeff[7]*fsv*fdv +
-             coeff[8]*fsv*fkv +
-             coeff[9]*fdv*fkv +
-             coeff[10]*np.sin(2*np.pi*xcc) +
-             coeff[11]*np.cos(2*np.pi*xcc) +
-             coeff[12]*np.sin(2*np.pi*ycc) +
-             coeff[13]*np.cos(2*np.pi*ycc) +
-             coeff[14]*np.sin(4*np.pi*xcc) +
-             coeff[15]*np.cos(4*np.pi*xcc) +
-             coeff[16]*np.sin(4*np.pi*ycc) +
-             coeff[17]*np.cos(4*np.pi*ycc) -
-             mag)
+    if observatory=='hatpi':
+        return -(coeff[0]*fsv**2. +
+                 coeff[1]*fsv +
+                 coeff[2]*fdv**2. +
+                 coeff[3]*fdv +
+                 coeff[4]*fkv**2. +
+                 coeff[5]*fkv +
+                 coeff[6] +
+                 coeff[7]*fsv*fdv +
+                 coeff[8]*fsv*fkv +
+                 coeff[9]*fdv*fkv +
+                 coeff[10]*np.sin(2*np.pi*xcc) +
+                 coeff[11]*np.cos(2*np.pi*xcc) +
+                 coeff[12]*np.sin(2*np.pi*ycc) +
+                 coeff[13]*np.cos(2*np.pi*ycc) +
+                 coeff[14]*np.sin(4*np.pi*xcc) +
+                 coeff[15]*np.cos(4*np.pi*xcc) +
+                 coeff[16]*np.sin(4*np.pi*ycc) +
+                 coeff[17]*np.cos(4*np.pi*ycc) +
+                 coeff[18]*(xcc - np.floor(xcc)) +
+                 coeff[19]*(ycc - np.floor(ycc))
+                 -
+                 mag)
+    elif observatory=='tess':
+        return -(coeff[0]*fsv**2. +
+                 coeff[1]*fsv +
+                 coeff[2]*fdv**2. +
+                 coeff[3]*fdv +
+                 coeff[4]*fkv**2. +
+                 coeff[5]*fkv +
+                 coeff[6] +
+                 coeff[7]*fsv*fdv +
+                 coeff[8]*fsv*fkv +
+                 coeff[9]*fdv*fkv +
+                 coeff[10]*np.sin(2*np.pi*xcc) +
+                 coeff[11]*np.cos(2*np.pi*xcc) +
+                 coeff[12]*np.sin(2*np.pi*ycc) +
+                 coeff[13]*np.cos(2*np.pi*ycc) +
+                 coeff[14]*np.sin(4*np.pi*xcc) +
+                 coeff[15]*np.cos(4*np.pi*xcc) +
+                 coeff[16]*np.sin(4*np.pi*ycc) +
+                 coeff[17]*np.cos(4*np.pi*ycc) +
+                 coeff[18]*(xcc - np.floor(xcc)) +
+                 coeff[19]*(ycc - np.floor(ycc)) +
+                 coeff[20]*temperatures
+                 -
+                 mag)
 
 
 
 def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
-                           smooth=21, sigmaclip=3.0):
+                           smooth=21, sigmaclip=3.0, observatory='hatpi',
+                           temperatures=None):
     '''
-    Detrends a magnitude series with EPD voodoo. The external parameters are
-    treated as specific to each star (while for TFA, we use information from
-    neighboring stars).
+    For each star, ask how the flux correlates with "external parameters" (for
+    instance the intra-pixel position, or the CCD temperature, or the shape
+    parameters S,D,K, or the hour angle / zenith distance from the ground).
+
+    Detrend these correlations with EPD External parameters are specific to
+    each star (TFA decorrelates remaining "unknown parameters" by looking for
+    correlations between similar stars).
+
+    For each star, we're fitting
+    \begin{equation}
+    mag =
+    a_s S + a_s2 S^2 + a_d D + a_d2 D^2 + a_k K + a_k2 K^2 +
+    const +
+    a_sd S * D + a_sk S * K + a_dk D * K +
+    a_x \sin(2\pi x) + b_x \cos(2\pi x) +
+    a_y \sin(2\pi y) + b_y \cos(2\pi y) +
+    a_2x \sin(4\pi x) + b_2x \cos(4\pi x) +
+    a_2y \sin(4\pi y) + b_2y \cos(4\pi y) +
+    a_intrax (x - floor(x)) +
+    a_intray (y - floor(y)).
+    \end{equation}
+
+    If observatory=='tess', we also include a linear correlation term between
+    temperature and magnitude.
 
     References:
+        Andras Pal's thesis, Section 2.10.1
         Bakos et al 2010, Appendix of HAT-P-11b paper.
         Zhang, Bakos et al 2016, Section 5.7.
 
-    TODO:
-        hour angle and zenith distance can also be important parameters? Worth
-        including?
-
     Args:
-        fsv: S value (PSF width)
-        fdv: D value (elongation of PSF)
-        fkv: K value (elongation of PSF)
-        xcc: x coordinate
-        ycc: y coordinate
-        smooth: number of cadences used when passing a median filter over the
-            magnitude time series. If 21 with HATPI, means a ~10 minute median
-            filter.
-        sigmaclip: number of sigma away from median from which to ignore
-        values.
+        fsv: S value (analog of FWHM from elongated gaussian fit to stars)
+
+        fdv: D value (elongation parameters, see Pal 2009 Eq 31 for definition)
+
+        fkv: K value (ditto)
+
+        xcc: x coordinate centroid
+
+        ycc: y coordinate centroid
+
+    Kwargs:
+
+        smooth (int) : number of cadences used when passing a median filter
+        over the magnitude time series. If 21 with HATPI, means a ~10 minute
+        median filter.
+
+        sigmaclip (float): number of sigma away from median from which to
+        ignore values in the EPD fit (NOTE: this does NOT sigma clip the actual
+        time-series.)
+
+        observatory (str): "hatpi" and "tess" implemented. Each uses a
+        different equation for EPD detrending.
+
+        temperatures (np.ndarray): CCD temperatures. These are expected for
+        TESS data.
 
     Returns:
         array of EPD differential mags, if the solution succeeds
@@ -3250,37 +3314,55 @@ def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
     # smooth the signal
     smoothedmag = medfilt(final_mag, smooth)
 
-    # make the linear equation matrix. for each star, we are fitting the
-    # function
-    # \begin{equation}
-    # mag =
-    # a_s S + a_s2 S^2 + a_d D + a_d2 D^2 + a_k K + a_k2 K^2 +
-    # const +
-    # a_sd S * D + a_sk S * K + a_dk D * K +
-    # a_x \sin(2\pi x) + b_x \cos(2\pi x) +
-    # a_y \sin(2\pi y) + b_y \cos(2\pi y) +
-    # a_2x \sin(4\pi x) + b_2x \cos(4\pi x) +
-    # a_2y \sin(4\pi y) + b_2y \cos(4\pi y) +
-    # \end{equation}
-    # through linear least squares.
-    epdmatrix = np.c_[fsv[finalind]**2.0,
-                      fsv[finalind],
-                      fdv[finalind]**2.0,
-                      fdv[finalind],
-                      fkv[finalind]**2.0,
-                      fkv[finalind],
-                      np.ones(final_len),
-                      fsv[finalind]*fdv[finalind],
-                      fsv[finalind]*fkv[finalind],
-                      fdv[finalind]*fkv[finalind],
-                      np.sin(2*np.pi*xcc[finalind]),
-                      np.cos(2*np.pi*xcc[finalind]),
-                      np.sin(2*np.pi*ycc[finalind]),
-                      np.cos(2*np.pi*ycc[finalind]),
-                      np.sin(4*np.pi*xcc[finalind]),
-                      np.cos(4*np.pi*xcc[finalind]),
-                      np.sin(4*np.pi*ycc[finalind]),
-                      np.cos(4*np.pi*ycc[finalind])]
+    # make the linear equation matrix.
+    if observatory=='hatpi':
+        epdmatrix = np.c_[fsv[finalind]**2.0,
+                          fsv[finalind],
+                          fdv[finalind]**2.0,
+                          fdv[finalind],
+                          fkv[finalind]**2.0,
+                          fkv[finalind],
+                          np.ones(final_len),
+                          fsv[finalind]*fdv[finalind],
+                          fsv[finalind]*fkv[finalind],
+                          fdv[finalind]*fkv[finalind],
+                          np.sin(2*np.pi*xcc[finalind]),
+                          np.cos(2*np.pi*xcc[finalind]),
+                          np.sin(2*np.pi*ycc[finalind]),
+                          np.cos(2*np.pi*ycc[finalind]),
+                          np.sin(4*np.pi*xcc[finalind]),
+                          np.cos(4*np.pi*xcc[finalind]),
+                          np.sin(4*np.pi*ycc[finalind]),
+                          np.cos(4*np.pi*ycc[finalind]),
+                          xcc[finalind] - np.floor(xcc[finalind]),
+                          ycc[finalind] - np.floor(ycc[finalind])
+                         ]
+    elif observatory=='tess':
+        epdmatrix = np.c_[fsv[finalind]**2.0,
+                          fsv[finalind],
+                          fdv[finalind]**2.0,
+                          fdv[finalind],
+                          fkv[finalind]**2.0,
+                          fkv[finalind],
+                          np.ones(final_len),
+                          fsv[finalind]*fdv[finalind],
+                          fsv[finalind]*fkv[finalind],
+                          fdv[finalind]*fkv[finalind],
+                          np.sin(2*np.pi*xcc[finalind]),
+                          np.cos(2*np.pi*xcc[finalind]),
+                          np.sin(2*np.pi*ycc[finalind]),
+                          np.cos(2*np.pi*ycc[finalind]),
+                          np.sin(4*np.pi*xcc[finalind]),
+                          np.cos(4*np.pi*xcc[finalind]),
+                          np.sin(4*np.pi*ycc[finalind]),
+                          np.cos(4*np.pi*ycc[finalind]),
+                          xcc[finalind] - np.floor(xcc[finalind]),
+                          ycc[finalind] - np.floor(ycc[finalind]),
+                          temperatures[finalind]
+                         ]
+    else:
+        raise NotImplementedError
+
 
     # solve the equation epdmatrix * x = smoothedmag
     # return the EPD differential mags if the solution succeeds
@@ -3291,7 +3373,13 @@ def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
         if DEBUG:
             print('coeffs = %s, residuals = %s' % (coeffs, residuals))
 
-        return epd_diffmags_imagesub(coeffs, fsv, fdv, fkv, xcc, ycc, mag)
+        if observatory=='hatpi':
+            return epd_diffmags_imagesub(coeffs, fsv, fdv, fkv, xcc, ycc, mag,
+                                         observatory=observatory)
+        elif observatory=='tess':
+            return epd_diffmags_imagesub(coeffs, fsv, fdv, fkv, xcc, ycc, mag,
+                                         temperatures=temperatures,
+                                         observatory=observatory)
 
     # if the solution fails, return nothing
     except Exception as e:
@@ -3306,11 +3394,13 @@ def epd_lightcurve_imagesub(ilcfile,
                             mags=[14,19,24],
                             sdk=[7,8,9],
                             xy=[5,6],
+                            framekey=[1],
                             smooth=21,
                             sigmaclip=3.0,
                             ilcext='ilc',
                             outfile=None,
-                            minndet=200):
+                            minndet=200,
+                            observatory='hatpi'):
     '''
     Runs the EPD process on ilcfile, using columns specified to get the required
     parameters. If outfile is None, the .epdlc will be placed in the same
@@ -3350,16 +3440,47 @@ def epd_lightcurve_imagesub(ilcfile,
     27 ep1    EPD magnitude for aperture 1
     28 ep2    EPD magnitude for aperture 2
     29 ep3    EPD magnitude for aperture 3
-
     '''
 
     # read the lightcurve in
     ilc = np.genfromtxt(ilcfile,
-                        usecols=tuple(xy + sdk + mags),
+                        usecols=tuple(framekey + xy + sdk + mags),
                         dtype='f8,f8,f8,f8,f8,f8,f8,f8',
-                        names=['xcc','ycc',
+                        names=['framekey', 'xcc','ycc',
                                'fsv','fdv','fkv',
                                'rm1','rm2','rm3'])
+    if observatory=='tess':
+
+        # get temperature for this camera/ccd pair. it would be nice if we
+        # could easily include this in the metadata of the lightcurve. however
+        # we cannot, and so will not.
+
+        # e.g., select fitsheader->'CCDTEMP', framekey, fits from
+        # calibratedframes where (fitsheader->'PROJID' = '1027') and (fits like
+        # '%tess2018242022941-s0002-2-4-0121_cal_img%');
+        projid = fieldinfo['projectid']
+
+        query = ("select fitsheader->'CCDTEMP' from calibratedframes where "
+                 "(fitsheader->'PROJID' = {:d}) and ".format(projid)
+                 "(fits like '%{:s}%')".format(framekey)
+                )
+
+        if DEBUG:
+            print('query: {:s}'.format(query))
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+
+        # if we're successful
+        if rows and len(rows) > 0:
+
+            # get the frame info
+            temperatures = np.array([x[0] for x in rows])
+
+        # FIXME: this process is silly. It would be much better to have a
+        # lightcurve format that is not so rigid.
+        raise NotImplementedError
+
 
     if len(ilc['xcc']) >= minndet:
 
@@ -3373,8 +3494,6 @@ def epd_lightcurve_imagesub(ilcfile,
                       np.isfinite(ilc['rm2']) &
                       np.isfinite(ilc['rm3']))
 
-
-
         # calculate the EPD differential mags
         epddiffmag1 = epd_magseries_imagesub(
             ilc['rm1'][combinedok],
@@ -3383,7 +3502,8 @@ def epd_lightcurve_imagesub(ilcfile,
             ilc['fkv'][combinedok],
             ilc['xcc'][combinedok],
             ilc['ycc'][combinedok],
-            smooth=smooth, sigmaclip=sigmaclip
+            smooth=smooth, sigmaclip=sigmaclip,
+            observatory=observatory, temperatures=temperatures
             )
 
         epddiffmag2 = epd_magseries_imagesub(
@@ -3393,7 +3513,8 @@ def epd_lightcurve_imagesub(ilcfile,
             ilc['fkv'][combinedok],
             ilc['xcc'][combinedok],
             ilc['ycc'][combinedok],
-            smooth=smooth, sigmaclip=sigmaclip
+            smooth=smooth, sigmaclip=sigmaclip,
+            observatory=observatory, temperatures=temperatures
             )
 
         epddiffmag3 = epd_magseries_imagesub(
@@ -3403,7 +3524,8 @@ def epd_lightcurve_imagesub(ilcfile,
             ilc['fkv'][combinedok],
             ilc['xcc'][combinedok],
             ilc['ycc'][combinedok],
-            smooth=smooth, sigmaclip=sigmaclip
+            smooth=smooth, sigmaclip=sigmaclip,
+            observatory=observatory, temperatures=temperatures
             )
 
         # add the EPD diff mags back to the median mag to get the EPD mags
@@ -3566,6 +3688,7 @@ def parallel_epd_worker(task):
         ilcext = os.path.splitext(ilc)[-1]
         outepd = os.path.join(outdir,
                               os.path.basename(ilc).replace(ilcext,'.epdlc'))
+
         outf = epd_lightcurve_imagesub(
             ilc,
             outfile=outepd,

@@ -620,7 +620,7 @@ def calibrated_frame_to_database(fitsfile,
         elif observatory == 'tess':
             header_list = ['PROJID', 'CAMERA', 'CCD', 'TSTART', 'TSTOP',
                            'CRVAL1', 'CRVAL2', 'RA_NOM', 'DEC_NOM', 'ROLL_NOM',
-                           'DQUALITY']
+                           'DQUALITY', 'CCDTEMP']
 
         else:
             raise ValueError('observatory must be tess or hatpi')
