@@ -13,6 +13,28 @@ First, clone this repo into a working directory, that we will call $TREX.
   git clone https://github.com/waqasbhatti/pipe-trex
   ```
 
+#### 3.X environment
+
+Have a working version of [conda](https://conda.io/miniconda.html) on your path
+(the 64-bit linux version, presumably).  Then
+
+  ```
+  cd $PIPE_TREX
+  conda env create -f environment_trex_37.yml -n trex_37
+  source activate trex_37
+  ```
+
+This deals with most of the details listed below, and is the recommended way to
+use pipe-trex. (A variety of "new" features since the 2018 development effort
+depend on using a 3.X environment).
+
+The main weird extra step is that to make `pipe-trex` accessible to the virtual
+environment, you need to add a `.pth` file to the approriate site-packages
+directory.  See "Making pipe-trex accessible within virtual environment" below.
+
+
+#### 2.7 environment
+
 Make a virtual environment in some local directory, for instance `~/local`. We
 will call the environment trex\_27:
 
@@ -51,7 +73,7 @@ develop, which you should!
 For transit-fitting, you will want `batman`, `corner`, and `emcee` installed:
   ```
   (trex_27) pip install batman-package
-  (trex_27) pip corner
+  (trex_27) pip install corner
   (trex_27) cd $SOME_DIR
   (trex_27) git clone https://github.com/dfm/emcee
   (trex_27) cd emcee
@@ -157,6 +179,7 @@ and add the appropriate password and info to your `~/.pgpass` file.
   
 
 ### Making pipe-trex accessible within virtual environment
+
 For the moment, go into the venv's `usr/lib/python2.7/site-packages` directory
 and create a `.pth` file, e.g.  `pipe-trex.pth` with the location of the local
 git cloned repository in it: `/path/to/where/you/cloned/pipe-trex`.
@@ -166,6 +189,10 @@ Then activate the virtualenv, and see if you can import a module:
 ```
 py> import imagesubphot as ism
 ```
+
+For a conda environment, do the same thing, but the site-packages directory
+will instead be at a path like
+`/home/lbouma/miniconda3/envs/trex_37/lib/python3.7/site-packages`.
 
 
 ## Getting Started
