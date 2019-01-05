@@ -1035,8 +1035,10 @@ def frame_radecbox_to_jpeg(
         ymid = ymin + ydelta/2
         xmid = xmin + xdelta/2
 
-        ymin, ymax = ymid - sqdelta/2, ymid + sqdelta/2
-        xmin, xmax = xmid - sqdelta/2, xmid + sqdelta/2
+        ymin, ymax = (int(np.round(ymid - sqdelta/2)),
+                      int(np.round(ymid + sqdelta/2)))
+        xmin, xmax = (int(np.round(xmid - sqdelta/2)),
+                      int(np.round(xmid + sqdelta/2)))
 
     # numpy is y,x so make sure to reverse the order
     trimmed_img = trimmed_img[ymin:ymax, xmin:xmax]

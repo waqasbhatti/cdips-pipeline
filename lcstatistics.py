@@ -269,7 +269,6 @@ def compute_acf_statistics_worker(task, n_apertures=3, timename='btjd',
             eval_times_hr = nparr(eval_times_hr)
             outdf['LAG_TIME_HR'] = eval_times_hr
 
-
             for acf, colstr in zip(
                 [acf_raw, acf_epd, acf_tfa],
                 ['RAW{:d}'.format(ap),'EPD{:d}'.format(ap),'TFA{:d}'.format(ap)]
@@ -281,7 +280,7 @@ def compute_acf_statistics_worker(task, n_apertures=3, timename='btjd',
 
                 outdf[colstr+"_ACF"] = these_acf_vals
 
-        with open(outpickle, 'w') as f:
+        with open(outpickle, 'wb') as f:
             pickle.dump(d_pkl, f, pickle.HIGHEST_PROTOCOL)
         print('wrote {}'.format(outpickle))
 

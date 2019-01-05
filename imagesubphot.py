@@ -183,7 +183,10 @@ import json
 import shutil
 import random
 from hashlib import md5
-from cStringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
 from functools import partial
 
 # used for fast random access to lines in text files
@@ -545,7 +548,7 @@ def select_astromref_frame(fitsdir,
             photdata = np.genfromtxt(
                 phot,
                 usecols=(12,13,14),
-                dtype='f8,f8,S5',
+                dtype='f8,f8,U5',
                 names=['mag','err','flag']
                 )
 
@@ -1194,7 +1197,7 @@ def select_photref_frames(fitsdir,
                 photdata = np.genfromtxt(
                     phot,
                     usecols=(12,13,14),
-                    dtype='f8,f8,S5',
+                    dtype='f8,f8,U5',
                     names=['mag','err','flag']
                     )
 
@@ -1509,8 +1512,8 @@ def genreg(masterphotref_fistar,
 
     outf = open(outfile,'wb')
 
-    for i in xrange(int(BX*BY)):
-        outf.write("%8.0f %8.0f %8.0f\n" % (mx[i],my[i],20))
+    for i in range(int(BX*BY)):
+        outf.write(("%8.0f %8.0f %8.0f\n" % (mx[i],my[i],20)).encode("utf-8"))
 
     outf.close()
 
@@ -1900,8 +1903,9 @@ def get_convsubfits_hash(photreftype, subtracttype, kernelspec):
 
     '''
 
-    return md5('%s-%s-%s' % (photreftype, subtracttype,
-                             kernelspec)).hexdigest()[:8]
+    return md5(
+        ('%s-%s-%s' % (photreftype, subtracttype, kernelspec)).encode('utf-8')
+    ).hexdigest()[:8]
 
 
 
@@ -1912,8 +1916,10 @@ def get_convsubphot_hash(photreftype, subtracttype,
 
     '''
 
-    return md5('%s-%s-%s-%s' % (photreftype, subtracttype,
-                                kernelspec, lcapertures)).hexdigest()[:8]
+    return md5(
+        ('%s-%s-%s-%s' % (photreftype, subtracttype,
+                          kernelspec, lcapertures)).encode('utf-8')
+    ).hexdigest()[:8]
 
 
 
@@ -2534,7 +2540,9 @@ def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
             with open(photpath, 'rb') as photfile:
 
                 for line in photfile:
-                    output.write('%.6f\t%s\t%s' % (frametime, framekey[0], line))
+                    output.write('%.6f\t%s\t%s' % (
+                        frametime, framekey[0], line.decode('utf-8'))
+                    )
 
             with open(tempphotpath, 'w') as tempphotfile:
                 output.seek(0)
@@ -2895,7 +2903,7 @@ def collect_imagesubphot_lightcurve(hatid,
                     rstfc = '%s-%s_%s' % (rstfc_elems[0])
                     out_line = '%s %s %s\n' % (framerjd, rstfc,
                                                ' '.join(phot_elem))
-                    outf.write(out_line)
+                    outf.write(out_line.encode('utf-8'))
 
             # if this frame isn't available, ignore it
             except Exception as e:
@@ -3073,7 +3081,7 @@ def lc_concatenate_worker(task):
 
         with open(baselcfile,'wb') as outfd:
             for line in baselclines:
-                outfd.write(line)
+                outfd.write(line.encode('utf-8'))
 
         print('%sZ: concat LC OK: %s with ndet %s -> %s with ndet %s' %
               (datetime.utcnow().isoformat(),
@@ -3219,8 +3227,8 @@ def epd_diffmags_imagesub(coeff, fsv, fdv, fkv, xcc, ycc, mag,
                  coeff[16]*np.sin(4*np.pi*ycc) +
                  coeff[17]*np.cos(4*np.pi*ycc) +
                  coeff[18]*(xcc - np.floor(xcc)) +
-                 coeff[19]*(ycc - np.floor(ycc)) +
-                 coeff[20]*temperatures
+                 coeff[19]*(ycc - np.floor(ycc)) #+
+                 #coeff[20]*temperatures #FIXME: include
                  -
                  mag)
 
@@ -3357,8 +3365,8 @@ def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
                           np.sin(4*np.pi*ycc[finalind]),
                           np.cos(4*np.pi*ycc[finalind]),
                           xcc[finalind] - np.floor(xcc[finalind]),
-                          ycc[finalind] - np.floor(ycc[finalind]),
-                          temperatures[finalind]
+                          ycc[finalind] - np.floor(ycc[finalind])#,
+                          #temperatures[finalind]  #FIXME include
                          ]
     else:
         raise NotImplementedError
@@ -3394,7 +3402,6 @@ def epd_lightcurve_imagesub(ilcfile,
                             mags=[14,19,24],
                             sdk=[7,8,9],
                             xy=[5,6],
-                            framekey=[1],
                             smooth=21,
                             sigmaclip=3.0,
                             ilcext='ilc',
@@ -3444,42 +3451,51 @@ def epd_lightcurve_imagesub(ilcfile,
 
     # read the lightcurve in
     ilc = np.genfromtxt(ilcfile,
-                        usecols=tuple(framekey + xy + sdk + mags),
+                        usecols=tuple(xy + sdk + mags),
                         dtype='f8,f8,f8,f8,f8,f8,f8,f8',
-                        names=['framekey', 'xcc','ycc',
+                        names=['xcc','ycc',
                                'fsv','fdv','fkv',
                                'rm1','rm2','rm3'])
-    if observatory=='tess':
+    if observatory=='hatpi':
+        temperatures=None
 
-        # get temperature for this camera/ccd pair. it would be nice if we
-        # could easily include this in the metadata of the lightcurve. however
-        # we cannot, and so will not.
+    elif observatory=='tess':
 
-        # e.g., select fitsheader->'CCDTEMP', framekey, fits from
-        # calibratedframes where (fitsheader->'PROJID' = '1027') and (fits like
-        # '%tess2018242022941-s0002-2-4-0121_cal_img%');
-        projid = fieldinfo['projectid']
+        #FIXME: get temperatures.
+        # # get temperature for this camera/ccd pair. it would be nice if we
+        # # could easily include this in the metadata of the lightcurve. however
+        # # we cannot, and so will not.
 
-        query = ("select fitsheader->'CCDTEMP' from calibratedframes where "
-                 "(fitsheader->'PROJID' = {:d}) and ".format(projid)
-                 "(fits like '%{:s}%')".format(framekey)
-                )
+        # # e.g., select fitsheader->'CCDTEMP', framekey, fits from
+        # # calibratedframes where (fitsheader->'PROJID' = '1027') and (fits like
+        # # '%tess2018242022941-s0002-2-4-0121_cal_img%');
+        # projid = fieldinfo['projectid']
 
-        if DEBUG:
-            print('query: {:s}'.format(query))
+        # query = ("select fitsheader->'CCDTEMP' from calibratedframes where "+
+        #          "(fitsheader->'PROJID' = {:d}) and ".format(projid)+
+        #          "(fits like '%{:s}%')".format(framekey)
+        #         )
 
-        cursor.execute(query, params)
-        rows = cursor.fetchall()
+        # if DEBUG:
+        #     print('query: {:s}'.format(query))
 
-        # if we're successful
-        if rows and len(rows) > 0:
+        # cursor.execute(query, params)
+        # rows = cursor.fetchall()
 
-            # get the frame info
-            temperatures = np.array([x[0] for x in rows])
+        # # if we're successful
+        # if rows and len(rows) > 0:
 
-        # FIXME: this process is silly. It would be much better to have a
-        # lightcurve format that is not so rigid.
-        raise NotImplementedError
+        #     # get the frame info
+        #     temperatures = np.array([x[0] for x in rows])
+
+        # # FIXME: this process is silly. It would be much better to have a
+        # # lightcurve format that is not so rigid.
+        # raise NotImplementedError
+
+        #FIXME: get temperatures.
+        temperatures = None
+    else:
+        raise NotImplementedError('observatory must be "tess" or "hatpi"')
 
 
     if len(ilc['xcc']) >= minndet:
@@ -3568,8 +3584,9 @@ def epd_lightcurve_imagesub(ilcfile,
 
         # only these lines can be attached to the output epd mags
         for line, epd1, epd2, epd3 in zip(inflines, epdmag1, epdmag2, epdmag3):
-            outline = '%s %.6f %.6f %.6f\n' % (line.rstrip('\n'), epd1, epd2, epd3)
-            outf.write(outline)
+            outline = '%s %.6f %.6f %.6f\n' % (
+                line.decode('utf-8').rstrip('\n'), epd1, epd2, epd3)
+            outf.write(outline.encode('utf-8'))
 
         outf.close()
 
@@ -3680,14 +3697,16 @@ def parallel_epd_worker(task):
     task[2] = smooth
     task[3] = sigmaclip
     task[4] = minndet
+    task[5] = observatory
     '''
 
     try:
 
-        ilc, outdir, smooth, sigmaclip, minndet = task
+        ilc, outdir, smooth, sigmaclip, minndet, observatory = task
         ilcext = os.path.splitext(ilc)[-1]
-        outepd = os.path.join(outdir,
-                              os.path.basename(ilc).replace(ilcext,'.epdlc'))
+        outepd = os.path.join(
+            outdir, os.path.basename(ilc).replace(ilcext,'.epdlc')
+        )
 
         outf = epd_lightcurve_imagesub(
             ilc,
@@ -3695,7 +3714,8 @@ def parallel_epd_worker(task):
             smooth=smooth,
             sigmaclip=sigmaclip,
             ilcext=ilcext,
-            minndet=minndet
+            minndet=minndet,
+            observatory=observatory
         )
 
         print('%sZ: %s -> %s EPD OK' %
@@ -3719,7 +3739,8 @@ def parallel_run_epd_imagesub(ilcdir,
                               nworkers=16,
                               overwrite=False,
                               maxworkertasks=1000,
-                              minndet=200):
+                              minndet=200,
+                              observatory='hatpi'):
     '''
     This runs EPD in parallel.
     '''
@@ -3737,7 +3758,8 @@ def parallel_run_epd_imagesub(ilcdir,
         ilcfiles = glob.glob(os.path.join(ilcdir, ilcglob))
 
     # if overwrite is false, only run EPD on LCs that don't have it
-    existingepd = glob.glob(outdir+'HAT-???-???????.epdlc')
+    existingepd = glob.glob(os.path.join(outdir,'*.epdlc'))
+    ilcext = os.path.splitext(ilcglob)[-1]
 
     if len(existingepd) > 0 and not overwrite:
 
@@ -3746,7 +3768,7 @@ def parallel_run_epd_imagesub(ilcdir,
 
         # substitute out the hash string
         alreadyexists = [ae.replace('.epdlc','') for ae in alreadyexists]
-        requested = [r.replace('.ilc','') for r in requested]
+        requested = [r.replace(ilcext,'') for r in requested]
 
         setdiff = np.setdiff1d(requested, alreadyexists)
 
@@ -3756,12 +3778,12 @@ def parallel_run_epd_imagesub(ilcdir,
             return
 
         else:
-            ilcfiles = [os.path.join(ilcdir,sd+'.ilc') for sd in setdiff]
+            ilcfiles = [os.path.join(ilcdir,sd+ilcext) for sd in setdiff]
 
-    tasks = [(x, outdir, smooth, sigmaclip, minndet) for x in ilcfiles]
+    tasks = [(x, outdir, smooth, sigmaclip, minndet, observatory)
+             for x in ilcfiles]
 
-    print('%sZ: starting...' %
-          (datetime.utcnow().isoformat(), ))
+    print('%sZ: starting EPD...' % (datetime.utcnow().isoformat(),))
     pool = mp.Pool(nworkers, maxtasksperchild=maxworkertasks)
 
     # fire up the pool of workers

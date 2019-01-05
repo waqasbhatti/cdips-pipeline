@@ -47,11 +47,14 @@ import time
 from hashlib import md5, sha256
 import gzip
 from traceback import format_exc
-from cStringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
 
 import tempfile
 
-import numpy as np
+import numpy as np, pandas as pd
 from numpy import nan
 import psycopg2 as pg
 from psycopg2.extras import Json
@@ -81,7 +84,7 @@ except:
 ## CONFIG ##
 ############
 
-DEBUG = True
+DEBUG = False
 
 # used to get the station ID, frame number, and CCD number from a FITS filename
 FRAMEREGEX = re.compile(r'(\d{1})\-(\d{6}\w{0,1})_(\d{1})')
@@ -365,7 +368,7 @@ def get_frame_info(frame):
         with open(photpath,'rb') as photf:
             header = photf.read(1000)
 
-        if '--binary-output' in header and HAVEBINPHOT:
+        if '--binary-output' in header.decode('utf-8') and HAVEBINPHOT:
 
             photdata_f = read_fiphot(photpath)
             photdata = {
@@ -377,7 +380,7 @@ def get_frame_info(frame):
                 }
             del photdata_f
 
-        elif '--binary-output' in header and not HAVEBINPHOT:
+        elif '--binary-output' in header.decode('utf-8') and not HAVEBINPHOT:
 
             print('WRN! %sZ: %s is a binary phot file, '
                   'but no binary phot reader is present, skipping...' %
@@ -390,7 +393,7 @@ def get_frame_info(frame):
             photdata = np.genfromtxt(
                 photpath,
                 usecols=(12,13,14),
-                dtype='f8,f8,S5',
+                dtype='f8,f8,U5',
                 names=['mag','err','flag']
                 )
 
@@ -403,7 +406,7 @@ def get_frame_info(frame):
                                        'dvalue'])
 
         # process fiphot data
-        if '--binary-output' in header:
+        if '--binary-output' in header.decode('utf-8'):
             goodind = np.where(photdata['flag'] == 0)
         else:
             goodind = np.where(photdata['flag'] == 'G')
@@ -462,7 +465,7 @@ def fitslist_frameinfo(fitslist,
     # the info collection, and then write it back to the cache.
     cachefile = os.path.join(FRAMEINFOCACHEDIR,
                              ('TM-frameinfo-%s.pkl.gz' %
-                              md5(repr(fitslist)).hexdigest()))
+                              md5(repr(fitslist).encode('utf-8')).hexdigest()))
 
     if os.path.exists(cachefile) and not forcecollectinfo:
 
@@ -700,9 +703,15 @@ def calibrated_frame_to_database(fitsfile,
 
             fitsheader['COMMENT'] = commentdict
 
+        fitsheader = {(k if not pd.isnull(v) else k):
+                      (v if not pd.isnull(v) else 'NaN')
+                      for k,v in fitsheader.items()}
         fitsheaderjson = Json(fitsheader)
 
         if photinfo:
+            photinfo = {(k if not pd.isnull(v) else k):
+                        (v if not pd.isnull(v) else 'NaN')
+                         for k,v in photinfo.items()}
             photinfojson = Json(photinfo)
         else:
             photinfojson = None
@@ -730,7 +739,7 @@ def calibrated_frame_to_database(fitsfile,
                      frameisok)
 
         if DEBUG:
-            print('query: {:s}\nparams: {:s}'.format(query,params))
+            print('query: {:s}\nparams: {:s}'.format(repr(query),repr(params)))
 
         # execute the query and commit
         cursor.execute(query, params)
@@ -1038,12 +1047,7 @@ def parallel_frames_to_database(fitsbasedir,
         print('%sZ: finding all FITS frames matching %s starting in %s' %
               (datetime.utcnow().isoformat(), fitsglob, fitsbasedir))
 
-        findcmd = "find {fitsbasedir} -type f -name '{fitsglob}' -print"
-        findcmd = findcmd.format(fitsbasedir=fitsbasedir,
-                                 fitsglob=fitsglob)
-        fitslist = subprocess.check_output(findcmd,shell=True)
-        fitslist = fitslist.split('\n')
-        fitslist = sorted(fitslist[:-1])
+        fitslist = np.sort(glob.glob(os.path.join(fitsbasedir, fitsglob)))
 
         # generate the task list
 
@@ -1603,12 +1607,13 @@ def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
                         "on conflict on constraint astromrefs_pkey do nothing"
                     )
                     params = (
-                        str(projectid), field, camera, ccd, int(makeactive),
+                        int(projectid), str(field), int(camera), int(ccd), int(makeactive),
                         time.time(),
                         os.path.join(refdir, areftargetfits),
                         os.path.join(refdir, areftargetjpeg),
-                        arefinfo['sval'], arefinfo['dval'],
-                        arefinfo['bgv'],arefinfo['ndet'], arefinfo['comment']
+                        float(arefinfo['sval']), float(arefinfo['dval']),
+                        float(arefinfo['bgv']), int(arefinfo['ndet']),
+                        str(arefinfo['comment'])
                     )
 
                 # execute the query to insert the astromref into the DB
@@ -2335,7 +2340,7 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
                                                              maxbackgroundstdevpctile,
                                                              maxbackgroundmedianpctile,
                                                              minngoodobjectpctile)
-    cachekey = md5(cachekey).hexdigest()
+    cachekey = md5(cachekey.encode('utf-8')).hexdigest()
     cachedir = os.path.join(FRAMEINFOCACHEDIR,'TM-photref-%s' % cachekey)
     cacheinfofile = os.path.join(cachedir, 'selection-info.pkl.gz')
 
@@ -4000,7 +4005,7 @@ def cstore_collect_imagesubphot_lightcurve(
                 # unpack the row to get our values
                 framerjd, framekey, photline = row
                 out_line = '%s %s %s\n' % (framerjd, framekey, photline)
-                outf.write(out_line)
+                outf.write(out_line.encode('utf-8'))
 
             # close the output LC once we're done with it
             outf.close()
@@ -4107,7 +4112,7 @@ def dbphot_collect_imagesubphot_lightcurve(hatid,
                     )
                     rstfc = '%s-%s_%s' % (rstfc_elems[0])
                     out_line = '%s %s %s\n' % (framerjd, rstfc, photline)
-                    outf.write(out_line)
+                    outf.write(out_line.encode('utf-8'))
 
                 # if this frame isn't available, ignore it
                 except Exception as e:
@@ -5044,7 +5049,9 @@ def forcedphot_generate_cmrawphot(
     srclist = tempfile.NamedTemporaryFile(delete=False)
     srclistf = srclist.name
     for o, r, d, pc in zip(objectids, ras, decls, pixcoords):
-        srclist.write('%s %.5f %.5f %.3f %.3f\n' % (o, r, d, pc[0], pc[1]))
+        srclist.write('{:s} {:.5f} {:.5f} {:.3f} {:.3f}\n'.
+                      format(o, r, d, pc[0], pc[1]).encode('utf-8'))
+
     srclist.close()
 
     # use this srclist as input to the cmrawphot command

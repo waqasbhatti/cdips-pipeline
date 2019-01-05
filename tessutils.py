@@ -530,10 +530,7 @@ def parallel_cluster_cutout_jpgs(calfitsimages, subfitsimages, wcsfiles,
             ]
 
     # fire up the pool of workers
-    try:
-        results = pool.map(cluster_cutout_jpg_worker, tasks)
-    except TypeError:
-        import IPython; IPython.embed()
+    results = pool.map(cluster_cutout_jpg_worker, tasks)
 
     # wait for the processes to complete work
     pool.close()
@@ -1169,7 +1166,7 @@ def make_ccd_temperature_timeseries_pickle(sectornum):
         'sector{:s}_ccd_temperature_timeseries.pickle'.
         format(str(sectornum).zfill(4))
     )
-    with open(pklpath, 'w') as f:
+    with open(pklpath, 'wb') as f:
         pickle.dump(d, f, pickle.HIGHEST_PROTOCOL)
     print('made {}'.format(pklpath))
 
@@ -1269,7 +1266,7 @@ def read_object_catalog(catalogfile, isgaiaid=False):
                                comments='#',
                                usecols=list(range(len(columns))),
                                names=columns,
-                               dtype='S19,f8,f8,f8,f8,f8,f8,U3,f8,f8,f8,f8',
+                               dtype='U19,f8,f8,f8,f8,f8,f8,U3,f8,f8,f8,f8',
                                delimiter=' '
                                )
 

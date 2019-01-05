@@ -400,7 +400,7 @@ def examine_astrometric_shifts(fitsdir, astromref, statsdir,
         d['poc_crval_c'] = poc_crval_c
         d['tmids'] = tmids
 
-        with open(pklpath, 'w') as f:
+        with open(pklpath, 'wb') as f:
             pickle.dump(d, f, pickle.HIGHEST_PROTOCOL)
         print('made {}'.format(pklpath))
 
@@ -687,7 +687,7 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
     outpickledir = '/nfs/phtess1/ar1/TESS/FFI/PROJ/REDUCTION_PARAM_PICKLES/'
     outpath = os.path.join(outpickledir, outpicklename)
 
-    with open(outpath, 'w') as f:
+    with open(outpath, 'wb') as f:
         pickle.dump(outd, f, pickle.HIGHEST_PROTOCOL)
     print('wrote {}'.format(outpath))
 
@@ -900,9 +900,12 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
         nworkers=nworkers, maxworkertasks=1000, photparams=photparams)
 
     # Step ISP9 + 10 : dump lightcurves.
-    ism.dump_lightcurves_with_grcollect(
-        iphotpattern, lcdirectory, '4g', lcextension='grcollectilc',
-        objectidcol=3, observatory='tess')
+    if len(glob(os.path.join(lcdirectory,'*.grcollectilc'))) < 10:
+        ism.dump_lightcurves_with_grcollect(
+            iphotpattern, lcdirectory, '4g', lcextension='grcollectilc',
+            objectidcol=3, observatory='tess')
+    else:
+        print('found grcollectilc files. skipping lc dump.')
 
     # # Alternative Step 9 + 10: add the .iphot files to postgres database. Collect
     # # LCs from postgres, and then make difference image lightcurve (*.ilc) files in
@@ -934,13 +937,25 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
     single .tfalc files. Then collect statistics.
     """
 
+    #FIXME: probably should convert lightcurves to FITS binary table format
+    # here (once python-3 refactor is done).
+    # assert 0 #FIXME
+    print('currently at a phase where detrending won\'t proceed.')
+    print('(because as-implemented, it requests temperatures).')
+    print('(can fix this for python-3 implementation purposes).')
+    #FIXME:
+
     if not os.path.exists(epdstatfile):
 
-        _ = ism.parallel_run_epd_imagesub(lcdirectory,
-                                          ilcglob='*.grcollectilc',
-                                          outdir=None, smooth=epdsmooth,
-                                          sigmaclip=epdsigclip, nworkers=nworkers,
-                                          maxworkertasks=1000, minndet=100)
+        if len(glob(os.path.join(lcdirectory,'*.epdlc'))) < 10:
+            _ = ism.parallel_run_epd_imagesub(lcdirectory,
+                                              ilcglob='*.grcollectilc',
+                                              outdir=None, smooth=epdsmooth,
+                                              sigmaclip=epdsigclip, nworkers=nworkers,
+                                              maxworkertasks=1000, minndet=100,
+                                              observatory='tess')
+        else:
+            print('found EPD lightcurves. will not re-make them.')
 
         ap.parallel_lc_statistics(lcdirectory, epdlcglob,
                                   reformed_cat_file, tfalcrequired=False,
@@ -1132,8 +1147,6 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
         make_percentiles_plot (bool)
     """
 
-    _make_movies(fitsdir, moviedir, field, camera, ccd, projectid)
-
     percentilesfiles = glob(os.path.join(statsdir,'percentiles_*png'))
     if not percentilesfiles:
         lcs.percentiles_RMSorMAD_stats_and_plots(
@@ -1188,6 +1201,8 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
         statsdir, 'examine_astrometric_shifts.pickle')
     ):
         examine_astrometric_shifts(fitsdir, astromrefpath, statsdir)
+
+    _make_movies(fitsdir, moviedir, field, camera, ccd, projectid)
 
     # how long did the pipeline take? how many lightcurves did it produce?
     endtime = datetime.utcnow()

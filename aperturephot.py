@@ -129,7 +129,7 @@ except:
 ########################
 
 # set this to show extra info
-DEBUG = False
+DEBUG = True
 
 # CCD minimum and maximum X,Y pixel coordinates
 # used to strip things outside FOV from output of make_frame_sourcelist
@@ -321,7 +321,7 @@ def reform_fistars(fistardir,
         for ind, line in enumerate(inf):
 
             if ind < linestokeep:
-                outf.write(line)
+                outf.write(line.encode('utf-8'))
 
         print('%s -> %s' % (fistar, outfname))
 
@@ -338,9 +338,16 @@ def fistarfile_to_xy(fistarfile):
     if not isinstance(fistarfile, str):
         raise AssertionError('called fistarfile_to_xy on not a path')
 
-    df = pd.read_csv(fistarfile, comment='#',
-                     names=['ident','x','y','bg','amp','s','d','k','flux','s/n'],
-                     delimiter=r"\s*", engine='python')
+    try:
+        # used for python 2.X
+        df = pd.read_csv(fistarfile, comment='#',
+                         names=['ident','x','y','bg','amp','s','d','k','flux','s/n'],
+                         delimiter=r"\s*", engine='python')
+    except pd.errors.ParserError:
+        # used for python 3.X
+        df = pd.read_csv(fistarfile, comment='#',
+                         names=['ident','x','y','bg','amp','s','d','k','flux','s/n'],
+                         delim_whitespace=True)
 
     if not len(df) > 1:
         print('skipping %s, did not get any sources' % fistarfile)
@@ -1083,14 +1090,15 @@ def make_fov_catalog(ra=None, dec=None, size=None,
         return None
 
 
-def reform_gaia_fov_catalog(incat, outcat,
-        columns='id,ra,dec,xi,eta,G,Rp,Bp,plx,pmra,pmdec,varflag'):
-    '''
+def reform_gaia_fov_catalog(
+    incat, outcat, columns='id,ra,dec,xi,eta,G,Rp,Bp,plx,pmra,pmdec,varflag'
+):
+    """
     This converts the output catalog for gaia2read to the format required
     for magfit.
 
     columns is a CSV string containing the required columns.
-    '''
+    """
     allcolumns = ['id','ra','dec','raerr','decerr','plx','plxerr','pmra',
                   'pmdec','pmraerr','pmdecerr','epoch','astexcnoise',
                   'astexcnoisesig','astpriflag','G_nobs','G_flux',
@@ -1106,7 +1114,7 @@ def reform_gaia_fov_catalog(incat, outcat,
     columns = columns.split(',')
     colstoget = [allcolumns.index(x) for x in columns]
 
-    inf = open(incat,'rb')
+    inf = open(incat,'r')
     outf = open(outcat,'wb')
 
     for line in inf:
@@ -1114,7 +1122,7 @@ def reform_gaia_fov_catalog(incat, outcat,
             sline = line.split()
             outcols = [sline[x] for x in colstoget]
             outline = ' '.join(outcols)
-            outf.write('%s\n' % outline)
+            outf.write('{:s}\n'.format(outline).encode('utf-8'))
 
 
 def reform_fov_catalog(incat,
@@ -1660,9 +1668,10 @@ def make_frameprojected_catalog(fits,
             with open(temppath,'rb') as tempf:
 
                 templines = tempf.readlines()
-                templines = [x for x in templines if '#' not in x]
+                templines = [x.decode('utf-8') for x in templines if '#' not in
+                             x.decode('utf-8')]
                 for ind in keep_ind:
-                    outf.write(templines[ind])
+                    outf.write(templines[ind].encode('utf-8'))
 
             outf.close()
 
@@ -4092,7 +4101,7 @@ def choose_tfa_template(statsfile,
                                         fovcat_xicol,
                                         fovcat_etacol,
                                         fovcat_magcol),
-                               dtype='S17,f8,f8,f8',
+                               dtype='U17,f8,f8,f8',
                                names=['objid','xi','eta','mag'])
         staridstr = 'HAT-'
     else:
@@ -4103,10 +4112,9 @@ def choose_tfa_template(statsfile,
                                         fovcat_xicol,
                                         fovcat_etacol,
                                         fovcat_magcol),
-                               dtype='S19,f8,f8,f8',
+                               dtype='U19,f8,f8,f8',
                                names=['objid','xi','eta','mag'])
         staridstr = '' # no pre-identifier for Gaia IDs.
-
 
     # figure out the number of stars to use in the initial TFA template
     # number of stars = TFA_TEMPLATE_FRACTION * median ndet
@@ -4302,7 +4310,7 @@ def choose_tfa_template(statsfile,
                 # if it doesn't, then add nans to the file
                 else:
 
-                    print('ERR! couldn\'t find an LC for %s' % tfaobj)
+                    print('ERR! couldn\'t find a LC for %s' % tfaobj)
 
                     tfa_stars_lcfile.append(None)
                     tfa_stars_catmag.append(np.nan)
@@ -4353,7 +4361,11 @@ def choose_tfa_template(statsfile,
                 outdict[aperture]['tfa_chosen_xi'],
                 outdict[aperture]['tfa_chosen_eta']
         ):
-            outf.write(outline % (objid, lcf, mag, rms, ndet, xi, eta))
+            outf.write(
+                (
+                outline % (objid, lcf, mag, rms, ndet, xi, eta)
+                ).encode('utf-8')
+            )
 
         outf.close()
         print('aperture %s: wrote object info to %s' %
@@ -4390,7 +4402,10 @@ def choose_tfa_template(statsfile,
                     )
 
                     if os.path.exists(templatelc):
-                        outf.write('%s\n' % os.path.abspath(templatelc))
+                        outf.write(
+                            ('%s\n' % os.path.abspath(templatelc)
+                            ).encode('utf-8')
+                        )
 
                 outf.close()
                 outdict[aperture]['stage1_tfa_templatefile'] = (
@@ -4449,7 +4464,7 @@ def run_tfa_stage1(tfainfo):
         # get results if succeeded, log outcome, and return path of outfile.
         # (note: this suppresses errors...)
         if tfaproc.returncode == 0 or tfa_stdout:
-            tfaobjects = tfa_stdout.split('\n')
+            tfaobjects = tfa_stdout.decode('utf-8').split('\n')
             tfaobjects = [x for x in tfaobjects
                           if x.startswith(staridstr) and x != '']
             print('aperture %s: TFA stage 1 completed, %s templates selected' %
@@ -5461,9 +5476,10 @@ def parallel_lc_statistics(lcdir,
         '%.3f %.3f %.3f\n'
         )
 
-    outheader = '# total objects: %s, sigmaclip used: %s\n' % (len(lcfiles),
-                                                               sigclip)
-    outf.write(outheader)
+    outheader = '# total objects: %s, sigmaclip used: %s\n' % (
+        len(lcfiles), sigclip)
+
+    outf.write(outheader.encode('utf-8'))
 
     outcolumnkey = (
         '# columns are:\n'
@@ -5509,21 +5525,21 @@ def parallel_lc_statistics(lcdir,
         '# 122, 123, 124: corrected cat mag AP1, corrected cat mag AP1, '
         'corrected cat mag AP3\n'
         ) % fovcatmaglabel
-    outf.write(outcolumnkey)
+    outf.write(outcolumnkey.encode('utf-8'))
 
     # open the fovcatalog and read in the column magnitudes and hatids
     if not fovcathasgaiaids:
         # assume HAT-IDs, HAT-123-4567890, 17 character strings
         fovcat = np.genfromtxt(fovcatalog,
                                usecols=fovcatcols,
-                               dtype='S17,f8',
+                               dtype='U17,f8',
                                names=['objid','mag'])
     else:
         # assume GAIA-IDs. From gaia2read, with "GAIA" id option, this is just
         # 19 character integers.
         fovcat = np.genfromtxt(fovcatalog,
                                usecols=fovcatcols,
-                               dtype='S19,f8',
+                               dtype='U19,f8',
                                names=['objid','mag'])
 
     # Using a dictionary leads to ~ 300x speedup
@@ -5538,6 +5554,14 @@ def parallel_lc_statistics(lcdir,
                 print('no catalog mag for %s, using median TF3 mag' %
                       stat['lcobj'])
                 catmag = stat['median_tf3']
+            if pd.isnull(catmag):
+                print('no median_tf3 mag for %s, using median EP3 mag' %
+                      stat['lcobj'])
+                catmag = stat['median_ep3']
+            if pd.isnull(catmag):
+                print('WRN! no catalog, TF3 or EP3 mag for {:s}. using nan'.
+                      format(stat['lcobj']))
+                catmag = np.array([np.nan])
 
             # calculate the corrected mags if present
             if (correctioncoeffs and len(correctioncoeffs) == 3 and
@@ -5699,7 +5723,7 @@ def parallel_lc_statistics(lcdir,
                 corrmag_ap3,
 
                 )
-            outf.write(outline)
+            outf.write(outline.encode('utf-8'))
 
     outf.close()
 
@@ -5724,7 +5748,7 @@ def read_stats_file(statsfile, fovcathasgaiaids=False):
     stats = np.genfromtxt(
         statsfile,
         dtype=(
-            'S{:d},f8,'
+            'U{:d},f8,'
             'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM1
             'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM2
             'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM3
@@ -6458,8 +6482,8 @@ def parallel_binnedlc_statistics(lcdir,
     # write the header to the file
     outheader = '# total objects: %s, sigmaclip used: %s\n' % (len(lcfiles),
                                                                sigclip)
-    outf.write(outheader)
-    outf.write(outcolumnkey)
+    outf.write(outheader.encode('utf-8'))
+    outf.write(outcolumnkey.encode('utf-8'))
 
     # open the fovcatalog and read in the column magnitudes and hatids
     if not fovcathasgaiaids:
@@ -6604,7 +6628,7 @@ def parallel_binnedlc_statistics(lcdir,
 
             # write the output line
             outline = outlineformat % tuple(outlinelist)
-            outf.write(outline)
+            outf.write(outline.encode('utf-8'))
 
     outf.close()
 
