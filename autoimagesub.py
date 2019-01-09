@@ -1,17 +1,48 @@
 #!/usr/bin/env python
 
-'''autoimagesub.py - Waqas Bhatti (wbhatti@astro.princeton.edu) - 09/2016
+"""
+autoimagesub.py - Waqas Bhatti (wbhatti@astro.princeton.edu) - 09/2016
 
 This contains functions to run image subtraction photometry continuously.
+Namely,
 
-TODO:
+Image & Database management:
 
-- functions for running imagesub steps on lists of reduced FITS
-- functions that search for reference images
-- functions that search for reference image photometry catalogs
-- function that knows how to time-out a subprocess call to ficonv
+    fitslist_frameinfo: parallelizes get_frame_info
+        get_frame_info: gets info from frame for selecting photref candidates.
 
-'''
+    parallel_frames_to_database
+        calibrated_frame_to_database
+        calframe_to_db_worker
+        arefshifted_frame_to_database
+        arefshifted_frame_to_db_worker
+        dbupdate_calibratedframe
+        convsubtracted_frame_to_database
+
+Astrometric references:
+
+    dbgen_get_astromref
+    generate_astromref
+    dbget_astromref: from postgresql database
+    get_astromref: from sqlite database
+    frames_astromref_worker
+    framelist_make_xtrnsfits
+
+Photometric references:
+
+    generate_photref_candidates_from_xtrns
+    amend_candidate_photrefs
+    generate_combined_photref
+    get_combined_photref
+    insert_phots_into_database
+
+Image subtraction:
+
+    xtrnsfits_convsub_worker
+    parallel_xtrnsfits_convsub
+    convsubfits_staticphot_worker: photometry on subtracted frames
+    parallel_convsubfits_staticphot
+"""
 
 #############
 ## IMPORTS ##
@@ -317,7 +348,6 @@ def find_subtracted_fits_fieldprojectidccd(
 def get_frame_info(frame):
     '''
     This gets the needed info from a frame for selecting photref candidates.
-
     '''
 
     try:
@@ -458,7 +488,6 @@ def fitslist_frameinfo(fitslist,
                        maxworkertasks=1000):
     '''
     This runs a parallel get_frame_info job.
-
     '''
 
     # check if we have it in the frameinfo cache, if so, use it. if not, redo
@@ -1163,13 +1192,13 @@ def convsubtracted_frame_to_database(
         overwrite=False,
         badframetag='badframes',
         database=None):
-    '''This puts a convolved and subtracted FITS into the DB.
+    '''
+    This puts a convolved and subtracted FITS into the DB.
 
     Associates it with the framekey of the original FITS and the framekey of the
     aref-shifted frame.  Adds info on subtraction success, its full path. Adds
     info about the kernel, and photref used, and type of photref used for
     subtraction.
-
     '''
 
     # open a database connection
@@ -1925,10 +1954,9 @@ def dbget_astromref(projectid, field, ccd, database=None, camera=0):
 
 
 def get_astromref(projectid, field, ccd, refinfo=REFINFO):
-    '''This finds the reference frame for the field, projectid, and ccd
+    '''
+    This finds the reference frame for the field, projectid, and ccd
     combination using the TM-refinfo.sqlite database.
-
-
     '''
 
     db = sqlite3.connect(
