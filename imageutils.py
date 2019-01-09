@@ -325,6 +325,26 @@ def get_header_keyword_list(fits_file,
     return out_dict
 
 
+def get_header_comment_list(fits_file,
+                            keyword_list,
+                            ext=0):
+
+    hdulist = pyfits.open(fits_file)
+
+    out_dict = {}
+
+    for keyword in keyword_list:
+
+        if keyword in hdulist[ext].header:
+            out_dict[keyword] = hdulist[ext].header.comments[keyword]
+        else:
+            out_dict[keyword] = None
+
+    hdulist.close()
+    return out_dict
+
+
+
 ## IMAGE SCALING FUNCTIONS ##
 
 def pixel_scale_func(x, m, c):
