@@ -1,4 +1,5 @@
-'''
+# -*- coding: utf-8 -*-
+"""
 functions for reducing TESS data.  contents are as follows, where "sub-tasks"
 in a conceptual sense are listed below the main task:
 ------------------------------------------
@@ -12,26 +13,28 @@ parallel_mask_dquality_flag_frames: mask entire frames based on DQUALITY flag
     mask_dquality_flag_frame
 
 parallel_trim_get_single_extension: get single extension image, trim to remove
-virtual columns, append "PROJID" header keywork.
+virtual columns, append "PROJID" header keywork
 
     from_CAL_to_fitsh_compatible
     (deprecated) from_ete6_to_fitsh_compatible
 
 are_known_HJs_in_field: precursor to measuring HJ properties is knowing if
-there are any.
+there are any
 
 measure_known_HJ_SNR: if there are known HJs in this frame, estimate their SNR
-through a max-likelihood trapezoidal transit model.
+through a max-likelihood trapezoidal transit model
 
     _measure_hj_snr
 
-------------------------------------------
-under construction:
+read_object_reformed_catalog: get objectid, ra, dec from reformed catalog
 
-    read_tess_lightcurve
+read_object_catalog: read the Gaia .catalog file into a pandas DataFrame
 
-    read_object_catalog
-'''
+read_tess_txt_lightcurve: Read grcollect dumped lightcurve file into a
+dictionary (which can then be put into a FITS table, or some other data
+structure better than text).
+"""
+from __future__ import division, print_function
 
 ##########################################
 
@@ -39,7 +42,7 @@ import aperturephot as ap
 import imageutils as iu
 import shared_variables as sv
 
-import os, pickle
+import os, pickle, re
 import numpy as np, pandas as pd, matplotlib.pyplot as plt
 from glob import glob
 from parse import search
@@ -639,7 +642,7 @@ def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory, statsdir,
     tab = tab[is_wanted]
 
     # get the starids that correspond to the HJs on-chip
-    projcat = read_object_catalog(projcatalogpath, isgaiaid=True)
+    projcat = read_object_reformed_catalog(projcatalogpath, isgaiaid=True)
 
     proj_ra, proj_dec = projcat['ra']*u.deg, projcat['dec']*u.deg
 
@@ -1171,59 +1174,91 @@ def make_ccd_temperature_timeseries_pickle(sectornum):
     print('made {}'.format(pklpath))
 
 
-
-##############################
-# UNDER CONSTRUCTION
-##############################
-
-def read_tess_lightcurve(
+def read_tess_txt_lightcurve(
     lcfile,
-    catfile='/home/lbouma/proj/ete6/data/RED_1-1/2MASS-RA250.546600342-DEC32.4748344421-SIZE24.reformed_catalog',
-    infokeys=['id', 'ra', 'dec', 'xi', 'eta', '2massJ', '2massK', '2massqlt',
-              '2massI', '2massr', '2massi', '2massz']
+    catalogdf,
+    infokeys=['Gaia-ID', 'RA[deg]', 'Dec[deg]', 'Parallax[mas]',
+              'PM_RA[mas/yr]', 'PM_Dec[mas/year]', 'Ref_Epoch[yr]',
+              'AstExcNoise[mas]', 'AstExcNoiseSig', 'AstPriFlag',
+              'phot_g_mean_mag', 'phot_bp_mean_mag', 'phot_rp_mean_mag',
+              'radial_velocity', 'phot_variable_flag', 'teff_val', 'a_g_val',
+              'e_bp_min_rp_val', 'radius_val', 'lum_val']
     ):
-    # 00 rjd    Reduced Julian Date (RJD = JD - 2400000.0)
-    # 01 hat    HAT ID of the object
-    # 02 rstfc  Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
-    # 03 xcc    original X coordinate on CCD
-    # 04 ycc    original y coordinate on CCD
-    # 05 bgv    Background value
-    # 06 bge    Background measurement error
-    # 07 fsv    Measured S value
-    # 08 fdv    Measured D value
-    # 09 fkv    Measured K value
-    # 10 im1    Instrumental magnitude in aperture 1
-    # 11 ie1    Instrumental magnitude error for aperture 1
-    # 12 iq1    Instrumental magnitude quality flag for aperture 1 (0/G OK, X bad)
-    # 13 im2    Instrumental magnitude in aperture 2
-    # 14 ie2    Instrumental magnitude error for aperture 2
-    # 15 iq2    Instrumental magnitude quality flag for aperture 2 (0/G OK, X bad)
-    # 16 im3    Instrumental magnitude in aperture 3
-    # 17 ie3    Instrumental magnitude error for aperture 3
-    # 18 iq3    Instrumental magnitude quality flag for aperture 3 (0/G OK, X bad)
-    # 19 rm1    Reduced Mags from magfit in aperture 1
-    # 20 rm2    Reduced Mags from magfit in aperture 2
-    # 21 rm3    Reduced Mags from magfit in aperture 3
+    """
+    Read grcollect dumped lightcurve file into a dictionary (which can then be
+    put into a FITS table, or some other data structure better than text
+    files).
+
+    Args:
+        lcfile (str): path to *.grcollectilc, matching format below.
+
+        catalogdf (pd.DataFrame): output from read_object_catalog(catfile)
+
+    catfile
+
+    Format details:
+
+    00 tjd    Spacecraft TESS Julian Date in TDB reference (JD - 2457000)
+    01 rstfc  Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
+    02 starid GAIA ID of the object
+    03 xcc    original X coordinate on CCD on photref frame
+    04 ycc    original y coordinate on CCD on photref frame
+    05 xic    shifted X coordinate on CCD on subtracted frame
+    06 yic    shifted Y coordinate on CCD on subtracted frame
+    07 fsv    Measured S value
+    08 fdv    Measured D value
+    09 fkv    Measured K value
+    10 bgv    Background value
+    11 bge    Background measurement error
+
+    12 ifl1   Flux in aperture 1 (ADU)
+    13 ife1   Flux error in aperture 1 (ADU)
+    14 irm1   Instrumental magnitude in aperture 1
+    15 ire1   Instrumental magnitude error for aperture 1
+    16 irq1   Instrumental magnitude quality flag for aperture 1 (0/G OK, X bad)
+
+    17 ifl2   Flux in aperture 2 (ADU)
+    18 ife2   Flux error in aperture 2 (ADU)
+    19 irm2   Instrumental magnitude in aperture 2
+    20 ire2   Instrumental magnitude error for aperture 2
+    21 irq2   Instrumental magnitude quality flag for aperture 2 (0/G OK, X bad)
+
+    22 ifl3   Flux in aperture 3 (ADU)
+    23 ife3   Flux error in aperture 3 (ADU)
+    24 irm3   Instrumental magnitude in aperture 3
+    25 ire3   Instrumental magnitude error for aperture 3
+    26 irq3   Instrumental magnitude quality flag for aperture 3 (0/G OK, X bad)
+    """
 
     # read the LC into a numpy recarray
+    lccolnames = ['tjd','rstfc','starid',
+                  'xcc','ycc','xic','yic','fsv','fdv','fkv',
+                  'bgv','bge',
+                  'ifl1', 'ife1', 'irm1', 'ire1', 'irq1',
+                  'ifl2', 'ife2', 'irm2', 'ire2', 'irq2',
+                  'ifl3', 'ife3', 'irm3', 'ire3', 'irq3' ]
+    dtypelist = ('f8,U40,U19,'+
+                 'f8,f8,f8,f8,f8,f8,f8,'+
+                 'f8,f8,'+
+                 'f8,f8,f8,f8,U1,'+
+                 'f8,f8,f8,f8,U1,'+
+                 'f8,f8,f8,f8,U1' )
+
     recarr = np.genfromtxt(lcfile,
-                           usecols=(0,3,4,10,11,13,14,16,17),
-                           names=['rjd','xcc','ycc','im1','ie1','im2','ie2','im3','ie3'],
-                           dtype='f8,f8,f8,f8,f8,f8,f8,f8,f8'
-                          )
+                           usecols=tuple(range(len(lccolnames))),
+                           names=lccolnames,
+                           dtype=dtypelist)
 
-    # generate the objectid
-    # here, we're basically stripping the filename to form the objectid
-    objectid = os.path.basename(lcfile).rstrip('.rlc')
-
-    catalog_recarray = read_object_catalog(catfile)
+    # generate the objectid by stripping the filename
+    objectid = os.path.basename(lcfile).rstrip(os.path.splitext(lcfile)[-1])
 
     # look up this object in the catalog
-    objind = catalog_recarray['id'] == objectid
+    objind = catalogdf['Gaia-ID'] == int(objectid)
 
     if objind.size > 0:
 
-        objectinfo = {x:np.asscalar(catalog_recarray[x][objind]) for x in infokeys}
+        objectinfo = catalogdf[infokeys].ix[objind]
+        objectinfo = objectinfo.to_dict('records')[0]
 
     else:
 
@@ -1231,30 +1266,24 @@ def read_tess_lightcurve(
 
     # this is the lcdict we need
     lcdict = {'objectid': objectid,
-              'objectinfo':objectinfo,
-              'rjd':recarr['rjd'],
-              'xcc':recarr['xcc'],
-              'ycc':recarr['ycc'],
-              'im1':recarr['im1'],
-              'ie1':recarr['ie1'],
-              'im2':recarr['im2'],
-              'ie2':recarr['ie2'],
-              'im3':recarr['im3'],
-              'ie3':recarr['ie3']
-             }
+              'objectinfo':objectinfo}
+    for col in lccolnames:
+        lcdict[col] = recarr[col]
 
     return lcdict
 
 
-def read_object_catalog(catalogfile, isgaiaid=False):
-    # you often need an objectid, ra, dec, and a magnitude.
-    # get these from the 2mass catalog.
-
-    columns='id,ra,dec,xi,eta,2massJ,2massK,2massqlt,2massI,2massr,2massi,2massz'
-    columns = columns.split(',')
+def read_object_reformed_catalog(reformedcatalogfile, isgaiaid=False):
+    """
+    you often need an objectid, ra, dec, and/or 2mass magnitudes.  get these
+    from the "reformed" catalog with a small sub-read.
+    """
 
     if not isgaiaid:
-        catarr = np.genfromtxt(catalogfile,
+        columns='id,ra,dec,xi,eta,2massJ,2massK,2massqlt,2massI,2massr,2massi,2massz'
+        columns = columns.split(',')
+
+        catarr = np.genfromtxt(reformedcatalogfile,
                                comments='#',
                                usecols=list(range(len(columns))),
                                names=columns,
@@ -1262,15 +1291,52 @@ def read_object_catalog(catalogfile, isgaiaid=False):
                                delimiter=' '
                                )
     else:
-        catarr = np.genfromtxt(catalogfile,
+        columns='id,ra,dec'
+        columns = columns.split(',')
+
+        catarr = np.genfromtxt(reformedcatalogfile,
                                comments='#',
                                usecols=list(range(len(columns))),
                                names=columns,
-                               dtype='U19,f8,f8,f8,f8,f8,f8,U3,f8,f8,f8,f8',
+                               dtype='U19,f8,f8',
                                delimiter=' '
                                )
-
     return catarr
 
 
+def read_object_catalog(catalogfile):
+    """
+    read the Gaia .catalog file into a pandas DataFrame
+    """
 
+    df = pd.read_csv(catalogfile, header=0, delim_whitespace=True)
+
+    # columns are read in looking like "teff_val[35]". strip the [integer], and
+    # the pre-pended "#" on the first column.
+    cols = [re.sub('\[\d+\]', '', c) for c in df.columns]
+    cols = [c.lstrip('#') for c in cols]
+
+    df = df.rename(index=str,
+                   columns={old:new for old, new in zip(df.columns, cols)})
+
+    # columns are:
+    # ['Gaia-ID', 'RA[deg]', 'Dec[deg]', 'RAError[mas]', 'DecError[mas]',
+    # 'Parallax[mas]', 'Parallax_error[mas]', 'PM_RA[mas/yr]',
+    # 'PM_Dec[mas/year]', 'PMRA_error[mas/yr]', 'PMDec_error[mas/yr]',
+    # 'Ref_Epoch[yr]', 'AstExcNoise[mas]', 'AstExcNoiseSig', 'AstPriFlag',
+    # 'phot_g_n_obs', 'phot_g_mean_flux', 'phot_g_mean_flux_error',
+    # 'phot_g_mean_flux_over_error', 'phot_g_mean_mag', 'phot_bp_n_obs',
+    # 'phot_bp_mean_flux', 'phot_bp_mean_flux_error',
+    # 'phot_bp_mean_flux_over_error', 'phot_bp_mean_mag', 'phot_rp_n_obs',
+    # 'phot_rp_mean_flux', 'phot_rp_mean_flux_error',
+    # 'phot_rp_mean_flux_over_error', 'phot_rp_mean_mag',
+    # 'phot_bp_rp_excess_factor', 'radial_velocity', 'radial_velocity_error',
+    # 'phot_variable_flag', 'teff_val', 'teff_percentile_lower',
+    # 'teff_percentile_upper', 'a_g_val', 'a_g_percentile_lower',
+    # 'a_g_percentile_upper', 'e_bp_min_rp_val',
+    # 'e_bp_min_rp_percentile_lower', 'e_bp_min_rp_percentile_upper',
+    # 'radius_val', 'radius_percentile_lower', 'radius_percentile_upper',
+    # 'lum_val', 'lum_percentile_lower', 'lum_percentile_upper', 'xi[deg]',
+    # 'eta[deg]']
+
+    return df
