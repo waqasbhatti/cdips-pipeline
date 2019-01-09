@@ -4672,21 +4672,20 @@ def get_lc_statistics(lcfile,
                       tfcols=[25,26,27],
                       rfcols=None,
                       sigclip=4.0,
-                      tfalcrequired=False):
+                      tfalcrequired=False,
+                      fitslcnottxt=False):
     '''
     This calculates the following statistics for the magnitude columns in the
     given lcfile.
 
-    mean
-    median
-    MAD
-    stdev
+    mean, median, MAD, stdev.
 
-    # TODO
-    iterative stdev after sigma-clipping (RMS)
+    Args:
+        lcfile: if using text file lightcurves, the lcfile is always the .epdlc
+        file (which contains the rlc, and is used to derive the filenames of
+        the tfalcs)
 
-    IMPORTANT: the lcfile is always the .epdlc file (which contains the rlc, and
-    is used to derive the filenames of the tfalcs)
+        fitslcnottxt (bool): a workaround for the above.
 
     rfcols are for the flux in aperture 1, 2, 3. used for ISM only
     '''
@@ -4695,79 +4694,104 @@ def get_lc_statistics(lcfile,
     tf2lc_check = os.path.exists(lcfile.replace('.epdlc','.tfalc.TF2'))
     tf3lc_check = os.path.exists(lcfile.replace('.epdlc','.tfalc.TF3'))
 
-    # check if we need TFALCs to proceed
-    if tfalcrequired and ((not tf1lc_check) or
-                          (not tf2lc_check) or
-                          (not tf3lc_check)):
-
-        print('%sZ: no TFA mags available for %s and '
-              'TFALC is required, skipping...' %
-              (datetime.utcnow().isoformat(), lcfile))
-        return None
-
-
     # otherwise, proceed with stat collection
-    try:
+    if fitslcnottxt:
 
-        # get the reduced magnitude columns
-        (rm1, rm2, rm3,
-         ep1, ep2, ep3) = np.genfromtxt(lcfile,
-                                        usecols=tuple(rmcols + epcols),
-                                        unpack=True)
+        hdulist = pyfits.open(lcfile)
 
-        tf1, tf2, tf3 = np.genfromtxt(
-            lcfile.replace('.epdlc','.tfalc'),
-            usecols=tfcols,
-            unpack=True)
-
-        if rfcols and len(rfcols) == 3:
-            rf1, rf2, rf3 = np.genfromtxt(lcfile,usecols=tuple(rfcols),
-                                          unpack=True)
+        if hdulist[0].header['DTR_EPD']:
+            rm1 = hdulist[1].data['IRM1']
+            rm2 = hdulist[1].data['IRM2']
+            rm3 = hdulist[1].data['IRM3']
+            ep1 = hdulist[1].data['EP1']
+            ep2 = hdulist[1].data['EP2']
+            ep3 = hdulist[1].data['EP3']
         else:
-            rf1, rf2, rf3 = [], [], []
+            raise AssertionError(
+                'expected DTR_EPD to be true in get_lc_statistics'
+            )
 
+        if hdulist[0].header['DTR_TFA']:
+            tf1 = hdulist[1].data['TF1']
+            tf2 = hdulist[1].data['TF2']
+            tf3 = hdulist[1].data['TF3']
+        elif not hdulist[0].header['DTR_TFA'] and tfalcrequired:
+            print(
+                '{:s}Z: no TFA for {:s} and TFA is required, skipping...'.
+                format(datetime.utcnow().isoformat(), lcfile)
+            )
+            return None
+        else:
+            tf1,tf2,tf3 = [], [], []
 
-    # if we don't have TF columns, cut down to RM and EP only
-    except Exception as e:
+        # no need to use the raw fluxes, that I know of.
+        rf1, rf2, rf3 = [], [], []
 
-        print('%sZ: no TFA mags available for %s!' %
-              (datetime.utcnow().isoformat(), lcfile))
+    else:
+
+        # check if we need TFALCs to proceed
+        if tfalcrequired and ((not tf1lc_check) or
+                              (not tf2lc_check) or
+                              (not tf3lc_check)):
+
+            print('%sZ: no TFA mags available for %s and '
+                  'TFALC is required, skipping...' %
+                  (datetime.utcnow().isoformat(), lcfile))
+            return None
 
         try:
-
+            # get the reduced magnitude columns
             (rm1, rm2, rm3,
              ep1, ep2, ep3) = np.genfromtxt(lcfile,
                                             usecols=tuple(rmcols + epcols),
                                             unpack=True)
-
-            tf1, tf2, tf3 = [], [], []
-
+            tf1, tf2, tf3 = np.genfromtxt(
+                lcfile.replace('.epdlc','.tfalc'),
+                usecols=tfcols,
+                unpack=True)
             if rfcols and len(rfcols) == 3:
                 rf1, rf2, rf3 = np.genfromtxt(lcfile,usecols=tuple(rfcols),
                                               unpack=True)
             else:
                 rf1, rf2, rf3 = [], [], []
 
-
+        # if we don't have TF columns, cut down to RM and EP only
         except Exception as e:
 
-            print('%sZ: no EPD mags available for %s!' %
+            print('%sZ: no TFA mags available for %s!' %
                   (datetime.utcnow().isoformat(), lcfile))
+            try:
+                (rm1, rm2, rm3,
+                 ep1, ep2, ep3) = np.genfromtxt(lcfile,
+                                                usecols=tuple(rmcols + epcols),
+                                                unpack=True)
+                tf1, tf2, tf3 = [], [], []
+                if rfcols and len(rfcols) == 3:
+                    rf1, rf2, rf3 = np.genfromtxt(lcfile,usecols=tuple(rfcols),
+                                                  unpack=True)
+                else:
+                    rf1, rf2, rf3 = [], [], []
 
-            rm1, rm2, rm3 = np.genfromtxt(lcfile,
-                                          usecols=tuple(rmcols),
-                                          unpack=True)
+            except Exception as e:
 
-            ep1, ep2, ep3, tf1, tf2, tf3 = [], [], [], [], [], []
+                print('%sZ: no EPD mags available for %s!' %
+                      (datetime.utcnow().isoformat(), lcfile))
 
-            if rfcols and len(rfcols) == 3:
-                rf1, rf2, rf3 = np.genfromtxt(lcfile,usecols=tuple(rfcols),
+                rm1, rm2, rm3 = np.genfromtxt(lcfile,
+                                              usecols=tuple(rmcols),
                                               unpack=True)
-            else:
-                rf1, rf2, rf3 = [], [], []
 
+                ep1, ep2, ep3, tf1, tf2, tf3 = [], [], [], [], [], []
 
-    # get statistics for each column
+                if rfcols and len(rfcols) == 3:
+                    rf1, rf2, rf3 = np.genfromtxt(lcfile,usecols=tuple(rfcols),
+                                                  unpack=True)
+                else:
+                    rf1, rf2, rf3 = [], [], []
+
+    ##################################
+    # get statistics for each column #
+    ##################################
 
     # fluxes
     # RF1
@@ -5368,7 +5392,6 @@ def get_lc_statistics(lcfile,
 def lc_statistics_worker(task):
     '''
     This is a worker that runs the function above in a parallel worker pool.
-
     '''
 
     try:
@@ -5384,6 +5407,7 @@ def parallel_lc_statistics(lcdir,
                            fovcatalog,
                            fovcathasgaiaids=False,
                            tfalcrequired=False,
+                           fitslcnottxt=False,
                            fovcatcols=(0,9), # objectid, magcol to use
                            fovcatmaglabel='r',
                            outfile=None,
@@ -5410,6 +5434,10 @@ def parallel_lc_statistics(lcdir,
         fovcathasgaiaids (bool): if the reformed FOV catalog has Gaia ids, set
         this to be true. The default is to assume HAT-IDs, which have different
         string lengths & and are read differently.
+
+        fitslcnottxt (bool): if True, I/O will attempt to read
+        INSTRUMENTAL/EPD/TFA magnitudes from a FITS-format lightcurve, not a
+        text-file lightcurve. By default, false.
 
     Output:
 
@@ -5444,7 +5472,8 @@ def parallel_lc_statistics(lcdir,
                   'tfcols':tfcols,
                   'rfcols':rfcols,
                   'sigclip':sigclip,
-                  'tfalcrequired':tfalcrequired}] for x in lcfiles]
+                  'tfalcrequired':tfalcrequired,
+                  'fitslcnottxt':fitslcnottxt}] for x in lcfiles]
 
     pool = mp.Pool(nworkers,maxtasksperchild=workerntasks)
     results = pool.map(lc_statistics_worker, tasks)
