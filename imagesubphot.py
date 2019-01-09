@@ -195,6 +195,7 @@ from linecache import getline
 import sqlite3
 
 import numpy as np
+from numpy import isfinite as npisfinite
 
 from scipy.spatial import cKDTree as kdtree
 from scipy.signal import medfilt
@@ -209,7 +210,7 @@ import matplotlib
 matplotlib.use('AGG')
 import matplotlib.pyplot as plt
 
-from astropy.io import fits as pyfits
+from astropy.io import fits
 
 import imageutils
 from imageutils import get_header_keyword, fits_to_full_jpeg, \
@@ -3227,8 +3228,8 @@ def epd_diffmags_imagesub(coeff, fsv, fdv, fkv, xcc, ycc, mag,
                  coeff[16]*np.sin(4*np.pi*ycc) +
                  coeff[17]*np.cos(4*np.pi*ycc) +
                  coeff[18]*(xcc - np.floor(xcc)) +
-                 coeff[19]*(ycc - np.floor(ycc)) #+
-                 #coeff[20]*temperatures #FIXME: include
+                 coeff[19]*(ycc - np.floor(ycc)) +
+                 coeff[20]*temperatures
                  -
                  mag)
 
@@ -3300,7 +3301,7 @@ def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
     '''
 
     # find all the finite values of the magnitude
-    finiteind = np.isfinite(mag)
+    finiteind = npisfinite(mag)
 
     # calculate median and stdev
     mag_median = np.median(mag[finiteind])
@@ -3365,8 +3366,8 @@ def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
                           np.sin(4*np.pi*ycc[finalind]),
                           np.cos(4*np.pi*ycc[finalind]),
                           xcc[finalind] - np.floor(xcc[finalind]),
-                          ycc[finalind] - np.floor(ycc[finalind])#,
-                          #temperatures[finalind]  #FIXME include
+                          ycc[finalind] - np.floor(ycc[finalind]),
+                          temperatures[finalind]
                          ]
     else:
         raise NotImplementedError
@@ -3458,57 +3459,27 @@ def epd_lightcurve_imagesub(ilcfile,
                                'rm1','rm2','rm3'])
     if observatory=='hatpi':
         temperatures=None
-
     elif observatory=='tess':
-
-        #FIXME: get temperatures.
-        # # get temperature for this camera/ccd pair. it would be nice if we
-        # # could easily include this in the metadata of the lightcurve. however
-        # # we cannot, and so will not.
-
-        # # e.g., select fitsheader->'CCDTEMP', framekey, fits from
-        # # calibratedframes where (fitsheader->'PROJID' = '1027') and (fits like
-        # # '%tess2018242022941-s0002-2-4-0121_cal_img%');
-        # projid = fieldinfo['projectid']
-
-        # query = ("select fitsheader->'CCDTEMP' from calibratedframes where "+
-        #          "(fitsheader->'PROJID' = {:d}) and ".format(projid)+
-        #          "(fits like '%{:s}%')".format(framekey)
-        #         )
-
-        # if DEBUG:
-        #     print('query: {:s}'.format(query))
-
-        # cursor.execute(query, params)
-        # rows = cursor.fetchall()
-
-        # # if we're successful
-        # if rows and len(rows) > 0:
-
-        #     # get the frame info
-        #     temperatures = np.array([x[0] for x in rows])
-
-        # # FIXME: this process is silly. It would be much better to have a
-        # # lightcurve format that is not so rigid.
-        # raise NotImplementedError
-
-        #FIXME: get temperatures.
-        temperatures = None
+        raise DeprecationWarning
+        raise NotImplementedError(
+            'use parallel_run_epd_imagesub_fits instead. '+
+            'EPD for text-file lightcurves not implemented for TESS, because '+
+            'keeping track of additional time-series vectors is impractical.'
+        )
     else:
         raise NotImplementedError('observatory must be "tess" or "hatpi"')
-
 
     if len(ilc['xcc']) >= minndet:
 
         # get the indices where all columns are non-nan
-        combinedok = (np.isfinite(ilc['xcc']) &
-                      np.isfinite(ilc['ycc']) &
-                      np.isfinite(ilc['fsv']) &
-                      np.isfinite(ilc['fdv']) &
-                      np.isfinite(ilc['fkv']) &
-                      np.isfinite(ilc['rm1']) &
-                      np.isfinite(ilc['rm2']) &
-                      np.isfinite(ilc['rm3']))
+        combinedok = (npisfinite(ilc['xcc']) &
+                      npisfinite(ilc['ycc']) &
+                      npisfinite(ilc['fsv']) &
+                      npisfinite(ilc['fdv']) &
+                      npisfinite(ilc['fkv']) &
+                      npisfinite(ilc['rm1']) &
+                      npisfinite(ilc['rm2']) &
+                      npisfinite(ilc['rm3']))
 
         # calculate the EPD differential mags
         epddiffmag1 = epd_magseries_imagesub(
@@ -3601,6 +3572,159 @@ def epd_lightcurve_imagesub(ilcfile,
               (ilcfile, len(ilc['xcc']), minndet))
         return None
 
+
+def parallel_run_epd_imagesub_fits(fitsilcfiles, outfiles, smooth=21,
+                                   sigmaclip=3.0, minndet=200,
+                                   observatory='tess', nworkers=16,
+                                   maxworkertasks=1000):
+
+    print('%sZ: %s lcs to run EPD on ' %
+          (datetime.utcnow().isoformat(), len(fitsilcfiles)))
+
+    tasks = [(x, y, smooth, sigmaclip, minndet, observatory)
+             for x,y in zip(fitsilcfiles, outfiles)]
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+    results = pool.map(epd_fitslightcurve_imagesub_worker, tasks)
+
+    pool.close()
+    pool.join()
+
+    return {result for result in results}
+
+
+def epd_fitslightcurve_imagesub_worker(task):
+
+    x, y, smooth, sigmaclip, minndet, observatory = task
+
+    epd_fitslightcurve_imagesub(x, y, smooth=smooth, sigmaclip=sigmaclip,
+                                minndet=minndet, observatory=observatory)
+
+
+def epd_fitslightcurve_imagesub(fitsilcfile, outfile, smooth=21, sigmaclip=3.0,
+                                minndet=200, observatory='tess'):
+    """
+    Runs the EPD process on fitsilcfile, using columns specified to get the
+    required parameters.
+
+    The recommended use case is to overwrite the fitsilcfile with added EPD
+    columns and an updated "DTR_EPD" flag in the primary HDU, by passing
+    identical paths for fitsilcfile and outfile.
+
+    The FITS lightcurves can have arbitrary columns, but should include:
+
+        [ 'FDV', 'FKV', 'FSV', 'XIC', 'YIC']
+
+    and apertures labelled "IRM1", "IRM2", etc for instrumental magnitudes.
+
+    (This function is similar to epd_lightcurve_imagesub, but different I/O and
+    generalizes to arbitrary aperture numbers, hence a new function).
+    """
+
+    # read the lightcurve in. check if EPD has already been performed, or if
+    # there are insufficient data points to perform it.
+    inhdulist = fits.open(fitsilcfile)
+    ilc, primary_hdu = inhdulist[1].data, inhdulist[0]
+
+    if primary_hdu.header['DTR_EPD']:
+        print('WRN! {} found EPD had been performed; skipping'.
+              format(fitsilcfile))
+        return 0
+
+    if len(ilc['XIC']) < minndet:
+        print('not running EPD for %s, ndet = %s < min ndet = %s' %
+              (fitsilcfile, len(ilc['XIC']), minndet))
+        return None
+
+    # checks passed; let's perform EPD. first get the number of apertures.
+    names = ilc.dtype.names
+    n_apertures = len([n for n in names if 'IRM' in n])
+    irm_ap_keys = ['IRM{}'.format(i) for i in range(1,n_apertures+1)]
+
+    # get the indices where all columns are non-nan
+    combinedok = (npisfinite(ilc['XIC']) &
+                  npisfinite(ilc['YIC']) &
+                  npisfinite(ilc['FSV']) &
+                  npisfinite(ilc['FDV']) &
+                  npisfinite(ilc['FKV']))
+    for irm_ap_key in irm_ap_keys:
+        combinedok &= npisfinite(ilc[irm_ap_key])
+
+    # get temperatures (optional)
+    if observatory == 'tess':
+        temperatures = ilc['CCDTEMP'][combinedok]
+    elif observatory == 'hatpi':
+        temperatures = None
+    else:
+        raise NotImplementedError('observatory must be "tess" or "hatpi"')
+
+    # get the EPD diff mags
+    epddiffmags = {}
+    for irm_ap_key in irm_ap_keys:
+
+        epddiffmags[irm_ap_key] = epd_magseries_imagesub(
+            ilc[irm_ap_key][combinedok],
+            ilc['FSV'][combinedok],
+            ilc['FDV'][combinedok],
+            ilc['FKV'][combinedok],
+            ilc['XIC'][combinedok],
+            ilc['YIC'][combinedok],
+            smooth=smooth, sigmaclip=sigmaclip,
+            observatory=observatory, temperatures=temperatures
+        )
+
+    # add the EPD diff mags back to the median mag to get the EPD mags
+    epdmags = {}
+    for irm_ap_key in irm_ap_keys:
+
+        if epddiffmags[irm_ap_key] is not None:
+            mag_median = np.nanmedian(ilc[irm_ap_key])
+            epdmags[irm_ap_key] = epddiffmags[irm_ap_key] + mag_median
+        else:
+            epdmags[irm_ap_key] = np.array(
+                [np.nan for x in ilc[irm_ap_key][combinedok]]
+            )
+            print('WRN! %sZ: no %s mags available for %s!' %
+                  (datetime.utcnow().isoformat(), irm_ap_key, fitsilcfile))
+
+    # write the EPD LCs out to the outfile if given, else default is overwrite
+    if not outfile:
+        outfile = fitsilcfile
+
+    # create the "EP1", "EP2", "EPN" keys, format keys, and data columns.
+    epdnames = [k.replace('IRM','EP') for k in irm_ap_keys]
+    epdformats = ['D'] * len(epdnames)
+    epddatacols = [epdmags[k] for k in irm_ap_keys]
+
+    epdcollist = [fits.Column(name=n, format=f, array=a) for n,f,a in
+                  zip(epdnames, epdformats, epddatacols)]
+
+    epdhdu = fits.BinTableHDU.from_columns(epdcollist)
+
+    new_columns = inhdulist[1].columns + epdhdu.columns
+    new_timeseries_hdu = fits.BinTableHDU.from_columns(new_columns)
+
+    # update the flag for whether detrending has been performed
+    primary_hdu.header['DTR_EPD'] = True
+
+    outhdulist = fits.HDUList([primary_hdu, new_timeseries_hdu])
+    outhdulist.writeto(outfile, overwrite=True)
+
+    inhdulist.close()
+
+    if outfile == fitsilcfile:
+        n_epd_mags = len(
+            epdmags[irm_ap_keys[0]][npisfinite(epdmags[irm_ap_keys[0]])]
+        )
+        print('overwrote {} with {} EPD mags'.format(
+            outfile, n_epd_mags))
+    else:
+        n_epd_mags = len(
+            epdmags[irm_ap_keys[0]][npisfinite(epdmags[irm_ap_keys[0]])]
+        )
+        print('wrote {} with {} EPD mags'.format(outfile, n_epd_mags))
+
+    return 1
 
 
 def serial_run_epd_imagesub(ilcdir,
