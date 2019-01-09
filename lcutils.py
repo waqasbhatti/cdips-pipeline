@@ -75,19 +75,22 @@ def _map_key_to_comment(k):
         "ife1"  : "Flux error in aperture 1 (ADU)",
         "irm1"  : "Instrumental mag in aperture 1",
         "ire1"  : "Instrumental mag error for aperture 1",
-        "irq1"  : "Instrumental mag quality flag ap 1 (0/G OK, X bad)",
+        "irq1"  : "Instrumental quality flag ap 1, 0/G OK, X bad",
         "ifl2"  : "Flux in aperture 2 (ADU)",
         "ife2"  : "Flux error in aperture 2 (ADU)",
         "irm2"  : "Instrumental mag in aperture 2",
         "ire2"  : "Instrumental mag error for aperture 2",
-        "irq2"  : "Instrumental mag quality flag ap 2 (0/G OK, X bad)",
+        "irq2"  : "Instrumental quality flag ap 2, 0/G OK, X bad",
         "ifl3"  : "Flux in aperture 3 (ADU)",
         "ife3"  : "Flux error in aperture 3 (ADU)",
         "irm3"  : "Instrumental mag in aperture 3",
         "ire3"  : "Instrumental mag error for aperture 3",
-        "irq3"  : "Instrumental mag quality flag ap 3 (0/G OK, X bad)",
-        "ccdtemp" : "mean CCD temperature (S_CAM[N]_ALCU_sensor_CCD[N])",
-        "ntemps"  : "number of temperatures avgd to get ccdtemp"
+        "irq3"  : "Instrumental quality flag ap 3, 0/G OK, X bad",
+        "ccdtemp" : "mean CCD temperature S_CAM_ALCU_sensor_CCD",
+        "ntemps"  : "number of temperatures avgd to get ccdtemp",
+        'dtr_isub': "img subtraction photometry performed",
+        'dtr_epd' : "EPD detrending performed",
+        'dtr_tfa' : "TFA detrending performed"
     }
     return kcd[k]
 
@@ -191,7 +194,10 @@ def convert_grcollect_to_fits_lc_worker(task):
 
     primary_hdu.header['XCC'] = np.mean(lcd['xcc'])
     primary_hdu.header['YCC'] = np.mean(lcd['ycc'])
-    for k in ['xcc','ycc']:
+    primary_hdu.header['DTR_ISUB'] = True
+    primary_hdu.header['DTR_EPD'] = False
+    primary_hdu.header['DTR_TFA'] = False
+    for k in ['xcc','ycc','DTR_ISUB','DTR_EPD','DTR_TFA']:
         primary_hdu.header.comments[k] = _map_key_to_comment(k.lower())
 
     hdulist = fits.HDUList([primary_hdu, hdutimeseries])
