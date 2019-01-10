@@ -290,9 +290,7 @@ provided that this structure is maintained.
 
 # Authors
 
-Waqas Bhatti
-Luke Bouma
-Samuel Yee
+Waqas Bhatti, Luke Bouma, Samuel Yee
 
 # License
 
