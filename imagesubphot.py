@@ -2538,7 +2538,11 @@ def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
                 # observation start and stop time as UTC calendar dates.
                 # calculated by SPOC. for WASP-4, these agreed with what was
                 # expected (the leap-seconds were included as expected for
-                # UTC, not TDB).
+                # UTC, not TDB). note it is better to use these than the given
+                # "BJD" time-stamps, because those have a wrong barycentric
+                # correction applied (and the sign convention for how the
+                # correction is applied -- is it added, or subtracted?) is not
+                # clear. UTC calendar dates avoid this ambiguity.
                 tstart_utc_str = get_header_keyword(originalframe, 'DATE-OBS')
                 tstop_utc_str = get_header_keyword(originalframe, 'DATE-END')
 
