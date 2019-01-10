@@ -2429,6 +2429,8 @@ def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
     fiphot with rows that are objects), make lightcurve files (text files for
     various objects whose rows are times).
 
+    (For TESS, the timestamp imprinted here is JD_UTC midtime.)
+
     This routine uses the `fitsh` routine `grcollect` to do the dumping. This
     is comparably fast to the postgresql indexing approach without heavy
     optimization (dumps ~1 photometry file per second).
@@ -2530,7 +2532,25 @@ def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
             # contains some weird JD header (probably inherited from the
             # photref frame)
             if observatory=='tess':
-                frametime = get_header_keyword(originalframe, 'TSTART')
+
+                from astropy.time import Time
+
+                # observation start and stop time as UTC calendar dates.
+                # calculated by SPOC. for WASP-4, these agreed with what was
+                # expected (the leap-seconds were included as expected for
+                # UTC, not TDB).
+                tstart_utc_str = get_header_keyword(originalframe, 'DATE-OBS')
+                tstop_utc_str = get_header_keyword(originalframe, 'DATE-END')
+
+                # record the midtime in JD_UTC with grcollect. barycentric
+                # correction comes later. (once ra/dec are accessible).
+                tstart_utc = Time(tstart_utc_str, format='isot', scale='utc')
+                tstop_utc = Time(tstop_utc_str, format='isot', scale='utc')
+
+                tmid_jd_utc = tstart_utc.jd + (tstop_utc.jd - tstart_utc.jd)/2.
+
+                frametime = tmid_jd_utc
+
             elif observatory=='hatpi':
                 frametime = get_header_keyword(originalframe, 'JD')
             else:
@@ -2540,8 +2560,9 @@ def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
             output = StringIO()
             with open(photpath, 'rb') as photfile:
 
+                # write time precise to 1e-7 days = 8.6 milliseconds.
                 for line in photfile:
-                    output.write('%.6f\t%s\t%s' % (
+                    output.write('%.7f\t%s\t%s' % (
                         frametime, framekey[0], line.decode('utf-8'))
                     )
 
