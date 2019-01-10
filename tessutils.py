@@ -1198,40 +1198,40 @@ def read_tess_txt_lightcurve(
 
     Format details:
 
-    00 tjd    Spacecraft TESS Julian Date in TDB reference (JD - 2457000)
-    01 rstfc  Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
-    02 starid GAIA ID of the object
-    03 xcc    original X coordinate on CCD on photref frame
-    04 ycc    original y coordinate on CCD on photref frame
-    05 xic    shifted X coordinate on CCD on subtracted frame
-    06 yic    shifted Y coordinate on CCD on subtracted frame
-    07 fsv    Measured S value
-    08 fdv    Measured D value
-    09 fkv    Measured K value
-    10 bgv    Background value
-    11 bge    Background measurement error
+    00 tmid_utc exp mid-time in JD_UTC (from DATE-OBS,DATE-END)
+    01 rstfc    Unique frame key ({STID}-{FRAMENUMBER}_{CCDNUM})
+    02 starid   GAIA ID of the object
+    03 xcc      original X coordinate on CCD on photref frame
+    04 ycc      original y coordinate on CCD on photref frame
+    05 xic      shifted X coordinate on CCD on subtracted frame
+    06 yic      shifted Y coordinate on CCD on subtracted frame
+    07 fsv      Measured S value
+    08 fdv      Measured D value
+    09 fkv      Measured K value
+    10 bgv      Background value
+    11 bge      Background measurement error
 
-    12 ifl1   Flux in aperture 1 (ADU)
-    13 ife1   Flux error in aperture 1 (ADU)
-    14 irm1   Instrumental magnitude in aperture 1
-    15 ire1   Instrumental magnitude error for aperture 1
-    16 irq1   Instrumental magnitude quality flag for aperture 1 (0/G OK, X bad)
+    12 ifl1     Flux in aperture 1 (ADU)
+    13 ife1     Flux error in aperture 1 (ADU)
+    14 irm1     Instrumental magnitude in aperture 1
+    15 ire1     Instrumental magnitude error for aperture 1
+    16 irq1     Instrumental magnitude quality flag for aperture 1 (0/G OK, X bad)
 
-    17 ifl2   Flux in aperture 2 (ADU)
-    18 ife2   Flux error in aperture 2 (ADU)
-    19 irm2   Instrumental magnitude in aperture 2
-    20 ire2   Instrumental magnitude error for aperture 2
-    21 irq2   Instrumental magnitude quality flag for aperture 2 (0/G OK, X bad)
+    17 ifl2     Flux in aperture 2 (ADU)
+    18 ife2     Flux error in aperture 2 (ADU)
+    19 irm2     Instrumental magnitude in aperture 2
+    20 ire2     Instrumental magnitude error for aperture 2
+    21 irq2     Instrumental magnitude quality flag for aperture 2 (0/G OK, X bad)
 
-    22 ifl3   Flux in aperture 3 (ADU)
-    23 ife3   Flux error in aperture 3 (ADU)
-    24 irm3   Instrumental magnitude in aperture 3
-    25 ire3   Instrumental magnitude error for aperture 3
-    26 irq3   Instrumental magnitude quality flag for aperture 3 (0/G OK, X bad)
+    22 ifl3     Flux in aperture 3 (ADU)
+    23 ife3     Flux error in aperture 3 (ADU)
+    24 irm3     Instrumental magnitude in aperture 3
+    25 ire3     Instrumental magnitude error for aperture 3
+    26 irq3     Instrumental magnitude quality flag for aperture 3 (0/G OK, X bad)
     """
 
     # read the LC into a numpy recarray
-    lccolnames = ['tjd','rstfc','starid',
+    lccolnames = ['tmid_utc','rstfc','starid',
                   'xcc','ycc','xic','yic','fsv','fdv','fkv',
                   'bgv','bge',
                   'ifl1', 'ife1', 'irm1', 'ire1', 'irq1',
