@@ -5,6 +5,13 @@ data, and real TESS data.
 
 ## Install
 
+### Operating system
+
+This installation is only tested on linux boxes (Debian/Ubuntu).  Compiling the
+`fitsh` binaries (see below) might be challenging, but if you do it on MacOS,
+please submit a PR describing your experience.
+
+
 ### Environment basics
 
 First, clone this repo into a working directory, that we will call $TREX.
@@ -28,15 +35,16 @@ This deals with most of the details listed below, and is the recommended way to
 use pipe-trex. (A variety of "new" features since the 2018 development effort
 depend on using a 3.X environment).
 
-The main weird extra step is that to make `pipe-trex` accessible to the virtual
-environment, you need to add a `.pth` file to the approriate site-packages
-directory.  See "Making pipe-trex accessible within virtual environment" below.
+An extra step is that to make `pipe-trex` accessible to the virtual
+environment, you currently need to add a `.pth` file to the approriate
+site-packages directory.  See "Making pipe-trex accessible within virtual
+environment" below.
 
 
 #### 2.7 environment
 
-Make a virtual environment in some local directory, for instance `~/local`. We
-will call the environment trex\_27:
+If you opt instead for a 2.7 environment, make a virtual environment in some
+local directory, for instance `~/local`. We will call the environment trex\_27:
 
   ```
   pip install virtualenv; virtualenv --python=/usr/bin/python2.7 trex_27
@@ -49,17 +57,13 @@ Active the empty python 2.7 environment:
 
   ```
   source trex_27/bin/activate
-  ```
-
-Change directories to $TREX, and install everything pip can find:
-
-  ```
+  (trex_27) cd $PIPE_TREX
   (trex_27) pip install -r requirements.txt
   ```
 
-This will take some time.  Then, ensure pyeebls and bleeding-edge astrobase are
-installed (they are commented out by default because they require a number of
-dependencies):
+This latter step will take some time.  Then, ensure pyeebls and bleeding-edge
+astrobase are installed (they are commented out by default because they require
+a number of dependencies):
 
   ```
   (trex_27) pip install pyeebls
@@ -82,9 +86,9 @@ For transit-fitting, you will want `batman`, `corner`, and `emcee` installed:
 
 ## catalog reading dependencies
 
-At various stages in the photometry process, we project known-star catalogs
-onto images in order to know where the stars are. (This is more reliable than
-source extraction.)
+In order to perform photometry, we project known-star catalogs onto images in
+order to know where the stars are. (This is more reliable than source
+extraction.)
 
 The best catalog in town is Gaia DR2. To access it quickly, `gaia2read` is a
 useful program. Jason Kim wrote it for his junior thesis, and his source is
@@ -93,7 +97,7 @@ Sam Yee added an important piece of functionality: cutting on different
 magnitudes, his fork is [available
 here](https://github.com/samuelyeewl/gaia2read).
 
-To install `gaia2read`, you will want to do the following:
+To install `gaia2read` to the command line, do the following:
   ```
   (trex_27) cd $SOME_DIRECTORY
   (trex_27) git clone https://github.com/samuelyeewl/gaia2read
@@ -112,41 +116,24 @@ already been performed to download and sort the Gaia DR2 catalog.
 
 ### anet and astrometry.net dependencies
 
-You must use either `anet` or `astrometry.net`. I recommend the later, since
-it's free.  To install, follow [this
+You must use either `anet` or `astrometry.net`. The latter is strongly
+recommended, since it's free.  To install, follow [this
 page](http://astrometry.net/doc/build.html#build). If you're doing wide-field
 work, be sure to get both the 4100 and 4200 indexes.
 
 
 ### fitsh and HATpipe dependencies
 
-This code inherits a large amount from the
-[`fitsh`](https://fitsh.net/wiki/Main_Page) project, developed mostly by Andras
-Pal. Much of `fitsh` was inherited by `HATpipe` circa 2010, when it forked.
-`HATpipe` now has top-secret special-sauce added, that you are not allowed to
-see or reuse without express written permission.
+This code inherits from the [`fitsh`](https://fitsh.net/wiki/Main_Page)
+project, developed mostly by Andras Pal. Much of `fitsh` was inherited by
+`HATpipe` circa 2010, when it forked.  Again, because they are free, we opt for
+the public `fitsh` versions, rather than the closed `HATpipe` fork versions.
 
 The utilities we want working on our path include: `ficalib`, `fistar`,
-`fiphot`, `grmatch`, `grtrans`, `ficonv`, `fitrans`, and `ficombine`, `anet`,
-and `2massread`.
+`fiphot`, `grmatch`, `grtrans`, `ficonv`, `fitrans`, and `ficombine`,
+`astrometry.net`, and `gaia2read` (deprecated: `2massread`).
 
-If you had access to the top-secret HATpipe svn repo, you would do something
-like this:
-  ```
-  cd ~/local
-  svn checkout --username lbouma https://hat.astro.princeton.edu/svn/HATreduc/HATpipe
-  cd HATpipe
-  svn up -r3186   # we froze dependencies for pipe-trex
-  cd ../ ; cp -r HATpipe HATpipe_R3186
-  ```
-
-Compiling the HATpipe source on a mac is challenging, because many of the
-libraries are linux-specific.
-
-
-Most of these are `fitsh` tasks. We will proceed using only free software
-unless absolutely necessary, which means using Andras' public version.
-The `fitsh` installation instructions are
+Most of these are `fitsh` tasks.  The `fitsh` installation instructions are
 [here](https://fitsh.net/wiki/Installation), and they are simple:
 
   ```
@@ -158,16 +145,31 @@ The `fitsh` installation instructions are
   make
   make install
   ```
+Check to make sure this gives you `ficalib`, `fistar`, `fiphot`, `grmatch`,
+`grtrans`, `ficonv`, `fitrans`, and `ficombine`.
+ 
+If you had access to the closed HATpipe svn repo, you could do something like
+this to install them:
+  ```
+  cd ~/local
+  svn checkout --username lbouma https://hat.astro.princeton.edu/svn/HATreduc/HATpipe
+  cd HATpipe
+  svn up -r3186   # we froze dependencies for pipe-trex
+  cd ../ ; cp -r HATpipe HATpipe_R3186
+  ```
 
 ### PostgreSQL installation
 
-For macs, see [here](https://www.postgresql.org/download/macosx/).
+For bookkeeping, you will also need a [PostgreSQL
+database](https://www.postgresql.org/files/documentation/pdf/10/postgresql-10-US.pdf).
+
+To install for macs, see [here](https://www.postgresql.org/download/macosx/).
 For linux boxes, see
 [here](https://wiki.postgresql.org/wiki/Detailed_installation_guides#MacOS).
 
-NB if you're installing on Mac OS X, it is a good idea to change your kernel state
+(If you're installing on Mac OS X, it is a good idea to change your kernel state
 by modifying your `/etc/sysctl.conf` file to include things discussed in the
-READMEs from the above links.
+READMEs from the above links.)
 
 Once you've done this:
 ```
@@ -176,77 +178,6 @@ postgres=# create user hpx with password 'pwgoeshere' createdb;
 $ createdb -U hpx hpx
 ```
 and add the appropriate password and info to your `~/.pgpass` file.
-  
-
-### Making pipe-trex accessible within virtual environment
-
-For the moment, go into the venv's `usr/lib/python2.7/site-packages` directory
-and create a `.pth` file, e.g.  `pipe-trex.pth` with the location of the local
-git cloned repository in it: `/path/to/where/you/cloned/pipe-trex`.
-
-Then activate the virtualenv, and see if you can import a module:
-
-```
-py> import imagesubphot as ism
-```
-
-For a conda environment, do the same thing, but the site-packages directory
-will instead be at a path like
-`/home/lbouma/miniconda3/envs/trex_37/lib/python3.7/site-packages`.
-
-
-## Getting Started
-
-Some usage examples are given in the `examples/` directory.
-
-
-### Concepts: Directory and database structure
-
-As Thom Yorke understood, everything must be in its right place for your
-photometry to Just Work. The assumed directory structure at its first level
-must look like this:
-
-  ```
-  .
-  ├── BASE      # 
-  ├── LC        # lightcurves go here
-  ├── PROJ      # project directories for specific users
-  ├── RAW       # raw fits images (or fits.fz images) go here
-  ├── RED       # calibrated fits images go here
-  └── REDTEMP   # temporary space for reduced files
-  ```
-
-At the second level:
-
-  ```
-  .
-  ├── BASE
-  │   ├── CAL                 # calibration frames (bias, flat, dark) go here
-  │   ├── CAT                 # FOV source catalogs for your field go here
-  │   └── reference-frames    # astrometric reference frames; sqlite3 databases
-  ├── LC
-  │   ├── projid12-G577       # lightcurves specific to particular projectids
-  │   ├── stats_files         # for lightcurve statistics
-  │   └── projid8-9-10-11-12
-  ├── PROJ
-  │   ├── lbouma
-  │   └── wbhatti
-  ├── RAW
-  │   ├── 1-20161109          # ??? each night gets its own directory under RAW
-  │   ├── 1-20161110
-  │   ├── 1-20161111
-  │   ├── 1-20161130
-  │   └── tmp
-  ├── RED
-  │   ├── projid12            # each project gets its own subdirectory under RED
-  │   └── wbhatti-red-frames
-  ```
-
-Maintaining this structure is essential. Commands can be run from anywhere,
-provided that this structure is maintained.
-
-For bookkeeping, you will also need a [PostgreSQL
-database](https://www.postgresql.org/files/documentation/pdf/10/postgresql-10-US.pdf).
 
 To access the database: `psql -U hpx hpx` launches the PostgreSQL database
 named `hpx` run by user `hpx`. Or `psql -U hpx -h xphtess1 hpx` does the same,
@@ -288,29 +219,79 @@ relations include:
    public | subtractedframes_framekey_seq  | sequence | hpx
   ```
 
+### Making pipe-trex accessible within virtual environment
+
+For the moment, go into the venv's `usr/lib/python2.7/site-packages` directory
+and create a `.pth` file, e.g.  `pipe-trex.pth` with the location of the local
+git cloned repository in it: `/path/to/where/you/cloned/pipe-trex`.
+
+Then activate the virtualenv, and see if you can import a module:
+
+```
+py> import imagesubphot as ism
+```
+
+For a conda environment, do the same thing, but the site-packages directory
+will instead be at a path like
+`/home/lbouma/miniconda3/envs/trex_37/lib/python3.7/site-packages`.
+
+
+## Getting Started
+
+Some usage examples are given in the `scripts/` directory.
+
+
+### Concepts: Directory structure
+
+Everything must be in its right place for your photometry to Just Work. The
+assumed directory structure is as follows.
+
+  ```
+  .
+  ├── BASE      # 
+  ├── LC        # lightcurves go here
+  ├── PROJ      # project directories for specific users
+  ├── RAW       # raw fits images (or fits.fz images) go here
+  ├── RED       # calibrated fits images go here
+  └── REDTEMP   # temporary space for reduced files
+  ```
+
+At the second level:
+
+  ```
+  .
+  ├── BASE
+  │   ├── CAL                 # calibration frames (bias, flat, dark) go here
+  │   ├── CAT                 # FOV source catalogs for your field go here
+  │   └── reference-frames    # astrometric reference frames; sqlite3 databases
+  ├── LC
+  │   ├── projid12-G577       # lightcurves specific to particular projectids
+  │   ├── stats_files         # for lightcurve statistics
+  │   └── projid8-9-10-11-12
+  ├── PROJ
+  │   ├── lbouma
+  │   └── wbhatti
+  ├── RAW
+  │   ├── 1-20161109          # ??? each night gets its own directory under RAW
+  │   ├── 1-20161110
+  │   ├── 1-20161111
+  │   ├── 1-20161130
+  │   └── tmp
+  ├── RED
+  │   ├── projid12            # each project gets its own subdirectory under RED
+  │   └── wbhatti-red-frames
+  ```
+
+Maintaining this structure is essential. Commands can be run from anywhere,
+provided that this structure is maintained.
+
 ### Usage
-
-* `shared_variables.py`: contains path variables that are set across the
-  pipeline.
-
-
-# Useful things
-
-Most of the tasks above produce JPEGs that can be examined to see how
-everything is going. Use the following command (if you have ffmpeg installed
-and libx264 installed) to make a movie of these frames:
-
-`ffmpeg -framerate 60 -pattern_type glob -i '*.jpg' -c:v libx264 -preset fast out.mp4`
-
-replace the \*.jpg above with the appropriate glob pattern to use for the files
-in question
 
 # Authors
 
 Waqas Bhatti
-
-_Contributors:_
 Luke Bouma
+Samuel Yee
 
 # License
 
