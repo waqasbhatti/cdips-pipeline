@@ -4075,7 +4075,8 @@ def choose_tfa_template(statsfile,
                         max_rms=0.1,
                         max_sigma_above_rmscurve=4.0,
                         outprefix=None,
-                        tfastage1=True):
+                        tfastage1=True,
+                        epdlcext='.epdlc'):
     '''
     This chooses suitable stars for TFA template purposes. This "template set"
     is a subsample of the stars, and is supposed to represent all the types of
@@ -4284,7 +4285,9 @@ def choose_tfa_template(statsfile,
             for i, tfaobj in enumerate(tfa_stars):
 
                 # search for the LC file for this object and make sure it exists
-                lcfile_searchpath = os.path.join(epdlcdir, '%s.epdlc' % tfaobj)
+                lcfile_searchpath = os.path.join(
+                    epdlcdir, '{:s}{:s}'.format(tfaobj,epdlcext)
+                )
 
                 if os.path.exists(lcfile_searchpath):
 
