@@ -33,7 +33,7 @@ mpl.use('AGG')
 import numpy as np, pandas as pd, matplotlib.pyplot as plt
 import aperturephot as ap, shared_variables as sv, autoimagesub as ais, \
        imagesubphot as ism, tessutils as tu, lcstatistics as lcs, \
-       imageutils as iu
+       imageutils as iu, lcutils as lcu
 from glob import glob
 from tqdm import tqdm
 from astropy.io import fits
@@ -881,23 +881,29 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
     # photometric reference.  With 30 workers, at best process ~few frames per
     # second.
 
-    _ = ais.parallel_xtrnsfits_convsub(
-        xtrnsfiles, photreftype, fitsdir=fitsdir, fitsglob=fitsglob,
-        outdir=None, observatory='tess', fieldinfo=fieldinfo,
-        reversesubtract=True, kernelspec=kernelspec, nworkers=nworkers,
-        maxworkertasks=1000, colorscheme=colorscheme)
+    if len(glob(os.path.join(fitsdir,'*.iphot')))<10:
+        _ = ais.parallel_xtrnsfits_convsub(
+            xtrnsfiles, photreftype, fitsdir=fitsdir, fitsglob=fitsglob,
+            outdir=None, observatory='tess', fieldinfo=fieldinfo,
+            reversesubtract=True, kernelspec=kernelspec, nworkers=nworkers,
+            maxworkertasks=1000, colorscheme=colorscheme)
+    else:
+        print('found .iphot files. skipping convolution+subtraction.')
 
     # Step ISP8: do photometry on your subtracted frames to produce .iphot files.
     # With 30 workers, at best process ~few frames per second.
 
-    subfitslist = glob(fitsdir+'rsub-????????-'+
-                       fitsglob.replace('.fits','-xtrns.fits'))
-    _ = ais.parallel_convsubfits_staticphot(
-        subfitslist, fitsdir=fitsdir, fitsglob=fitsglob,
-        photreftype=photreftype, kernelspec=kernelspec,
-        lcapertures=aperturelist, photdisjointradius=photdisjointradius,
-        outdir=None, fieldinfo=fieldinfo, observatory='tess',
-        nworkers=nworkers, maxworkertasks=1000, photparams=photparams)
+    if len(glob(os.path.join(fitsdir,'*.iphot')))<10:
+        subfitslist = glob(fitsdir+'rsub-????????-'+
+                           fitsglob.replace('.fits','-xtrns.fits'))
+        _ = ais.parallel_convsubfits_staticphot(
+            subfitslist, fitsdir=fitsdir, fitsglob=fitsglob,
+            photreftype=photreftype, kernelspec=kernelspec,
+            lcapertures=aperturelist, photdisjointradius=photdisjointradius,
+            outdir=None, fieldinfo=fieldinfo, observatory='tess',
+            nworkers=nworkers, maxworkertasks=1000, photparams=photparams)
+    else:
+        print('found .iphot files. skipping their production.')
 
     # Step ISP9 + 10 : dump lightcurves.
     if len(glob(os.path.join(lcdirectory,'*.grcollectilc'))) < 10:
@@ -925,9 +931,10 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
 
 
 def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
-                   reformed_cat_file, statsdir, field, epdsmooth=11,
-                   epdsigclip=10, nworkers=10, binlightcurves=False,
-                   tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0):
+                   reformed_cat_file, statsdir, field, fitsdir, fitsglob,
+                   epdsmooth=11, epdsigclip=10, nworkers=10,
+                   binlightcurves=False, tfa_template_sigclip=5.0,
+                   tfa_epdlc_sigclip=5.0):
     """
     Step ISP11: do EPD on all the LCs, and collect stats on the results.
     for ISP LCs, use lcmagcols=([27,28,29],[30,],[30,],[30,])
@@ -937,33 +944,46 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
     single .tfalc files. Then collect statistics.
     """
 
-    #FIXME: probably should convert lightcurves to FITS binary table format
-    # here (once python-3 refactor is done).
-    # assert 0 #FIXME
-    print('currently at a phase where detrending won\'t proceed.')
-    print('(because as-implemented, it requests temperatures).')
-    print('(can fix this for python-3 implementation purposes).')
-    #FIXME:
+    catfile = reformed_cat_file.replace('.reformed_catalog', '.catalog')
+
+    if len(glob(os.path.join(lcdirectory,'*_llc.fits')))<10:
+
+        lcu.parallel_convert_grcollect_to_fits_lc(lcdirectory, fitsdir,
+                                                  catfile=catfile,
+                                                  ilcglob='*.grcollectilc',
+                                                  nworkers=nworkers,
+                                                  observatory='tess')
+
+        lcu.parallel_apply_barycenter_time_correction(lcdirectory,
+                                                      nworkers=nworkers)
+    else:
+        print('found >10 fits LCs from grcollect. continuing.')
 
     if not os.path.exists(epdstatfile):
 
-        if len(glob(os.path.join(lcdirectory,'*.epdlc'))) < 10:
-            _ = ism.parallel_run_epd_imagesub(lcdirectory,
-                                              ilcglob='*.grcollectilc',
-                                              outdir=None, smooth=epdsmooth,
-                                              sigmaclip=epdsigclip, nworkers=nworkers,
-                                              maxworkertasks=1000, minndet=100,
-                                              observatory='tess')
+        fitsilcfiles = glob(os.path.join(lcdirectory,'*_llc.fits'))
+        outfiles = fitsilcfiles
+        hdulist = fits.open(fitsilcfiles[0])
+        if hdulist[0].header['DTR_EPD']:
+            print('first LC had DTR_EPD flag true -> skipping EPD.')
         else:
-            print('found EPD lightcurves. will not re-make them.')
+            _ = lcu.parallel_run_epd_imagesub_fits(fitsilcfiles, outfiles,
+                                                   smooth=epdsmooth,
+                                                   sigmaclip=epdsigclip,
+                                                   nworkers=nworkers,
+                                                   maxworkertasks=1000,
+                                                   minndet=100,
+                                                   observatory='tess')
 
+        # n.b. this actually works on fits lcs as well.
         ap.parallel_lc_statistics(lcdirectory, epdlcglob,
                                   reformed_cat_file, tfalcrequired=False,
+                                  fitslcnottxt=True,
                                   fovcatcols=(0,6), # objectid, magcol to use
                                   fovcatmaglabel='r', outfile=epdstatfile,
                                   nworkers=nworkers,
-                                  workerntasks=500, rmcols=[14,19,24],
-                                  epcols=[27,28,29], tfcols=[30,31,32],
+                                  workerntasks=500, rmcols=None,
+                                  epcols=None, tfcols=None,
                                   rfcols=None, correctioncoeffs=None,
                                   sigclip=5.0, fovcathasgaiaids=True)
     else:
@@ -978,13 +998,17 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
     else:
         print('already made EPD LC plots')
 
-    if not os.path.exists(lcdirectory+'aperture-1-tfa-template.list'):
+    # choose the TFA template stars
+    if not os.path.exists(os.path.join(
+        statsdir,'tfa-stage1-input-aperture-1.txt')
+    ):
         if 'TUNE' in statsdir:
             target_nstars, max_nstars = 40, 42
         elif 'FULL' in statsdir:
             target_nstars, max_nstars = 500, 502
         else:
             raise NotImplementedError
+
         _ = ap.choose_tfa_template(epdstatfile, reformed_cat_file, lcdirectory,
                                    ignoretfamin=False, fovcat_idcol=0,
                                    fovcat_xicol=3, fovcat_etacol=4,
@@ -993,20 +1017,39 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
                                    max_nstars=max_nstars,
                                    brightest_mag=8.5, faintest_mag=13.0,
                                    max_rms=0.1, max_sigma_above_rmscurve=4.0,
-                                   outprefix=statsdir, tfastage1=True,
-                                   fovcathasgaiaids=True)
+                                   outprefix=statsdir, tfastage1=False,
+                                   fovcathasgaiaids=True, epdlcext='_llc.fits')
 
     if not os.path.exists(tfastatfile):
-        templatefiles = glob(lcdirectory+'aperture-?-tfa-template.list')
-        ism.parallel_run_tfa(lcdirectory, templatefiles, epdlc_glob='*.epdlc',
-                             epdlc_jdcol=0, epdlc_magcol=(27,28,29),
-                             template_sigclip=tfa_template_sigclip,
-                             epdlc_sigclip=tfa_epdlc_sigclip,
-                             nworkers=nworkers, workerntasks=1000)
+        templatefiles = glob(os.path.join(
+            statsdir, 'tfa-stage1-input-aperture-?.txt'))
+        lcfiles = glob(os.path.join(lcdirectory,'*_llc.fits'))
+
+        # create ascii files needed for vartools:
+        # lc_list_tfa, trendlist_tfa and dates_tfa
+        lcu.make_ascii_files_for_vartools(lcfiles, templatefiles, statsdir,
+                                          fitsdir, fitsglob)
+
+        import IPython; IPython.embed()
+        # FIXME IMPLEMENT PER JOEL'S DEBUGGIN
+        assert 0
+        #TODO: implement below, through vartools call.
+        lcu.parallel_run_tfa()
+
+    assert 0 #FIXME
+
+    if not os.path.exists(tfastatfile):
+        # templatefiles = glob(lcdirectory+'aperture-?-tfa-template.list')
+        # ism.parallel_run_tfa(lcdirectory, templatefiles, epdlc_glob='*.epdlc',
+        #                      epdlc_jdcol=0, epdlc_magcol=(27,28,29),
+        #                      template_sigclip=tfa_template_sigclip,
+        #                      epdlc_sigclip=tfa_epdlc_sigclip,
+        #                      nworkers=nworkers, workerntasks=1000)
 
         # for Gaia DR2, catalog mag col corresponds to G_Rp (Gaia "R" band).
         ap.parallel_lc_statistics(lcdirectory, '*.epdlc', reformed_cat_file,
                                   tfalcrequired=True,
+                                  fitslcnottxt=True,
                                   fovcatcols=(0,6), # objectid, magcol from fovcat
                                   fovcatmaglabel='r',
                                   outfile=tfastatfile,
@@ -1416,7 +1459,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
 
     photreftype, dbtype = 'onenight', 'postgres'
 
-    epdlcglob, tfalcglob = '*.epdlc', '*.tfalc'
+    epdlcglob, tfalcglob = '*_llc.fits', '*_llc.fits'
     statsdir = os.path.dirname(lcdirectory) + '/stats_files/'
     for dirname in [lcdirectory, statsdir]:
         if not os.path.exists(dirname):
@@ -1443,9 +1486,9 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
         print('found that image subtraction is complete.')
 
     run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
-                   reformed_cat_file, statsdir, field, epdsmooth=epdsmooth,
-                   epdsigclip=epdsigclip, nworkers=nworkers,
-                   binlightcurves=binlightcurves,
+                   reformed_cat_file, statsdir, field, fitsdir, fitsglob,
+                   epdsmooth=epdsmooth, epdsigclip=epdsigclip,
+                   nworkers=nworkers, binlightcurves=binlightcurves,
                    tfa_template_sigclip=tfa_template_sigclip,
                    tfa_epdlc_sigclip=tfa_epdlc_sigclip)
 
