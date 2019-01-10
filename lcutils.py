@@ -11,8 +11,6 @@ parallel_convert_grcollect_to_fits_lc
 parallel_run_epd_imagesub_fits
     epd_fitslightcurve_imagesub_worker
     epd_fitslightcurve_imagesub
-
-
 """
 
 import os
@@ -32,6 +30,10 @@ import multiprocessing as mp
 import tessutils as tu, imageutils as iu, imagesubphot as ism
 
 from astropy.io import fits
+from astropy.time import Time
+from astropy import units as u
+import astropy
+import astropy.coordinates as coord
 
 DEBUG = False
 
@@ -47,7 +49,7 @@ def _map_key_to_format(key):
     # ['bge', 'bgv', 'fdv', 'fkv', 'fsv',
     #  'ife1', 'ife2', 'ife3', 'ifl1', 'ifl2',
     #  'ifl3', 'ire1', 'ire2', 'ire3', 'irm1', 'irm2', 'irm3', 'irq1', 'irq2',
-    #  'irq3', 'tjd', 'rstfc', 'xic', 'yic']
+    #  'irq3', 'tmid_utc', 'rstfc', 'xic', 'yic']
 
     if key in ['bge','bgv','fdv','fkv','fsv','xic','yic']:
         return 'D'
@@ -61,14 +63,14 @@ def _map_key_to_format(key):
         return 'D'
     elif 'irq' in key: # quality flag
         return '1A'
-    elif 'tjd' in key: # timestamp
+    elif 'tmid_utc' in key: # timestamp
         return 'D'
     elif 'rstfc' in key: # frame id
         return '40A'
 
 def _map_key_to_comment(k):
     kcd = {
-        "tjd"   : "Spacecraft JD-2457000 in TDB",
+        "tmid_utc": "exp mid-time in JD_UTC (from DATE-OBS,DATE-END)",
         "rstfc" : "Unique frame key",
         "starid": "GAIA ID of the object",
         "xcc"   : "original X coordinate on CCD on photref frame",
@@ -119,7 +121,7 @@ def convert_grcollect_to_fits_lc_worker(task):
 
     lcd = tu.read_tess_txt_lightcurve(grclcpath, catdf)
 
-    times = lcd['tjd']
+    times = lcd['tmid_utc']
     earliestframename = lcd['rstfc'][np.argmin(times)]
     earliestframepath = os.path.join(fitsdir, earliestframename+'.fits')
 
@@ -142,7 +144,7 @@ def convert_grcollect_to_fits_lc_worker(task):
 
     primary_hdu = fits.PrimaryHDU(header=hdr)
 
-    # make the lightcurve data extension
+    # make the lightcurve data extension, and make list of time-series columns
     datakeys = [k for k in np.sort(list(lcd.keys()))
                 if k not in ['starid','xcc','ycc','objectid','objectinfo']
                ]
@@ -275,9 +277,9 @@ def parallel_convert_grcollect_to_fits_lc(lcdirectory,
 
         return 1
 
-##############
-# DETRENDING #
-##############
+##################
+# EPD DETRENDING #
+##################
 
 def parallel_run_epd_imagesub_fits(fitsilcfiles, outfiles, smooth=21,
                                    sigmaclip=3.0, minndet=200,
@@ -432,6 +434,11 @@ def epd_fitslightcurve_imagesub(fitsilcfile, outfile, smooth=21, sigmaclip=3.0,
 
     return 1
 
+
+##################
+# TFA DETRENDING #
+##################
+
 def _make_tfa_lc_list(lcfiles, statsdir):
     """
     lc_list_tfa = List of input light curve files to process. The filenames are
@@ -527,3 +534,132 @@ def make_ascii_files_for_vartools(lcfiles, templatefiles, statsdir, fitsdir,
     _make_trendlist_tfa(templatefiles, statsdir)
 
     _make_dates_tfa(fitsdir, fitsimgglob, statsdir)
+
+
+
+##################
+# TIME UTILITIES #
+##################
+def parallel_apply_barycenter_time_correction(lcdirectory, nworkers=16,
+                                              maxworkertasks=1000):
+
+    fitsilcfiles = glob(os.path.join(lcdirectory,'*_llc.fits'))
+
+    print('%sZ: %s lcs to apply barycenter time correction on' %
+          (datetime.utcnow().isoformat(), len(fitsilcfiles)))
+
+    tasks = [(x) for x in fitsilcfiles]
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+    results = pool.map(apply_barycenter_time_correction_worker, tasks)
+
+    pool.close()
+    pool.join()
+
+    return {result for result in results}
+
+
+def apply_barycenter_time_correction_worker(task):
+    # wrapper for common API
+    fitsilcfile = task
+    apply_barycenter_time_correction(fitsilcfile)
+
+
+def apply_barycenter_time_correction(fitsilcfile):
+    """
+    make the TMID_BJD and BARYCORR columns, and write it.
+    """
+
+    inhdulist = fits.open(fitsilcfile)
+    primary_hdu = inhdulist[0]
+
+    # utc_tmid calculated in ism.dump_lightcurves_with_grcollect
+    tmid_utc = Time(inhdulist[1].data['TMID_UTC'], format='jd',
+                    scale='utc')
+
+    # coordinates from gaia
+    ra = inhdulist[0].header['RA[deg]']*u.deg
+    dec = inhdulist[0].header['Dec[deg]']*u.deg
+
+    # get the midtime in BJD_TDB, and the barycentric correction
+    tmid_bjd_tdb, ltt_bary = astropy_utc_time_to_bjd_tdb(
+        tmid_utc, ra, dec, observatory='tess', get_barycorr=True
+    )
+
+    # write to FITS lightcurve table
+    tmidcol = fits.Column(name='TMID_BJD', format='D', array=tmid_bjd_tdb)
+    barycorrcol = fits.Column(name='BJDCORR', format='D', array=ltt_bary)
+
+    timecollist = [tmidcol, barycorrcol]
+    timehdu = fits.BinTableHDU.from_columns(timecollist)
+
+    new_columns = inhdulist[1].columns + timehdu.columns
+    new_timeseries_hdu = fits.BinTableHDU.from_columns(new_columns)
+
+    # update primary HDU time meta-data
+    primary_hdu.header['TIMESYS'] = 'TDB'
+    primary_hdu.header['TIMEUNIT'] = 'd'
+
+    outhdulist = fits.HDUList([primary_hdu, new_timeseries_hdu])
+    outhdulist.writeto(fitsilcfile, overwrite=True)
+
+    inhdulist.close()
+
+    print('{}Z: wrote TMID_BJD and BARYCORR to {}'.
+          format(datetime.utcnow().isoformat(), fitsilcfile)
+    )
+
+
+def astropy_utc_time_to_bjd_tdb(tmid_utc, ra, dec, observatory='tess',
+                                get_barycorr=False):
+    """
+    Args:
+
+        tmid_utc (astropy.time.core.Time): measurement midtime in UTC
+        reference, as an astropy Time object. It can be vector, e.g.,
+
+            <Time object: scale='utc' format='jd' value=[2458363.41824751
+            2458364.41824751]>
+
+        ra, dec: with astropy units included.
+
+        get_barycorr: if True, returns tmid_bjd_tdb, ltt_bary tuple.
+
+    Returns:
+
+        tmid_bjd_tdb (np.ndarray, or float) if not get_barycorr.
+
+        else
+
+        tmid_bjd_tdb, ltt_bary: tuple of midtimes in BJD_TDB, and the
+        barycentric time corrections that were applied.
+    """
+
+    assert type(tmid_utc) == astropy.time.core.Time
+    assert type(ra) == astropy.units.quantity.Quantity
+
+    if observatory=='tess':
+        # For TESS, assume the observatory is at the Earth's center. This
+        # introduces a maximal timing error of
+        #
+        # (orbital major axis length)/(speed of light) ~= 80R_earth/c = 1.7 seconds.
+        #
+        # This is below the timing precision expected for pretty much anything
+        # from our lightcurves.
+
+        location = coord.EarthLocation.from_geocentric(0*u.m,0*u.m,0*u.m)
+    else:
+        raise NotImplementedError
+
+    tmid_utc.location = location
+
+    obj = coord.SkyCoord(ra, dec, frame='icrs')
+
+    ltt_bary = tmid_utc.light_travel_time(obj)
+
+    tmid_bjd_tdb = tmid_utc.tdb + ltt_bary
+
+    if not get_barycorr:
+        return tmid_bjd_tdb.jd
+    else:
+        return tmid_bjd_tdb.jd, ltt_bary.value
