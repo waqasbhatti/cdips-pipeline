@@ -2535,23 +2535,34 @@ def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
 
                 from astropy.time import Time
 
-                # observation start and stop time as UTC calendar dates.
-                # calculated by SPOC. for WASP-4, these agreed with what was
-                # expected (the leap-seconds were included as expected for
-                # UTC, not TDB). note it is better to use these than the given
-                # "BJD" time-stamps, because those have a wrong barycentric
-                # correction applied (and the sign convention for how the
-                # correction is applied -- is it added, or subtracted?) is not
-                # clear. UTC calendar dates avoid this ambiguity.
-                tstart_utc_str = get_header_keyword(originalframe, 'DATE-OBS')
-                tstop_utc_str = get_header_keyword(originalframe, 'DATE-END')
+                # observation start and stop time as BJD_UTC calendar dates.
+                # calculated by SPOC. (these include the leapseconds). the
+                # wrong barycentric correction has been applied to all
+                # available timestamps (and the sign convention for how the
+                # correction is applied -- is it added, or subtracted? -- has
+                # been confirmed via private comm. with Jon Jenkins)
+                tstart_bjd_utc_str = get_header_keyword(
+                    originalframe, 'DATE-OBS')
+                tstop_bjd_utc_str = get_header_keyword(
+                    originalframe, 'DATE-END')
+                ltt_barycenter_spoc = get_header_keyword(
+                    originalframe, 'BARYCORR')
 
                 # record the midtime in JD_UTC with grcollect. barycentric
                 # correction comes later. (once ra/dec are accessible).
-                tstart_utc = Time(tstart_utc_str, format='isot', scale='utc')
-                tstop_utc = Time(tstop_utc_str, format='isot', scale='utc')
+                tstart_bjd_utc = Time(tstart_bjd_utc_str, format='isot',
+                                      scale='utc')
+                tstop_bjd_utc = Time(tstop_bjd_utc_str, format='isot',
+                                     scale='utc')
 
-                tmid_jd_utc = tstart_utc.jd + (tstop_utc.jd - tstart_utc.jd)/2.
+                tmid_bjd_utc = (
+                    tstart_bjd_utc.jd + (tstop_bjd_utc.jd - tstart_utc.jd)/2.
+                )
+
+                # WANT: bjd_tdb_me = jd_utc_spoc + ltt_barycenter_me + leapseconds (eq 1)
+                # HAVE: bjd_utc_spoc = jd_utc_spoc + ltt_barycenter_spoc (eq 2)
+                # use eq (2) to get jd_tdb_spoc:
+                tmid_jd_utc = tmid_bjd_utc - ltt_barycenter_spoc
 
                 frametime = tmid_jd_utc
 
