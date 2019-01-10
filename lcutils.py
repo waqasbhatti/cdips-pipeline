@@ -11,6 +11,8 @@ parallel_convert_grcollect_to_fits_lc
 parallel_run_epd_imagesub_fits
     epd_fitslightcurve_imagesub_worker
     epd_fitslightcurve_imagesub
+
+
 """
 
 import os
@@ -430,4 +432,98 @@ def epd_fitslightcurve_imagesub(fitsilcfile, outfile, smooth=21, sigmaclip=3.0,
 
     return 1
 
+def _make_tfa_lc_list(lcfiles, statsdir):
+    """
+    lc_list_tfa = List of input light curve files to process. The filenames are
+    in the first column, the X coordinates of the stars (on the reference
+    image) are in the second column, and the Y coordinates are in the third
+    column. e.g.
+    """
 
+    # silly way to populate the lists, but we're I/O limited here anyway
+    xcc, ycc = [], []
+    for lcfile in lcfiles:
+        d = iu.get_header_keyword_list(lcfile, ['XCC','YCC'], ext=0)
+        xcc.append(d['XCC'])
+        ycc.append(d['YCC'])
+    xcc, ycc = nparr(xcc), nparr(ycc)
+
+    df = pd.DataFrame({'fname':lcfiles,'xcc':xcc,'ycc':ycc})
+
+    outpath = os.path.join(statsdir, 'lc_list_tfa.txt')
+    df.to_csv(outpath, index=False, header=False, sep=' ')
+    print('made {}'.format(outpath))
+
+
+def _make_trendlist_tfa(templatefiles, statsdir):
+    """
+    trendlist_tfa.txt columns are:
+        path to template lightcurve; XCC of template LC; YCC ditto.
+    """
+
+    n_apertures = len(templatefiles)
+
+    # iterate over "templatefiles", which for each aperture have the selected
+    # template stars, plus some other info (made by
+    # aperturephot.choose_tfa_template)
+    for templatefile, apind in zip(
+        np.sort(templatefiles), range(1,n_apertures+1)):
+
+        lcpaths, xcc, ycc = [], [], []
+
+        df = pd.read_csv(templatefile, sep=' ',
+                         names=['gaiaid', 'lcpath', 'aperture_mag','rms',
+                                'ndet', 'xi', 'eta'])
+
+        for lcpath in df['lcpath']:
+            d = iu.get_header_keyword_list(lcpath, ['XCC','YCC'], ext=0)
+            xcc.append(d['XCC'])
+            ycc.append(d['YCC'])
+            lcpaths.append(lcpath)
+
+        xcc, ycc = nparr(xcc), nparr(ycc)
+
+        outdf = pd.DataFrame({'fname':lcpaths,'xcc':xcc,'ycc':ycc})
+
+        outpath = os.path.join(statsdir, 'trendlist_tfa_ap{}.txt'.
+                               format(apind))
+        outdf.to_csv(outpath, index=False, header=False, sep=' ')
+        print('made {}'.format(outpath))
+
+
+def _make_dates_tfa(fitsdir, fitsimgglob, statsdir):
+    """
+    dates_tfa.txt: list of all the image identifiers and times in the data set.
+    these are the SAME for every (complete) lightcurve.
+
+    the most obvious (and complete) way to generate them is directly from the
+    images.
+
+    tess2018241202941-s0002-4-4-0121_cal_img 1360.3540539999999
+    """
+
+    imgfiles = glob(os.path.join(fitsdir, fitsimgglob))
+
+    framekeyarr = nparr([os.path.basename(f).rstrip('.fits')
+                         for f in imgfiles])
+
+    tstartarr = nparr(
+        [iu.get_header_keyword(f, 'TSTART', ext=0) for f in imgfiles]
+    )
+
+    outdf = pd.DataFrame({'framekey':framekeyarr,'tstart':tstartarr})
+
+    outpath = os.path.join(statsdir, 'dates_tfa.txt')
+    outdf.to_csv(outpath, index=False, header=False, sep=' ')
+    print('made {}'.format(outpath))
+
+
+def make_ascii_files_for_vartools(lcfiles, templatefiles, statsdir, fitsdir,
+                                  fitsimgglob):
+    # lc_list_tfa, trendlist_tfa and dates_tfa
+
+    _make_tfa_lc_list(lcfiles, statsdir)
+
+    _make_trendlist_tfa(templatefiles, statsdir)
+
+    _make_dates_tfa(fitsdir, fitsimgglob, statsdir)
