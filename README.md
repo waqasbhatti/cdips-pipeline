@@ -3,6 +3,9 @@
 Timeseries photometry pipeline used for HATPI prototype, TESS simulated
 data, and real TESS data.
 
+![pipe-trex](https://raw.githubusercontent.com/waqasbhatti/pipe-trex/blob/master/graphics/pipetrex_small.png)
+
+
 ## Install
 
 ### Operating system
@@ -284,8 +287,6 @@ At the second level:
 
 Maintaining this structure is essential. Commands can be run from anywhere,
 provided that this structure is maintained.
-
-### Usage
 
 # Authors
 
