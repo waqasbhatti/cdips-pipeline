@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-'''
+"""
 aperturephot.py - Waqas Bhatti (wbhatti@astro.princeton.edu) - Dec 2014
 
 Contains aperture photometry routines for HATPI. Needs reduced frames.
@@ -57,8 +57,7 @@ The usual sequence is:
 
 22. run plot_ismphot_comparison to compare against ISM photometry statistics for
     the same field (requires common stars).
-
-'''
+"""
 
 #############
 ## IMPORTS ##
@@ -296,15 +295,14 @@ def reform_fistars(fistardir,
                    fistarglob='1-*_?.fistar',
                    linestokeep=300,
                    outpostfix='astrometry'):
-    '''
+    """
     This truncates all fistars in the directory fistardir to linestokeep
     lines. This is useful for astrometry since the fistar files we produce are
     sorted by decreasing flux, and we only only need a couple of thousand bright
     sources to do astrometry with anet.
 
     Mostly so we don't need to do source extraction over again
-
-    '''
+    """
 
     fistars = glob.glob(os.path.join(os.path.abspath(fistardir),
                                      fistarglob))
@@ -330,10 +328,10 @@ def reform_fistars(fistardir,
 
 
 def fistarfile_to_xy(fistarfile):
-    '''
+    """
     Takes a single fistar file and convert it to a binary fits table of the
     source positions. The latter is readable by astrometry.net.
-    '''
+    """
 
     if not isinstance(fistarfile, str):
         raise AssertionError('called fistarfile_to_xy on not a path')
@@ -366,10 +364,10 @@ def fistarfile_to_xy(fistarfile):
 
 
 def fistardir_to_xy(fistardir, fistarglob='1-*_?.fistar'):
-    '''
+    """
     Convert a directory of fistar outputs to binary fits table of x,y source
     positions. The latter is readable by astrometry.net.
-    '''
+    """
 
     fistars = glob.glob(
         os.path.join(os.path.abspath(fistardir), fistarglob)
@@ -401,7 +399,8 @@ def astrometrydotnet_solve_frame(srclist,
                                  ycolname='yimage',
                                  useimagenotfistar=False,
                                  downsample=4):
-    '''This uses astrometry.net to solve frame astrometry. This is the
+    """
+    This uses astrometry.net to solve frame astrometry. This is the
     free version of anet_solve_frame.
 
     Uses the frame extracted sources (.fistar-fits-xy file, see
@@ -424,7 +423,7 @@ def astrometrydotnet_solve_frame(srclist,
 
     For astrometry.net to work, you need to install it, and get all the index
     files. See http://astrometry.net/doc/readme.html.
-    '''
+    """
 
     if useimagenotfistar:
 
@@ -537,7 +536,8 @@ def anet_solve_frame(srclist,
                      cols=(2,3),
                      scale=None,
                      usescalenotwidth=False):
-    '''This uses anet to solve frame astrometry.
+    """
+    This uses anet to solve frame astrometry.
 
     Uses the frame extracted sources (.fistar file) and returns a .wcs file
     containing the astrometric transformation between frame x,y and RA/DEC.
@@ -565,8 +565,7 @@ def anet_solve_frame(srclist,
 
     The input sourcelist can come from fistar, with a fluxthreshold set to 10000
     to just get the bright stars. This makes anet way faster.
-
-    '''
+    """
 
     if infofromframe:
 
@@ -683,9 +682,10 @@ def anet_solve_frame(srclist,
 
 
 def parallel_anet_worker(task):
-    ''' This expands the task arg into the args and kwargs necessary for
+    """
+    This expands the task arg into the args and kwargs necessary for
     anet_solve_frame.
-    '''
+    """
 
     return (
         task[0],
@@ -696,9 +696,10 @@ def parallel_anet_worker(task):
 
 
 def parallel_astrometrydotnet_worker(task):
-    ''' This expands the task arg into the args and kwargs necessary for
+    """
+    This expands the task arg into the args and kwargs necessary for
     astrometrydotnet_solve_frame.
-    '''
+    """
 
     return (
         task[0],
@@ -721,11 +722,10 @@ def parallel_anet(srclistdir,
                   xpix=2048,
                   ypix=2048,
                   cols=(2,3)):
-    '''
+    """
     This does parallel anet astrometry for all frames in srclistdir and
     generates their wcs files.
-
-    '''
+    """
 
     # get a list of all fits files in the directory
     fistarlist = glob.glob(os.path.join(srclistdir, fistarglob))
@@ -805,10 +805,10 @@ def parallel_astrometrydotnet(
         downsample=4
     ):
 
-    '''
+    """
     Uses astrometrydotnet_solve_frame to do parallel astrometry for all frames
     in srclistdir and generate their wcs files.
-    '''
+    """
 
     # get a list of all fits files in the directory
     fistarfitsxylist = glob.glob(os.path.join(srclistdir, fistarfitsxyglob))
@@ -883,10 +883,9 @@ def parallel_anet_list(srclistlist,
                        xpix=2048,
                        ypix=2048,
                        cols=(2,3)):
-    '''
+    """
     This runs anet on a list of frames in parallel.
-
-    '''
+    """
 
     # get a list of all fits files in the directory
     fistarlist = [x for x in srclistlist if os.path.exists(x)]
@@ -949,7 +948,7 @@ def make_fov_catalog(ra=None, dec=None, size=None,
                      columns=None,
                      observatory='hatpi',
                      gaiaidrequest='HAT'):
-    '''
+    """
     This function gets all the sources in the field of view of the frame, given
     its central pointing coordinates and plate-scale from either 2MASS or
     UCAC4. Makes a catalog file that can then be used as input to project
@@ -985,7 +984,7 @@ def make_fov_catalog(ra=None, dec=None, size=None,
     Returns:
 
         path of the catalog file produced.
-    '''
+    """
 
     if ra and dec and size:
 
@@ -1128,13 +1127,12 @@ def reform_gaia_fov_catalog(
 def reform_fov_catalog(incat,
                        outcat,
                        columns='id,ra,dec,xi,eta,J,K,qlt,I,r,i,z'):
-    '''
+    """
     This converts the full output catalog from 2massread, etc. to the format
     required for magfit. Also useful for general reforming of the columns.
 
     columns is a CSV string containing columns needed from allcolumns below.
-
-    '''
+    """
 
     allcolumns = ['id','ra','dec','xi','eta','arcdis','J',
                   'Junc','H','Hunc','K','Kunc','qlt','B',
@@ -1163,11 +1161,15 @@ def extract_frame_sources(fits,
                           fluxthreshold=1000,
                           zeropoint=17.11,
                           exptime=30.0):
-    '''
+    """
     This uses fistar to extract sources from the image.
 
-    fistar -i 1-377741e_5.fits -o test.fistar --model elliptic --iterations symmetric=4,general=2 --algorithm uplink --format id,x,y,bg,amp,s,d,k,flux,s/n -g 2.725 --mag-flux 17,30 --sort flux --flux-threshold 1000 --section 0:0,2048:2048
-    '''
+    fistar -i 1-377741e_5.fits -o test.fistar --model elliptic \
+            --iterations symmetric=4,general=2 --algorithm uplink \
+            --format id,x,y,bg,amp,s,d,k,flux,s/n -g 2.725 \
+            --mag-flux 17,30 --sort flux \
+            --flux-threshold 1000 --section 0:0,2048:2048
+    """
 
     if not os.path.exists(fits):
 
@@ -1220,18 +1222,17 @@ def extract_frame_sources(fits,
 
 
 def parallel_sourceextract_worker(task):
-    '''
+    """
     This expands the task arg into the args and kwargs necessary for
     extract_frame_sources.
-
-    '''
+    """
 
     return (task[0][0], extract_frame_sources(*task[0],**task[1]))
 
 
 def check_files(inlist, operationstr, outdir, intailstr='.fits',
                 outtailstr='.fistar', skipifpartial=False):
-    '''
+    """
     You have a list of files you think you want to run an operation on.
 
     However, you do not want to repeat the operation if you have already run
@@ -1260,8 +1261,7 @@ def check_files(inlist, operationstr, outdir, intailstr='.fits',
         default: the list of files on which to operate. If there are no files
         on which to operate, or skipifpartial==True and there are some matches,
         returns -1.
-
-    '''
+    """
 
     # construct list of file names that would be created for the operation to
     # be performed
@@ -1307,11 +1307,10 @@ def parallel_extract_sources(fitsdir,
                              exptime=30.0,
                              tailstr=FITS_TAIL,
                              fnamestr='*_?.fits'):
-    '''
+    """
     This does parallel source extraction from all FITS in fitsdir, and puts the
     results in outdir.
-
-    '''
+    """
 
     # get a list of all fits files in the directory
     fitslist = glob.glob(os.path.join(fitsdir,fnamestr))
@@ -1364,14 +1363,13 @@ def parallel_extract_sources(fitsdir,
 
 
 def parallel_srcextract_list_worker(task):
-    '''
+    """
     This is the worker for the function below.
 
     task[0] = fits
     task[1] = {'fistarexec','ccdextent','ccdgain','fluxthreshold',
                'zeropoint', 'exptime'}
-
-    '''
+    """
 
     try:
 
@@ -1448,12 +1446,11 @@ def parallel_extract_sources_for_list(fitslist,
                                       fluxthreshold=1000,
                                       zeropoint=17.11,
                                       exptime=30.0):
-    '''
+    """
     This runs a parallel fistar operation on all sources in fitslist.
 
     Puts the results in the same directories as the FITS themselves.
-
-    '''
+    """
 
     pool = mp.Pool(nworkers, maxtasksperchild=maxtasksperworker)
 
@@ -1485,7 +1482,7 @@ def match_fovcatalog_framesources(frame_extracted_sourcelist,
                                   srclist_cols=(0,1,2,5,6,7),
                                   fovcat_cols=(0,1,2,12,13),
                                   match_pixel_distance=0.5):
-    '''
+    """
     Does frame_projected_fovcatalog and frame_extracted_sourcelist matching.
 
         frame_extracted_sourcelist: *.fistar file
@@ -1513,8 +1510,7 @@ def match_fovcatalog_framesources(frame_extracted_sourcelist,
     8. get indices of framelist for each pair and use to get S, D, K info
     9. make sure fovcatalog IDs are unique
     10. write to a combined fiphot file.
-
-    '''
+    """
 
     srclist = np.genfromtxt(frame_extracted_sourcelist,
                            dtype='S17,f8,f8,f8,f8,f8',
@@ -1583,7 +1579,7 @@ def make_frameprojected_catalog(fits,
                                 removetemp=True,
                                 pixborders=0.0):
 
-    '''
+    """
     This makes the projected catalog for the frame to use with fiphot using the
     anet rdtoxy transform stored in the filename wcs and projects the catalog
     into pixel coordinates of the image. If wcs is None, a file with .wcs
@@ -1597,8 +1593,7 @@ def make_frameprojected_catalog(fits,
 
     Returns the path of the source list file produced if successful, otherwise
     returns None.
-
-    '''
+    """
 
     fitspath = os.path.abspath(fits)
 
@@ -1716,14 +1711,14 @@ def run_fiphot(fits,
                removesourcelist=False,
                binaryoutput=True,
                observatory='hatpi'):
-    '''
+    """
     Thus runs fiphot for a single frame. Only the fits filename is required. If
     other parameters are not provided, they will be obtained from the image
     header and defaults.
 
     Returns the path of the .fiphot file produced if successful, otherwise
     returns None.
-    '''
+    """
 
     # get the required header keywords from the FITS file
     if observatory=='hatpi':
@@ -1864,7 +1859,8 @@ def do_photometry(fits,
                   minnstars=500,
                   observatory='hatpi',
                   extractforsdk=False):
-    '''This rolls up the sourcelist and fiphot functions above.
+    """
+    This rolls up the sourcelist and fiphot functions above.
 
     Runs both stages on fits, and puts the output in outdir if it exists. If it
     doesn't or is None, then puts the output in the same directory as fits.
@@ -1877,7 +1873,7 @@ def do_photometry(fits,
         extractforsdk (bool): if you want to run fistar source extraction on
         the frame to get SDK values, even though you're really forcing the
         photometry from a projected catalog.
-    '''
+    """
 
     outprojcat = re.sub(sv.FITS_TAIL,'.projcatalog',os.path.basename(fits))
     outsourcelist = re.sub(sv.FITS_TAIL,'.sourcelist',os.path.basename(fits))
@@ -2019,7 +2015,7 @@ def do_photometry(fits,
 
 
 def parallel_photometry_worker(task):
-    '''
+    """
     This is the parallel photometry worker function for use with
     parallel_fitsdir_photometry below. Just calls do_photometry with expanded
     args and kwargs from the two element task list. task[0] is a tuple of args,
@@ -2027,8 +2023,7 @@ def parallel_photometry_worker(task):
     should kill bad frames.
 
     Returns a tuple of form: (fits, fiphot)
-
-    '''
+    """
 
     try:
 
@@ -2103,10 +2098,10 @@ def parallel_fitsdir_photometry(
         fiphot_xycols='7,8',
         observatory='hatpi'
         ):
-    '''
+    """
     This does photometry for all FITS files in a directory using nworkers
     parallel workers.
-    '''
+    """
 
     # get a list of all fits files in the directory
     fitslist = glob.glob(os.path.join(fitsdir,fitsglob))
@@ -2194,13 +2189,12 @@ def parallel_fitslist_photometry(
         maxframebgv=2000.0,
         minnstars=500
         ):
-    '''
+    """
     This does photometry for all FITS files in the given list using nworkers
     parallel workers.
 
     photokey is required to set the name of the output photometry info pickle.
-
-    '''
+    """
 
     # get a list of all fits files in the directory
     goodlist = [x for x in fitslist if os.path.exists(x)]
@@ -2276,7 +2270,7 @@ def collect_image_info(fits, fistar,
                        maxframebgv=2000.0,
                        maxmadbgv=150.0,
                        minnstars=500):
-    '''
+    """
     This collects the following info about a frame.
 
     - nstars detected
@@ -2296,8 +2290,7 @@ def collect_image_info(fits, fistar,
     - nstars
     - median source background
     - overall image background
-
-    '''
+    """
 
     frame, hdr = read_fits(fits)
 
@@ -2354,7 +2347,7 @@ def collect_image_info(fits, fistar,
 
 
 def frame_filter_worker(task):
-    '''
+    """
     This wraps collect_image_info above and removes the fiphot for image if it's
     rejected.
 
@@ -2368,8 +2361,7 @@ def frame_filter_worker(task):
     True: if the frame was not filtered out
     False: if the frame was filtered out
     None: if the frame filtering failed
-
-    '''
+    """
 
     try:
 
@@ -2413,10 +2405,9 @@ def parallel_frame_filter(fitsdir,
                           minnstars=500,
                           nworkers=16,
                           maxworkertasks=1000):
-    '''
+    """
     This goes through a fitsdir and removes bad frames.
-
-    '''
+    """
 
     # find all the fits files
     fitslist = glob.glob(os.path.join(os.path.abspath(fitsdir),
@@ -2501,7 +2492,7 @@ def get_magfit_frames(fitsdir,
                       linkfiles=True,
                       outlistfile=None,
                       observatory='hatpi'):
-    '''
+    """
     fitsdir = directory where the FITS object frames are
     fitsglob = glob to select a subset of the FITS object frames
     photdir = directory where the TEXT fiphot files are (to select a
@@ -2549,8 +2540,7 @@ def get_magfit_frames(fitsdir,
      'referenceframe':<path to the chosen reference frame>,
      'referencestats':<stats dictionary for the reference frame>,
      'framestats':<a stats dictionary for all the frames>}
-
-    '''
+    """
 
     # first, get the frames
     fitslist = glob.glob(os.path.join(fitsdir, fitsglob))
@@ -2890,12 +2880,11 @@ def get_magfit_frames(fitsdir,
 
 def textphot_links_to_binphot_links(workdir,
                                     binphotdir):
-    '''
+    """
     This is used to convert the fiphot links in workdir (which are text fiphot
     files) to the equivalent binary fiphot links in the same directory. Useful
     only for MagnitudeFitting.py.
-
-    '''
+    """
 
     # get a list of text fiphot links
     text_fiphot_links = glob.glob(os.path.join(workdir,'*.fiphot'))
@@ -2937,10 +2926,9 @@ def make_magfit_config(configoutfile,
                        singlephot_statdir='',
                        masterphot_statdir='',
                        masterphot_outdir=''):
-    '''
+    """
     This creates a magfit config file.
-
-    '''
+    """
 
     # open the output file object
     outf = open(configoutfile,'wb')
@@ -3058,12 +3046,12 @@ def make_magfit_config(configoutfile,
 def make_fiphot_list(searchdirs,
                      searchglob,
                      listfile):
-    '''This makes a list of fiphot files in the list of directories specified in
+    """
+    This makes a list of fiphot files in the list of directories specified in
     searchdirs, using the searchglob to filter by filename. Returns a list of
     absolute paths to the fiphot files and writes this to the file specified in
     listfile.
-
-    '''
+    """
 
     fiphotlist = []
 
@@ -3091,7 +3079,7 @@ def run_magfit(sphotref_frame,
                nprocs=16,
                hatnetwork='HATSouth',
                magfitexec='MagnitudeFitting.py'):
-    '''
+    """
     This runs magfit in single/master photometric reference mode.
 
     lcohpsrv1 invocation:
@@ -3103,8 +3091,7 @@ def run_magfit(sphotref_frame,
     master photref:
 
     nohup python /home/hatuser/wbhatti/src/MagnitudeFittingOrig.py HATSouth master /nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid16/photometry-ap/G557-ccd6-work/1-470789a_6.fits /nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid16/photometry-ap/G557-ccd6-work/1-470789a_6.fiphot -p 8 --log-config=/home/hatuser/wbhatti/src/logging.conf --config-file=/nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid16/photometry-ap/ccd6-magfit.cfg --manual-frame-list=/nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid16/photometry-ap/ccd6-magfit-frames.list --stat > ccd6-mmagfit.log
-
-    '''
+    """
 
     if not (os.path.exists(magfit_frame_list) and
             os.path.exists(sphotref_frame) and
@@ -3163,14 +3150,13 @@ def get_master_photref(sphotref_frame,
                        magfit_config_file,
                        hatnetwork='HATSouth',
                        photrefexec='do_masterphotref.py'):
-    '''
+    """
     Generates the master photometric reference from single ref photometry.
 
     lcohpsrv1 invocation:
 
     nohup python /home/hatuser/wbhatti/src/do_masterphotref.py HATSouth /nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/ccd5-fits/1-404411d_5.fits --manual-frame-list=/nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/photometry-ap/ccd5-fiphot.list --config-file=/nfs/lcohpsrv1/ar1/scratch/PHOT_WB/projid8/photometry-ap/ccd5-magfit.cfg --log-config=/home/hatuser/wbhatti/src/logging.conf --nostat > ccd5-masterphotref.log &
-
-    '''
+    """
 
     if not (os.path.exists(fiphot_list) and
             os.path.exists(sphotref_frame) and
@@ -3226,7 +3212,7 @@ def get_master_photref(sphotref_frame,
 def dump_binary_fiphot(fiphot,
                        sourcelist,
                        outfile):
-    '''
+    """
     This dumps all columns from a fiphot binary format file to a text fiphot
     file. This also needs the sourcelist file for the same frame to get the S,
     D, K values correctly for each detection. This assumes that the sourcelist
@@ -3256,8 +3242,7 @@ def dump_binary_fiphot(fiphot,
 
     NOTE: each line has a length of 210 characters (this will be useful as input
     to the fast parallel LC collection function in imagesubphot.py).
-
-    '''
+    """
 
     # first, read the fiphot in
     binphot = read_fiphot(fiphot)
@@ -3330,15 +3315,14 @@ def dump_binary_fiphot(fiphot,
 
 
 def dump_binary_worker(task):
-    '''
+    """
     This is a worker for parallelization of binary fiphot dumping.
 
     task[0] -> path to input binary fiphot
     task[1] -> path to accompanying sourcelist file
     task[2] -> output directory
     task[3] -> output fiphot extension to use
-
-    '''
+    """
 
     try:
 
@@ -3368,13 +3352,12 @@ def parallel_dump_binary_fiphots(fiphotdir,
                                  textfiphotext='text-fiphot',
                                  nworkers=16,
                                  maxworkertasks=1000):
-    '''
+    """
     This dumps all binary fiphots found in fiphotdir (we check if the file is
     binary or not) to text fiphots with all the same row lengths in outdir. This
     is needed if we want to use the fast LC collection method implemented in
     imagesubphot.py.
-
-    '''
+    """
 
     if not sourcelistdir:
         sourcelistdir = fiphotdir
@@ -3416,11 +3399,10 @@ def make_photometry_indexdb(framedir,
                             photext='text-fiphot',
                             maxframes=None,
                             overwrite=False):
-    '''
+    """
     This is like make_photometry_index below, but uses an sqlite3 database
     instead of an in-memory disk.
-
-    '''
+    """
 
     # make sure we don't overwrite anything unless we're supposed to
     if os.path.exists(outfile) and not overwrite:
@@ -3535,10 +3517,9 @@ def make_photometry_indexdb(framedir,
 
 
 def get_fiphot_line(fiphot, linenum, fiphotlinechars=249):
-    '''
+    """
     This gets a random fiphot line out of the file fiphot.
-
-    '''
+    """
 
     fiphotf = open(fiphot, 'rb')
     filelinenum = fiphotlinechars*linenum
@@ -3550,10 +3531,10 @@ def get_fiphot_line(fiphot, linenum, fiphotlinechars=249):
 
 
 def get_fiphot_line_linecache(fiphot, linenum, fiphotlinechars=249):
-    '''
+    """
     This uses linecache's getline function to get the line out of the file
     fiphot.
-    '''
+    """
 
     return getline(fiphot, linenum)
 
@@ -3564,7 +3545,7 @@ def collect_aperturephot_lightcurve(hatid,
                                     skipcollected=True,
                                     fiphotlinefunc=get_fiphot_line,
                                     fiphotlinechars=249):
-    '''
+    """
     This collects the imagesubphot lightcurve of a single object into a .ilc
     file.
 
@@ -3610,7 +3591,7 @@ def collect_aperturephot_lightcurve(hatid,
     19 rm1    Reduced Mags from magfit in aperture 1
     20 rm2    Reduced Mags from magfit in aperture 2
     21 rm3    Reduced Mags from magfit in aperture 3
-    '''
+    """
 
     # connect to the photindex sqlite3 database
     indexdb = sqlite3.connect(photindex)
@@ -3696,7 +3677,7 @@ def collect_aperturephot_lightcurve(hatid,
 
 
 def aperturephotlc_collection_worker(task):
-    '''
+    """
     This wraps collect_aperurephot_lightcurve for parallel_collect_lightcurves
     below.
 
@@ -3704,8 +3685,7 @@ def aperturephotlc_collection_worker(task):
     task[1] -> photindex DB name
     task[2] -> outdir
     task[3] -> {skipcollected, fiphotlinefunc, fiphotlinechars}
-
-    '''
+    """
 
     try:
 
@@ -3734,10 +3714,9 @@ def parallel_collect_aperturephot_lightcurves(framedir,
                                               fiphotlinechars=249,
                                               nworkers=16,
                                               maxworkertasks=1000):
-    '''
+    """
     This collects all .fiphot files into lightcurves.
-
-    '''
+    """
 
     # first, check if the output directory exists
     if not os.path.exists(outdir):
@@ -3805,13 +3784,12 @@ def parallel_collect_aperturephot_lightcurves(framedir,
 ###################
 
 def epd_diffmags(coeff, fsv, fdv, fkv, xcc, ycc, bgv, bge, mag):
-    '''
+    """
     This calculates the difference in mags after EPD coefficients are
     calculated.
 
     final EPD mags = median(magseries) + epd_diffmags()
-
-    '''
+    """
 
     return -(coeff[0]*fsv**2. +
              coeff[1]*fsv +
@@ -3838,13 +3816,12 @@ def epd_diffmags(coeff, fsv, fdv, fkv, xcc, ycc, bgv, bge, mag):
 
 def epd_magseries(mag, fsv, fdv, fkv, xcc, ycc, bgv, bge,
                   smooth=21, sigmaclip=3.0):
-    '''
+    """
     Detrends a magnitude series given in mag using accompanying values of S in
     fsv, D in fdv, K in fkv, x coords in xcc, y coords in ycc, background in
     bgv, and background error in bge. smooth is used to set a smoothing
     parameter for the fit function. Does EPD voodoo.
-
-    '''
+    """
 
     # find all the finite values of the magnitude
     finiteind = np.isfinite(mag)
@@ -3920,12 +3897,11 @@ def epd_lightcurve(rlcfile,
                    rlcext='rlc',
                    outfile=None,
                    minndet=200):
-    '''
+    """
     Runs the EPD process on rlcfile, using columns specified to get the required
     parameters. If outfile is None, the .epdlc will be placeed in the same
     directory as rlcfile.
-
-    '''
+    """
 
     # read the lightcurve in
     rlc = np.genfromtxt(rlcfile,
@@ -3995,15 +3971,14 @@ def epd_lightcurve(rlcfile,
 
 
 def parallel_epd_worker(task):
-    '''
+    """
     Function to wrap the epd_lightcurve function for use with mp.Pool.
 
     task[0] = rlcfile
     task[1] = {'mags', 'sdk', 'xy', 'backgnd',
                'smooth', 'sigmaclip', 'rlcext',
                'minndet'}
-
-    '''
+    """
 
     try:
         return task[0], epd_lightcurve(task[0], **task[1])
@@ -4025,10 +4000,9 @@ def parallel_run_epd(rlcdir,
                      nworkers=16,
                      maxworkertasks=1000,
                      minndet=200):
-    '''
+    """
     This runs EPD in parallel on the lightcurves in rlcdir.
-
-    '''
+    """
 
     # find all the rlc files in the rlcdir
     rlclist = glob.glob(os.path.join(os.path.abspath(rlcdir), '%s.%s' %
@@ -4077,7 +4051,7 @@ def choose_tfa_template(statsfile,
                         outprefix=None,
                         tfastage1=True,
                         epdlcext='.epdlc'):
-    '''
+    """
     This chooses suitable stars for TFA template purposes. This "template set"
     is a subsample of the stars, and is supposed to represent all the types of
     systematics across the dataset. Kovacs et al (2005) give details.
@@ -4089,7 +4063,7 @@ def choose_tfa_template(statsfile,
 
     Returns a dict with lists of stars chosen, their stats, and filenames of
     where each star list was written.
-    '''
+    """
 
     # read in the stats file
     stats = read_stats_file(statsfile, fovcathasgaiaids=fovcathasgaiaids)
@@ -4422,7 +4396,8 @@ def choose_tfa_template(statsfile,
 
 
 def run_tfa_stage1(tfainfo):
-    '''This just runs the TFA in fake mode to generate a list of template
+    """
+    This just runs the TFA in fake mode to generate a list of template
     stars. Uses the tfainfo dict created in choose_tfa_template above.
 
     Communicates with the tfa program over pipe and then writes its output to a
@@ -4434,8 +4409,7 @@ def run_tfa_stage1(tfainfo):
                         -n <NTEMPLATES_TO_USE>
                         -T - (for stdout)
                         -i /dev/null (no input file?)
-
-    '''
+    """
 
     staridstr = tfainfo['staridstr']
     tfa_stage1_results = {}
@@ -4489,12 +4463,12 @@ def run_tfa_singlelc(epdlc,
                      epdlc_magcol=(22,23,24),
                      template_sigclip=5.0,
                      epdlc_sigclip=5.0):
-    '''This runs TFA for all apertures defined in epdlc_magcol for the input
+    """
+    This runs TFA for all apertures defined in epdlc_magcol for the input
     epdlc file, given an existing TFA template list in templatefile. If outfile
     is None, the output TFA LC will be in the same directory as epdlc but with
     an extension of .tfalc.
-
-    '''
+    """
 
     tfacmdstr = ("tfa -i {epdlc} -t {templatefile} "
                  "--col-jd {epdlc_jdcol} "
@@ -4588,10 +4562,9 @@ def run_tfa_singlelc(epdlc,
 
 
 def parallel_tfa_worker(task):
-    '''
+    """
     This wraps run_tfa_singlelc above.
-
-    '''
+    """
 
     try:
 
@@ -4615,10 +4588,9 @@ def parallel_run_tfa(lcdir,
                      epdlc_sigclip=5.0,
                      nworkers=16,
                      workerntasks=1000):
-    '''
+    """
     This runs TFA on the EPD lightcurves.
-
-    '''
+    """
 
     epdlcfiles = glob.glob(os.path.join(lcdir, epdlc_glob))
 
@@ -4658,14 +4630,13 @@ def get_magnitude_measurement_errs(photfile,
                                    frame,
                                    errcols=[],
                                    airmassheaderkey='X'):
-    '''
+    """
     This gets the median mag errs for the object and the airmass.
 
     Used to calculate the expected noise curve in an RMS plot.
 
     predicted total noise = sqrt((median mag err)**2 + (scintillation noise)**2)
-
-    '''
+    """
 
 
 
@@ -4677,7 +4648,7 @@ def get_lc_statistics(lcfile,
                       sigclip=4.0,
                       tfalcrequired=False,
                       fitslcnottxt=False):
-    '''
+    """
     This calculates the following statistics for the magnitude columns in the
     given lcfile.
 
@@ -4691,7 +4662,7 @@ def get_lc_statistics(lcfile,
         fitslcnottxt (bool): a workaround for the above.
 
     rfcols are for the flux in aperture 1, 2, 3. used for ISM only
-    '''
+    """
 
     tf1lc_check = os.path.exists(lcfile.replace('.epdlc','.tfalc.TF1'))
     tf2lc_check = os.path.exists(lcfile.replace('.epdlc','.tfalc.TF2'))
@@ -5393,9 +5364,9 @@ def get_lc_statistics(lcfile,
 
 
 def lc_statistics_worker(task):
-    '''
+    """
     This is a worker that runs the function above in a parallel worker pool.
-    '''
+    """
 
     try:
         return get_lc_statistics(task[0], **task[1])
@@ -5422,7 +5393,7 @@ def parallel_lc_statistics(lcdir,
                            rfcols=None,
                            correctioncoeffs=None,
                            sigclip=4.0):
-    '''
+    """
     This calculates statistics on all lc files in lcdir.
 
     Args:
@@ -5466,7 +5437,7 @@ def parallel_lc_statistics(lcdir,
 
         correctioncoeffs is like:
             [[ap1_c1,ap1_c2],[ap2_c1,ap2_c2],[ap3_c1,ap3_c2]]
-    '''
+    """
 
     lcfiles = glob.glob(os.path.join(lcdir, lcglob))
 
@@ -5766,10 +5737,9 @@ def parallel_lc_statistics(lcdir,
 
 
 def read_stats_file(statsfile, fovcathasgaiaids=False):
-    '''
+    """
     Reads the stats file into a numpy recarray.
-
-    '''
+    """
 
     if fovcathasgaiaids:
         idstrlength = 19
@@ -5851,7 +5821,7 @@ def time_bin_lightcurve(lcprefix,
                         lcmagcols=([22,23,24],[25,],[25,],[25,]),
                         binsize=540,
                         outfile=None):
-    '''
+    """
     This bins a lightcurve in time using the binsize given. binsize is in
     seconds.
 
@@ -5865,7 +5835,7 @@ def time_bin_lightcurve(lcprefix,
     For gzipped TFA LCs, use:
 
     lcexts = ('epdlc','tfalc.TF1.gz','tfalc.TF2.gz','tfalc.TF3.gz')
-    '''
+    """
 
     collected_binned_mags = {}
 
@@ -5992,12 +5962,11 @@ def serial_bin_lightcurves(lcdir,
 
 
 def parallel_lcbinning_worker(task):
-    '''
+    """
     This calls time_bin_lightcurve above with all binsizes specified in
     task[1]. task[0] contains the lcprefix, and task[2] is a dict containing
     kwargs, which are expanded.
-
-    '''
+    """
 
     try:
         results = [time_bin_lightcurve(task[0],binsize=x,**task[2])
@@ -6018,7 +5987,7 @@ def parallel_bin_lightcurves(lcdir,
                              lcmagcols=([22,23,24],[25,],[25,],[25,]),
                              nworkers=16,
                              workerntasks=1000):
-    '''
+    """
     This bins light curves in time.
 
     For ISM LCs, use:
@@ -6028,7 +5997,7 @@ def parallel_bin_lightcurves(lcdir,
     For gzipped TFA LCs, use:
 
     lcexts = ('epdlc','tfalc.TF1.gz','tfalc.TF2.gz','tfalc.TF3.gz')
-    '''
+    """
 
     epdlcfiles = glob.glob(os.path.join(lcdir, epdlc_glob))
 
@@ -6053,9 +6022,9 @@ def parallel_bin_lightcurves(lcdir,
 
 
 def read_binned_lc(binnedlc):
-    '''
+    """
     This reads back the binnedlc pkl file to a dictionary.
-    '''
+    """
     with open(binnedlc,'rb') as lcf:
         lcdict = pickle.load(lcf)
     return lcdict
@@ -6064,10 +6033,9 @@ def read_binned_lc(binnedlc):
 
 def get_binnedlc_statistics(lcfile,
                             sigclip=4.0):
-    '''
+    """
     This collects stats for the binned LCs in the lcfile.
-
-    '''
+    """
 
     # read in the lcfile
     binnedlc = read_binned_lc(lcfile)
@@ -6391,10 +6359,9 @@ def get_binnedlc_statistics(lcfile,
 
 
 def binnedlc_statistics_worker(task):
-    '''
+    """
     This is a worker that runs the function above in a parallel worker pool.
-
-    '''
+    """
 
     try:
         return get_binnedlc_statistics(task[0], **task[1])
@@ -6417,7 +6384,8 @@ def parallel_binnedlc_statistics(lcdir,
                                  nworkers=16,
                                  workerntasks=500,
                                  sigclip=4.0):
-    '''This calculates statistics on all binned lc files in lcdir.
+    """
+    This calculates statistics on all binned lc files in lcdir.
 
     Puts the results in text file outfile.
 
@@ -6432,8 +6400,7 @@ def parallel_binnedlc_statistics(lcdir,
     median TF[1-3], MAD TF[1-3], mean TF[1-3], stdev TF[1-3]
 
     if a value is missing, it will be np.nan.
-
-    '''
+    """
 
     lcfiles = glob.glob(os.path.join(lcdir, lcglob))
 
@@ -6672,10 +6639,9 @@ def parallel_binnedlc_statistics(lcdir,
 
 
 def read_binnedlc_stats_file(statsfile):
-    '''
+    """
     Reads the stats file into a numpy recarray.
-
-    '''
+    """
 
     # open the statfile and read all the columns
     stats = np.genfromtxt(
@@ -7065,7 +7031,8 @@ def plot_stats_file(statsfile, outdir, outprefix,
                     observatory='hatpi',
                     fovcathasgaiaids=False,
                     yaxisval='MAD'):
-    '''This plots MAD vs magnitude for RAW, EPD, TFA for all apertures.
+    """
+    This plots MAD vs magnitude for RAW, EPD, TFA for all apertures.
 
     args:
 
@@ -7087,7 +7054,7 @@ def plot_stats_file(statsfile, outdir, outprefix,
         mags > than this value. This is used for crowded fields where the
         catalog photometry may not be as precise, so will get incorrect mags
         for fainter stars.
-    '''
+    """
 
     plt.close('all')
 
@@ -7293,10 +7260,9 @@ def plot_magrms_comparison(reference_stats_file,
                            comp_col='mad_tf3',
                            logy=False, logx=False,
                            rangex=(5.9,14.1)):
-    '''
+    """
     This makes magrms comparison plots using two lightcurve stats files.
-
-    '''
+    """
 
     ref_stats = read_stats_file(reference_stats_file)
     comp_stats = read_stats_file(comparison_stats_file)
@@ -7440,10 +7406,9 @@ def rollup_plots(projid,
                  projdir,
                  ccdlist=[5,6,7,8],
                  phottype='ism'):
-    '''
+    """
     This makes the mag-RMS plots and the comparison plots for all of the ccds.
-
-    '''
+    """
 
 
     # make the rms plots

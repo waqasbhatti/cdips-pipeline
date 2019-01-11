@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-'''imagesubphot.py - Waqas Bhatti (wbhatti@astro.princeton.edu) - March 2015
+"""imagesubphot.py - Waqas Bhatti (wbhatti@astro.princeton.edu) - March 2015
 
 This contains functions to do image subtraction photometry.
 
@@ -156,8 +156,7 @@ different from the aperture photometry lightcurves.
     the same field (requires common stars). this step is pretty much obsolete
     since we're now using the same functions to produce ISM and AP lightcurve
     stats.
-
-'''
+"""
 
 #############
 ## IMPORTS ##
@@ -382,7 +381,7 @@ def select_astromref_frame(fitsdir,
                            photext='.fiphot',
                            jpeg=True,
                            overrideref=None):
-    '''
+    """
     This picks an astrometric reference frame.
 
     We're looking for (in order):
@@ -391,8 +390,7 @@ def select_astromref_frame(fitsdir,
     - median D value closest to zero (roundest stars)
     - lowest median background
     - largest number of sources with good extractions
-
-    '''
+    """
 
     # if fitsdir is already a list, then use it directly
     if isinstance(fitsdir, list):
@@ -768,10 +766,9 @@ def select_astromref_frame(fitsdir,
 
 
 def xysdk_coeffs_worker(task):
-    '''
+    """
     This is a parallel worker to run the xysdk coeff operation.
-
-    '''
+    """
 
     fistar, fistarglob = task
 
@@ -798,7 +795,7 @@ def get_smoothed_xysdk_coeffs(fistardir,
                               fistarglob='*.fistar',
                               nworkers=16,
                               maxworkertasks=1000):
-    '''
+    """
     This generates smoothed xy and sdk coefficents for use with iphot later
     (these go into the output photometry file or something).
 
@@ -806,8 +803,7 @@ def get_smoothed_xysdk_coeffs(fistardir,
                   --col-weight 10 --order 4 \
                   --iterations 3 --rejection-level 3 \
                   --comment --output-transformation ${IPHOT}/$base.xysdk
-
-    '''
+    """
 
     fistarlist = glob.glob(os.path.join(os.path.abspath(fistardir), fistarglob))
 
@@ -839,15 +835,14 @@ def get_smoothed_xysdk_coeffs(fistardir,
 
 
 def astromref_shift_worker(task):
-    '''
+    """
     This is a parallel worker for getting the shifts between the astromref frame
     and the frame in the task definition.
 
     task[0] = target frame fistar
     task[1] = astromref frame fistar
     task[2] = outdir
-
-    '''
+    """
 
     fistartoshift, astromref, outdir = task
 
@@ -888,11 +883,10 @@ def get_astromref_shifts(fistardir,
                          outdir=None,
                          nworkers=16,
                          maxworkertasks=1000):
-    '''
+    """
     This gets shifts between the astrometric reference frame and all other
     frames.
-
-    '''
+    """
 
     if isinstance(fistardir, list):
         fistarlist = fistardir
@@ -919,14 +913,13 @@ def get_astromref_shifts(fistardir,
 
 
 def frame_to_astromref_worker(task):
-    '''
+    """
     This is a parallel worker for the frame shift to astromref frame operation.
 
     task[0] = FITS frame to shift
     task[1] = directory where transform files are
     task[2] = output directory
-
-    '''
+    """
 
     frametoshift, transdir, outdir = task
 
@@ -995,10 +988,9 @@ def transform_frames_to_astromref(fitsdir,
                                   outdir=None,
                                   nworkers=16,
                                   maxworkertasks=1000):
-    '''
+    """
     This shifts all frames to the astrometric reference.
-
-    '''
+    """
 
     if isinstance(fitsdir, list):
         fitslist = fitsdir
@@ -1040,7 +1032,8 @@ def select_photref_frames(fitsdir,
                           maxbackgroundstdev=10.0,
                           maxbackgroundmedian=1000.0,
                           forcecollectinfo=False):
-    '''This selects a group of photometric reference frames that will later be
+    """
+    This selects a group of photometric reference frames that will later be
     stacked and medianed to form the single photometric reference frame.
 
     0. this is run on the transformed frames (the ones with -xtrns.fits)
@@ -1070,8 +1063,7 @@ def select_photref_frames(fitsdir,
     3. now that all the frames are in the same coordinate system, and have been
     convolved to the same PSF, we can median-stack them (using scipy or
     ficombine)
-
-    '''
+    """
 
     if isinstance(fitslist, list):
         fitslist = fitsdir
@@ -1428,7 +1420,8 @@ def generate_masterphotref_registration_info(masterphotref_fistar,
                                              outfile,
                                              xycols=(1,2),
                                              fluxcol=8):
-    '''This generates a registration information file using the master
+    """
+    This generates a registration information file using the master
     photometric reference frame. This file is then used by the convolution step
     somehow to figure out the convolution kernel? In any case, it's needed for:
 
@@ -1437,8 +1430,7 @@ def generate_masterphotref_registration_info(masterphotref_fistar,
 
     - do the convolution of the reference frame to each -xtrns target frame when
       doing the image subtraction
-
-    '''
+    """
 
     # get the x and y coordinate columns from the source list (fistar)
     srcinfo = np.genfromtxt(masterphotref_fistar,
@@ -1476,7 +1468,7 @@ def generate_masterphotref_registration_info(masterphotref_fistar,
 def genreg(masterphotref_fistar,
            outfile,
            xycols=(1,2)):
-    '''
+    """
     This generates a registration information file using the master
     photometric reference frame. This file is then used by the convolution step
     somehow to figure out the convolution kernel? In any case, it's needed for:
@@ -1488,8 +1480,7 @@ def genreg(masterphotref_fistar,
       doing the image subtraction
 
     NOTE: masterphotref_fistar might also be a master *astrometric* reference.
-
-    '''
+    """
 
     # get the x and y coordinate columns from the source list (fistar)
     srcxy = np.genfromtxt(masterphotref_fistar,
@@ -1521,7 +1512,8 @@ def genreg(masterphotref_fistar,
 
 
 def photref_convolution_worker(task):
-    '''This is a parallel worker to convolve the photref frames to the chosen
+    """
+    This is a parallel worker to convolve the photref frames to the chosen
     master photref frame. Used by convolve_photref_frames below.
 
     task[0] -> the frame to convolve
@@ -1529,8 +1521,7 @@ def photref_convolution_worker(task):
     task[2] -> the convolution target's registration info file
     task[3] -> the kernel specification for the convolution
     task[4] -> the output directory where to place the results
-
-    '''
+    """
 
     frametoconvolve, targetframe, convregfile, kernelspec, outdir = task
 
@@ -1595,10 +1586,10 @@ def convolve_photref_frames(photreflist,
                             maxworkertasks=1000,
                             outdir=None):
 
-    '''This convolves all photref frames in photreflist to the photrefframe. See
+    """
+    This convolves all photref frames in photreflist to the photrefframe. See
     getref() in run_ficonv.py.
-
-    '''
+    """
 
     # make a list of tasks
 
@@ -1624,7 +1615,8 @@ def convolve_photref_frames(photreflist,
 def combine_frames(framelist,
                    outfile,
                    combinemethod='median'):
-    '''This combines all of the frames in framelist (a list of filenames) using
+    """
+    This combines all of the frames in framelist (a list of filenames) using
     ficombine and the specified combinemethod. combinemethod is one of the
     following strings (taken from ficombine's help):
 
@@ -1640,8 +1632,7 @@ def combine_frames(framelist,
      ignorenegative     Ignore (i.e. mask) pixels with negative values.
      ignorezero         Ignore (i.e. mask) pixels with a zero value.
      ignorenegative     Ignore (i.e. mask) pixels with positive values.
-
-    '''
+    """
 
     combineflist = ' '.join(framelist)
 
@@ -1694,15 +1685,13 @@ def photometry_on_combined_photref(
         photreffluxthreshold=50000,
         observatory='hatpi',
         ):
-    '''
+    """
     This does source extraction, WCS, catalog projection, and then runs fiphot
     in the special iphot mode on the combined photometric reference frame. See
     cmrawphot.sh for the correct commandline to use.
 
     Chelsea's apertures='2.95:7.0:6.0,3.35:7.0:6.0,3.95:7.0:6.0'
-
-
-    '''
+    """
 
     # get the required header keywords from the FITS file
     if observatory=='hatpi':
@@ -1899,10 +1888,9 @@ def photometry_on_combined_photref(
 #################################
 
 def get_convsubfits_hash(photreftype, subtracttype, kernelspec):
-    '''
+    """
     This calculates a hash for the convsub FITS files.
-
-    '''
+    """
 
     return md5(
         ('%s-%s-%s' % (photreftype, subtracttype, kernelspec)).encode('utf-8')
@@ -1912,10 +1900,9 @@ def get_convsubfits_hash(photreftype, subtracttype, kernelspec):
 
 def get_convsubphot_hash(photreftype, subtracttype,
                          kernelspec, lcapertures):
-    '''
+    """
     This calculates a hash for the convsub iphot files.
-
-    '''
+    """
 
     return md5(
         ('%s-%s-%s-%s' % (photreftype, subtracttype,
@@ -1926,7 +1913,8 @@ def get_convsubphot_hash(photreftype, subtracttype,
 
 
 def subframe_convolution_worker(task, **kwargs):
-    '''This is a parallel worker to convolve the combined photref frame to each
+    """
+    This is a parallel worker to convolve the combined photref frame to each
     input frame, subtract them, and then return the subtracted frame. Used by
     convolve_and_subtract_frames below.
 
@@ -1937,8 +1925,7 @@ def subframe_convolution_worker(task, **kwargs):
     task[4] -> the output directory where to place the results
     task[5] -> whether this is a reverse subtraction
     task[6] -> the photrefprefix to attach to the output convsub FITS filename
-
-    '''
+    """
 
     (frametoconvolve, targetframe, convregfile,
      kernelspec, outdir, reversesubtract, photrefprefix) = task
@@ -2059,12 +2046,11 @@ def convolve_and_subtract_frames(fitsdir,
                                  maxworkertasks=1000,
                                  outdir=None,
                                  colorscheme=None):
-    '''
+    """
     This convolves the photometric reference to each frame, using the specified
     kernel, then subtracts the frame from the photometric reference to produce
     the subtracted frames.
-
-    '''
+    """
 
     if isinstance(fitsdir, list):
         transframelist = fitsdir
@@ -2100,7 +2086,8 @@ def convolve_and_subtract_frames(fitsdir,
 
 
 def subframe_photometry_worker(task):
-    '''This runs the special version of fiphot in subtracted image mode to
+    """
+    This runs the special version of fiphot in subtracted image mode to
     calculate the ISM magnitudes.
 
     task[0] -> subtracted frame FITS
@@ -2116,8 +2103,7 @@ def subframe_photometry_worker(task):
     task[10] -> observatory
     task[11] -> photparams. if hatpi, None. elif tess, dict with gain, exptime,
                 and zeropoint.
-
-    '''
+    """
 
     # get the info out of the task
     (subframe, photrefrawphot, disjointrad,
@@ -2264,13 +2250,12 @@ def photometry_on_subtracted_frames(subframedir,
                                     outdir=None,
                                     photparams=None):
 
-    '''
+    """
     This runs photometry on the subtracted frames and finally produces the ISM
     magnitudes.
 
     See run_iphot.py and IMG-3-PHOT_st5.sh for what this is supposed to do.
-
-    '''
+    """
 
     if isinstance(subframedir, list):
         subframelist = subframedir
@@ -2363,13 +2348,13 @@ def get_lc_for_object(lcobject,
                       frameglob='1-*_?.fits',
                       iphotglob='1-*_?.iphot',
                       datekeyword='BJD'):
-    '''This pulls out the photometry for an arbitrary object.
+    """
+    This pulls out the photometry for an arbitrary object.
 
     Gets the line for the object from the iphot files and generates a flux light
     curve. Assumes 5 apertures and that the iphots are the same name pattern as
     the fits files so it can get JD out of their headers.
-
-    '''
+    """
 
     # make a list of the iphots
     iphotlist = sorted(glob.glob(os.path.join(framedir, iphotglob)))
@@ -2424,7 +2409,7 @@ def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
                                     objectidcol=3,
                                     lcextension='grcollectilc',
                                     observatory='tess'):
-    '''
+    """
     Given a list of photometry files (text files at various times output by
     fiphot with rows that are objects), make lightcurve files (text files for
     various objects whose rows are times).
@@ -2474,7 +2459,7 @@ def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
     Returns:
 
         diddly-squat.
-    '''
+    """
 
     if not os.path.exists(lcdir):
         os.mkdir(lcdir)
@@ -2623,11 +2608,10 @@ def make_photometry_indexdb(framedir,
                             maxframes=None,
                             overwrite=False):
 
-    '''
+    """
     This is like make_photometry_index below, but uses an sqlite3 database
     instead of an in-memory disk.
-
-    '''
+    """
 
     # make sure we don't overwrite anything unless we're supposed to
     if os.path.exists(outfile) and not overwrite:
@@ -2748,10 +2732,9 @@ def make_photometry_indexdb(framedir,
 
 
 def get_iphot_line(iphot, linenum, lcobject, iphotlinechars=338):
-    '''
+    """
     This gets a random iphot line out of the file iphot.
-
-    '''
+    """
 
     iphotf = open(iphot, 'rb')
     filelinenum = iphotlinechars*linenum
@@ -2775,26 +2758,23 @@ def get_iphot_line(iphot, linenum, lcobject, iphotlinechars=338):
 
 
 def get_iphot_line_linecache(iphot, linenum, lcobject, iphotlinechars=260):
-    '''
+    """
     This uses linecache's getline function to get the line out of the file
     iphot.
-
-    '''
+    """
 
     return getline(iphot, linenum)
 
 
 
 def get_iphot_line_sed(iphot, linenum, lcobject, iphotlinechars=260):
-    '''
+    """
     This uses the sed utility to pull the line out of the iphot.
 
     Following: http://stackoverflow.com/questions/6022384
 
     sed '{linenum}q;d' file
-
-
-    '''
+    """
 
     try:
 
@@ -2810,10 +2790,9 @@ def get_iphot_line_sed(iphot, linenum, lcobject, iphotlinechars=260):
 
 
 def iphot_line_tail(iphot, linenum, lcobject, iphotlinechars=338):
-    '''
+    """
     Uses head | tail.
-
-    '''
+    """
 
     try:
         cmd = 'head -n {headline} {iphot} | tail -n 1'.format(
@@ -2834,7 +2813,7 @@ def collect_imagesubphot_lightcurve(hatid,
                                     iphotlinefunc=get_iphot_line,
                                     iphotlinechars=338,
                                     mindetections=50):
-    '''
+    """
     This collects the imagesubphot lightcurve of a single object into a .ilc
     file.
 
@@ -2879,8 +2858,7 @@ def collect_imagesubphot_lightcurve(hatid,
     18 irm3   Instrumental magnitude in aperture 3
     19 ire3   Instrumental magnitude error for aperture 3
     20 irq3   Instrumental magnitude quality flag for aperture 3 (0/G OK, X bad)
-
-    '''
+    """
 
     # connect to the photindex sqlite3 database
     indexdb = sqlite3.connect(photindex)
@@ -2975,7 +2953,7 @@ def collect_imagesubphot_lightcurve(hatid,
 
 
 def imagesublc_collection_worker(task):
-    '''
+    """
     This wraps collect_imagesuphot_lightcurve for parallel_collect_lightcurves
     below.
 
@@ -2983,8 +2961,7 @@ def imagesublc_collection_worker(task):
     task[1] -> photindex DB name
     task[2] -> outdir
     task[3] -> {skipcollected, iphotlinefunc, iphotlinechars, mindetections}
-
-    '''
+    """
 
     try:
 
@@ -3017,10 +2994,9 @@ def parallel_collect_imagesub_lightcurves(
         nworkers=16,
         maxworkertasks=1000
     ):
-    '''
+    """
     This collects all .iphot files into lightcurves.
-
-    '''
+    """
 
     # first, check if the output directory exists
     if not os.path.exists(outdir):
@@ -3083,7 +3059,8 @@ def parallel_collect_imagesub_lightcurves(
 
 
 def lc_concatenate_worker(task):
-    '''This is the parallel worker for the function below.
+    """
+    This is the parallel worker for the function below.
 
     task is a tuple:
 
@@ -3096,7 +3073,7 @@ def lc_concatenate_worker(task):
     lines to baselc file directly
 
     FIXME: add sorting by any column
-    '''
+    """
 
     try:
 
@@ -3139,7 +3116,8 @@ def parallel_concatenate_lightcurves(baselcdir,
                                      sortcol=0,
                                      nworkers=16,
                                      maxworkertasks=1000):
-    '''This concatenates light curves in baselcdir with newlcdir.
+    """
+    This concatenates light curves in baselcdir with newlcdir.
 
     Searches for light curves in the baselcdir, then searches for LCs in the
     newlcdir. Concatenates the light curves of matching objects together and
@@ -3154,8 +3132,7 @@ def parallel_concatenate_lightcurves(baselcdir,
     - collect night's photometry into light curves
     - use parallel_concatenate_lightcurves to add night's LCs to base LCs
     - rerun post-processing, EPD, TFA, etc.
-
-    '''
+    """
 
     baselcpaths = sorted(glob.glob(os.path.join(baselcdir),
                                   '*.{lcext}'.format(lcext=lcext)))
@@ -3212,14 +3189,13 @@ def epd_diffmags_imagesub(coeff, fsv, fdv, fkv, xcc, ycc, mag,
                           temperatures=None,
                           observatory='hatpi'):
 
-    '''
+    """
     This calculates the difference in mags after EPD coefficients are calculated
     for imagesub lightcurves. The only difference is that we don't use the
     background or background error to figure out the fit.
 
     final EPD mags = median(magseries) + epd_diffmags()
-
-    '''
+    """
 
     if observatory=='hatpi':
         return -(coeff[0]*fsv**2. +
@@ -3274,7 +3250,7 @@ def epd_diffmags_imagesub(coeff, fsv, fdv, fkv, xcc, ycc, mag,
 def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
                            smooth=21, sigmaclip=3.0, observatory='hatpi',
                            temperatures=None):
-    '''
+    """
     For each star, ask how the flux correlates with "external parameters" (for
     instance the intra-pixel position, or the CCD temperature, or the shape
     parameters S,D,K, or the hour angle / zenith distance from the ground).
@@ -3334,7 +3310,7 @@ def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
 
     Returns:
         array of EPD differential mags, if the solution succeeds
-    '''
+    """
 
     # find all the finite values of the magnitude
     finiteind = npisfinite(mag)
@@ -3445,7 +3421,7 @@ def epd_lightcurve_imagesub(ilcfile,
                             outfile=None,
                             minndet=200,
                             observatory='hatpi'):
-    '''
+    """
     Runs the EPD process on ilcfile, using columns specified to get the required
     parameters. If outfile is None, the .epdlc will be placed in the same
     directory as ilcfile.
@@ -3484,7 +3460,7 @@ def epd_lightcurve_imagesub(ilcfile,
     27 ep1    EPD magnitude for aperture 1
     28 ep2    EPD magnitude for aperture 2
     29 ep3    EPD magnitude for aperture 3
-    '''
+    """
 
     # read the lightcurve in
     ilc = np.genfromtxt(ilcfile,
@@ -3615,7 +3591,7 @@ def serial_run_epd_imagesub(ilcdir,
                             smooth=21,
                             sigmaclip=3.0,
                             minndet=200):
-    '''
+    """
     This runs EPD on the lightcurves from the pipeline.
 
     00 rjd    Reduced Julian Date (RJD = JD - 2400000.0)
@@ -3657,8 +3633,7 @@ def serial_run_epd_imagesub(ilcdir,
     30 tf1    TFA magnitude for aperture 1
     31 tf2    TFA magnitude for aperture 2
     32 tf3    TFA magnitude for aperture 3
-
-    '''
+    """
 
     if not outdir:
         outdir = ilcdir
@@ -3695,7 +3670,7 @@ def serial_run_epd_imagesub(ilcdir,
 
 
 def parallel_epd_worker(task):
-    '''
+    """
     This is the worker for the function below.
 
     task[0] = ilc
@@ -3704,7 +3679,7 @@ def parallel_epd_worker(task):
     task[3] = sigmaclip
     task[4] = minndet
     task[5] = observatory
-    '''
+    """
 
     try:
 
@@ -3747,9 +3722,9 @@ def parallel_run_epd_imagesub(ilcdir,
                               maxworkertasks=1000,
                               minndet=200,
                               observatory='hatpi'):
-    '''
+    """
     This runs EPD in parallel.
-    '''
+    """
 
     if not outdir:
         outdir = ilcdir
@@ -3815,12 +3790,12 @@ def run_tfa_singlelc(epdlc,
                      epdlc_magcol=(27,28,29),
                      template_sigclip=5.0,
                      epdlc_sigclip=5.0):
-    '''
+    """
     This runs TFA for all apertures defined in epdlc_magcol for the input
     epdlc file, given an existing TFA template list in templatefile. If outfile
     is None, the output TFA LC will be in the same directory as epdlc but with
     an extension of .tfalc.
-    '''
+    """
 
     tfacmdstr = ("tfa -i {epdlc} -t {templatefile} "
                  "--col-jd {epdlc_jdcol} "
@@ -3959,10 +3934,9 @@ def run_tfa_singlelc(epdlc,
 
 
 def parallel_tfa_worker(task):
-    '''
+    """
     This wraps run_tfa_singlelc above.
-
-    '''
+    """
 
     try:
 
@@ -3988,9 +3962,9 @@ def parallel_run_tfa(lcdir,
                      overwrite=False,
                      workerntasks=1000,
                      tfalc_glob='*.tfalc'):
-    '''
+    """
     This runs TFA on the EPD lightcurves.
-    '''
+    """
 
     # pick up the list/dir of EPD LCs to run TFA on
     if isinstance(lcdir, list):

@@ -163,12 +163,11 @@ else:
 ###############
 
 def smartcast(castee, caster, subval=None):
-    '''
+    """
     This just tries to apply the caster function to castee.
 
     Returns None on failure.
-
-    '''
+    """
 
     try:
         return caster(castee)
@@ -183,10 +182,9 @@ def smartcast(castee, caster, subval=None):
 
 
 def fits_fieldprojectidccd_worker(frame):
-    '''
+    """
     This is a worker for the two functions below.
-
-    '''
+    """
 
     try:
 
@@ -214,10 +212,9 @@ def fits_fieldprojectidccd_worker(frame):
 def find_original_fits_in_database(field, projectid, ccd,
                                    enforceok=True,
                                    database=None):
-    '''
+    """
     This finds the FITS matching the field-projectid-ccd combo in the DB.
-
-    '''
+    """
 
 
 
@@ -229,12 +226,11 @@ def find_original_fits_fieldprojectidccd(dirlist,
                                          fglob='?-???????_?.fits',
                                          nworkers=8,
                                          maxworkertasks=1000):
-    '''This searches in dirlist for all original FITS files matching the specified
+    """This searches in dirlist for all original FITS files matching the specified
     projectid, field, and ccd combination.
 
     Returns a flat list of matching FITS, and list of all fits + their info.
-
-    '''
+    """
 
     # first, go through the directories and get all the original FITS files
     print('%sZ: finding frames matching %s...' %
@@ -286,12 +282,11 @@ def find_arefshifted_fits_fieldprojectidccd(dirlist,
                                             fglob='?-???????_?-xtrns.fits',
                                             nworkers=8,
                                             maxworkertasks=1000):
-    '''This searches for all astromref-shifted FITS files matching the
+    """This searches for all astromref-shifted FITS files matching the
     specified projectid, field, and ccd combination.
 
     Returns a flat list of matching FITS, and list of all fits + their info.
-
-    '''
+    """
 
     return find_original_fits_fieldprojectidccd(dirlist,
                                                 field,
@@ -313,12 +308,11 @@ def find_subtracted_fits_fieldprojectidccd(
         kernelspec='b/4;i/4;d=4/4',
         nworkers=8,
         maxworkertasks=1000):
-    '''This searches for all subtracted FITS files matching the specified
+    """This searches for all subtracted FITS files matching the specified
     projectid, field, and ccd combination.
 
     Returns a flat list of matching FITS, and list of all fits + their info.
-
-    '''
+    """
 
     photrefbit = (
         'rsub' if subtracttype == 'reverse' else 'nsub'
@@ -346,9 +340,9 @@ def find_subtracted_fits_fieldprojectidccd(
 ########################
 
 def get_frame_info(frame):
-    '''
+    """
     This gets the needed info from a frame for selecting photref candidates.
-    '''
+    """
 
     try:
 
@@ -486,9 +480,9 @@ def fitslist_frameinfo(fitslist,
                        forcecollectinfo=False,
                        nworkers=8,
                        maxworkertasks=1000):
-    '''
+    """
     This runs a parallel get_frame_info job.
-    '''
+    """
 
     # check if we have it in the frameinfo cache, if so, use it. if not, redo
     # the info collection, and then write it back to the cache.
@@ -586,7 +580,7 @@ def calibrated_frame_to_database(fitsfile,
                                  badframetag='badframes',
                                  nonwcsframes_are_ok=False,
                                  database=None):
-    '''
+    """
     This puts a fully calibrated FITS into the database.
 
     Requires that the frame have gone through the full
@@ -617,7 +611,7 @@ def calibrated_frame_to_database(fitsfile,
         well.
 
         database: if passing pg.connect() instance
-    '''
+    """
 
     # open database connection
     if database:
@@ -818,10 +812,9 @@ def calibrated_frame_to_database(fitsfile,
 
 
 def calframe_to_db_worker(task):
-    '''
+    """
     This wraps calibrated_frames_to_database for the parallel driver below.
-
-    '''
+    """
 
     fitsfile, kwargs = task
     return calibrated_frame_to_database(fitsfile, **kwargs)
@@ -834,7 +827,7 @@ def arefshifted_frame_to_database(
         badframetag='badframes',
         nonwcsframes_are_ok=False,
         database=None):
-    '''
+    """
     This puts a shifted-to-astromref xtrns FITS into the DB.
 
     fitsfile: of the shifted image, for example:
@@ -853,7 +846,7 @@ def arefshifted_frame_to_database(
         * include "warp check" flagging
         * include "badframe" tagging
 
-    '''
+    """
 
     if nonwcsframes_are_ok:
         raise NotImplementedError
@@ -1034,10 +1027,9 @@ def arefshifted_frame_to_database(
 
 
 def arefshifted_frame_to_db_worker(task):
-    '''
+    """
     This wraps arefshifted_frame_to_database for the parallel driver below.
-
-    '''
+    """
 
     fitsfile, kwargs = task
     return arefshifted_frame_to_database(fitsfile, **kwargs)
@@ -1053,7 +1045,7 @@ def parallel_frames_to_database(fitsbasedir,
                                 nonwcsframes_are_ok=False,
                                 nworkers=16,
                                 maxworkertasks=1000):
-    '''
+    """
     This runs a DB ingest on all FITS located in fitsbasedir and subdirs.  Runs
     a 'find' subprocess to find all the FITS to process.  If the frames have
     already been injested, based on their fits file paths they will not be
@@ -1069,7 +1061,7 @@ def parallel_frames_to_database(fitsbasedir,
 
         fitsglob: if arefshifted frames, it's actually '1-???????_?-xtrns.fits'
 
-    '''
+    """
     # find all the FITS files
     try:
 
@@ -1131,10 +1123,9 @@ def parallel_frames_to_database(fitsbasedir,
 def dbupdate_calibratedframe(fitspath,
                              column, newval,
                              database=None):
-    '''
+    """
     This updates a column of the calibratedframes table for a frame.
-
-    '''
+    """
 
     # open a database connection
     if database:
@@ -1192,14 +1183,14 @@ def convsubtracted_frame_to_database(
         overwrite=False,
         badframetag='badframes',
         database=None):
-    '''
+    """
     This puts a convolved and subtracted FITS into the DB.
 
     Associates it with the framekey of the original FITS and the framekey of the
     aref-shifted frame.  Adds info on subtraction success, its full path. Adds
     info about the kernel, and photref used, and type of photref used for
     subtraction.
-    '''
+    """
 
     # open a database connection
     if database:
@@ -1252,15 +1243,14 @@ def convsubtracted_frame_to_database(
 def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
                         overwrite=False, refdir=REFBASEDIR, database=None):
 
-    '''
+    """
     This gets all the frame info from the DB and finds a good astromref.
 
     Args:
 
         fieldinfo: dict with keys that point to values for projectid,
         field, and ccd (if HATPI), or camera and ccd (if TESS).
-
-    '''
+    """
 
     if not os.path.exists(refdir):
         os.mkdir(refdir)
@@ -1706,7 +1696,7 @@ def generate_astromref(fitsfiles,
                        refinfo=REFINFO,
                        overrideref=None):
 
-    '''This chooses an astrometry reference frame from the frames in fitfiles.
+    """This chooses an astrometry reference frame from the frames in fitfiles.
 
     writes the frame to refdir.
 
@@ -1722,8 +1712,7 @@ def generate_astromref(fitsfiles,
     if overrideref is passed (a string path to a manually chosen reference
     frame), overrides the automated frame selection called in
     ism.select_astromref_frame.
-
-    '''
+    """
 
     goodfits = [x for x in fitsfiles if os.path.exists(x)]
 
@@ -1882,9 +1871,9 @@ def generate_astromref(fitsfiles,
 
 
 def dbget_astromref(projectid, field, ccd, database=None, camera=0):
-    '''
+    """
     This finds the reference frame using the PG database.
-    '''
+    """
 
     # open a database connection
     if database:
@@ -1954,10 +1943,10 @@ def dbget_astromref(projectid, field, ccd, database=None, camera=0):
 
 
 def get_astromref(projectid, field, ccd, refinfo=REFINFO):
-    '''
+    """
     This finds the reference frame for the field, projectid, and ccd
     combination using the TM-refinfo.sqlite database.
-    '''
+    """
 
     db = sqlite3.connect(
         refinfo,
@@ -1998,7 +1987,7 @@ def get_astromref(projectid, field, ccd, refinfo=REFINFO):
 
 
 def frames_astromref_worker(task):
-    '''
+    """
     This is the parallel worker for frames_to_astromref.
 
     task[0] = fits file
@@ -2016,7 +2005,7 @@ def frames_astromref_worker(task):
         deal with HATPI naming scheme). If you were to pass it, it would look
         like:
             {'ccd': 8, 'camera': 42, 'field': 'G1830-2230_577', 'projectid': 12}
-    '''
+    """
 
     try:
 
@@ -2219,7 +2208,7 @@ def framelist_make_xtrnsfits(fitsfiles,
                              observatory='hatpi',
                              maxworkertasks=1000,
                              fieldinfo=None):
-    '''
+    """
     This calculates the shifts between frames in fitsfiles and the appropriate
     astromref for the projectid, field and CCD, then shifts each frame to the
     astromref's coordinate system, generating -xtrns.fits files.
@@ -2227,7 +2216,7 @@ def framelist_make_xtrnsfits(fitsfiles,
     Per the docstring of imageutils.check_frame_warping, "warpcheck" by default
     is set OFF, because it depends on a detailed (manual) empirical calibration
     step.
-    '''
+    """
 
     # check if astrometric translation was already done.
     existing = glob.glob(
@@ -2305,7 +2294,7 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
                                            forcecollectinfo=False,
                                            nworkers=8,
                                            maxworkertasks=1000):
-    '''
+    """
     This uses ism.select_photref_frames run on fitsfiles to get photref
     candidates.
 
@@ -2347,7 +2336,7 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
 
         photrefinfo, a dictionary with information about chosen photometric
         reference frames.
-    '''
+    """
 
     if not os.path.exists(FRAMEINFOCACHEDIR):
         os.mkdir(FRAMEINFOCACHEDIR)
@@ -2580,7 +2569,7 @@ def generate_photref_candidates_from_xtrns(fitsfiles,
 
 
 def amend_candidate_photrefs(photrefinfo):
-    '''
+    """
     This is an interactive way to update masterphotref, photrefs, and
     photrefjpegs after reviewing them.
 
@@ -2592,7 +2581,7 @@ def amend_candidate_photrefs(photrefinfo):
 
     Returns:
         photrefinfo: updated version of same dictionary
-    '''
+    """
 
     cachekey = photrefinfo['cachekey']
     cachedir = os.path.join(FRAMEINFOCACHEDIR,'TM-photref-%s' % cachekey)
@@ -2717,7 +2706,7 @@ def generate_combined_photref(
         fieldinfo=None,
         observatory='hatpi',
         overwrite=False):
-    '''
+    """
     This generates a combined photref from photref target and candidates and
     updates the sqlite or postgres database.
 
@@ -2770,8 +2759,7 @@ def generate_combined_photref(
         the REFBASEDIR, using the following prototype for the filename:
 
         {REFBASEDIR}/proj{projid}-{field}-ccd{ccd}-combinedphotref-{photreftype}.XXX
-
-    '''
+    """
 
     assert (dbtype == 'postgres') or (dbtype == 'sqlite')
 
@@ -3162,13 +3150,13 @@ def get_combined_photref(projectid,
                          dbtype='postgres',
                          refinfo=REFINFO,
                          camera=0):
-    '''
+    """
     This gets the combined photref for the given combo of projid, field, ccd.
 
     Used for the convsubphot functions below.
 
     dbtype: 'postgres' or 'sqlite'. By default, 'postgres'.
-    '''
+    """
 
     assert (dbtype == 'postgres') or (dbtype == 'sqlite')
 
@@ -3267,7 +3255,7 @@ def get_combined_photref(projectid,
 #######################
 
 def xtrnsfits_convsub_worker(task, **kwargs):
-    '''This is a parallel worker for framelist_convsub_photref below.
+    """This is a parallel worker for framelist_convsub_photref below.
 
     task[0] = xtrnsfits file
     task[1] = photreftype to use <"oneframe"|"onehour"|"onenight">
@@ -3281,8 +3269,7 @@ def xtrnsfits_convsub_worker(task, **kwargs):
     This only does convolution and subtraction. Finding new objects is handled
     by another function in transients.py, and doing photometry on the subtracted
     frames is handled by convsubfits_photometry_worker below.
-
-    '''
+    """
 
     (frame, photreftype, outdir,
      kernelspec, reversesubtract, refinfo, observatory, fieldinfo) = task
@@ -3354,9 +3341,9 @@ def parallel_xtrnsfits_convsub(xtrnsfits,
                                nworkers=16,
                                maxworkertasks=1000,
                                colorscheme=None):
-    '''
+    """
     This convolves, and subtracts all FITS files in the xtrnsfits list.
-    '''
+    """
 
     # first, check if the convolved, subtracted frames already exist. if so,
     # and overwrite == False, then do not run them.
@@ -3421,7 +3408,7 @@ def parallel_xtrnsfits_convsub(xtrnsfits,
 #########################################
 
 def convsubfits_staticphot_worker(task):
-    '''
+    """
     This does subtracted frame photometry on already-known objects from the
     photref.
 
@@ -3439,8 +3426,7 @@ def convsubfits_staticphot_worker(task):
     currently produces iphot files.
 
     TODO: should this write to the database?
-
-    '''
+    """
 
     (subframe, photreftype, kernelspec,
      lcapertures, disjrad, outdir, refinfo,
@@ -3581,10 +3567,10 @@ def parallel_convsubfits_staticphot(
         fieldinfo=None,
         overwrite=False,
         photparams=None):
-    '''
+    """
     This does static object photometry on the all subtracted FITS in
     subfitslist.
-    '''
+    """
 
     # check if the convolved, subtracted frames already have photometry. if so,
     # and overwrite == False, then do not re-run photometry.
@@ -3655,10 +3641,10 @@ def insert_phots_into_database(framedir,
                                maxframes=None,
                                overwrite=False,
                                database=None):
-    '''
+    """
     This makes photometry index rows in the postgresql database.  Intended for
     use when the sqlite3 databases get out of hand.
-    '''
+    """
 
     # open a database connection
     if database:
@@ -3820,11 +3806,11 @@ def insert_phots_into_cstore(framedir,
                              maxframes=None,
                              overwrite=False,
                              database=None):
-    '''
+    """
     This makes photometry index rows in the postgresql database. This was an
     attempt to use the postgres column store extension to speed up ingestion of
     iphots. It did not speed it up.
-    '''
+    """
 
     # open a database connection
     if database:
@@ -3978,11 +3964,12 @@ def cstore_collect_imagesubphot_lightcurve(
         skipcollected=True,
         mindetections=50,
         database=None):
-    '''This collects an ISM LC using the cstore tables in Postgres.
-    This makes photometry index rows in the postgresql database. This was an
-    attempt to use the postgres column store extension to speed up ingestion of
-    iphots. It did not speed it up.
-    '''
+    """
+    This collects an ISM LC using the cstore tables in Postgres.  This makes
+    photometry index rows in the postgresql database. This was an attempt to
+    use the postgres column store extension to speed up ingestion of iphots. It
+    did not speed it up.
+    """
 
     # prepare the output file
     outfile = os.path.join(os.path.abspath(outdir), '%s.ilc' % hatid)
@@ -4079,9 +4066,9 @@ def dbphot_collect_imagesubphot_lightcurve(hatid,
                                            skipcollected=True,
                                            mindetections=50,
                                            database=None):
-    '''
+    """
     This collects an ISM LC using the photindex info in Postgres.
-    '''
+    """
 
     # prepare the output file
     outfile = os.path.join(os.path.abspath(outdir), '%s.ilc' % hatid)
@@ -4191,9 +4178,9 @@ def dbphot_collect_imagesubphot_lightcurve(hatid,
 
 def get_hatidlist_from_cmrawphot(projectid, field, ccd, photreftype,
                                  refinfo=REFINFO):
-    '''
+    """
     This gets the hatidlist from the cmrawphot of a combined photref.
-    '''
+    """
 
     cphotref = get_combined_photref(projectid, field, ccd, photreftype,
                                     refinfo=refinfo)
@@ -4224,15 +4211,14 @@ def get_hatidlist_from_cmrawphot(projectid, field, ccd, photreftype,
 
 
 def parallel_dbphot_collect_worker(task):
-    '''
+    """
     This is the parallel worker for the function below.
 
     task[0] = hatid
     task[1] = outdir
     task[2] = skipcollected
     task[3] = mindetections
-
-    '''
+    """
 
     hatid, outdir, skipcollected, mindetections = task
     return dbphot_collect_imagesubphot_lightcurve(hatid,
@@ -4248,13 +4234,13 @@ def parallel_dbphot_lightcurves_hatidlist(hatidlist,
                                           mindetections=50,
                                           nworkers=24,
                                           maxworkertasks=1000):
-    '''This collects light curves for the provided list of hatids.
+    """
+    This collects light curves for the provided list of hatids.
 
     Get hatidlist by reading in the .cmrawphot file for a projectid-ccd
     combination using get_hatidlist_from_cmrawphot. In the future, we'll add
     these to the database.
-
-    '''
+    """
 
     # first, check if the output directory exists
     if not os.path.exists(outdir):
@@ -4291,10 +4277,9 @@ def parallel_dbphot_lightcurves_projectid(projectid,
                                           mindetections=50,
                                           nworkers=24,
                                           maxworkertasks=1000):
-    '''
+    """
     This collects LCs for specific projectids.
-
-    '''
+    """
 
     hatidlist = get_hatidlist_from_cmrawphot(projectid,
                                              field,
@@ -4328,12 +4313,12 @@ def parallel_dbphot_lightcurves_projectid(projectid,
 
 def parse_iphot_line(iphotline):
 
-    '''This parses the iphot line and returns a row of formatted elems.
+    """
+    This parses the iphot line and returns a row of formatted elems.
 
     These can be then attached to other metadata and written directly to the
     database.
-
-    '''
+    """
 
     photelemline = iphotline.rstrip(' \n')
     photelem = photelemline.split()
@@ -4440,13 +4425,13 @@ def convsub_photometry_to_ismphot_database(convsubfits,
                                            overwrite=False,
                                            database=None):
 
-    '''This inserts the ISM photometry from a single convsub FITS into the DB.
+    """
+    This inserts the ISM photometry from a single convsub FITS into the DB.
 
     If projectid, field, ccd are not provided, gets them from the FITS
     file. Also gets the photreftype from the filename of the
     convolved-subtracted photometry iphot file.
-
-    '''
+    """
 
     # open a database connection
     if database:
@@ -4674,12 +4659,12 @@ def convsub_photometry_to_ismphot_database(convsubfits,
 
 
 def parallel_convsubphotdb_worker(task):
-    '''This wraps the function above for use with the parallel driver below.
+    """
+    This wraps the function above for use with the parallel driver below.
 
     task[0] = convsubfits
     task[1] = {'projectid', 'field', 'ccd', 'overwrite'}
-
-    '''
+    """
 
     convsubfits = task[0]
     kwargs = task[1]
@@ -4695,9 +4680,9 @@ def parallel_convsubphot_to_db(convsubfitslist,
                                overwrite=False,
                                nworkers=16,
                                maxworkertasks=1000):
-    '''This runs a convsubphot ingest in parallel.
-
-    '''
+    """
+    This runs a convsubphot ingest in parallel.
+    """
 
     tasks = [(x, {'projectid':projectid, 'field':field,
                   'ccd':ccd, 'overwrite':overwrite})
@@ -4745,7 +4730,8 @@ def collect_lightcurve(objectid,
                        lcbasedir=LCBASEDIR,
                        updateifexists=True,
                        database=None):
-    '''This collects lightcurves for objectid into a hatlc.sqlite file.
+    """
+    This collects lightcurves for objectid into a hatlc.sqlite file.
 
     We'll collect all photometry across observed fields and CCDs in the same
     file, organized as below:
@@ -4760,8 +4746,7 @@ def collect_lightcurve(objectid,
     FIXME: if we're going to run realtime imagesubphot, this will require that a
     collect_lightcurve is run after every image is taken. This will probably be
     stupidly slow...
-
-    '''
+    """
 
     # open a database connection
     if database:
@@ -4963,12 +4948,12 @@ def forcedphot_generate_cmrawphot(
         ccdexptime=None,
         extractsources=True,
         refinfo=REFINFO):
-    '''This generates a cmrawphot file for objectid on the photref.
+    """
+    This generates a cmrawphot file for objectid on the photref.
 
     objectid, ra, decl are either scalars or lists for the objects to do forced
     photometry for.
-
-    '''
+    """
 
     # first, get the photrefinfo
     cphotref = get_combined_photref(projectid,
@@ -5119,7 +5104,7 @@ def forcedphot_generate_cmrawphot(
 
 
 def forcedphot_subphot_worker(task):
-    '''
+    """
     This does subtracted frame photometry on forced-phot objects.
 
     task[0] = subframe
@@ -5129,8 +5114,7 @@ def forcedphot_subphot_worker(task):
     task[4] = disjointradius
     task[5] = outdir
     task[6] = frcmrawphot
-
-    '''
+    """
 
     (subframe, photreftype, kernelspec,
      lcapertures, disjrad, outdir, frcmrawphot) = task
@@ -5232,13 +5216,13 @@ def parallel_convsubfits_forcedphot(
         photdisjointradius=2,
         nworkers=16,
         maxworkertasks=1000,):
-    '''This does forced object photometry on the all subtracted FITS in
+    """
+    This does forced object photometry on the all subtracted FITS in
     subfitslist using the forcedphot_cmrawphot as input.
 
     Make sure the outdir is NOT the same as the dirname for the usual output
     iphot files. A good plan is to append forcedphot- in the directory name.
-
-    '''
+    """
 
     tasks = [(x, photreftype, kernelspec,
               lcapertures, photdisjointradius,
@@ -5303,11 +5287,11 @@ def subfits_to_jpeg_series(subframedir,
                            outdir=None,
                            makemovie=False,
                            moviefps=10):
-    '''This generates JPEGs for all subtracted FITS in subframedir.
+    """
+    This generates JPEGs for all subtracted FITS in subframedir.
 
     origframedir is directory of the original FITS to get JD from.
-
-    '''
+    """
 
     subframes = sorted(glob.glob(os.path.join(subframedir, subframeglob)))
 
@@ -5381,7 +5365,8 @@ def subfits_radec_to_jpeg_series(subframedir,
                                  outdir=None,
                                  makemovie=False,
                                  moviefps=10):
-    '''This generates JPEGs for all subtracted FITS in subframedir.
+    """
+    This generates JPEGs for all subtracted FITS in subframedir.
 
     origframedir is directory of the original FITS to get JD from.
 
@@ -5396,8 +5381,7 @@ def subfits_radec_to_jpeg_series(subframedir,
     subtracted frame are usually the same as the original frame WCS, which may
     have been shifted around to match the astromref so any RA/DEC -> x/y
     transform will give the wrong results.
-
-    '''
+    """
 
     subframes = sorted(glob.glob(os.path.join(subframedir, subframeglob)))
 
@@ -5475,7 +5459,8 @@ def subfits_pixbox_to_jpeg_series(subframedir,
                                   outdir=None,
                                   makemovie=False,
                                   moviefps=10):
-    '''This generates JPEGs for all subtracted FITS in subframedir.
+    """
+    This generates JPEGs for all subtracted FITS in subframedir.
 
     origframedir is directory of the original FITS to get JD from.
 
@@ -5491,8 +5476,7 @@ def subfits_pixbox_to_jpeg_series(subframedir,
     radecspec is a list with four elements:
 
     [xminpix, xmaxpix, yminpx, ymaxpx]
-
-    '''
+    """
 
     subframes = sorted(glob.glob(os.path.join(subframedir, subframeglob)))
 
