@@ -126,10 +126,12 @@ def convert_grcollect_to_fits_lc_worker(task):
     temperature timeseries.
     """
 
-    grclcpath, outpath, catdf, observatory, lcdir, fitsdir = task
+    (grclcpath, outpath, catdf, temperaturedf,
+     observatory, lcdir, fitsdir) = task
 
     if observatory != 'tess':
-        # if not TESS, you'll need to modify the header lists.
+        # if not TESS, you may need to modify the header reads, and the overall
+        # lightcurve format 
         raise NotImplementedError
 
     lcd = tu.read_tess_txt_lightcurve(grclcpath, catdf)
@@ -183,15 +185,33 @@ def convert_grcollect_to_fits_lc_worker(task):
     # in each frame, as identified by the 'rstfc' data key.
     if observatory=='tess':
 
-        fitsimglist = [os.path.join(fitsdir, fc+'.fits')
-                       for fc in lcd['rstfc']]
+        # Only pick the frame keys that have flux values in the lightcurve. A
+        # few nans from the original FITS files are expected, because of the
+        # momentum dumps.
+        inds = nparr(temperaturedf['framekey'].isin(lcd['rstfc']))
 
-        ccdtemplist, ntempslist = [], []
-        for fpath in fitsimglist:
-            ccdtemplist.append(iu.get_header_keyword(fpath, 'CCDTEMP'))
-            ntempslist.append(iu.get_header_keyword(fpath, 'NTEMPS'))
-        ccdtemp = nparr(ccdtemplist)
-        ntemps = nparr(ntempslist)
+        tdfframekeys = nparr(temperaturedf['framekey'])[inds]
+        ccdtemp = nparr(temperaturedf['ccdtemp'])[inds]
+        ntemps = nparr(temperaturedf['ntemps'])[inds]
+
+        # Sort the temperature timeseries to be in the same order as
+        # the lightcurve, using the framekeys. Requires a double argsort, for
+        # example:
+        #
+        # a = array([4, 2, 5, 6])
+        # b = array([5, 2, 6, 4])
+        # b.argsort()[a.argsort()] # array([3, 1, 0, 2])
+        #
+        # where we're matching b to the array a.
+        matchsortinds = tdfframekeys.argsort()[lcd['rstfc'].argsort()]
+        tdfframekeys = tdfframekeys[matchsortinds]
+        ccdtemp = ccdtemp[matchsortinds]
+        ntemps = ntemps[matchsortinds]
+
+        np.testing.assert_array_equal(
+            tdfframekeys, lcd['rstfc'],
+            err_msg='got tdfframekeys != lcd keys. bad temperature sort?'
+        )
 
         fitscollist.append(
             fits.Column(name='CCDTEMP', format='D', array=ccdtemp)
@@ -244,7 +264,8 @@ def parallel_convert_grcollect_to_fits_lc(lcdirectory,
                                           ilcglob='*.grcollectilc',
                                           nworkers=16,
                                           maxworkertasks=1000,
-                                          observatory='tess'):
+                                          observatory='tess',
+                                          temperaturedfpath=None):
     """
     Parallelizes convert_grcollect_to_fits_lc_worker.
 
@@ -253,12 +274,24 @@ def parallel_convert_grcollect_to_fits_lc(lcdirectory,
 
     we will eventually use:
         projid1234_s000X_gaiaid_llc.fits.gz
+
+    Non-obvious kwargs:
+        catfile (str): path to non-reformed Gaia catalog, projected onto the
+        frame. Various star parameters are read to the FITS headers.
+
+        temperaturedfpath (str): if TESS, path to the engineering file with
+        temperature information (CCDTEMP, NTEMPS, FRAMEKEY). E.g.,
+        /nfs/phtess1/ar1/TESS/FFI/ENGINEERING/s0002-3-3-0121_key_temperature_count.csv
     """
 
     # load the catalog file.
     if observatory=='tess':
         catdf = tu.read_object_catalog(catfile)
+        # since it's the same temperature information across each CCD, no need
+        # to repeat the read operation.
+        temperaturedf = pd.read_csv(temperaturedfpath)
     else:
+        temperaturedf = None
         raise NotImplementedError
 
     ilclist = glob(os.path.join(lcdirectory, ilcglob))
@@ -286,8 +319,8 @@ def parallel_convert_grcollect_to_fits_lc(lcdirectory,
 
     else:
 
-        tasks = [(x, y, catdf, observatory, lcdirectory, fitsdir) for x,y in
-                 zip(ilclist, outlist)]
+        tasks = [(x, y, catdf, temperaturedf, observatory, lcdirectory,
+                  fitsdir) for x,y in zip(ilclist, outlist)]
 
         pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
         results = pool.map(convert_grcollect_to_fits_lc_worker, tasks)
