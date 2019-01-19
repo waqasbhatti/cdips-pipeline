@@ -388,19 +388,40 @@ def epd_fitslightcurve_imagesub(fitsilcfile, outfile, smooth=21, sigmaclip=3.0,
         raise NotImplementedError('observatory must be "tess" or "hatpi"')
 
     # get the EPD diff mags
-    epddiffmags = {}
+    epddiffmags, epddetails = {}, {}
     for irm_ap_key in irm_ap_keys:
 
-        epddiffmags[irm_ap_key] = ism.epd_magseries_imagesub(
-            ilc[irm_ap_key][combinedok],
-            ilc['FSV'][combinedok],
-            ilc['FDV'][combinedok],
-            ilc['FKV'][combinedok],
-            ilc['XIC'][combinedok],
-            ilc['YIC'][combinedok],
-            smooth=smooth, sigmaclip=sigmaclip,
-            observatory=observatory, temperatures=temperatures
-        )
+        if observatory=='hatpi':
+            epddiffmags[irm_ap_key] = ism.epd_magseries_imagesub(
+                ilc[irm_ap_key][combinedok],
+                ilc['FSV'][combinedok],
+                ilc['FDV'][combinedok],
+                ilc['FKV'][combinedok],
+                ilc['XIC'][combinedok],
+                ilc['YIC'][combinedok],
+                smooth=smooth, sigmaclip=sigmaclip,
+                observatory=observatory, temperatures=temperatures
+            )
+        elif observatory=='tess':
+            if len(ilc[irm_ap_key][combinedok])>0:
+                (epddiffmags[irm_ap_key],
+                 epddetails[irm_ap_key]) = ism.epd_magseries_imagesub(
+                    ilc[irm_ap_key][combinedok],
+                    ilc['FSV'][combinedok],
+                    ilc['FDV'][combinedok],
+                    ilc['FKV'][combinedok],
+                    ilc['XIC'][combinedok],
+                    ilc['YIC'][combinedok],
+                    smooth=smooth, sigmaclip=sigmaclip,
+                    observatory=observatory, temperatures=temperatures,
+                    times=ilc['TMID_BJD'][combinedok],
+                )
+            else:
+                return None, None
+        else:
+            raise NotImplementedError(
+                'EPD must be worked out on per-observatory basis.'
+            )
 
     # add the EPD diff mags back to the median mag to get the EPD mags
     epdmags = {}
@@ -432,6 +453,38 @@ def epd_fitslightcurve_imagesub(fitsilcfile, outfile, smooth=21, sigmaclip=3.0,
 
     new_columns = inhdulist[1].columns + epdhdu.columns
     new_timeseries_hdu = fits.BinTableHDU.from_columns(new_columns)
+
+    # Update the new timeseries HDU header with the info from the EPD fit:
+    # 'n_knots', 'chisq', 'n_data', 'k_freeparam'. Give it for each orbit, for
+    # each aperture, and include comments.
+    # Note that we are NOT including sufficient info to reconstruct the fit.
+    # The predicted vectors would give an extra (Ndim-1)*(3 apertures)
+    # time-series vectors. And the "tck, u" representation would require an
+    # annoying extra two extensions.
+    for orbitnum in [0,1]:
+        for irm_ap_key in irm_ap_keys:
+            knotkey = 'nknot_o{}_{}'.format(orbitnum, irm_ap_key)
+            chisqkey = 'chisq_o{}_{}'.format(orbitnum, irm_ap_key)
+            ndatakey = 'ndata_o{}_{}'.format(orbitnum, irm_ap_key)
+            nfp = 'nfp_o{}_{}'.format(orbitnum, irm_ap_key)
+            bickey = 'BIC_o{}_{}'.format(orbitnum, irm_ap_key)
+
+            knotc = 'N knots in EPD spline fit (orbit/aper)'
+            chisqc = 'chi^2 in EPD spline fit (orbit/aper)'
+            ndatac = 'N data pts in EPD spline fit (orbit/aper)'
+            nfpc = 'N free params in EPD spline fit (orbit/aper)'
+            chisqc = 'BIC in EPD spline fit (orbit/aper)'
+
+            tempkeys = ['n_knots', 'chisq', 'n_data', 'k_freeparam', 'BIC']
+
+            for k, c, tk in zip(
+                [knotkey, chisqkey, ndatakey, nfp],
+                [knotc, chisqc, ndatac, nfpc],
+                tempkeys
+            ):
+                new_timeseries_hdu.header[k] = (
+                    epddetails[irm_ap_key][orbitnum][tk], c
+                )
 
     # update the flag for whether detrending has been performed
     primary_hdu.header['DTR_EPD'] = True

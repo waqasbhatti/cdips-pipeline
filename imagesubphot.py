@@ -175,12 +175,8 @@ except:
     from subprocess import check_output
     import pickle
 
-import shlex
 from datetime import datetime
-import re
-import json
-import shutil
-import random
+import shlex, re, json, random
 from hashlib import md5
 try:
     from cStringIO import StringIO
@@ -195,6 +191,7 @@ import sqlite3
 
 import numpy as np
 from numpy import isfinite as npisfinite
+import numpy.random as nprand
 
 from scipy.spatial import cKDTree as kdtree
 from scipy.signal import medfilt
@@ -203,7 +200,6 @@ from scipy.stats import sigmaclip as stats_sigmaclip
 from scipy.optimize import curve_fit
 
 import scipy.stats
-import numpy.random as nprand
 
 import matplotlib
 matplotlib.use('AGG')
@@ -229,6 +225,10 @@ from aperturephot import extract_frame_sources, anet_solve_frame, \
     do_photometry, astrometrydotnet_solve_frame, fistarfile_to_xy
 
 import shared_variables as sv
+
+from astrobase import lcmath
+from scipy.interpolate import splprep, splev
+from numpy import array as nparr
 
 #################
 ## DEFINITIONS ##
@@ -2541,7 +2541,7 @@ def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
                                      scale='utc')
 
                 tmid_bjd_utc = (
-                    tstart_bjd_utc.jd + (tstop_bjd_utc.jd - tstart_utc.jd)/2.
+                    tstart_bjd_utc.jd + (tstop_bjd_utc.jd - tstart_bjd_utc.jd)/2.
                 )
 
                 # WANT: bjd_tdb_me = jd_utc_spoc + ltt_barycenter_me + leapseconds (eq 1)
@@ -3185,7 +3185,7 @@ def parallel_concatenate_lightcurves(baselcdir,
 ## SPECIAL EPD FUNCTIONS FOR IMAGESUB LCS ##
 ############################################
 
-def epd_diffmags_imagesub(coeff, fsv, fdv, fkv, xcc, ycc, mag,
+def epd_diffmags_imagesub_linearmodel(coeff, fsv, fdv, fkv, xcc, ycc, mag,
                           temperatures=None,
                           observatory='hatpi'):
 
@@ -3245,11 +3245,15 @@ def epd_diffmags_imagesub(coeff, fsv, fdv, fkv, xcc, ycc, mag,
                  -
                  mag)
 
-
+def rolling_window(a, window):
+    # a cheap way to pass a rolling window over an array
+    shape = a.shape[:-1] + (a.shape[-1] - window + 1, window)
+    strides = a.strides + (a.strides[-1],)
+    return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
 
 def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
                            smooth=21, sigmaclip=3.0, observatory='hatpi',
-                           temperatures=None):
+                           temperatures=None, times=None):
     """
     For each star, ask how the flux correlates with "external parameters" (for
     instance the intra-pixel position, or the CCD temperature, or the shape
@@ -3259,22 +3263,30 @@ def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
     each star (TFA decorrelates remaining "unknown parameters" by looking for
     correlations between similar stars).
 
-    For each star, we're fitting
+    A traditional fit for each stars from HATS/HATNet looks like:
     \begin{equation}
-    mag =
-    a_s S + a_s2 S^2 + a_d D + a_d2 D^2 + a_k K + a_k2 K^2 +
-    const +
-    a_sd S * D + a_sk S * K + a_dk D * K +
-    a_x \sin(2\pi x) + b_x \cos(2\pi x) +
-    a_y \sin(2\pi y) + b_y \cos(2\pi y) +
-    a_2x \sin(4\pi x) + b_2x \cos(4\pi x) +
-    a_2y \sin(4\pi y) + b_2y \cos(4\pi y) +
-    a_intrax (x - floor(x)) +
-    a_intray (y - floor(y)).
+        mag =
+        a_s S + a_s2 S^2 + a_d D + a_d2 D^2 + a_k K + a_k2 K^2 +
+        const +
+        a_sd S * D + a_sk S * K + a_dk D * K +
+        a_x \sin(2\pi x) + b_x \cos(2\pi x) +
+        a_y \sin(2\pi y) + b_y \cos(2\pi y) +
+        a_2x \sin(4\pi x) + b_2x \cos(4\pi x) +
+        a_2y \sin(4\pi y) + b_2y \cos(4\pi y) +
+        a_intrax (x - floor(x)) +
+        a_intray (y - floor(y)).
     \end{equation}
 
-    If observatory=='tess', we also include a linear correlation term between
-    temperature and magnitude.
+    However, different parameters may be correlated with different instruments.
+    An appropriate EPD model needs to be determined on an instrument by
+    instrument basis, by looking at plots of e.g., magnitude vs (time, S, D, K,
+    x, y, {x}, {y}, temperature, hour angle, zenith distance, background level)
+    etc. Also, look at "pair plots" (triangle plots scattering each of these
+    dimensions against the other).
+
+    For TESS, a linear model is not a good fit to the data. However the
+    magnitudes have a secular drift that correlates with that seen in (x, y,
+    and CCD temperature). We therefore adopt a nonlinear, spline model.
 
     References:
         Andras Pal's thesis, Section 2.10.1
@@ -3309,7 +3321,19 @@ def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
         TESS data.
 
     Returns:
-        array of EPD differential mags, if the solution succeeds
+        If HATPI: array of "differential" EPD mags (to add back to median mag),
+        if the solution succeeds.
+
+        If TESS: same array, also returns a dictionary with the fit details,
+        including useful tidbits like the predicted (X,Y,temperature,magnitude)
+        vectors.
+
+        (NOTE: we are adding the magnitudes back. In fitting models to LCs, if
+        you're modeling the FLUX with some multiplicative function that is
+        distorting the number of electrons you are reading out, then dividing
+        out your model is best.  However, in magnitudes, that multiplicative
+        function becomes additive, because logarithms. So add for magnitudes,
+        divide for fluxes).
     """
 
     # find all the finite values of the magnitude
@@ -3335,79 +3359,200 @@ def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
     # smooth the signal
     smoothedmag = medfilt(final_mag, smooth)
 
-    # make the linear equation matrix.
     if observatory=='hatpi':
-        epdmatrix = np.c_[fsv[finalind]**2.0,
-                          fsv[finalind],
-                          fdv[finalind]**2.0,
-                          fdv[finalind],
-                          fkv[finalind]**2.0,
-                          fkv[finalind],
-                          np.ones(final_len),
-                          fsv[finalind]*fdv[finalind],
-                          fsv[finalind]*fkv[finalind],
-                          fdv[finalind]*fkv[finalind],
-                          np.sin(2*np.pi*xcc[finalind]),
-                          np.cos(2*np.pi*xcc[finalind]),
-                          np.sin(2*np.pi*ycc[finalind]),
-                          np.cos(2*np.pi*ycc[finalind]),
-                          np.sin(4*np.pi*xcc[finalind]),
-                          np.cos(4*np.pi*xcc[finalind]),
-                          np.sin(4*np.pi*ycc[finalind]),
-                          np.cos(4*np.pi*ycc[finalind]),
-                          xcc[finalind] - np.floor(xcc[finalind]),
-                          ycc[finalind] - np.floor(ycc[finalind])
-                         ]
+        try:
+            # make the linear equation matrix.
+            epdmatrix = np.c_[fsv[finalind]**2.0,
+                              fsv[finalind],
+                              fdv[finalind]**2.0,
+                              fdv[finalind],
+                              fkv[finalind]**2.0,
+                              fkv[finalind],
+                              np.ones(final_len),
+                              fsv[finalind]*fdv[finalind],
+                              fsv[finalind]*fkv[finalind],
+                              fdv[finalind]*fkv[finalind],
+                              np.sin(2*np.pi*xcc[finalind]),
+                              np.cos(2*np.pi*xcc[finalind]),
+                              np.sin(2*np.pi*ycc[finalind]),
+                              np.cos(2*np.pi*ycc[finalind]),
+                              np.sin(4*np.pi*xcc[finalind]),
+                              np.cos(4*np.pi*xcc[finalind]),
+                              np.sin(4*np.pi*ycc[finalind]),
+                              np.cos(4*np.pi*ycc[finalind]),
+                              xcc[finalind] - np.floor(xcc[finalind]),
+                              ycc[finalind] - np.floor(ycc[finalind])
+                             ]
+
+            # solve the equation epdmatrix * x = smoothedmag
+            # return the EPD differential mags if the solution succeeds
+            coeffs, residuals, rank, singulars = lstsq(epdmatrix, smoothedmag)
+
+            if DEBUG:
+                print('coeffs = %s, residuals = %s' % (coeffs, residuals))
+
+            return epd_diffmags_imagesub_linearmodel(coeffs, fsv, fdv, fkv,
+                                                     xcc, ycc, mag,
+                                                     observatory=observatory)
+        except Exception as e:
+            # if the solution fails, return nothing
+            print('ERR! %sZ: EPD solution did not converge! Error was: %s' %
+                  (datetime.utcnow().isoformat(), e))
+            return None
+
     elif observatory=='tess':
-        epdmatrix = np.c_[fsv[finalind]**2.0,
-                          fsv[finalind],
-                          fdv[finalind]**2.0,
-                          fdv[finalind],
-                          fkv[finalind]**2.0,
-                          fkv[finalind],
-                          np.ones(final_len),
-                          fsv[finalind]*fdv[finalind],
-                          fsv[finalind]*fkv[finalind],
-                          fdv[finalind]*fkv[finalind],
-                          np.sin(2*np.pi*xcc[finalind]),
-                          np.cos(2*np.pi*xcc[finalind]),
-                          np.sin(2*np.pi*ycc[finalind]),
-                          np.cos(2*np.pi*ycc[finalind]),
-                          np.sin(4*np.pi*xcc[finalind]),
-                          np.cos(4*np.pi*xcc[finalind]),
-                          np.sin(4*np.pi*ycc[finalind]),
-                          np.cos(4*np.pi*ycc[finalind]),
-                          xcc[finalind] - np.floor(xcc[finalind]),
-                          ycc[finalind] - np.floor(ycc[finalind]),
-                          temperatures[finalind]
-                         ]
+
+        ##########################################
+        # for each orbit, fit a spline for (x,y,temperature,magnitude).  then
+        # divide it out.  (note: the time-sort shouldn't be necessary! already
+        # done).
+        ##########################################
+        sort = np.argsort(times)
+        times = times[sort]
+        final_mag = final_mag[sort]
+        xcc = xcc[sort]
+        ycc = ycc[sort]
+        temperatures = temperatures[sort]
+
+        orbitgap = 1. # days
+        expected_norbits = 2
+        norbits, groups = lcmath.find_lc_timegroups(times, mingap=orbitgap)
+
+        if norbits != expected_norbits:
+            raise AssertionError('EPD detrending assumes given two orbits')
+
+        fitdetails = {}
+        orbitind = 0
+        for group in groups:
+            groupind = np.zeros_like(times)
+            groupind[group.start : group.stop] += 1
+            groupind = groupind.astype(np.bool)
+
+            tg_mag = final_mag[groupind]
+            tg_x = xcc[finalind & groupind]
+            tg_y = ycc[finalind & groupind]
+            tg_temp = temperatures[finalind & groupind]
+
+            theta = [tg_mag, tg_x, tg_y, tg_temp]
+            ndim = len(theta)
+
+            # to get the weight vector used in chi^2 estimation, estimate
+            # uncertainty in x,y,T,mag as 1-sigma standard deviation from 6-hr
+            # timescale window.
+            sigma_vec = []
+            for _theta in theta:
+                windowsize = 12 # 6 hour timescale = 12 time points for FFIs.
+                _sigma = np.std(rolling_window(_theta, windowsize))
+                sigma_vec.append(np.ones_like(_theta)*np.nanmean(_sigma))
+
+            # Find B-spline representation of N-dimensional curve. Assumption
+            # is that \vec{theta}(t) represents a curve in N-dimensional space
+            # parametrized by u, for u in [0,1]. We are trying to find a smooth
+            # approximating spline curve g(u). The main function wraps the
+            # PARCUR routine from FITPACK, a FORTRAN library. Written by Paul
+            # Dierckx.  PARCUR is for fitting of parametric open curves. (e.g.,
+            # Dierckx, "Curve and surface fitting with splines", (1993, pg 111,
+            # sec 6.3.1).  The method, and statement of the optimization
+            # problem, are equations 6.46 and 6.47 of the above reference.  The
+            # smoothing parameter s must be positive.  For each value of the
+            # smoothing parameter, refit for the optimal number of knots.
+            # Calculate chi^2 and BIC. Set the maximum number of knots for a
+            # 13.7 day time-series (one orbit) to be 13, to prevent fitting out
+            # <1 day frequencies unless they involve sharp features.  (This
+            # imposes a high-pass filter.) The grid spacing is arbitrary, but
+            # should be enough to get some decent resolution, and to bracket
+            # the BIC-minimum.
+            s_grid = np.logspace(-4,-1,num=50)
+            n_knot_max = 13
+            korder = 3 # spline order
+
+            spld = {}
+            BICs = []
+            for s in s_grid:
+                (tckp, u), metric, ier, msg = splprep(theta, s=s, k=korder,
+                                                      nest=n_knot_max, task=0,
+                                                      full_output=1)
+
+                # t_knots: "this array contains the knots of the spline curve,
+                # i.e.  the position of the interior knots t(k+2),
+                # t(k+3),..,t(n-k-1) as well as the position of the additional
+                # t(1)=t(2)=...=t(k+1)=ub and t(n-k)=...=t(n)=ue needed for the
+                # b-spline representation"
+                #
+                # knots: knots of the spline curve; i.e. position of the knots
+                # in (x,y,temperature,mag) space.
+                #
+                # order: b-spline order
+                t_knots, knots, order = tckp
+
+                n_dim = 4
+                n_data = len(theta[0])
+                n_knots = np.atleast_1d(knots).shape[1]
+                k_freeparam = n_dim*( n_knots + korder + 1 )
+
+                # Compute chisq by evaluating the spline.
+
+                mag_pred, x_pred, y_pred, T_pred = splev(u, tckp)
+                pred_vec = mag_pred, x_pred, y_pred, T_pred
+
+                chisq = 0
+                for _theta, _theta_pred, _sigma_theta in zip(
+                    theta, pred_vec, sigma_vec
+                ):
+                    chisq += np.sum( ( (_theta - _theta_pred)/_sigma_theta)**2 )
+
+                BIC = chisq + k_freeparam * np.log(n_data)
+
+                spld[s] = {}
+                spld[s]['tckp'] = tckp
+                spld[s]['n_knots'] = n_knots
+                spld[s]['u'] = u
+                spld[s]['metric'] = metric
+                spld[s]['chisq'] = chisq
+                spld[s]['n_data'] = n_data
+                spld[s]['k_freeparam'] = k_freeparam
+                spld[s]['BIC'] = BIC
+
+                spld[s]['mag_pred'] = mag_pred
+                spld[s]['x_pred'] = x_pred
+                spld[s]['y_pred'] = y_pred
+                spld[s]['T_pred'] = T_pred
+
+                BICs.append(BIC)
+
+            # using BIC, get the best-fit model (the only one we will keep).
+            # for each spacecraft orbit, save the best-fit model, and also the
+            # tckp and u vectors used to generate it.
+
+            BICs = nparr(BICs)
+            sel = np.argmin(BICs)
+            best_s = s_grid[sel]
+            fitdetails[orbitind] = {}
+
+            for k in ['tckp', 'u', 'n_knots', 'chisq', 'n_data', 'k_freeparam',
+                      'BIC', 'x_pred', 'y_pred', 'T_pred', 'mag_pred']:
+
+                fitdetails[orbitind][k] = spld[best_s][k]
+
+            orbitind += 1
+
+        if DEBUG:
+            print('{}'.format(repr(fitdetails)))
+
+        # now stitch together the two orbits, and subtract out the model
+        mag_pred = np.concatenate(([fitdetails[0]['mag_pred'],
+                                    fitdetails[1]['mag_pred']]))
+
+        epd_diffmags_imagesub_splinemodel = final_mag - mag_pred
+
+        return epd_diffmags_imagesub_splinemodel, fitdetails
+
+
+
     else:
         raise NotImplementedError
 
 
-    # solve the equation epdmatrix * x = smoothedmag
-    # return the EPD differential mags if the solution succeeds
-    try:
-
-        coeffs, residuals, rank, singulars = lstsq(epdmatrix, smoothedmag)
-
-        if DEBUG:
-            print('coeffs = %s, residuals = %s' % (coeffs, residuals))
-
-        if observatory=='hatpi':
-            return epd_diffmags_imagesub(coeffs, fsv, fdv, fkv, xcc, ycc, mag,
-                                         observatory=observatory)
-        elif observatory=='tess':
-            return epd_diffmags_imagesub(coeffs, fsv, fdv, fkv, xcc, ycc, mag,
-                                         temperatures=temperatures,
-                                         observatory=observatory)
-
-    # if the solution fails, return nothing
-    except Exception as e:
-
-        print('ERR! %sZ: EPD solution did not converge! Error was: %s' %
-              (datetime.utcnow().isoformat(), e))
-        return None
 
 
 
