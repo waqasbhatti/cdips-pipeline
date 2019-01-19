@@ -3,7 +3,10 @@
 """
 lcutils.py - Luke Bouma (luke@astro.princeton.edu) - Jan 2019
 
-Tools for working with FITS lightcurves.
+Tools for working with FITS lightcurves. Including: converting text LCs (from
+grcollect) to FITS lightcurves. Running EPD on FITS lightcurves. Getting
+barycentric time correction for FITS lightcurves. And making input lists TFA
+needs, from FITS LCs.
 
 parallel_convert_grcollect_to_fits_lc
     convert_grcollect_to_fits_lc_worker
@@ -11,6 +14,15 @@ parallel_convert_grcollect_to_fits_lc
 parallel_run_epd_imagesub_fits
     epd_fitslightcurve_imagesub_worker
     epd_fitslightcurve_imagesub
+
+make_ascii_files_for_vartools
+    _make_tfa_lc_list
+    _make_trendlist_tfa
+    _make_dates_tfa
+
+parallel_apply_barycenter_time_correction
+    apply_barycenter_time_correction_worker
+    astropy_utc_time_to_bjd_tdb
 """
 
 import os
@@ -109,8 +121,9 @@ def _map_key_to_comment(k):
 def convert_grcollect_to_fits_lc_worker(task):
     """
     Given grcollect lightcurve, make a FITS binary table with the lightcurve
-    data. Collect header information from the frames that created the
-    lightcurve.
+    data. Sort the lightcurve in time order. Collect header information from
+    the frames that created the lightcurve.  (TESS-specific): get the CCD
+    temperature timeseries.
     """
 
     grclcpath, outpath, catdf, observatory, lcdir, fitsdir = task
@@ -121,12 +134,20 @@ def convert_grcollect_to_fits_lc_worker(task):
 
     lcd = tu.read_tess_txt_lightcurve(grclcpath, catdf)
 
+    # sort the lightcurve, and the X, Y, temperature, etc timeseries, time.
+    # every entry in "sortkeys" is a np.ndarray.
     times = lcd['tmid_utc']
-    earliestframename = lcd['rstfc'][np.argmin(times)]
-    earliestframepath = os.path.join(fitsdir, earliestframename+'.fits')
+    sortkeys = [k for k in np.sort(list(lcd.keys())) if k not in
+                ['objectid','objectinfo']]
+    timesortedind = np.argsort(times)
+    for k in sortkeys:
+        lcd[k] = lcd[k][timesortedind]
 
     # read the fits header from the earliest frame in the sequence; inherit
     # various header properties from this frame.
+    earliestframename = lcd['rstfc'][np.argmin(times)]
+    earliestframepath = os.path.join(fitsdir, earliestframename+'.fits')
+
     kwlist=['SIMPLE', 'SIMDATA', 'TELESCOP', 'INSTRUME', 'CAMERA', 'CCD',
             'EXPOSURE', 'TIMEREF', 'TASSIGN', 'TIMESYS', 'BJDREFI', 'BJDREFF',
             'TIMEUNIT', 'TELAPSE', 'LIVETIME', 'TSTART', 'TSTOP', 'DATE-OBS',
