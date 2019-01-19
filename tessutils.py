@@ -1037,6 +1037,8 @@ def append_ccd_temperature_to_hdr_worker(task):
 
     fitsname, d = task
 
+    framekey = os.path.splitext(os.path.basename(fitsname))[0]
+
     # get the temperature time series appropriate for this CAM/CCD pair using
     # the file name.  match: tess2018206192942-s0001-4-3-0120_cal_img.fits
     sr = search('{}/tess2{}-{}-{}-{}-{}_cal_img.fits', fitsname)
@@ -1047,7 +1049,6 @@ def append_ccd_temperature_to_hdr_worker(task):
 
     time = d[thiskey]['time'] # engineering data time in "TJD = BJD-2457000".
     temperature = d[thiskey]['temperature'] # ditto, for CCD temperature
-
 
     # take the mean of the temperature values within this time window. append
     # it to the header.
@@ -1080,8 +1081,10 @@ def append_ccd_temperature_to_hdr_worker(task):
 
     if n_temps>=1:
         print('Wrote CCDTEMP to {:s}'.format(fitsname))
+        return framekey, mean_temp, n_temps
     else:
         print('WRN! Wrote NAN CCDTEMP to {:s}'.format(fitsname))
+        return framekey, np.nan, 0
 
 
 def parallel_append_ccd_temperature_to_hdr(fitslist, temperaturepklpath,
@@ -1108,11 +1111,25 @@ def parallel_append_ccd_temperature_to_hdr(fitslist, temperaturepklpath,
     print('%sZ: finished appending CCD temperatures to headers' %
           (datetime.utcnow().isoformat()))
 
+    # write CCDTEMP, NTEMPS, and FRAMEKEY csv file for later quick-read during
+    # FITS LC creation.
+    outdf = pd.DataFrame(results, columns=['framekey','ccdtemp','ntemps'])
+
+    framekey = outdf['framekey'].iloc[0]
+    res = search('tess{}-{}_cal_img', framekey)
+    keystring = res[-1]
+    outname = '{}_key_temperature_count.csv'.format(keystring)
+
+    # output csv path example:
+    # /nfs/phtess1/ar1/TESS/FFI/ENGINEERING/s0002-3-3-0121_key_temperature_count.csv
+    outdir = os.path.dirname(temperaturepklpath)
+    outpath = os.path.join(outdir, outname)
+
+    outdf.to_csv(outpath, index=False)
+    print('made {}'.format(outpath))
+
     return {result for result in results}
 
-
-
-    #IMPLEMENT
 
 
 def make_ccd_temperature_timeseries_pickle(sectornum):
