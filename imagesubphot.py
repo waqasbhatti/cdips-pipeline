@@ -3419,7 +3419,11 @@ def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
         norbits, groups = lcmath.find_lc_timegroups(times, mingap=orbitgap)
 
         if norbits != expected_norbits:
-            raise AssertionError('EPD detrending assumes given two orbits')
+            outmsg = (
+                'EPD assumes given two orbits. {} orbits. Time {}, Mag {}'.
+                format(norbits, repr(times), repr(final_mag))
+            )
+            raise AssertionError(outmsg)
 
         fitdetails = {}
         orbitind = 0

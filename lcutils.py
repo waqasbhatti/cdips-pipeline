@@ -437,18 +437,22 @@ def epd_fitslightcurve_imagesub(fitsilcfile, outfile, smooth=21, sigmaclip=3.0,
             )
         elif observatory=='tess':
             if len(ilc[irm_ap_key][combinedok])>0:
-                (epddiffmags[irm_ap_key],
-                 epddetails[irm_ap_key]) = ism.epd_magseries_imagesub(
-                    ilc[irm_ap_key][combinedok],
-                    ilc['FSV'][combinedok],
-                    ilc['FDV'][combinedok],
-                    ilc['FKV'][combinedok],
-                    ilc['XIC'][combinedok],
-                    ilc['YIC'][combinedok],
-                    smooth=smooth, sigmaclip=sigmaclip,
-                    observatory=observatory, temperatures=temperatures,
-                    times=ilc['TMID_BJD'][combinedok],
-                )
+                try:
+                    (epddiffmags[irm_ap_key],
+                     epddetails[irm_ap_key]) = ism.epd_magseries_imagesub(
+                        ilc[irm_ap_key][combinedok],
+                        ilc['FSV'][combinedok],
+                        ilc['FDV'][combinedok],
+                        ilc['FKV'][combinedok],
+                        ilc['XIC'][combinedok],
+                        ilc['YIC'][combinedok],
+                        smooth=smooth, sigmaclip=sigmaclip,
+                        observatory=observatory, temperatures=temperatures,
+                        times=ilc['TMID_BJD'][combinedok],
+                    )
+                except Exception as e:
+                    print('EPD failed for {}. Msg is:'.format(fitsilcfile))
+                    print(e)
             else:
                 return None, None
         else:
@@ -459,6 +463,13 @@ def epd_fitslightcurve_imagesub(fitsilcfile, outfile, smooth=21, sigmaclip=3.0,
     # add the EPD diff mags back to the median mag to get the EPD mags
     epdmags = {}
     for irm_ap_key in irm_ap_keys:
+
+        if irm_ap_key not in epddiffmags:
+            print('ERR! EPD failed for {} b/c epddiffmags had no key.'.
+                  format(fitsilcfile))
+            return 42
+        else:
+            pass
 
         if epddiffmags[irm_ap_key] is not None:
             mag_median = np.nanmedian(ilc[irm_ap_key])
