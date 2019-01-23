@@ -421,6 +421,7 @@ def epd_fitslightcurve_imagesub(fitsilcfile, outfile, smooth=21, sigmaclip=3.0,
         raise NotImplementedError('observatory must be "tess" or "hatpi"')
 
     # get the EPD diff mags
+    isfull = True if 'FULL' in fitsilcfile else False
     epddiffmags, epddetails = {}, {}
     for irm_ap_key in irm_ap_keys:
 
@@ -433,7 +434,8 @@ def epd_fitslightcurve_imagesub(fitsilcfile, outfile, smooth=21, sigmaclip=3.0,
                 ilc['XIC'][combinedok],
                 ilc['YIC'][combinedok],
                 smooth=smooth, sigmaclip=sigmaclip,
-                observatory=observatory, temperatures=temperatures
+                observatory=observatory, temperatures=temperatures,
+                isfull=isfull
             )
         elif observatory=='tess':
             if len(ilc[irm_ap_key][combinedok])>0:
@@ -449,6 +451,7 @@ def epd_fitslightcurve_imagesub(fitsilcfile, outfile, smooth=21, sigmaclip=3.0,
                         smooth=smooth, sigmaclip=sigmaclip,
                         observatory=observatory, temperatures=temperatures,
                         times=ilc['TMID_BJD'][combinedok],
+                        isfull=isfull
                     )
                 except Exception as e:
                     print('EPD failed for {}. Msg is:'.format(fitsilcfile))
@@ -505,7 +508,8 @@ def epd_fitslightcurve_imagesub(fitsilcfile, outfile, smooth=21, sigmaclip=3.0,
     # The predicted vectors would give an extra (Ndim-1)*(3 apertures)
     # time-series vectors. And the "tck, u" representation would require an
     # annoying extra two extensions.
-    for orbitnum in [0,1]:
+    orbitnums = [0,1] if isfull else [0]
+    for orbitnum in orbitnums:
         for irm_ap_key in irm_ap_keys:
             knotkey = 'nknot_o{}_{}'.format(orbitnum, irm_ap_key)
             chisqkey = 'chisq_o{}_{}'.format(orbitnum, irm_ap_key)

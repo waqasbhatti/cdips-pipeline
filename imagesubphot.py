@@ -162,7 +162,7 @@ different from the aperture photometry lightcurves.
 ## IMPORTS ##
 #############
 
-import os, glob, time
+import os, glob, time, shutil
 import os.path
 import multiprocessing as mp
 
@@ -3245,15 +3245,17 @@ def epd_diffmags_imagesub_linearmodel(coeff, fsv, fdv, fkv, xcc, ycc, mag,
                  -
                  mag)
 
+
 def rolling_window(a, window):
     # a cheap way to pass a rolling window over an array
     shape = a.shape[:-1] + (a.shape[-1] - window + 1, window)
     strides = a.strides + (a.strides[-1],)
     return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
 
+
 def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
                            smooth=21, sigmaclip=3.0, observatory='hatpi',
-                           temperatures=None, times=None):
+                           temperatures=None, times=None, isfull=True):
     """
     For each star, ask how the flux correlates with "external parameters" (for
     instance the intra-pixel position, or the CCD temperature, or the shape
@@ -3403,19 +3405,25 @@ def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
     elif observatory=='tess':
 
         ##########################################
-        # for each orbit, fit a spline for (x,y,temperature,magnitude).  then
-        # divide it out.  (note: the time-sort shouldn't be necessary! already
-        # done).
+        # for each orbit, fit a spline for (x,y,temperature,smoothedmag).  then
+        # divide it out.  (note: the time-sort is a sanity check -- it was
+        # already done when making the grcollect -> FITS "raw" lightcurves).
         ##########################################
+        # cut for sigma-clipped / finite values
+        times = times[finalind]
+        xcc = xcc[finalind]
+        ycc = ycc[finalind]
+        temperatures = temperatures[finalind]
+
+        # sort by time
         sort = np.argsort(times)
-        times = times[sort]
-        final_mag = final_mag[sort]
+        final_mag = smoothedmag[sort]
         xcc = xcc[sort]
         ycc = ycc[sort]
         temperatures = temperatures[sort]
 
         orbitgap = 1. # days
-        expected_norbits = 2
+        expected_norbits = 2 if isfull else 1
         norbits, groups = lcmath.find_lc_timegroups(times, mingap=orbitgap)
 
         if norbits != expected_norbits:
@@ -3433,9 +3441,9 @@ def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
             groupind = groupind.astype(np.bool)
 
             tg_mag = final_mag[groupind]
-            tg_x = xcc[finalind & groupind]
-            tg_y = ycc[finalind & groupind]
-            tg_temp = temperatures[finalind & groupind]
+            tg_x = xcc[groupind]
+            tg_y = ycc[groupind]
+            tg_temp = temperatures[groupind]
 
             theta = [tg_mag, tg_x, tg_y, tg_temp]
             ndim = len(theta)
@@ -3467,7 +3475,7 @@ def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
             # should be enough to get some decent resolution, and to bracket
             # the BIC-minimum.
             s_grid = np.logspace(-4,-1,num=50)
-            n_knot_max = 13
+            n_knot_max = 13 if isfull else 4 # ~one knot per day.
             korder = 3 # spline order
 
             spld = {}
@@ -3544,8 +3552,13 @@ def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
             print('{}'.format(repr(fitdetails)))
 
         # now stitch together the two orbits, and subtract out the model
-        mag_pred = np.concatenate(([fitdetails[0]['mag_pred'],
-                                    fitdetails[1]['mag_pred']]))
+        if isfull:
+            mag_pred = np.concatenate(([fitdetails[0]['mag_pred'],
+                                        fitdetails[1]['mag_pred']]))
+        else:
+            # for the TUNE case, no need to stitch (because it's a subset of
+            # one orbit).
+            mag_pred = fitdetails[0]['mag_pred']
 
         epd_diffmags_imagesub_splinemodel = final_mag - mag_pred
 
@@ -3555,9 +3568,6 @@ def epd_magseries_imagesub(mag, fsv, fdv, fkv, xcc, ycc,
 
     else:
         raise NotImplementedError
-
-
-
 
 
 def epd_lightcurve_imagesub(ilcfile,
