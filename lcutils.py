@@ -628,11 +628,16 @@ def _make_tfa_lc_list(lcfiles, statsdir):
     df.to_csv(outpath, index=False, header=False, sep=' ')
     print('made {}'.format(outpath))
 
+    return outpath
+
 
 def _make_trendlist_tfa(templatefiles, statsdir):
     """
     trendlist_tfa.txt columns are:
         path to template lightcurve; XCC of template LC; YCC ditto.
+
+    function returns:
+        list of paths to trendlist_tfa_ap{}.txt files
     """
 
     n_apertures = len(templatefiles)
@@ -640,6 +645,7 @@ def _make_trendlist_tfa(templatefiles, statsdir):
     # iterate over "templatefiles", which for each aperture have the selected
     # template stars, plus some other info (made by
     # aperturephot.choose_tfa_template)
+    outpaths = []
     for templatefile, apind in zip(
         np.sort(templatefiles), range(1,n_apertures+1)):
 
@@ -663,6 +669,9 @@ def _make_trendlist_tfa(templatefiles, statsdir):
                                format(apind))
         outdf.to_csv(outpath, index=False, header=False, sep=' ')
         print('made {}'.format(outpath))
+        outpaths.append(outpath)
+
+    return outpaths
 
 
 def _make_dates_tfa(fitsdir, fitsimgglob, statsdir):
@@ -691,16 +700,367 @@ def _make_dates_tfa(fitsdir, fitsimgglob, statsdir):
     outdf.to_csv(outpath, index=False, header=False, sep=' ')
     print('made {}'.format(outpath))
 
+    return outpath
+
 
 def make_ascii_files_for_vartools(lcfiles, templatefiles, statsdir, fitsdir,
                                   fitsimgglob):
     # lc_list_tfa, trendlist_tfa and dates_tfa
 
-    _make_tfa_lc_list(lcfiles, statsdir)
+    tfalclist_path = _make_tfa_lc_list(lcfiles, statsdir)
 
-    _make_trendlist_tfa(templatefiles, statsdir)
+    trendlisttfa_paths = _make_trendlist_tfa(templatefiles, statsdir)
 
-    _make_dates_tfa(fitsdir, fitsimgglob, statsdir)
+    datestfa_path = _make_dates_tfa(fitsdir, fitsimgglob, statsdir)
+
+    return tfalclist_path, trendlisttfa_paths, datestfa_path
+
+
+# should work with public vartools version
+tfablslskillharmcmd = (
+    '/home/jhartman/SVN/HATpipe/bin/vartools -l {lc_list_tfa} -matchstringid '
+    ' -inputlcformat BGE:BGE:double,BGV:BGV:double,FDV:FDV:double,'
+    'FKV:FKV:double,FSV:FSV:double,IFE1:IFE1:double,IFE2:IFE2:double,'
+    'IFE3:IFE3:double,IFL1:IFL1:double,IFL2:IFL2:double,IFL3:IFL3:double,'
+    'IRE1:IRE1:double,IRE2:IRE2:double,IRE3:IRE3:double,IRM1:IRM1:double,'
+    'IRM2:IRM2:double,IRM3:IRM3:double,IRQ1:IRQ1:string,IRQ2:IRQ2:string,'
+    'IRQ3:IRQ3:string,id:RSTFC:string,RSTFC:RSTFC:string,TMID_UTC:TMID_UTC:double,'
+    'XIC:XIC:double,YIC:YIC:double,CCDTEMP:CCDTEMP:double,'
+    'NTEMPS:NTEMPS:int,'
+    't:TMID_BJD:double,TMID_BJD:TMID_BJD:double,BJDCORR:BJDCORR:double,'
+    'EP1:EP1:double,EP2:EP2:double,EP3:EP3:double '
+    '-expr \'mag=EP1\' -expr \'err=IRE1\' '
+    '-TFA {trendlist_tfa_ap1} readformat 0 RSTFC EP1 {dates_tfa} '
+    '{npixexclude} xycol 2 3 1 0 0 '
+    '-expr \'TFA1=mag\' '
+    '-expr \'mag=EP2\' -expr \'err=IRE2\' '
+    '-TFA {trendlist_tfa_ap2} readformat 0 RSTFC EP2 {dates_tfa} '
+    '{npixexclude} xycol 2 3 1 0 0 '
+    '-expr \'TFA2=mag\' '
+    '-expr \'mag=EP3\' -expr \'err=IRE3\' '
+    '-TFA {trendlist_tfa_ap3} readformat 0 RSTFC EP3 {dates_tfa} '
+    '{npixexclude} xycol 2 3 1 0 0 '
+    '-expr \'TFA3=mag\' '
+    '-stats TFA1,TFA2,TFA3 stddev,MAD '
+    '-if \'(STATS_TFA1_MAD_12<=STATS_TFA2_MAD_12)'
+        '*(STATS_TFA1_MAD_12<=STATS_TFA3_MAD_12)\' '
+        '-expr \'mag=TFA1\' -expr \'err=IRE1\' '
+        '-BLS q {blsqmin} {blsqmax} {blsminper} {blsmaxper} {blsnfreq} {blsnbins} '
+        '0 5 0 1 {outblsmodeldir_iter1} 0 fittrap '
+        '-LS {lsminp} {lsmaxp} {lssubsample} 5 0 '
+        '-Killharm ls {killharmnharm} 0 0 '
+        '-expr \'HARMFILTER=mag\' '
+        '-BLS q {blsqmin} {blsqmax} {blsminper} {blsmaxper} {blsnfreq} {blsnbins} '
+        '0 5 0 1 {outblsmodeldir_iter2} 0 fittrap '
+    '-elif \'(STATS_TFA2_MAD_12<=STATS_TFA1_MAD_12)'
+        '*(STATS_TFA2_MAD_12<=STATS_TFA3_MAD_12)\' '
+        '-expr \'mag=TFA2\' -expr \'err=IRE2\' '
+        '-BLS q {blsqmin} {blsqmax} {blsminper} {blsmaxper} {blsnfreq} {blsnbins} '
+        '0 5 0 1 {outblsmodeldir_iter1} 0 fittrap '
+        '-LS {lsminp} {lsmaxp} {lssubsample} 5 0 '
+        '-Killharm ls {killharmnharm} 0 0 '
+        '-expr \'HARMFILTER=mag\' '
+        '-BLS q {blsqmin} {blsqmax} {blsminper} {blsmaxper} {blsnfreq} {blsnbins} '
+        '0 5 0 1 {outblsmodeldir_iter2} 0 fittrap '
+    '-else '
+        '-expr \'mag=TFA3\' -expr \'err=IRE3\' '
+        '-BLS q {blsqmin} {blsqmax} {blsminper} {blsmaxper} {blsnfreq} {blsnbins} '
+        '0 5 0 1 {outblsmodeldir_iter1} 0 fittrap '
+        '-LS {lsminp} {lsmaxp} {lssubsample} 5 0 '
+        '-Killharm ls {killharmnharm} 0 0 '
+        '-expr \'HARMFILTER=mag\' '
+        '-BLS q {blsqmin} {blsqmax} {blsminper} {blsmaxper} {blsnfreq} {blsnbins} '
+        '0 5 0 1 {outblsmodeldir_iter2} 0 fittrap '
+    '-fi '
+    '-stats HARMFILTER stddev,MAD '
+    ''
+    '-o {outlcdir_tfa} columnformat RSTFC:\"Image\",'
+    'TMID_BJD:\"BJDTDB midexp time\",TFA1:mag,TFA2:mag,TFA3:mag,HARMFILTER:mag '
+    'fits copyheader logcommandline -header -numbercolumns -parallel {nproc} '
+    '> {outstatsfile}'
+)
+
+
+tfaonlycmd = (
+    '/home/jhartman/SVN/HATpipe/bin/vartools -l {lc_list_tfa} -matchstringid '
+    ' -inputlcformat BGE:BGE:double,BGV:BGV:double,FDV:FDV:double,'
+    'FKV:FKV:double,FSV:FSV:double,IFE1:IFE1:double,IFE2:IFE2:double,'
+    'IFE3:IFE3:double,IFL1:IFL1:double,IFL2:IFL2:double,IFL3:IFL3:double,'
+    'IRE1:IRE1:double,IRE2:IRE2:double,IRE3:IRE3:double,IRM1:IRM1:double,'
+    'IRM2:IRM2:double,IRM3:IRM3:double,IRQ1:IRQ1:string,IRQ2:IRQ2:string,'
+    'IRQ3:IRQ3:string,id:RSTFC:string,RSTFC:RSTFC:string,TMID_UTC:TMID_UTC:double,'
+    'XIC:XIC:double,YIC:YIC:double,CCDTEMP:CCDTEMP:double,'
+    'NTEMPS:NTEMPS:int,'
+    't:TMID_BJD:double,TMID_BJD:TMID_BJD:double,BJDCORR:BJDCORR:double,'
+    'EP1:EP1:double,EP2:EP2:double,EP3:EP3:double '
+    '-expr \'mag=EP1\' -expr \'err=IRE1\' '
+    '-TFA {trendlist_tfa_ap1} readformat 0 RSTFC EP1 {dates_tfa} '
+    '{npixexclude} xycol 2 3 1 0 0 '
+    '-expr \'TFA1=mag\' '
+    '-expr \'mag=EP2\' -expr \'err=IRE2\' '
+    '-TFA {trendlist_tfa_ap2} readformat 0 RSTFC EP2 {dates_tfa} '
+    '{npixexclude} xycol 2 3 1 0 0 '
+    '-expr \'TFA2=mag\' '
+    '-expr \'mag=EP3\' -expr \'err=IRE3\' '
+    '-TFA {trendlist_tfa_ap3} readformat 0 RSTFC EP3 {dates_tfa} '
+    '{npixexclude} xycol 2 3 1 0 0 '
+    '-expr \'TFA3=mag\' '
+    '-stats TFA1,TFA2,TFA3 stddev,MAD '
+    '-o {outlcdir_tfa} columnformat RSTFC:\"Image\",'
+    'TMID_BJD:\"BJDTDB midexp time\",TFA1:mag,TFA2:mag,TFA3:mag '
+    'fits copyheader logcommandline -header -numbercolumns -parallel {nproc} '
+    '> {outstatsfile}'
+)
+
+
+def run_tfa(tfalclist_path, trendlisttfa_paths, datestfa_path, lcdirectory,
+            statsdir,
+            nworkers=16, do_bls_ls_killharm=True, npixexclude=10,
+            blsqmin=0.002, blsqmax=0.1, blsminper=0.2, blsmaxper=30.0,
+            blsnfreq=20000, blsnbins=1000, lsminp=0.1, lsmaxp=30.0,
+            lssubsample=0.1, killharmnharm=10):
+    """
+    Run TFA on all apertures. Optionally, if do_bls_ls_killharm, include a
+    sequence of BLS, then Lomb-Scargle, then harmonic killing, then BLS on the
+    harmonic-subtracted residual.
+
+    If running TFA alone, of order ~10k lightcurves per minute are created in
+    os.path.join(lcdirectory, 'TFA_LCS'). If also doing BLS etc, it's of order
+    50-100 processed lightcurves per minute. Periodograms are expensive.
+
+    TFA parameters:
+        npixexclude: trend stars exclusion radius, in units of pixels.
+
+    BLS parameters
+        blsqmin: minimum transit duration in phase units
+        blsqmax
+        blsminper
+        blsmaxper
+        blsnfreq
+        blsnbins
+
+    GLS parameters
+        lsminp
+        lsmaxp
+        lssubsample
+
+    Killharm parameters
+        killharmnharm
+    """
+
+    trendlist_tfa_ap1 = [t for t in trendlisttfa_paths if 'ap1' in t][0]
+    trendlist_tfa_ap2 = [t for t in trendlisttfa_paths if 'ap2' in t][0]
+    trendlist_tfa_ap3 = [t for t in trendlisttfa_paths if 'ap3' in t][0]
+
+    outblsmodeldir_iter1 = os.path.join(lcdirectory,'BLS_MODEL_ITER1')
+    outblsmodeldir_iter2 = os.path.join(lcdirectory,'BLS_MODEL_ITER2')
+    outlcdir_tfa = os.path.join(lcdirectory,'TFA_LCS')
+    outstatsfile = os.path.join(statsdir, 'vartools_tfa_stats.txt')
+
+    for d in [outblsmodeldir_iter1, outblsmodeldir_iter2, outlcdir_tfa]:
+        if not os.path.exists(d):
+            os.mkdir(d)
+
+    if do_bls_ls_killharm:
+        cmdtorun = tfablslskillharmcmd.format(
+            lc_list_tfa = tfalclist_path,
+            trendlist_tfa_ap1 = trendlist_tfa_ap1,
+            trendlist_tfa_ap2 = trendlist_tfa_ap2,
+            trendlist_tfa_ap3 = trendlist_tfa_ap3,
+            dates_tfa = datestfa_path,
+            npixexclude = npixexclude,
+            outblsmodeldir_iter1 = outblsmodeldir_iter1,
+            outblsmodeldir_iter2 = outblsmodeldir_iter2,
+            outlcdir_tfa = outlcdir_tfa,
+            outstatsfile = outstatsfile,
+            nproc = nworkers,
+            blsqmin = blsqmin,
+            blsqmax = blsqmax,
+            blsminper = blsminper,
+            blsmaxper = blsmaxper,
+            blsnfreq = blsnfreq,
+            blsnbins = blsnbins,
+            lsminp = lsminp,
+            lsmaxp = lsmaxp,
+            lssubsample = lssubsample,
+            killharmnharm = killharmnharm
+        )
+    else:
+        cmdtorun = tfaonlycmd.format(
+            lc_list_tfa = tfalclist_path,
+            trendlist_tfa_ap1 = trendlist_tfa_ap1,
+            trendlist_tfa_ap2 = trendlist_tfa_ap2,
+            trendlist_tfa_ap3 = trendlist_tfa_ap3,
+            dates_tfa = datestfa_path,
+            npixexclude = npixexclude,
+            outblsmodeldir_iter1 = outblsmodeldir_iter1,
+            outblsmodeldir_iter2 = outblsmodeldir_iter2,
+            outlcdir_tfa = outlcdir_tfa,
+            outstatsfile = outstatsfile,
+            nproc = nworkers
+        )
+
+
+    print(cmdtorun)
+
+    returncode = os.system(cmdtorun)
+
+    if returncode == 0:
+        print('{}Z: TFA+BLS+LS+KILLHARM cmd ran'.format(
+              datetime.utcnow().isoformat()))
+        return 1
+    else:
+        print('ERR! {}Z: TFA+BLS+LS+KILLHARM cmd failed'.format(
+              datetime.utcnow().isoformat()))
+        return 0
+
+
+def merge_tfa_lc_worker(task):
+    """
+    overwrite the given FITS LC at lcpath with appended TFA magnitudes.
+    """
+    lcpath, tfalcdir = task
+
+    lcbase = os.path.basename(lcpath)
+    tfalcpath = os.path.join(tfalcdir, lcbase)
+
+    # note: you can only merge things that have TFA LCs. so check if it exists.
+    tfalcexists = os.path.exists(tfalcpath)
+    lcexists = os.path.exists(lcpath)
+
+    if tfalcexists and lcexists:
+
+        tfahdulist = fits.open(tfalcpath)
+        tfaprimaryhdr, tfahdr, tfadata = (
+            tfahdulist[0].header, tfahdulist[1].header, tfahdulist[1].data
+        )
+
+        inhdulist = fits.open(lcpath)
+        primaryhdr, hdr, data = (
+            inhdulist[0].header, inhdulist[1].header, inhdulist[1].data
+        )
+
+        if primaryhdr['DTR_TFA']:
+            print('WRN! {} found TFA had been performed; skipping'.
+                  format(lcpath))
+            return 0
+
+        np.testing.assert_equal(
+            data['RSTFC'], tfadata['RSTFC'],
+            err_msg='frame ids in TFA/MAIN LC must be equal, else need to sort'
+        )
+
+        # create the "TF1", "TF2", "EPN" keys, format keys, and data columns.
+        n_apertures = len([t[1] for t in hdr.cards if 'IRM' in str(t[1])])
+        irm_ap_keys = ['IRM{}'.format(i) for i in range(1,n_apertures+1)]
+        tfanames = [k.replace('IRM','TFA') for k in irm_ap_keys]
+        tfaformats = ['D'] * len(tfanames)
+        tfadatacols = [tfadata[k] for k in tfanames]
+
+        tfacollist = [fits.Column(name=n, format=f, array=a) for n,f,a in
+                      zip(tfanames, tfaformats, tfadatacols)]
+
+        tfahdu = fits.BinTableHDU.from_columns(tfacollist)
+
+        new_columns = inhdulist[1].columns + tfahdu.columns
+        new_timeseries_hdu = fits.BinTableHDU.from_columns(new_columns)
+
+        # update the flag for whether detrending has been performed
+        primaryhdr['DTR_TFA'] = True
+
+        # update the history with the vartools invocation
+        primaryhdr['HISTORY'] = str(tfaprimaryhdr['HISTORY']).replace('\n','')
+
+        outhdulist = fits.HDUList([inhdulist[0], new_timeseries_hdu])
+        outfile = lcpath
+        outhdulist.writeto(outfile, overwrite=True)
+
+        inhdulist.close()
+        tfahdulist.close()
+
+        n_tfa_mags = len(tfadatacols[0])
+        print('overwrote {} with {} TFA mags'.format(outfile, n_tfa_mags))
+
+        return 1
+
+    elif not tfalcexists and lcexists:
+        # if the TFA LC does not exist for some reason, put in all nans to the
+        # TFA columns.
+
+        inhdulist = fits.open(lcpath)
+        primaryhdr, hdr, data = (
+            inhdulist[0].header, inhdulist[1].header, inhdulist[1].data
+        )
+
+        if primaryhdr['DTR_TFA']:
+            print('WRN! {} found TFA had been performed; skipping'.
+                  format(lcpath))
+            return 0
+
+        # create the "TF1", "TF2", "EPN" keys, format keys, and data columns.
+        n_apertures = len([t[1] for t in hdr.cards if 'IRM' in str(t[1])])
+        irm_ap_keys = ['IRM{}'.format(i) for i in range(1,n_apertures+1)]
+        tfanames = [k.replace('IRM','TFA') for k in irm_ap_keys]
+        tfaformats = ['D'] * len(tfanames)
+        tfadatacols = [np.nan * np.ones_like(data[k]) for k in irm_ap_keys]
+
+        tfacollist = [fits.Column(name=n, format=f, array=a) for n,f,a in
+                      zip(tfanames, tfaformats, tfadatacols)]
+
+        tfahdu = fits.BinTableHDU.from_columns(tfacollist)
+
+        new_columns = inhdulist[1].columns + tfahdu.columns
+        try:
+            new_timeseries_hdu = fits.BinTableHDU.from_columns(new_columns)
+        except ValueError as e:
+            print(e)
+            print('ValueError on {}'.format(lcpath))
+
+        # update the flag for whether detrending has been performed
+        primaryhdr['DTR_TFA'] = True
+
+        outhdulist = fits.HDUList([inhdulist[0], new_timeseries_hdu])
+        outfile = lcpath
+        outhdulist.writeto(outfile, overwrite=True)
+
+        inhdulist.close()
+
+        n_tfa_mags = len(tfadatacols[0])
+        print('WRN! wrote {} with all NaN TFA mags'.
+              format(outfile, n_tfa_mags))
+
+        return 1
+
+    else:
+        raise NotImplementedError(
+            'merge tfa lc called on {} and {}. neither exists.'.
+            format(lcpath, tfalcpath)
+        )
+        return 0
+
+
+
+def parallel_merge_tfa_lcs(lcdirectory, nworkers=32, maxworkertasks=1000):
+
+    tfalcdir = os.path.join(lcdirectory, 'TFA_LCS')
+
+    tfalcs = glob(os.path.join(tfalcdir,'*_llc.fits'))
+
+    lcpaths = glob(os.path.join(lcdirectory, '*_llc.fits'))
+
+    tasks = [(x, tfalcdir) for x in lcpaths]
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+    results = pool.map(merge_tfa_lc_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    return 1
+
+
+
 
 
 
