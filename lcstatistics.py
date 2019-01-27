@@ -54,6 +54,7 @@ from astrobase.varbase.autocorr import autocorr_magseries
 from datetime import datetime
 import multiprocessing as mp
 
+from astropy.io import fits
 
 #####################
 # READING FUNCTIONS #
@@ -185,8 +186,9 @@ def read_acf_stat_files(acfstatfiles, N_acf_types=9):
 # FUNCTIONS TO CALCULATE STATISTICS #
 #####################################
 
-def compute_acf_statistics_worker(task, n_apertures=3, timename='btjd',
-                                  filterwindow=7, istessffi=True):
+def compute_acf_statistics_worker(task, n_apertures=3, timename='TMID_BJD',
+                                  filterwindow=7, istessffi=True,
+                                  isfitslc=True):
 
     #NOTE : might want to check a couple smoothing values ("filterwindows")...
 
@@ -199,15 +201,19 @@ def compute_acf_statistics_worker(task, n_apertures=3, timename='btjd',
 
         tfafile, outdir, eval_times_hr = task
 
-        lcdata = read_tfa_lc(tfafile)
+        if not isfitslc:
+            lcdata = read_tfa_lc(tfafile)
+        else:
+            hdulist = fits.open(tfafile)
+            lcdata = hdulist[1].data
 
         outpickle = os.path.join(
             outdir,
-            os.path.basename(tfafile).replace('.tfalc','_acf_stats.pickle')
+            os.path.basename(tfafile).replace('.fits','_acf_stats.pickle')
         )
         outcsv = os.path.join(
             outdir,
-            os.path.basename(tfafile).replace('.tfalc','_acf_stats.csv')
+            os.path.basename(tfafile).replace('.fits','_acf_stats.csv')
         )
         if os.path.exists(outpickle) and os.path.exists(outcsv):
             return 1
@@ -215,10 +221,10 @@ def compute_acf_statistics_worker(task, n_apertures=3, timename='btjd',
         d_pkl, outdf = {}, pd.DataFrame({})
         for ap in range(1,n_apertures+1):
 
-            rawap = 'RM{:d}'.format(ap)
+            rawap = 'IRM{:d}'.format(ap)
             epdap = 'EP{:d}'.format(ap)
-            tfaap = 'TF{:d}'.format(ap)
-            errap = 'RMERR{:d}'.format(ap)
+            tfaap = 'TFA{:d}'.format(ap)
+            errap = 'IRE{:d}'.format(ap)
 
             time = lcdata[timename]
             flux_raw = lcdata[rawap]

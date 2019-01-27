@@ -513,7 +513,7 @@ def astrometrydotnet_solve_frame(srclist,
                       os.path.abspath(wcsout),
                       os.path.abspath(srclist)
               )+
-              'Error was: {:s}'.format(anet_stderr)
+              'Error was: {:s}'.format(repr(anet_stderr))
         )
 
         # remove the broken wcs if astrometry failed
@@ -4686,9 +4686,9 @@ def get_lc_statistics(lcfile,
             )
 
         if hdulist[0].header['DTR_TFA']:
-            tf1 = hdulist[1].data['TF1']
-            tf2 = hdulist[1].data['TF2']
-            tf3 = hdulist[1].data['TF3']
+            tf1 = hdulist[1].data['TFA1']
+            tf2 = hdulist[1].data['TFA2']
+            tf3 = hdulist[1].data['TFA3']
         elif not hdulist[0].header['DTR_TFA'] and tfalcrequired:
             print(
                 '{:s}Z: no TFA for {:s} and TFA is required, skipping...'.

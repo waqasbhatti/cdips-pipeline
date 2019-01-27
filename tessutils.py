@@ -697,9 +697,9 @@ def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory, statsdir,
             epdlc = str(np.nan)
             tfalc = str(np.nan)
         else:
-            rawlc = glob(os.path.join(lcdirectory, starid+'.grcollectilc'))
-            epdlc = glob(os.path.join(lcdirectory, starid+'.epdlc'))
-            tfalc = glob(os.path.join(lcdirectory, starid+'.tfalc'))
+            rawlc = glob(os.path.join(lcdirectory, starid+'._llc.fits'))
+            epdlc = glob(os.path.join(lcdirectory, starid+'._llc.fits'))
+            tfalc = glob(os.path.join(lcdirectory, starid+'._llc.fits'))
 
             for lc in [rawlc, epdlc, tfalc]:
                 if len(lc) > 1:
@@ -756,7 +756,7 @@ def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory, statsdir,
         _measure_hj_snr(plname, tfalc, statsdir, sectornum, nworkers=nworkers)
 
 
-def _measure_hj_snr(plname, tfalc, statsdir, sectornum, timename='btjd',
+def _measure_hj_snr(plname, tfalc, statsdir, sectornum, timename='TMID_BJD',
                     nworkers=20,
                     n_transit_durations=4):
 
@@ -773,18 +773,19 @@ def _measure_hj_snr(plname, tfalc, statsdir, sectornum, timename='btjd',
     metallicity = 0.
 
     # we only care about TFA lightcurves for planet SNR measurements.
-    dtrstages = ['TF']
+    dtrstages = ['TFA']
     aps = [str(r) for r in range(1,4)]
     magnames = [dtrstage+ap for dtrstage in dtrstages for ap in aps]
-    errnames = ['RMERR'+ap for dtrstage in dtrstages for ap in aps]
+    errnames = ['IRE'+ap for dtrstage in dtrstages for ap in aps]
 
     # read the lc
-    lc = read_tfa_lc(tfalc)
+    hdulist = fits.open(tfafile)
+    lc = hdulist[1].data
 
     time = lc[timename]
 
     plotpath = os.path.join(statsdir, str(plname)+'_AP1_lightcurve.png')
-    plot_raw_epd_tfa(time, lc['RM1'], lc['EP1'], lc['TF1'], 1,
+    plot_raw_epd_tfa(time, lc['IRM1'], lc['EP1'], lc['TFA1'], 1,
                      savpath=plotpath, xlabel='BTJD = BJD - 2457000')
 
     outdir = os.path.join(statsdir, plname)
