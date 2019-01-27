@@ -55,7 +55,7 @@ def _get_random_tfa_lcs(lcdirectory, n_desired_lcs=100):
 
     np.random.seed(42)
 
-    tfafiles = np.array(glob(os.path.join(lcdirectory,'*.tfalc')))
+    tfafiles = np.array(glob(os.path.join(lcdirectory,'*_llc.fits')))
     n_possible_lcs = len(tfafiles)
 
     # if you have fewer than `n_desired_lcs`, just get as many as possible.
@@ -486,7 +486,7 @@ def plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=10):
             )
 
 def plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20,
-                                     timename='btjd'):
+                                     timename='TMID_BJD', isfitslc=True):
     """
     make sequential RAW, EPD, TFA plots for `n_desired_lcs`
     """
@@ -496,12 +496,16 @@ def plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20,
 
     for tfafile in sel_tfafiles:
 
-        lcdata = lcs.read_tfa_lc(tfafile)
+        if not isfitslc:
+            lcdata = read_tfa_lc(tfafile)
+        else:
+            hdulist = fits.open(tfafile)
+            lcdata = hdulist[1].data
 
         for ap in range(1,4):
-            rawap = 'RM{:d}'.format(ap)
+            rawap = 'IRM{:d}'.format(ap)
             epdap = 'EP{:d}'.format(ap)
-            tfaap = 'TF{:d}'.format(ap)
+            tfaap = 'TFA{:d}'.format(ap)
 
             savdir = os.path.join(os.path.dirname(tfafile),'stats_files')
             savpath = os.path.join(
@@ -930,8 +934,50 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
     # ais.parallel_dbphot_lightcurves_hatidlist(hatidlist, lcdirectory)
 
 
-def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
-                   reformed_cat_file, statsdir, field, fitsdir, fitsglob,
+def _get_ok_lightcurve_files(lcfiles):
+    # given a list of lightcurve files with some that are corrupted, or for
+    # some reason have zero length, or other issues. get the ones that are ok.
+    # delete the not OK ones.
+
+    # clean LCs.
+    iszerosize = np.array([os.stat(f).st_size == 0 for f in lcfiles])
+
+    if np.any(iszerosize):
+
+        for zerosizelc in np.array(lcfiles)[iszerosize]:
+            os.remove(zerosizelc)
+            print('{} WRN! removed {} because zero size'.format(
+                datetime.utcnow().isoformat(), zerosizelc))
+
+        lcfiles = np.array(lcfiles)[~iszerosize]
+
+    isopenable = []
+    for ix, lcfile in enumerate(lcfiles):
+        print('{}/{}'.format(ix, len(lcfiles)))
+        try:
+            hdulist = fits.open(lcfile)
+            _ = hdulist.info()
+            hdulist.close()
+            isopenable.append(True)
+        except:
+            isopenable.append(False)
+    isopenable = np.array(isopenable)
+
+    if np.any(~isopenable):
+
+        for notopenablelc in np.array(lcfiles)[~isopenable]:
+            os.remove(notopenablelc)
+            print('{} WRN! removed {} because could not open'.format(
+                datetime.utcnow().isoformat(), notopenablelc))
+
+        lcfiles = np.array(lcfiles)[isopenable]
+
+    return lcfiles
+
+
+def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
+                   epdlcglob, reformed_cat_file, statsdir, field, fitsdir,
+                   fitsglob, camera, ccd,
                    epdsmooth=11, epdsigclip=10, nworkers=10,
                    binlightcurves=False, tfa_template_sigclip=5.0,
                    tfa_epdlc_sigclip=5.0):
@@ -948,14 +994,24 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
 
     if len(glob(os.path.join(lcdirectory,'*_llc.fits')))<10:
 
-        lcu.parallel_convert_grcollect_to_fits_lc(lcdirectory, fitsdir,
-                                                  catfile=catfile,
-                                                  ilcglob='*.grcollectilc',
-                                                  nworkers=nworkers,
-                                                  observatory='tess')
+        engdir = '/nfs/phtess1/ar1/TESS/FFI/ENGINEERING/'
+        # e.g., s0002-3-3-0121_key_temperature_count.csv
+        temperatureglob = ('{}-{}-{}-????_key_temperature_count.csv'.
+                    format(field, camera, ccd))
+        temperaturedfpath = glob(os.path.join(engdir, temperatureglob))
+        if len(temperaturedfpath) != 1:
+            raise AssertionError('expected a single temperature csv file')
+        temperaturedfpath = temperaturedfpath[0]
 
-        lcu.parallel_apply_barycenter_time_correction(lcdirectory,
-                                                      nworkers=nworkers)
+        lcu.parallel_convert_grcollect_to_fits_lc(
+            lcdirectory, fitsdir, catfile=catfile, ilcglob='*.grcollectilc',
+            nworkers=nworkers, observatory='tess',
+            temperaturedfpath=temperaturedfpath
+        )
+
+        lcu.parallel_apply_barycenter_time_correction(
+            lcdirectory, nworkers=nworkers
+        )
     else:
         print('found >10 fits LCs from grcollect. continuing.')
 
@@ -975,17 +1031,17 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
                                                    minndet=100,
                                                    observatory='tess')
 
-        # n.b. this actually works on fits lcs as well.
-        ap.parallel_lc_statistics(lcdirectory, epdlcglob,
-                                  reformed_cat_file, tfalcrequired=False,
-                                  fitslcnottxt=True,
-                                  fovcatcols=(0,6), # objectid, magcol to use
-                                  fovcatmaglabel='r', outfile=epdstatfile,
-                                  nworkers=nworkers,
-                                  workerntasks=500, rmcols=None,
-                                  epcols=None, tfcols=None,
-                                  rfcols=None, correctioncoeffs=None,
-                                  sigclip=5.0, fovcathasgaiaids=True)
+            # n.b. this actually works on fits lcs as well.
+            ap.parallel_lc_statistics(lcdirectory, epdlcglob,
+                                      reformed_cat_file, tfalcrequired=False,
+                                      fitslcnottxt=True,
+                                      fovcatcols=(0,6), # objectid, magcol to use
+                                      fovcatmaglabel='r', outfile=epdstatfile,
+                                      nworkers=nworkers,
+                                      workerntasks=500, rmcols=None,
+                                      epcols=None, tfcols=None,
+                                      rfcols=None, correctioncoeffs=None,
+                                      sigclip=5.0, fovcathasgaiaids=True)
     else:
         print('already made EPD LC stats file')
 
@@ -1020,47 +1076,43 @@ def run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
                                    outprefix=statsdir, tfastage1=False,
                                    fovcathasgaiaids=True, epdlcext='_llc.fits')
 
-    if not os.path.exists(tfastatfile):
+    if not os.path.exists(vartoolstfastatfile):
         templatefiles = glob(os.path.join(
             statsdir, 'tfa-stage1-input-aperture-?.txt'))
         lcfiles = glob(os.path.join(lcdirectory,'*_llc.fits'))
 
+        lcfiles = _get_ok_lightcurve_files(lcfiles)
+
         # create ascii files needed for vartools:
         # lc_list_tfa, trendlist_tfa and dates_tfa
+        (tfalclist_path, trendlisttfa_paths, datestfa_path) = (
         lcu.make_ascii_files_for_vartools(lcfiles, templatefiles, statsdir,
                                           fitsdir, fitsglob)
+        )
 
-        import IPython; IPython.embed()
-        # FIXME IMPLEMENT PER JOEL'S DEBUGGIN
-        assert 0
-        #TODO: implement below, through vartools call.
-        lcu.parallel_run_tfa()
+        # note that sometimes, you should do BLS + LS + killharm too.  for now
+        # though, we are making lightcurves; these extra steps can come later.
+        npixexclude=10
+        lcu.run_tfa(tfalclist_path, trendlisttfa_paths, datestfa_path,
+                    lcdirectory, statsdir, nworkers=nworkers,
+                    do_bls_ls_killharm=False, npixexclude=npixexclude)
 
-    assert 0 #FIXME
+        lcu.parallel_merge_tfa_lcs(lcdirectory, nworkers=32)
 
     if not os.path.exists(tfastatfile):
-        # templatefiles = glob(lcdirectory+'aperture-?-tfa-template.list')
-        # ism.parallel_run_tfa(lcdirectory, templatefiles, epdlc_glob='*.epdlc',
-        #                      epdlc_jdcol=0, epdlc_magcol=(27,28,29),
-        #                      template_sigclip=tfa_template_sigclip,
-        #                      epdlc_sigclip=tfa_epdlc_sigclip,
-        #                      nworkers=nworkers, workerntasks=1000)
 
-        # for Gaia DR2, catalog mag col corresponds to G_Rp (Gaia "R" band).
-        ap.parallel_lc_statistics(lcdirectory, '*.epdlc', reformed_cat_file,
-                                  tfalcrequired=True,
-                                  fitslcnottxt=True,
-                                  fovcatcols=(0,6), # objectid, magcol from fovcat
+        # catalog projection performed here does some useful things joel's
+        # stats file does not for Gaia DR2, catalog mag col corresponds to G_Rp
+        # (Gaia "R" band).
+        ap.parallel_lc_statistics(lcdirectory, epdlcglob, reformed_cat_file,
+                                  tfalcrequired=True, fitslcnottxt=True,
+                                  fovcatcols=(0,6), # objectid, magcol from
                                   fovcatmaglabel='r',
-                                  outfile=tfastatfile,
-                                  nworkers=nworkers,
-                                  workerntasks=500,
-                                  rmcols=[14,19,24],
-                                  epcols=[27,28,29],
-                                  tfcols=[30,31,32],
-                                  rfcols=None,
-                                  correctioncoeffs=None,
-                                  sigclip=5.0, fovcathasgaiaids=True)
+                                  outfile=tfastatfile, nworkers=nworkers,
+                                  workerntasks=500, rmcols=None, epcols=None,
+                                  tfcols=None, rfcols=None,
+                                  correctioncoeffs=None, sigclip=5.0,
+                                  fovcathasgaiaids=True)
     else:
         print('already made TFA LC stats file')
 
@@ -1221,7 +1273,7 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
     # just make some lightcurve plots to look at them
     plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=10)
 
-    # count numbers of lightcurves
+    # count numbers of lightcurves #FIXME: or do it by nan parsing?
     n_rawlc = len(glob(os.path.join(lcdirectory,'*.grcollectilc')))
     n_epdlc = len(glob(os.path.join(lcdirectory,'*.epdlc')))
     n_tfalc = len(glob(os.path.join(lcdirectory,'*.tfalc')))
@@ -1466,6 +1518,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
             os.mkdir(dirname)
     epdstatfile = statsdir + 'camera' + str(camera) + '_ccd' + str(ccd) + '.epdstats'
     tfastatfile = statsdir + 'camera' + str(camera) + '_ccd' + str(ccd) + '.tfastats'
+    vartoolstfastatfile = os.path.join(statsdir, 'vartools_tfa_stats.txt')
 
     xtrnsglob = fitsglob.replace('.fits','-xtrns.fits')
     iphotpattern = fitsdir+'rsub-????????-'+fitsglob.replace('.fits','.iphot')
@@ -1485,8 +1538,9 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     else:
         print('found that image subtraction is complete.')
 
-    run_detrending(epdstatfile, tfastatfile, lcdirectory, epdlcglob,
-                   reformed_cat_file, statsdir, field, fitsdir, fitsglob,
+    run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
+                   epdlcglob, reformed_cat_file, statsdir, field, fitsdir,
+                   fitsglob, camera, ccd,
                    epdsmooth=epdsmooth, epdsigclip=epdsigclip,
                    nworkers=nworkers, binlightcurves=binlightcurves,
                    tfa_template_sigclip=tfa_template_sigclip,
