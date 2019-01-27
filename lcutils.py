@@ -359,8 +359,9 @@ def epd_fitslightcurve_imagesub_worker(task):
 
     x, y, smooth, sigmaclip, minndet, observatory = task
 
-    epd_fitslightcurve_imagesub(x, y, smooth=smooth, sigmaclip=sigmaclip,
-                                minndet=minndet, observatory=observatory)
+    return epd_fitslightcurve_imagesub(x, y, smooth=smooth,
+                                       sigmaclip=sigmaclip, minndet=minndet,
+                                       observatory=observatory)
 
 
 def epd_fitslightcurve_imagesub(fitsilcfile, outfile, smooth=21, sigmaclip=3.0,
@@ -386,7 +387,15 @@ def epd_fitslightcurve_imagesub(fitsilcfile, outfile, smooth=21, sigmaclip=3.0,
     # read the lightcurve in. check if EPD has already been performed, or if
     # there are insufficient data points to perform it.
     inhdulist = fits.open(fitsilcfile)
-    ilc, primary_hdu = inhdulist[1].data, inhdulist[0]
+    try:
+        ilc, primary_hdu = inhdulist[1].data, inhdulist[0]
+    except (IndexError, TypeError) as e:
+        print('{} ERR! {} found corrupted header/data. removing lc file.'.
+              format(datetime.utcnow().isoformat(), fitsilcfile))
+        print('ERR! error was {}'.format(
+            datetime.utcnow().isoformat(), repr(e)))
+        os.remove(fitsilcfile)
+        return 0
 
     if primary_hdu.header['DTR_EPD']:
         print('WRN! {} found EPD had been performed; skipping'.
@@ -438,6 +447,7 @@ def epd_fitslightcurve_imagesub(fitsilcfile, outfile, smooth=21, sigmaclip=3.0,
                 isfull=isfull
             )
         elif observatory=='tess':
+            giveallnan = True
             if len(ilc[irm_ap_key][combinedok])>0:
                 try:
                     (epddiffmags[irm_ap_key],
@@ -449,19 +459,54 @@ def epd_fitslightcurve_imagesub(fitsilcfile, outfile, smooth=21, sigmaclip=3.0,
                         ilc['XIC'][combinedok],
                         ilc['YIC'][combinedok],
                         smooth=smooth, sigmaclip=sigmaclip,
-                        observatory=observatory, temperatures=temperatures,
+                        observatory=observatory,
+                        temperatures=temperatures[combinedok],
                         times=ilc['TMID_BJD'][combinedok],
                         isfull=isfull
                     )
-                except Exception as e:
-                    print('EPD failed for {}. Msg is:'.format(fitsilcfile))
-                    print(e)
-            else:
-                return None, None
+                    giveallnan = False
+                except IndexError:
+                    # sometimes temperature array gets wonky. for the few such
+                    # cases, give an all-nan epd column.
+                    giveallnan = True
+                    pass
+
+            if giveallnan:
+                print('WRN! for {}, all nan EPD columns'.format(fitsilcfile))
+                # all nans. vartools TFA needs the column populated (and it
+                # should be anyway).
+                epddiffmags[irm_ap_key] = (
+                    np.nan * np.ones_like(ilc[irm_ap_key])
+                )
+                epddetails[irm_ap_key] = {}
+
+                orbitinds = [0,1] if isfull else [0]
+
+                for orbitind in orbitinds:
+                    epddetails[irm_ap_key][orbitind] = {}
+
+                    for k in ['tckp', 'u', 'n_knots', 'chisq', 'n_data',
+                              'k_freeparam', 'BIC', 'x_pred', 'y_pred',
+                              'T_pred', 'mag_pred']:
+
+                        epddetails[irm_ap_key][orbitind][k] = str(np.nan)
+
+                    epddetails[irm_ap_key][orbitind]['mag_pred'] = (
+                        np.nan * np.ones_like(ilc[irm_ap_key])
+                    )
         else:
             raise NotImplementedError(
                 'EPD must be worked out on per-observatory basis.'
             )
+
+    # assert that epddiffmags and epddetails have same keys
+    err_msg = ('ERR on {}. epddiffmags and epddetails must have same keys'.
+               format(fitsilcfile))
+
+    np.testing.assert_array_equal(
+        np.sort(list(epddiffmags.keys())), np.sort(list(epddetails.keys())),
+        err_msg=err_msg
+    )
 
     # add the EPD diff mags back to the median mag to get the EPD mags
     epdmags = {}
