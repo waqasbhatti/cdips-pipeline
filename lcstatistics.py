@@ -611,12 +611,10 @@ def plot_raw_epd_tfa(time, rawmag, epdmag, tfamag, ap_index, savpath=None,
                  'TF{:d}'.format(ap_index)]
 
     for ax, mag, txt in zip(axs, [rawmag,epdmag,tfamag], stagestrs):
-        ax.plot(time, mag, c='k', linestyle='-', marker='o',
-                markerfacecolor='k', markeredgecolor='k', ms=3, lw=0.,
-                zorder=1, rasterized=True)
-        ax.plot(time, mag, c='orange', linestyle='-', marker='o',
-                markerfacecolor='orange', markeredgecolor='orange', ms=1.5,
-                lw=0., zorder=2, rasterized=True)
+
+        ax.scatter(time, mag, c='black', alpha=0.9, zorder=2, s=3,
+                   rasterized=True, linewidths=0)
+
         txt_x, txt_y = 0.99, 0.98
         t = ax.text(txt_x, txt_y, txt, horizontalalignment='right',
                 verticalalignment='top', fontsize='small', zorder=3,
@@ -626,6 +624,8 @@ def plot_raw_epd_tfa(time, rawmag, epdmag, tfamag, ap_index, savpath=None,
                                        labelsize='x-small')
         ax.get_xaxis().set_tick_params(which='both', direction='in',
                                        labelsize='x-small')
+        ylim = ax.get_ylim()
+        ax.set_ylim((max(ylim), min(ylim)))
 
     axs[2].set_xlabel(xlabel, fontsize='small')
 
@@ -678,12 +678,9 @@ def plot_lightcurve_and_ACF(
         (a0,a2,a4), [rawflux,epdflux,tfaflux], [rawtime,epdtime,tfatime],
         stagestrs
     ):
-        ax.plot(time, mag, c='k', linestyle='-', marker='o',
-                markerfacecolor='k', markeredgecolor='k', ms=3, lw=0.,
-                zorder=1, rasterized=True)
-        ax.plot(time, mag, c='orange', linestyle='-', marker='o',
-                markerfacecolor='orange', markeredgecolor='orange', ms=1.5,
-                lw=0., zorder=2, rasterized=True)
+        ax.scatter(time, mag, c='black', alpha=0.9, zorder=2, s=3,
+                   rasterized=True, linewidths=0)
+
         txt_x, txt_y = 0.99, 0.98
         t = ax.text(txt_x, txt_y, txt, horizontalalignment='right',
                 verticalalignment='top', fontsize='small', zorder=3,
