@@ -20,6 +20,11 @@ make_ascii_files_for_vartools
     _make_trendlist_tfa
     _make_dates_tfa
 
+run_tfa
+
+parallel_merge_tfa_lcs
+    merge_tfa_lc_worker
+
 parallel_apply_barycenter_time_correction
     apply_barycenter_time_correction_worker
     astropy_utc_time_to_bjd_tdb
@@ -813,12 +818,45 @@ tfaonlycmd = (
 )
 
 
+tfafromirmcmd = (
+    '/home/jhartman/SVN/HATpipe/bin/vartools -l {lc_list_tfa} -matchstringid '
+    ' -inputlcformat BGE:BGE:double,BGV:BGV:double,FDV:FDV:double,'
+    'FKV:FKV:double,FSV:FSV:double,IFE1:IFE1:double,IFE2:IFE2:double,'
+    'IFE3:IFE3:double,IFL1:IFL1:double,IFL2:IFL2:double,IFL3:IFL3:double,'
+    'IRE1:IRE1:double,IRE2:IRE2:double,IRE3:IRE3:double,IRM1:IRM1:double,'
+    'IRM2:IRM2:double,IRM3:IRM3:double,IRQ1:IRQ1:string,IRQ2:IRQ2:string,'
+    'IRQ3:IRQ3:string,id:RSTFC:string,RSTFC:RSTFC:string,TMID_UTC:TMID_UTC:double,'
+    'XIC:XIC:double,YIC:YIC:double,CCDTEMP:CCDTEMP:double,'
+    'NTEMPS:NTEMPS:int,'
+    't:TMID_BJD:double,TMID_BJD:TMID_BJD:double,BJDCORR:BJDCORR:double,'
+    'EP1:EP1:double,EP2:EP2:double,EP3:EP3:double '
+    '-expr \'mag=IRM1\' -expr \'err=IRE1\' '
+    '-TFA {trendlist_tfa_ap1} readformat 0 RSTFC IRM1 {dates_tfa} '
+    '{npixexclude} xycol 2 3 1 0 0 '
+    '-expr \'TFA1=mag\' '
+    '-expr \'mag=IRM2\' -expr \'err=IRE2\' '
+    '-TFA {trendlist_tfa_ap2} readformat 0 RSTFC IRM2 {dates_tfa} '
+    '{npixexclude} xycol 2 3 1 0 0 '
+    '-expr \'TFA2=mag\' '
+    '-expr \'mag=IRM3\' -expr \'err=IRE3\' '
+    '-TFA {trendlist_tfa_ap3} readformat 0 RSTFC IRM3 {dates_tfa} '
+    '{npixexclude} xycol 2 3 1 0 0 '
+    '-expr \'TFA3=mag\' '
+    '-stats TFA1,TFA2,TFA3 stddev,MAD '
+    '-o {outlcdir_tfa} columnformat RSTFC:\"Image\",'
+    'TMID_BJD:\"BJDTDB midexp time\",TFA1:mag,TFA2:mag,TFA3:mag '
+    'fits copyheader logcommandline -header -numbercolumns -parallel {nproc} '
+    '> {outstatsfile}'
+)
+
+
+
 def run_tfa(tfalclist_path, trendlisttfa_paths, datestfa_path, lcdirectory,
             statsdir,
             nworkers=16, do_bls_ls_killharm=True, npixexclude=10,
             blsqmin=0.002, blsqmax=0.1, blsminper=0.2, blsmaxper=30.0,
             blsnfreq=20000, blsnbins=1000, lsminp=0.1, lsmaxp=30.0,
-            lssubsample=0.1, killharmnharm=10):
+            lssubsample=0.1, killharmnharm=10, tfafromirm=False):
     """
     Run TFA on all apertures. Optionally, if do_bls_ls_killharm, include a
     sequence of BLS, then Lomb-Scargle, then harmonic killing, then BLS on the
@@ -886,20 +924,36 @@ def run_tfa(tfalclist_path, trendlisttfa_paths, datestfa_path, lcdirectory,
             killharmnharm = killharmnharm
         )
     else:
-        cmdtorun = tfaonlycmd.format(
-            lc_list_tfa = tfalclist_path,
-            trendlist_tfa_ap1 = trendlist_tfa_ap1,
-            trendlist_tfa_ap2 = trendlist_tfa_ap2,
-            trendlist_tfa_ap3 = trendlist_tfa_ap3,
-            dates_tfa = datestfa_path,
-            npixexclude = npixexclude,
-            outblsmodeldir_iter1 = outblsmodeldir_iter1,
-            outblsmodeldir_iter2 = outblsmodeldir_iter2,
-            outlcdir_tfa = outlcdir_tfa,
-            outstatsfile = outstatsfile,
-            nproc = nworkers
-        )
 
+        if tfafromirm:
+            cmdtorun = tfafromirmcmd.format(
+                lc_list_tfa = tfalclist_path,
+                trendlist_tfa_ap1 = trendlist_tfa_ap1,
+                trendlist_tfa_ap2 = trendlist_tfa_ap2,
+                trendlist_tfa_ap3 = trendlist_tfa_ap3,
+                dates_tfa = datestfa_path,
+                npixexclude = npixexclude,
+                outblsmodeldir_iter1 = outblsmodeldir_iter1,
+                outblsmodeldir_iter2 = outblsmodeldir_iter2,
+                outlcdir_tfa = outlcdir_tfa,
+                outstatsfile = outstatsfile,
+                nproc = nworkers
+            )
+
+        else:
+            cmdtorun = tfaonlycmd.format(
+                lc_list_tfa = tfalclist_path,
+                trendlist_tfa_ap1 = trendlist_tfa_ap1,
+                trendlist_tfa_ap2 = trendlist_tfa_ap2,
+                trendlist_tfa_ap3 = trendlist_tfa_ap3,
+                dates_tfa = datestfa_path,
+                npixexclude = npixexclude,
+                outblsmodeldir_iter1 = outblsmodeldir_iter1,
+                outblsmodeldir_iter2 = outblsmodeldir_iter2,
+                outlcdir_tfa = outlcdir_tfa,
+                outstatsfile = outstatsfile,
+                nproc = nworkers
+            )
 
     print(cmdtorun)
 
