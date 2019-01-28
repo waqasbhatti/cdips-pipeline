@@ -18,13 +18,13 @@ virtual columns, append "PROJID" header keywork
     from_CAL_to_fitsh_compatible
     (deprecated) from_ete6_to_fitsh_compatible
 
-are_known_HJs_in_field: precursor to measuring HJ properties is knowing if
-there are any
+are_known_planets_in_field: precursor to measuring known planet properties is
+knowing if there are any
 
-measure_known_HJ_SNR: if there are known HJs in this frame, estimate their SNR
-through a max-likelihood trapezoidal transit model
+measure_known_planet_SNR: if there are known planets in this frame, estimate
+their SNR through a max-likelihood trapezoidal transit model
 
-    _measure_hj_snr
+    _measure_planet_snr
 
 read_object_reformed_catalog: get objectid, ra, dec from reformed catalog
 
@@ -321,9 +321,10 @@ def from_ete6_to_fitsh_compatible(fitslist, outdir, projid=42):
         from_CAL_to_fitsh_compatible((fitsname, outdir, projid))
 
 
-def are_known_HJs_in_field(ra_center, dec_center, outname):
+def are_known_planets_in_field(ra_center, dec_center, outname, use_NEA=False,
+                               use_alerts=True):
     """
-    Given a field center, find which known hot Jupiters are on chip.
+    Given a field center, find which known planets are on chip.
     Dependencies: tessmaps, astroquery
 
     Args:
@@ -332,37 +333,67 @@ def are_known_HJs_in_field(ra_center, dec_center, outname):
         outname (str): path to which csv file with details of HJs on chip will
         be written
 
+        useNEA (bool): whether to use NASA exoplanet archive to grab the known
+        planet properties (in particular, known HJs), or not.
+
+        use_alerts (bool): whether to use the "alert" file, from
+        https://archive.stsci.edu/prepds/tess-data-alerts/index.html, to get
+        candidate planet host (TOI) properties.
+
     Returns:
         True if any HJs on chip, else False.
     """
 
     from tessmaps import get_time_on_silicon as gts
 
-    eatab = NasaExoplanetArchive.get_confirmed_planets_table()
-
     cam_dirn = SkyCoord(ra_center*u.deg, dec_center*u.deg, frame='icrs')
     cam_tuple = (cam_dirn.barycentrictrueecliptic.lat.value,
                  cam_dirn.barycentrictrueecliptic.lon.value)
 
-    is_jup = (eatab['pl_radj'] > 0.4*u.Rjup)
-    is_hot = (eatab['pl_orbper'] < 10*u.day)
+    if use_NEA:
+        eatab = NasaExoplanetArchive.get_confirmed_planets_table()
 
-    is_hj = is_jup & is_hot
+        is_jup = (eatab['pl_radj'] > 0.4*u.Rjup)
+        is_hot = (eatab['pl_orbper'] < 10*u.day)
+        is_hj = is_jup & is_hot
+        hj_coords = eatab[is_hj]['sky_coord']
 
-    hj_coords = eatab[is_hj]['sky_coord']
+        pl_onchip = gts.given_one_camera_get_stars_on_silicon(
+            hj_coords, cam_tuple, withgaps=False)
 
-    hj_onchip = gts.given_one_camera_get_stars_on_silicon(
-        hj_coords, cam_tuple, withgaps=False)
+    elif use_alerts:
+        df = pd.read_csv(
+            '/home/lbouma/proj/pipe-trex/data/'
+            'hlsp_tess-data-alerts_tess_phot_alert-summary-s01+s02+s03+s04_tess_v9_spoc.csv'
+        )
+        kp_coords = SkyCoord(nparr(df['RA'])*u.deg,
+                             nparr(df['Dec'])*u.deg,
+                             frame='icrs')
 
-    if np.any(hj_onchip):
+        pl_onchip = gts.given_one_camera_get_stars_on_silicon(
+            kp_coords, cam_tuple, withgaps=False)
+
+    else:
+        raise NotImplementedError('use_alerts or use_NEA must be true.')
+
+
+    if np.any(pl_onchip) and use_NEA:
         desiredcols = ['pl_hostname', 'pl_letter', 'pl_name', 'pl_orbper',
                        'pl_radj', 'st_optmag', 'gaia_gmag','sky_coord']
 
         outtab = eatab[is_hj][desiredcols]
-        outtab = outtab[hj_onchip.astype(bool)]
+        outtab = outtab[pl_onchip.astype(bool)]
 
         ascii.write(outtab, output=outname, format='ecsv',
                     overwrite=True)
+        print('wrote {}'.format(outname))
+
+        return True
+
+    elif np.any(pl_onchip) and use_alerts:
+
+        outdf = df[pl_onchip.astype(bool)]
+        outdf.to_csv(outname, index=False)
         print('wrote {}'.format(outname))
 
         return True
@@ -600,12 +631,13 @@ def make_cluster_cutout_jpgs(sectornum, fitsdir, racenter, deccenter, field,
 
 
 
-def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory, statsdir,
-                         sectornum, minxmatchsep=3, nworkers=20):
+def measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
+                             statsdir, sectornum, minxmatchsep=3, nworkers=20,
+                             use_NEA=False, use_alerts=True):
     """
     Args:
 
-        hjonchippath (str): path to csv that tells you which HJs are expected
+        kponchippath (str): path to csv that tells you which HJs are expected
         to be on (or near) chip.
 
         projcatalogpath (str): path to projected catalog (from e.g., 2MASS or
@@ -621,25 +653,32 @@ def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory, statsdir,
 
     minxmatchsep = minxmatchsep*u.arcsec
 
-    # read HJ information table from `tessutils.are_known_HJs_in_field`
-    tab = ascii.read(hjonchippath)
+    if use_NEA:
+        # read information table from `tessutils.are_known_planets_in_field`
+        tab = ascii.read(kponchippath)
 
-    # if it's not HAT/WASP/KELT, it's probably not a HJ that this tuning test
-    # cares about. if so, scrap it.
-    wantstrs = ['HAT','WASP','KELT']
-    is_wanted = []
-    for hn in nparr(tab['pl_hostname']):
-        want = False
-        for wantstr in wantstrs:
-            if wantstr in hn:
-                want = True
-                break
-            else:
-                pass
-        is_wanted.append(want)
-    is_wanted = nparr(is_wanted)
+        # if it's not HAT/WASP/KELT, it's probably not a HJ that this tuning test
+        # cares about. if so, scrap it.
+        wantstrs = ['HAT','WASP','KELT']
+        is_wanted = []
+        for hn in nparr(tab['pl_hostname']):
+            want = False
+            for wantstr in wantstrs:
+                if wantstr in hn:
+                    want = True
+                    break
+                else:
+                    pass
+            is_wanted.append(want)
+        is_wanted = nparr(is_wanted)
 
-    tab = tab[is_wanted]
+        tab = tab[is_wanted]
+    elif use_alerts:
+        tab = pd.read_csv(kponchippath)
+        tab['pl_name'] = tab['toi_id']
+        tab['pl_hostname'] = tab['tic_id']
+    else:
+        raise NotImplementedError
 
     # get the starids that correspond to the HJs on-chip
     projcat = read_object_reformed_catalog(projcatalogpath, isgaiaid=True)
@@ -647,7 +686,12 @@ def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory, statsdir,
     proj_ra, proj_dec = projcat['ra']*u.deg, projcat['dec']*u.deg
 
     proj_coords = SkyCoord(proj_ra, proj_dec, frame='icrs')
-    hj_coords = tab['sky_coord']
+    if use_NEA:
+        kp_coords = tab['sky_coord']
+    elif use_alerts:
+        kp_coords = SkyCoord(nparr(tab['RA'])*u.deg,
+                             nparr(tab['Dec'])*u.deg,
+                             frame='icrs')
 
     for colname in [
         'match_proj_ra','match_proj_dec','match_sep_arcsec'
@@ -655,9 +699,9 @@ def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory, statsdir,
         tab[colname] = np.nan
 
     starids = []
-    for hj_coord, name in zip(hj_coords, tab['pl_name']):
+    for kp_coord, name in zip(kp_coords, tab['pl_name']):
 
-        seps = hj_coord.separation(proj_coords)
+        seps = kp_coord.separation(proj_coords)
         projsorted = proj_coords[np.argsort(seps)]
         sepssorted = proj_coords[np.argsort(seps)]
 
@@ -666,7 +710,11 @@ def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory, statsdir,
             sel = (seps < minxmatchsep)
 
             if len(sel[sel]) > 1:
-                raise NotImplementedError('expected a single HJ STARID match')
+                print('got {} matches'.format(len(sel[sel])))
+                print('separations are {}'.format(
+                    repr(seps[sel].to(u.arcsec)))
+                )
+                print('taking minimum separation...')
 
             projcatmatch = projcat[np.argmin(seps)]
 
@@ -697,9 +745,11 @@ def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory, statsdir,
             epdlc = str(np.nan)
             tfalc = str(np.nan)
         else:
-            rawlc = glob(os.path.join(lcdirectory, starid+'._llc.fits'))
-            epdlc = glob(os.path.join(lcdirectory, starid+'._llc.fits'))
-            tfalc = glob(os.path.join(lcdirectory, starid+'._llc.fits'))
+            if type(starid) == bytes:
+                starid = starid.decode('utf-8')
+            rawlc = glob(os.path.join(lcdirectory, starid+'_llc.fits'))
+            epdlc = glob(os.path.join(lcdirectory, starid+'_llc.fits'))
+            tfalc = glob(os.path.join(lcdirectory, starid+'_llc.fits'))
 
             for lc in [rawlc, epdlc, tfalc]:
                 if len(lc) > 1:
@@ -727,8 +777,8 @@ def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory, statsdir,
     tab['epdlc'] = nparr(elcs)
     tab['tfalc'] = nparr(tlcs)
 
-    print(tab['pl_name', 'starids', 'rawlcexists', 'epdlcexists',
-              'tfalcexists'])
+    print(tab[['pl_name', 'starids', 'rawlcexists', 'epdlcexists',
+               'tfalcexists']])
     print(tab['rawlc'])
 
     if not np.any(tab['tfalcexists']):
@@ -753,24 +803,17 @@ def measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory, statsdir,
     for tfalc, plname in zip(
         tab['tfalc'][tab['tfalcexists']], tab['pl_name'][tab['tfalcexists']]
     ):
-        _measure_hj_snr(plname, tfalc, statsdir, sectornum, nworkers=nworkers)
+        _measure_planet_snr(plname, tfalc, statsdir, sectornum,
+                            nworkers=nworkers, use_NEA=use_NEA,
+                            use_alerts=use_alerts)
 
 
-def _measure_hj_snr(plname, tfalc, statsdir, sectornum, timename='TMID_BJD',
-                    nworkers=20,
-                    n_transit_durations=4):
+def _measure_planet_snr(plname, tfalc, statsdir, sectornum,
+                        timename='TMID_BJD', nworkers=20,
+                        n_transit_durations=4, use_NEA=False, use_alerts=True):
 
-    plname = plname.replace(' ','')
-
-    eatab = NasaExoplanetArchive.get_confirmed_planets_table()
-    earow = eatab[eatab['NAME_LOWERCASE']==plname.lower()]
-    if not len(earow)==1:
-        raise AssertionError('exoplanet archive query must have failed.')
-
-    teff = float(earow['st_teff'].value)
-    logg = float(np.log10( (const.G * earow['st_mass'] /
-                      (earow['st_rad'])**2).cgs.value ))
-    metallicity = 0.
+    plname = str(plname).replace(' ','')
+    plname = str(plname).replace('.','-')
 
     # we only care about TFA lightcurves for planet SNR measurements.
     dtrstages = ['TFA']
@@ -779,7 +822,7 @@ def _measure_hj_snr(plname, tfalc, statsdir, sectornum, timename='TMID_BJD',
     errnames = ['IRE'+ap for dtrstage in dtrstages for ap in aps]
 
     # read the lc
-    hdulist = fits.open(tfafile)
+    hdulist = fits.open(tfalc)
     lc = hdulist[1].data
 
     time = lc[timename]
@@ -845,17 +888,6 @@ def _measure_hj_snr(plname, tfalc, statsdir, sectornum, timename='TMID_BJD',
         # isolate each transit to within +/- n_transit_durations
         tmids, t_starts, t_ends = (
             get_transit_times(fitd, time, n_transit_durations, trapd=trapfit)
-        )
-
-        rp = np.sqrt(trapfit['fitinfo']['finalparams'][2])
-
-        # period, a/Rstar, inclination used as initial guesses
-        ea_sma = ((const.G * earow['st_mass'] / (4*np.pi**2) *
-                  earow['pl_orbper']**2)**(1/3.)).to(u.AU)
-        litparams = tuple(map(float,
-            [earow['pl_orbper'].value,
-             (ea_sma/earow['st_rad']).cgs.value,
-             earow['pl_orbincl'].value])
         )
 
         fitmags = trapfit['fitinfo']['fitmags']
