@@ -7,14 +7,33 @@ contents:
 main
     get_files_needed_before_image_subtraction
     run_imagesubtraction
+        framelist_make_xtrnsfits
+        generate_photref_candidates_from_xtrns
+        generate_combined_photref
+        parallel_xtrnsfits_convsub
+        parallel_convsubfits_staticphot
+        dump_lightcurves_with_grcollect
     run_detrending
+        parallel_convert_grcollect_to_fits_lc
+        parallel_apply_barycenter_time_correction
+        parallel_run_epd_imagesub_fits
+        parallel_lc_statistics
+        choose_tfa_template
+        make_ascii_files_for_vartools
+        run_tfa
+        parallel_merge_tfa_lcs
     assess_run
+        percentiles_RMSorMAD_stats_and_plots
+        parallel_compute_acf_statistics
+        acf_percentiles_stats_and_plots
+        is_image_noise_gaussian
+        plot_random_lightcurve_subsample
+        measure_known_HJ_SNR
+        are_known_HJs_in_field
 
 wrapper functions:
     record_reduction_parameters
-    is_image_noise_gaussian
     _plot_normalized_subtractedimg_histogram
-    plot_random_lightcurve_subsample
     plot_random_lightcurves_and_ACFs
     examine_astrometric_shifts
     is_imagesubtraction_complete
@@ -991,6 +1010,7 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
     """
 
     catfile = reformed_cat_file.replace('.reformed_catalog', '.catalog')
+    tfaboolstatusfile = os.path.join(statsdir,'are_tfa_plots_done.txt')
 
     if len(glob(os.path.join(lcdirectory,'*_llc.fits')))<10:
 
@@ -1046,13 +1066,14 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
         print('already made EPD LC stats file')
 
     epdmadplot = glob(os.path.join(statsdir, '*median-EP1-vs-mad-*png'))
-    if not epdmadplot:
+    if not epdmadplot and not os.path.exists(tfaboolstatusfile):
         ap.plot_stats_file(epdstatfile, statsdir, field, binned=False,
                            logy=True, logx=False, correctmagsafter=None,
                            rangex=(5.9,16), observatory='tess',
                            fovcathasgaiaids=True, yaxisval='RMS')
     else:
         print('already made EPD LC plots')
+
 
     # choose the TFA template stars
     if not os.path.exists(os.path.join(
@@ -1092,10 +1113,12 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
 
         # note that sometimes, you should do BLS + LS + killharm too.  for now
         # though, we are making lightcurves; these extra steps can come later.
+        # FIXME: TFA FROM IRM SEEMS SILLY, BUT MAYBE BEST APPROACH?
         npixexclude=10
         lcu.run_tfa(tfalclist_path, trendlisttfa_paths, datestfa_path,
                     lcdirectory, statsdir, nworkers=nworkers,
-                    do_bls_ls_killharm=False, npixexclude=npixexclude)
+                    do_bls_ls_killharm=False, npixexclude=npixexclude,
+                    tfafromirm=True)
 
         lcu.parallel_merge_tfa_lcs(lcdirectory, nworkers=32)
 
@@ -1116,7 +1139,10 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
     else:
         print('already made TFA LC stats file')
 
-    tfaboolstatusfile = os.path.join(statsdir,'are_tfa_plots_done.txt')
+    if os.path.exists(tfaboolstatusfile):
+        # NOTE: this invalidates the check for whether the plots exist. however
+        # writing them is fairly quick. this makes it happen once.
+        os.remove(tfaboolstatusfile)
     if not os.path.exists(tfaboolstatusfile):
         ap.plot_stats_file(tfastatfile, statsdir, field, binned=False,
                            logy=True, logx=False, correctmagsafter=None,
@@ -1279,10 +1305,10 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
     n_tfalc = len(glob(os.path.join(lcdirectory,'*.tfalc')))
 
     # measure S/N of known HJ transits
-    hjonchippath = os.path.join(statsdir,'hjs_onchip.csv')
-    if tu.are_known_HJs_in_field(ra_nom, dec_nom, hjonchippath):
-        tu.measure_known_HJ_SNR(hjonchippath, projcatalogpath, lcdirectory,
-                                statsdir, sectornum, nworkers=nworkers)
+    kponchippath = os.path.join(statsdir,'knownplanet_onchip.csv')
+    if tu.are_known_planets_in_field(ra_nom, dec_nom, kponchippath):
+        tu.measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
+                                    statsdir, sectornum, nworkers=nworkers)
     else:
         print('did not find any known HJs on this field')
 
