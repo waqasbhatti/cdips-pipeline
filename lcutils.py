@@ -260,7 +260,7 @@ def convert_grcollect_to_fits_lc_worker(task):
     hdulist = fits.HDUList([primary_hdu, hdutimeseries])
 
     hdulist.writeto(outpath, overwrite=True)
-    print('wrote {}'.format(outpath))
+    print('{} wrote {}'.format(datetime.utcnow().isoformat(), outpath))
 
 
 def parallel_convert_grcollect_to_fits_lc(lcdirectory,
@@ -596,13 +596,15 @@ def epd_fitslightcurve_imagesub(fitsilcfile, outfile, smooth=21, sigmaclip=3.0,
         n_epd_mags = len(
             epdmags[irm_ap_keys[0]][npisfinite(epdmags[irm_ap_keys[0]])]
         )
-        print('overwrote {} with {} EPD mags'.format(
-            outfile, n_epd_mags))
+        print('{}: overwrote {} with {} EPD mags'.format(
+            datetime.utcnow().isoformat(), outfile, n_epd_mags))
     else:
         n_epd_mags = len(
             epdmags[irm_ap_keys[0]][npisfinite(epdmags[irm_ap_keys[0]])]
         )
-        print('wrote {} with {} EPD mags'.format(outfile, n_epd_mags))
+        print('{}: wrote {} with {} EPD mags'.format(
+            datetime.utcnow().isoformat(), outfile, n_epd_mags)
+        )
 
     return 1
 
@@ -850,7 +852,6 @@ tfafromirmcmd = (
 )
 
 
-
 def run_tfa(tfalclist_path, trendlisttfa_paths, datestfa_path, lcdirectory,
             statsdir,
             nworkers=16, do_bls_ls_killharm=True, npixexclude=10,
@@ -1033,7 +1034,8 @@ def merge_tfa_lc_worker(task):
         tfahdulist.close()
 
         n_tfa_mags = len(tfadatacols[0])
-        print('overwrote {} with {} TFA mags'.format(outfile, n_tfa_mags))
+        print('{}: overwrote {} with {} TFA mags'.format(
+            datetime.utcnow().isoformat(), outfile, n_tfa_mags))
 
         return 1
 
@@ -1080,8 +1082,8 @@ def merge_tfa_lc_worker(task):
         inhdulist.close()
 
         n_tfa_mags = len(tfadatacols[0])
-        print('WRN! wrote {} with all NaN TFA mags'.
-              format(outfile, n_tfa_mags))
+        print('{}: WRN! wrote {} with all NaN TFA mags'.
+              format(datetime.utcnow().isoformat(), outfile, n_tfa_mags))
 
         return 1
 
@@ -1091,7 +1093,6 @@ def merge_tfa_lc_worker(task):
             format(lcpath, tfalcpath)
         )
         return 0
-
 
 
 def parallel_merge_tfa_lcs(lcdirectory, nworkers=32, maxworkertasks=1000):
@@ -1112,10 +1113,6 @@ def parallel_merge_tfa_lcs(lcdirectory, nworkers=32, maxworkertasks=1000):
     pool.join()
 
     return 1
-
-
-
-
 
 
 ##################

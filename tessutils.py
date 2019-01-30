@@ -307,7 +307,8 @@ def from_CAL_to_fitsh_compatible(task):
 
     fits.writeto(outname, trim, header=hdr)
 
-    print('Wrote {:s} to {:s}'.format(fitsname, outname))
+    print('{:s} Wrote {:s} to {:s}'.format(
+        datetime.utcnow().isoformat(), fitsname, outname))
 
 
 def from_ete6_to_fitsh_compatible(fitslist, outdir, projid=42):
@@ -959,7 +960,8 @@ def _measure_planet_snr(plname, tfalc, statsdir, sectornum,
             outdf.to_csv(snrfit_savfile, index=False)
             print('WRN! SNR calculation failed, but made {} anyway with nan'.
                   format(snrfit_savfile))
-            print('made {}'.format(snrfit_savfile))
+            print('{} made {}'.format(
+                datetime.utcnow().isoformat(), snrfit_savfile))
 
     return 1
 
@@ -1113,10 +1115,12 @@ def append_ccd_temperature_to_hdr_worker(task):
                  overwrite=True)
 
     if n_temps>=1:
-        print('Wrote CCDTEMP to {:s}'.format(fitsname))
+        print('{} Wrote CCDTEMP to {:s}'.format(
+            datetime.utcnow().isoformat(), fitsname))
         return framekey, mean_temp, n_temps
     else:
-        print('WRN! Wrote NAN CCDTEMP to {:s}'.format(fitsname))
+        print('{} WRN! Wrote NAN CCDTEMP to {:s}'.format(
+            datetime.utcnow().isoformat(), fitsname))
         return framekey, np.nan, 0
 
 
@@ -1159,7 +1163,7 @@ def parallel_append_ccd_temperature_to_hdr(fitslist, temperaturepklpath,
     outpath = os.path.join(outdir, outname)
 
     outdf.to_csv(outpath, index=False)
-    print('made {}'.format(outpath))
+    print('{}: made {}'.format(datetime.utcnow().isoformat(), outpath))
 
     return {result for result in results}
 
@@ -1221,7 +1225,7 @@ def make_ccd_temperature_timeseries_pickle(sectornum):
     )
     with open(pklpath, 'wb') as f:
         pickle.dump(d, f, pickle.HIGHEST_PROTOCOL)
-    print('made {}'.format(pklpath))
+    print('{} made {}'.format(datetime.utcnow().isoformat(), pklpath))
 
 
 def read_tess_txt_lightcurve(
