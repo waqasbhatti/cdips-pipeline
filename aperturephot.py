@@ -716,7 +716,8 @@ def parallel_anet(srclistdir,
                   radius=13,
                   xpix=2048,
                   ypix=2048,
-                  cols=(2,3)):
+                  cols=(2,3),
+                  overwrite=True):
     """
     This does parallel anet astrometry for all frames in srclistdir and
     generates their wcs files.
@@ -724,6 +725,22 @@ def parallel_anet(srclistdir,
 
     # get a list of all fits files in the directory
     fistarlist = glob.glob(os.path.join(srclistdir, fistarglob))
+    if not overwrite:
+        existing = glob.glob(
+            os.path.join(fitsdir, fistarglob.replace('.fistar', '.wcs'))
+        )
+        requested = list(map(os.path.basename, fistarlist))
+        requested = [r.replace('.fistar','') for r in requested]
+        alreadyexists = list(map(os.path.basename, existing))
+        alreadyexists = [ae.replace('.wcs','') for ae in alreadyexists]
+
+        setdiff = np.setdiff1d(requested, alreadyexists)
+        if len(setdiff) == 0:
+            print("%sZ: astrometry already done for all .fistar files..." %
+                  datetime.utcnow().isoformat())
+            return
+        fistarlist = [os.path.join(fitsdir, sd+'.fistar') for sd in setdiff]
+
 
     print('%sZ: found %s fistar files in %s, starting astrometry...' %
           (datetime.utcnow().isoformat(),
@@ -2091,7 +2108,8 @@ def parallel_fitsdir_photometry(
         fovcat_xycols=(12,13),
         projcat_xycols=(24,25),
         fiphot_xycols='7,8',
-        observatory='hatpi'
+        observatory='hatpi',
+        overwrite=True
         ):
     """
     This does photometry for all FITS files in a directory using nworkers
@@ -2100,6 +2118,23 @@ def parallel_fitsdir_photometry(
 
     # get a list of all fits files in the directory
     fitslist = glob.glob(os.path.join(fitsdir,fitsglob))
+
+    if not overwrite:
+        existing = glob.glob(
+            os.path.join(fitsdir, fitsglob.replace('.fits', '.fiphot'))
+        )
+        requested = list(map(os.path.basename, fitslist))
+        requested = [r.replace('.fits','') for r in requested]
+        alreadyexists = list(map(os.path.basename, existing))
+        alreadyexists = [ae.replace('.fiphot','') for ae in alreadyexists]
+
+        setdiff = np.setdiff1d(requested, alreadyexists)
+        if len(setdiff) == 0:
+            print("%sZ: aperture photometry already done for all FITS files..." %
+                  datetime.utcnow().isoformat())
+            return
+        fitslist = [os.path.join(fitsdir, sd+'.fits') for sd in setdiff]
+
 
     print('%sZ: found %s FITS files in %s, starting photometry...' %
           (datetime.utcnow().isoformat(),

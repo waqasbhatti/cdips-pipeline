@@ -579,6 +579,7 @@ def calibrated_frame_to_database(fitsfile,
                                  overwrite=False,
                                  badframetag='badframes',
                                  nonwcsframes_are_ok=False,
+                                 custom_projid=False,
                                  database=None):
     """
     This puts a fully calibrated FITS into the database.
@@ -609,6 +610,8 @@ def calibrated_frame_to_database(fitsfile,
         marked as badframes.  If a frame doesn't have an accompanying wcs or
         fiphot, it will be tagged with frameisok = false in the database as
         well.
+
+        custom_projid (str): Custom project ID
 
         database: if passing pg.connect() instance
     """
@@ -729,6 +732,8 @@ def calibrated_frame_to_database(fitsfile,
         fitsheader = {(k if not pd.isnull(v) else k):
                       (v if not pd.isnull(v) else 'NaN')
                       for k,v in fitsheader.items()}
+        if custom_projid is not None:
+            fitsheader['PROJID'] = custom_projid
         fitsheaderjson = Json(fitsheader)
 
         if photinfo:
@@ -826,6 +831,7 @@ def arefshifted_frame_to_database(
         overwrite=False,
         badframetag='badframes',
         nonwcsframes_are_ok=False,
+        custom_projid=None,
         database=None):
     """
     This puts a shifted-to-astromref xtrns FITS into the DB.
@@ -879,6 +885,9 @@ def arefshifted_frame_to_database(
         frameinfo = {'field':frameelems['object'],
                      'ccd':ccd,
                      'projectid':frameelems['projid']}
+
+        if custom_projid is not None:
+            frameinfo['projectid'] = custom_projid
 
         # find this frame's associated active astromref
         astromref = dbget_astromref(frameinfo['projectid'], frameinfo['field'],
@@ -1044,7 +1053,8 @@ def parallel_frames_to_database(fitsbasedir,
                                 badframetag='badframes',
                                 nonwcsframes_are_ok=False,
                                 nworkers=16,
-                                maxworkertasks=1000):
+                                maxworkertasks=1000,
+                                custom_projid=None):
     """
     This runs a DB ingest on all FITS located in fitsbasedir and subdirs.  Runs
     a 'find' subprocess to find all the FITS to process.  If the frames have
@@ -1060,6 +1070,8 @@ def parallel_frames_to_database(fitsbasedir,
             and astrometrically shifted frames, into the database.
 
         fitsglob: if arefshifted frames, it's actually '1-???????_?-xtrns.fits'
+
+        custom_projid: specify a custom project ID (useful for running experiments)
 
     """
     # find all the FITS files
@@ -1082,12 +1094,14 @@ def parallel_frames_to_database(fitsbasedir,
             tasks = [(x, {'observatory':observatory,
                           'overwrite':overwrite,
                           'nonwcsframes_are_ok':nonwcsframes_are_ok,
-                          'badframetag':badframetag}) for x in fitslist]
+                          'badframetag':badframetag,
+                          'custom_projid':custom_projid}) for x in fitslist]
         elif frametype == 'arefshifted_frames':
             frame_to_db_worker = arefshifted_frame_to_db_worker
             tasks = [(x, {'overwrite':overwrite,
                           'nonwcsframes_are_ok':nonwcsframes_are_ok,
-                          'badframetag':badframetag}) for x in fitslist]
+                          'badframetag':badframetag,
+                          'custom_projid':custom_projid}) for x in fitslist]
 
 
         print('%sZ: %s files to send to db' %
