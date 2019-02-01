@@ -63,9 +63,7 @@ The usual sequence is:
 ## IMPORTS ##
 #############
 
-import os
-import os.path
-import glob
+import os, os.path, glob, sys
 import multiprocessing as mp
 
 try:
@@ -75,19 +73,15 @@ except:
 
 import shlex
 from datetime import datetime
-import re
-import json
-import shutil
-import random
+import re, json, shutil, random
 try:
     import cPickle as pickle
 except:
     import pickle
 
-import sqlite3
-import gzip
+import sqlite3, gzip
 
-import numpy as np
+import numpy as np, pandas as pd
 
 from scipy.spatial import cKDTree as kdtree
 from scipy.signal import medfilt
@@ -110,7 +104,6 @@ from imageutils import get_header_keyword, read_fits, extract_img_background
 from shared_variables import FITS_TAIL
 import shared_variables as sv
 
-import pandas as pd
 from astropy.table import Table
 from astropy.io import fits
 
@@ -336,15 +329,17 @@ def fistarfile_to_xy(fistarfile):
     if not isinstance(fistarfile, str):
         raise AssertionError('called fistarfile_to_xy on not a path')
 
-    try:
+    if sys.version_info[0] == 2:
         # used for python 2.X
         df = pd.read_csv(fistarfile, comment='#',
-                         names=['ident','x','y','bg','amp','s','d','k','flux','s/n'],
+                         names=['ident', 'x', 'y', 'bg', 'amp', 's', 'd', 'k',
+                                'flux', 's/n'],
                          delimiter=r"\s*", engine='python')
-    except pd.errors.ParserError:
+    elif sys.version_info[0] == 3:
         # used for python 3.X
         df = pd.read_csv(fistarfile, comment='#',
-                         names=['ident','x','y','bg','amp','s','d','k','flux','s/n'],
+                         names=['ident', 'x', 'y', 'bg', 'amp', 's', 'd', 'k',
+                                'flux', 's/n'],
                          delim_whitespace=True)
 
     if not len(df) > 1:
