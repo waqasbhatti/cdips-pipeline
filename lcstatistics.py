@@ -681,6 +681,11 @@ def plot_lightcurve_and_ACF(
         ax.scatter(time, mag, c='black', alpha=0.9, zorder=2, s=3,
                    rasterized=True, linewidths=0)
 
+        ax.set_ylim(
+            (np.mean(mag)  - 3*np.std(mag),
+             np.mean(mag)  + 3*np.std(mag))
+        )
+
         txt_x, txt_y = 0.99, 0.98
         t = ax.text(txt_x, txt_y, txt, horizontalalignment='right',
                 verticalalignment='top', fontsize='small', zorder=3,

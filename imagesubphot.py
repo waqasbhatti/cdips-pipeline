@@ -1918,8 +1918,8 @@ def subframe_convolution_worker(task, **kwargs):
     input frame, subtract them, and then return the subtracted frame. Used by
     convolve_and_subtract_frames below.
 
-    task[0] -> the frame to convolve
-    task[1] -> the frame to use as the convolution target
+    task[0] -> the frame to convolve (AKA: reference)
+    task[1] -> the frame to use as the convolution target (AKA: image)
     task[2] -> the convolution target's registration info file
     task[3] -> the kernel specification for the convolution
     task[4] -> the output directory where to place the results
