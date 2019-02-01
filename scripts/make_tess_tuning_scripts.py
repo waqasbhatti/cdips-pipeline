@@ -76,6 +76,17 @@ def main():
         "\"i/3;b/3;d=3/2\"",
         "\"i/2;b/3;d=3/2\""
     ]
+    nobkgkernellist = [
+        "\"i/3;d=3/2\"", # best from 2019/01/30
+        "\"i/1;d=3/2\"",
+        "\"i/2;d=3/2\"",
+        "\"i/5;d=3/2\"",
+        "\"i/3;d=5/2\"",
+        "\"i/2;d=3/3\"",
+        "\"i/2;d=2/2\"",
+        "\"i/3;d=3/4\"",
+        "\"i/3;d=3/3\""
+    ]
 
     # top is default
     # change the inner and outer boundary of background annulus
@@ -83,22 +94,23 @@ def main():
     apertureslist = [
         "\"0.71:7.0:6.0,1.41:7.0:6.0,2.82:7.0:6.0\"",
         "\"0.71:5.0:6.0,1.41:5.0:6.0,2.82:5.0:6.0\"",
-        "\"0.71:5.0:4.0,1.41:5.0:e4.0,2.82:5.0:4.0\"",
+        "\"0.71:5.0:4.0,1.41:5.0:4.0,2.82:5.0:4.0\"",
         "\"1:7.0:6.0,2:7.0:6.0,3:7.0:6.0\"",
         "\"1.7:7.0:6.0,3.5:7.0:6.0,4.5:7.0:6.0\""
     ]
 
     n_kernels_aps = len(kernellist) + len(apertureslist) # 18
 
-    # all TUNE reductions for camN, ccdN (3 different cam/ccd pairs).
-    camccdnums = [1,3,4]
+    # all TUNE reductions for camN, ccdN (3 different cam/ccd pairs). cam 2,
+    # ccd 2 has benefit of wasp-4 being on chip!
+    camccdnums = [1,2,4]
     camnumlist = camccdnums*n_kernels_aps
     ccdnumlist = camccdnums*n_kernels_aps
 
     n_runs = len(camnumlist) # 54 runs, from the above
 
     # make the paramdict for the first 3*13 kernel list runs
-    projid = 1033
+    projid = 1089
     varyparamdict = {}
     for kernel in kernellist:
         for camccd in camccdnums:
@@ -108,7 +120,7 @@ def main():
                 'ccdnum':camccd,
                 'projectid':projid,     # increment this whenever new things go to PSQL database.
                 'sector':"'s0002'",        # match SPOC syntax, zfill to 4.
-                'tuneparameters':'true',
+                'tuneparameters':'false',
                 'nworkers':32,
                 'aperturelist':apertureslist[0],
                 'epdsmooth':11,            # 11*30min = 5.5 hr median smooth in EPD pre-processing.
@@ -138,7 +150,7 @@ def main():
                 'ccdnum':camccd,
                 'projectid':projid,     # increment this whenever new things go to PSQL database.
                 'sector':"'s0002'",        # match SPOC syntax, zfill to 4.
-                'tuneparameters':'true',
+                'tuneparameters':'false',
                 'nworkers':32,
                 'aperturelist':aperturelist,
                 'epdsmooth':11,            # 11*30min = 5.5 hr median smooth in EPD pre-processing.
@@ -159,32 +171,64 @@ def main():
 
             projid += 1
 
+    # sector 2, cam1ccd2 -- for blanco 1 initial analysis. a full run down to
+    # G_Rp=16. might take a while.
+    varyparamdict[projid] = {
+        'camnum':1,
+        'ccdnum':2,
+        'projectid':projid,     # increment this whenever new things go to PSQL database.
+        'sector':"'s0002'",        # match SPOC syntax, zfill to 4.
+        'tuneparameters':'false',
+        'nworkers':32,
+        'aperturelist':apertureslist[3],
+        'epdsmooth':11,            # 11*30min = 5.5 hr median smooth in EPD pre-processing.
+        'epdsigclip':10000,
+        'photdisjointradius':2,
+        'anetfluxthreshold':50000,
+        'anettweak':6,
+        'anetradius':30,
+        'initccdextent':"\"0:2048,0:2048\"",
+        'kernelspec':"i/3;d=3/2", # best from 20190130
+        'catalog_faintrmag':16,
+        'fiphotfluxthreshold':500,
+        'photreffluxthreshold':500,
+        'extractsources':0,
+        'binlightcurves':0,
+        'translateimages':1
+    }
 
-    # OUTDATED (SINGLE)
-    # paramdict = {
-    #     'camnum':4,
-    #     'ccdnum':4,
-    #     'projectid':projectid,     # increment this whenever new things go to PSQL database.
-    #     'sector':"'s0002'",        # match SPOC syntax, zfill to 4.
-    #     'tuneparameters':'true',
-    #     'nworkers':32,
-    #     'aperturelist':"\"0.71:7.0:6.0,1.41:7.0:6.0,2.82:7.0:6.0\"",
-    #     'epdsmooth':11,            # 11*30min = 5.5 hr median smooth in EPD pre-processing.
-    #     'epdsigclip':10000,
-    #     'photdisjointradius':2,
-    #     'anetfluxthreshold':50000,
-    #     'anettweak':6,
-    #     'anetradius':30,
-    #     'initccdextent':"\"0:2048,0:2048\"",
-    #     'kernelspec':"\"b/5;i/5;d=3/2\"",
-    #     'catalog_faintrmag':14,      ## catalog_faintrmag=16
-    #     'fiphotfluxthreshold':1000,  ## fiphotfluxthreshold=300
-    #     'photreffluxthreshold':1000, ## photreffluxthreshold=300
-    #     'extractsources':0,
-    #     'binlightcurves':0,
-    #     'translateimages':1
-    # }
-    # OUTDATED
+    projid += 1
+
+
+    # now ditto, for cam2ccd2, no bkg kernels. omit the one that was already
+    # done!
+    for kernel in nobkgkernellist[1:]:
+
+        varyparamdict[projid] = {
+            'camnum':2,
+            'ccdnum':2,
+            'projectid':projid,     # increment this whenever new things go to PSQL database.
+            'sector':"'s0002'",        # match SPOC syntax, zfill to 4.
+            'tuneparameters':'false',
+            'nworkers':32,
+            'aperturelist':aperturelist,
+            'epdsmooth':11,            # 11*30min = 5.5 hr median smooth in EPD pre-processing.
+            'epdsigclip':10000,
+            'photdisjointradius':2,
+            'anetfluxthreshold':50000,
+            'anettweak':6,
+            'anetradius':30,
+            'initccdextent':"\"0:2048,0:2048\"",
+            'kernelspec':"i/5;b/5;d=3/2",
+            'catalog_faintrmag':14,      ## catalog_faintrmag=16
+            'fiphotfluxthreshold':1000,  ## fiphotfluxthreshold=300
+            'photreffluxthreshold':1000, ## photreffluxthreshold=300
+            'extractsources':0,
+            'binlightcurves':0,
+            'translateimages':1
+        }
+
+        projid += 1
 
     projids = np.sort(list(varyparamdict.keys()))
 

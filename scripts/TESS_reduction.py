@@ -25,16 +25,16 @@ main
     assess_run
         percentiles_RMSorMAD_stats_and_plots
         parallel_compute_acf_statistics
+        plot_random_lightcurves_and_ACFs
         acf_percentiles_stats_and_plots
         is_image_noise_gaussian
         plot_random_lightcurve_subsample
         measure_known_HJ_SNR
         are_known_HJs_in_field
 
-wrapper functions:
+minor functions:
     record_reduction_parameters
     _plot_normalized_subtractedimg_histogram
-    plot_random_lightcurves_and_ACFs
     examine_astrometric_shifts
     is_imagesubtraction_complete
     is_presubtraction_complete
@@ -1113,7 +1113,8 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
 
         # note that sometimes, you should do BLS + LS + killharm too.  for now
         # though, we are making lightcurves; these extra steps can come later.
-        # FIXME: TFA FROM IRM SEEMS SILLY, BUT MAYBE BEST APPROACH?
+        # FIXME: TFA FROM IRM SEEMS LIKE A WASTE OF WORK, BUT MAYBE IT REALLY
+        # IS BEST APPROACH? FOR QUICK LCS, AT LEAST
         npixexclude=10
         lcu.run_tfa(tfalclist_path, trendlisttfa_paths, datestfa_path,
                     lcdirectory, statsdir, nworkers=nworkers,
