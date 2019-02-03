@@ -3349,7 +3349,7 @@ def parallel_xtrnsfits_convsub(xtrnsfits,
     # and overwrite == False, then do not run them.
 
     existingcsframes = glob.glob(os.path.join(
-        fitsdir, 'rsub-????????-'+fitsglob.replace('.fits','-xtrns.fits')))
+        fitsdir, '[r|n]sub-????????-'+fitsglob.replace('.fits','-xtrns.fits')))
 
     if len(existingcsframes) > 0 and not overwrite:
 
@@ -3357,7 +3357,7 @@ def parallel_xtrnsfits_convsub(xtrnsfits,
         alreadyexists = list(map(os.path.basename, existingcsframes))
 
         # use lazy matching to substitute out the hash string
-        alreadyexists = [re.sub('rsub-.*?-','',ae) for ae in alreadyexists]
+        alreadyexists = [re.sub('[r|n]sub-.*?-','',ae) for ae in alreadyexists]
 
         setdiff = np.setdiff1d(requested, alreadyexists)
 
@@ -3576,7 +3576,7 @@ def parallel_convsubfits_staticphot(
     # and overwrite == False, then do not re-run photometry.
 
     existingiphot = glob.glob(os.path.join(
-        fitsdir,'rsub-????????-'+ fitsglob.replace('.fits','iphot')))
+        fitsdir,'[r|n]sub-????????-'+ fitsglob.replace('.fits','iphot')))
 
     if len(existingiphot) > 0 and not overwrite:
 
@@ -3584,9 +3584,10 @@ def parallel_convsubfits_staticphot(
         alreadyexists = list(map(os.path.basename, existingiphot))
 
         # substitute out the hash string
-        alreadyexists = [re.sub('rsub-.*?-','',ae).replace('.iphot','') for ae in
-                         alreadyexists]
-        requested = [re.sub('rsub-.*?-','',r).replace('-xtrns.fits','') for r in requested]
+        alreadyexists = [re.sub('[r|n]sub-.*?-','',ae).replace('.iphot','') for
+                         ae in alreadyexists]
+        requested = [re.sub('[r|n]sub-.*?-','',r).replace('-xtrns.fits','') for
+                     r in requested]
 
         setdiff = np.setdiff1d(requested, alreadyexists)
 

@@ -149,11 +149,11 @@ def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid):
     # is:
     # CUT-NGC_2516_rsub-9ab2774b-tess2018232225941-s0001-4-3-0120_cal_img-xtrns_SUB_grayscale.jpg
     clusterjpgs = glob(os.path.join(
-        fitsdir, 'CUT-*_rsub-*-tess2*_cal_img*_SUB_grayscale.jpg'))
+        fitsdir, 'CUT-*_[r|n]sub-*-tess2*_cal_img*_SUB_grayscale.jpg'))
     if len(clusterjpgs)>1:
 
         clusternames = nparr(
-            [search('CUT-{}_rsub-{}-{}',c)[0] for c in clusterjpgs]
+            [search('CUT-{}_{}sub-{}-{}',c)[0] for c in clusterjpgs]
         )
         uclusternames = np.sort(np.unique(clusternames))
 
@@ -162,9 +162,9 @@ def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid):
 
             # iterate over movie formats
             for jpgstr, outstr in zip(
-                ['CUT-{:s}_rsub-*-tess2*SUB_grayscale.jpg'.
+                ['CUT-{:s}_[r|n]sub-*-tess2*SUB_grayscale.jpg'.
                  format(uclustername),
-                 'CUT-{:s}_rsub-*-tess2*SUB_bwr.jpg'.
+                 'CUT-{:s}_[r|n]sub-*-tess2*SUB_bwr.jpg'.
                  format(uclustername),
                  'CUT-{:s}_tess2*CAL.jpg'.
                  format(uclustername)
@@ -299,16 +299,16 @@ def is_presubtraction_complete(outdir, fitsglob, lcdir, percentage_required=95,
 def is_imagesubtraction_complete(fitsdir, fitsglob, lcdir):
 
     N_subfitslist = len(glob(
-        fitsdir+'rsub-????????-'+fitsglob.replace('.fits','-xtrns.fits')))
+        fitsdir+'[r|n]sub-????????-'+fitsglob.replace('.fits','-xtrns.fits')))
     N_iphotlist = len(glob(
-        fitsdir+'rsub-????????-'+fitsglob.replace('.fits','.iphot')))
+        fitsdir+'[r|n]sub-????????-'+fitsglob.replace('.fits','.iphot')))
     N_itranslist = len(glob(
-        fitsdir+'rsub-????????-'+fitsglob.replace('.fits','.itrans')))
+        fitsdir+'[r|n]sub-????????-'+fitsglob.replace('.fits','.itrans')))
     N_kernellist = len(glob(
-        fitsdir+'rsub-????????-'+
+        fitsdir+'[r|n]sub-????????-'+
         fitsglob.replace('.fits','-xtrns.fits-kernel')))
     N_subconvjpglist = len(glob(
-        fitsdir+'JPEG-SUBTRACTEDCONV-rsub-*-tess*.jpg'))
+        fitsdir+'JPEG-SUBTRACTEDCONV-[r|n]sub-*-tess*.jpg'))
     N_lcs = len(glob(
         lcdir+'*.grcollectilc'))
 
@@ -544,12 +544,12 @@ def plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20,
                                  savpath=savpath)
 
 def _plot_normalized_subtractedimg_histogram(
-    subimg_normalized, rsubimgfile, zerooutnans=True):
+    subimg_normalized, subimgfile, zerooutnans=True):
     """subimg_normalized: subtracted, normalized image."""
 
-    savdir = os.path.dirname(rsubimgfile)
+    savdir = os.path.dirname(subimgfile)
     savname = (
-        os.path.basename(rsubimgfile).replace(
+        os.path.basename(subimgfile).replace(
             '.fits','-normalized_histogram.png')
     )
     savpath = os.path.join(savdir, savname)
@@ -613,8 +613,8 @@ def is_image_noise_gaussian(
     devn of 1.
     """
 
-    rsubglob = 'rsub-*-tess*-xtrns.fits'
-    rsubfiles = np.sort(glob(fitsdir+rsubglob))
+    subglob = '[r|n]sub-*-tess*-xtrns.fits'
+    subfiles = np.sort(glob(fitsdir+subglob))
 
     imgglob = 'tess*-xtrns.fits'
     sciimgfiles = np.sort(glob(fitsdir+imgglob))
@@ -630,19 +630,19 @@ def is_image_noise_gaussian(
     photreffile = photreffile[0]
     photrefimg, _ = iu.read_fits(photreffile, ext=0)
 
-    for rsubimgfile, sciimgfile in zip(rsubfiles[:n_histograms_to_make],
+    for subimgfile, sciimgfile in zip(subfiles[:n_histograms_to_make],
                                        sciimgfiles[:n_histograms_to_make]):
 
-        savdir = os.path.dirname(rsubimgfile)
+        savdir = os.path.dirname(subimgfile)
         savname = (
-            os.path.basename(rsubimgfile).replace(
+            os.path.basename(subimgfile).replace(
                 '.fits','-normalized_histogram.png')
         )
         savpath = os.path.join(savdir, savname)
         if os.path.exists(savpath):
             continue
 
-        subimg, subhdr = iu.read_fits(rsubimgfile, ext=0)
+        subimg, subhdr = iu.read_fits(subimgfile, ext=0)
         sciimg, scihdr = iu.read_fits(sciimgfile, ext=0)
 
         expected_noise = np.sqrt(photrefimg + sciimg)
@@ -650,7 +650,7 @@ def is_image_noise_gaussian(
         subimg_normalized = subimg / expected_noise
 
         _plot_normalized_subtractedimg_histogram(
-            subimg_normalized, rsubimgfile)
+            subimg_normalized, subimgfile)
 
 
 def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
@@ -664,7 +664,7 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
                                 photreffluxthreshold, extractsources,
                                 binlightcurves, get_masks,
                                 tfa_template_sigclip, tfa_epdlc_sigclip,
-                                translateimages):
+                                translateimages, reversesubtract):
     """
     each "reduction version" is identified by a project ID. the parameters
     corresponding to each project ID are written in a pickle file, so that we
@@ -703,7 +703,8 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
         "get_masks":get_masks,
         "tfa_template_sigclip":tfa_template_sigclip,
         "tfa_epdlc_sigclip":tfa_epdlc_sigclip,
-        "translateimages":translateimages
+        "translateimages":translateimages,
+        "reversesubtract":reversesubtract
     }
 
     outpicklename = "projid_{:s}.pickle".format(repr(projectid))
@@ -829,7 +830,7 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
                          aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
                          photdisjointradius=2, colorscheme='bwr',
                          photreffluxthreshold=30000, extractsources=True,
-                         translateimages=True):
+                         translateimages=True, reversesubtract=False):
 
     ccdgain = photparams['ccdgain']
     exptime = photparams['ccdexptime']
@@ -908,8 +909,8 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
         _ = ais.parallel_xtrnsfits_convsub(
             xtrnsfiles, photreftype, fitsdir=fitsdir, fitsglob=fitsglob,
             outdir=None, observatory='tess', fieldinfo=fieldinfo,
-            reversesubtract=True, kernelspec=kernelspec, nworkers=nworkers,
-            maxworkertasks=1000, colorscheme=colorscheme)
+            reversesubtract=reversesubtract, kernelspec=kernelspec,
+            nworkers=nworkers, maxworkertasks=1000, colorscheme=colorscheme)
     else:
         print('found .iphot files. skipping convolution+subtraction.')
 
@@ -917,7 +918,7 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
     # With 30 workers, at best process ~few frames per second.
 
     if len(glob(os.path.join(fitsdir,'*.iphot')))<10:
-        subfitslist = glob(fitsdir+'rsub-????????-'+
+        subfitslist = glob(fitsdir+'[r|n]sub-????????-'+
                            fitsglob.replace('.fits','-xtrns.fits'))
         _ = ais.parallel_convsubfits_staticphot(
             subfitslist, fitsdir=fitsdir, fitsglob=fitsglob,
@@ -943,8 +944,8 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
     # # fitsh's `grcollect`, which skips the database architecture entirely.
     # 
     # print('beginning insert_phots_into_database')
-    # ais.insert_phots_into_database(sv.REDPATH, frameglob='rsub-*-xtrns.fits',
-    #                                photdir=None, photglob='rsub-*-%s.iphot',
+    # ais.insert_phots_into_database(sv.REDPATH, frameglob='[r|n]sub-*-xtrns.fits',
+    #                                photdir=None, photglob='[r|n]sub-*-%s.iphot',
     #                                maxframes=None, overwrite=False, database=None)
     # 
     # hatidlist = ais.get_hatidlist_from_cmrawphot(projectid, field, ccd, photreftype)
@@ -1360,7 +1361,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
          catalog_faintrmag=13, fiphotfluxthreshold=1000,
          photreffluxthreshold=1000, extractsources=True, binlightcurves=False,
          get_masks=1, tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0,
-         translateimages=True
+         translateimages=True, reversesubtract=False
          ):
     """
     args:
@@ -1403,7 +1404,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                                 photreffluxthreshold, extractsources,
                                 binlightcurves, get_masks,
                                 tfa_template_sigclip, tfa_epdlc_sigclip,
-                                translateimages)
+                                translateimages, reversesubtract)
 
     starttime = datetime.utcnow()
 
@@ -1548,7 +1549,10 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     vartoolstfastatfile = os.path.join(statsdir, 'vartools_tfa_stats.txt')
 
     xtrnsglob = fitsglob.replace('.fits','-xtrns.fits')
-    iphotpattern = fitsdir+'rsub-????????-'+fitsglob.replace('.fits','.iphot')
+    if reversesubtract:
+        iphotpattern = fitsdir+'rsub-????????-'+fitsglob.replace('.fits','.iphot')
+    else:
+        iphotpattern = fitsdir+'nsub-????????-'+fitsglob.replace('.fits','.iphot')
 
     if not is_imagesubtraction_complete(fitsdir, fitsglob, lcdirectory):
 
@@ -1561,7 +1565,8 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                              colorscheme='bwr',
                              photreffluxthreshold=photreffluxthreshold,
                              extractsources=extractsources,
-                             translateimages=translateimages)
+                             translateimages=translateimages,
+                             reversesubtract=reversesubtract)
     else:
         print('found that image subtraction is complete.')
 
@@ -1781,6 +1786,17 @@ if __name__ == '__main__':
     )
     parser.set_defaults(trnsimgs=True)
 
+    parser.add_argument(
+        '--reversesubtract', dest='reversesubtract', action='store_true',
+        help=('diff img = reference - model, for model = (img*kernel) + bkgd.')
+    )
+    parser.add_argument(
+        '--no-reversesubtract', dest='reversesubtract', action='store_false',
+        help=('diff img = image - model, for model = (ref*kernel) + bkgd.')
+    )
+    parser.set_defaults(reversesubtract=False)
+
+
     args = parser.parse_args()
 
     check_args(args)
@@ -1812,5 +1828,6 @@ if __name__ == '__main__':
          binlightcurves=args.binlcs,
          tfa_template_sigclip=args.tfa_template_sigclip,
          tfa_epdlc_sigclip=args.tfa_epdlc_sigclip,
-         translateimages=args.trnsimgs
+         translateimages=args.trnsimgs,
+         reversesubtract=args.reversesubtract
     )
