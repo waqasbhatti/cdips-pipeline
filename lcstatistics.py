@@ -481,14 +481,15 @@ def percentiles_RMSorMAD_stats_and_plots(statdir, outprefix, binned=False,
 
             minmag = np.floor(np.nanmin(stats[medstr])).astype(int)
             maxmag = np.ceil(np.nanmax(stats[medstr])).astype(int)
+            magdiff = 0.5
             mag_bins = [
-                (me, me+1) for me in np.arange(minmag, maxmag, 1)
+                (me, me+magdiff) for me in np.arange(minmag, maxmag, magdiff)
             ]
 
             percentile_dict = {}
             for mag_bin in mag_bins:
 
-                thismagmean = np.round(np.mean(mag_bin),1)
+                thismagmean = np.round(np.mean(mag_bin),2)
                 percentile_dict[thismagmean] = {}
 
                 thismin, thismax = min(mag_bin), max(mag_bin)
