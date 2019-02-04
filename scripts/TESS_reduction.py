@@ -725,7 +725,7 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
 def get_files_needed_before_image_subtraction(
         fitsdir, fitsglob, outdir, initccdextent, ccdgain, zeropoint, exptime,
         ra_nom, dec_nom,
-        catra, catdec, ccd_fov,
+        catra, catdec, catboxsize,
         catalog, catalog_file, reformed_cat_file,
         fnamestr='*-1-1-0016_cal_img.fits', anetfluxthreshold=20000,
         fistarglob='*.fistar',
@@ -784,7 +784,7 @@ def get_files_needed_before_image_subtraction(
     # This function gets all the sources in the field of view of the frame, given
     # its central pointing coordinates and plate-scale from 2MASS. This catalog
     # file is then be used as input to make_source_list below.
-    _ = ap.make_fov_catalog(ra=catra, dec=catdec, size=ccd_fov,
+    _ = ap.make_fov_catalog(ra=catra, dec=catdec, size=catboxsize,
                             brightrmag=brightrmag, faintrmag=faintrmag,
                             fits=None, outfile=None, outdir=outdir,
                             catalog=catalog, catalogpath=None,
@@ -1484,7 +1484,10 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     ###########################################################################
 
     # TESS specific variables.
-    ccd_fov = 12 # degrees. 24/2.
+    # [degrees]. 12 degrees produces LCs that looked around 12 degrees from
+    # the center of field. 24 is simply to play it safe (more likely (12^2 +
+    # 12^2)^(1/2) = 17 is the needed number...)
+    catboxsize = 24
 
     # get gain, ccdextent, zeropoint, exposure time from header.
     rand_fits = fits_list[np.random.randint(0, high=len(fits_list))]
@@ -1496,7 +1499,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     ra_nom = hdr['CRVAL1']  # RA at CRPIX1, CRPIX2. Roughly "camera boresight".
     dec_nom = hdr['CRVAL2'] # DEC at CRPIX1, CRPIX2
 
-    catalog, catra, catdec, catbox = 'GAIADR2', ra_nom, dec_nom, ccd_fov
+    catalog, catra, catdec, catbox = 'GAIADR2', ra_nom, dec_nom, catboxsize
     catalog_file = (
         '%s-RA%s-DEC%s-SIZE%s.catalog' % (catalog, catra, catdec, catbox)
     )
@@ -1511,7 +1514,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                                       extractsources=extractsources):
         get_files_needed_before_image_subtraction(
             fitsdir, fitsglob, outdir, initccdextent, ccdgain, zeropoint, exptime,
-            ra_nom, dec_nom, catra, catdec, ccd_fov, catalog, catalog_file,
+            ra_nom, dec_nom, catra, catdec, catboxsize, catalog, catalog_file,
             reformed_cat_file, fnamestr=fitsglob,
             anetfluxthreshold=anetfluxthreshold, anetradius=anetradius,
             fistarglob='*.fistar', width=13, anettweak=anettweak, xpix=2048,
