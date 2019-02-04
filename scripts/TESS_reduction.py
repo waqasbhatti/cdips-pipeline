@@ -664,7 +664,7 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
                                 photreffluxthreshold, extractsources,
                                 binlightcurves, get_masks,
                                 tfa_template_sigclip, tfa_epdlc_sigclip,
-                                translateimages, reversesubtract):
+                                translateimages, reversesubtract, skipepd):
     """
     each "reduction version" is identified by a project ID. the parameters
     corresponding to each project ID are written in a pickle file, so that we
@@ -704,7 +704,8 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
         "tfa_template_sigclip":tfa_template_sigclip,
         "tfa_epdlc_sigclip":tfa_epdlc_sigclip,
         "translateimages":translateimages,
-        "reversesubtract":reversesubtract
+        "reversesubtract":reversesubtract,
+        "skipepd":skipepd
     }
 
     outpicklename = "projid_{:s}.pickle".format(repr(projectid))
@@ -1000,7 +1001,7 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
                    fitsglob, camera, ccd,
                    epdsmooth=11, epdsigclip=10, nworkers=10,
                    binlightcurves=False, tfa_template_sigclip=5.0,
-                   tfa_epdlc_sigclip=5.0):
+                   tfa_epdlc_sigclip=5.0, skipepd=True):
     """
     Step ISP11: do EPD on all the LCs, and collect stats on the results.
     for ISP LCs, use lcmagcols=([27,28,29],[30,],[30,],[30,])
@@ -1036,7 +1037,7 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
     else:
         print('found >10 fits LCs from grcollect. continuing.')
 
-    if not os.path.exists(epdstatfile):
+    if not os.path.exists(epdstatfile) and not skipepd:
 
         fitsilcfiles = glob(os.path.join(lcdirectory,'*_llc.fits'))
         outfiles = fitsilcfiles
@@ -1063,17 +1064,22 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
                                       epcols=None, tfcols=None,
                                       rfcols=None, correctioncoeffs=None,
                                       sigclip=5.0, fovcathasgaiaids=True)
+    elif skipepd:
+        print('skipped EPD because got skipepd flag')
     else:
         print('already made EPD LC stats file')
 
     epdmadplot = glob(os.path.join(statsdir, '*median-EP1-vs-mad-*png'))
-    if not epdmadplot and not os.path.exists(tfaboolstatusfile):
+    if (not epdmadplot and
+        not os.path.exists(tfaboolstatusfile) and
+        not skipepd
+       ):
         ap.plot_stats_file(epdstatfile, statsdir, field, binned=False,
                            logy=True, logx=False, correctmagsafter=None,
                            rangex=(5.9,16), observatory='tess',
                            fovcathasgaiaids=True, yaxisval='RMS')
     else:
-        print('already made EPD LC plots')
+        print('skipped making EPD LC plots')
 
 
     # choose the TFA template stars
@@ -1112,21 +1118,22 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
                                           fitsdir, fitsglob)
         )
 
-        # note that sometimes, you should do BLS + LS + killharm too.  for now
+        # Note that sometimes, you should do BLS + LS + killharm too.  for now
         # though, we are making lightcurves; these extra steps can come later.
-        # FIXME: TFA FROM IRM SEEMS LIKE A WASTE OF WORK, BUT MAYBE IT REALLY
-        # IS BEST APPROACH? FOR QUICK LCS, AT LEAST
-        npixexclude=10
+        # If you skipped EPD, then you do TFA from IRM. otherwise, you do TFA
+        # from EPD.
+        npixexclude = 10
+        tfafromirm = skipepd
         lcu.run_tfa(tfalclist_path, trendlisttfa_paths, datestfa_path,
                     lcdirectory, statsdir, nworkers=nworkers,
                     do_bls_ls_killharm=False, npixexclude=npixexclude,
-                    tfafromirm=True)
+                    tfafromirm=tfafromirm)
 
         lcu.parallel_merge_tfa_lcs(lcdirectory, nworkers=32)
 
     if not os.path.exists(tfastatfile):
 
-        # catalog projection performed here does some useful things joel's
+        # Catalog projection performed here does some useful things joel's
         # stats file does not for Gaia DR2, catalog mag col corresponds to G_Rp
         # (Gaia "R" band).
         ap.parallel_lc_statistics(lcdirectory, epdlcglob, reformed_cat_file,
@@ -1361,7 +1368,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
          catalog_faintrmag=13, fiphotfluxthreshold=1000,
          photreffluxthreshold=1000, extractsources=True, binlightcurves=False,
          get_masks=1, tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0,
-         translateimages=True, reversesubtract=False
+         translateimages=True, reversesubtract=False, skipepd=True
          ):
     """
     args:
@@ -1404,7 +1411,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                                 photreffluxthreshold, extractsources,
                                 binlightcurves, get_masks,
                                 tfa_template_sigclip, tfa_epdlc_sigclip,
-                                translateimages, reversesubtract)
+                                translateimages, reversesubtract, skipepd)
 
     starttime = datetime.utcnow()
 
@@ -1576,7 +1583,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                    epdsmooth=epdsmooth, epdsigclip=epdsigclip,
                    nworkers=nworkers, binlightcurves=binlightcurves,
                    tfa_template_sigclip=tfa_template_sigclip,
-                   tfa_epdlc_sigclip=tfa_epdlc_sigclip)
+                   tfa_epdlc_sigclip=tfa_epdlc_sigclip, skipepd=skipepd)
 
     statsdir = os.path.dirname(epdstatfile)+'/'
     outprefix = str(field)+'-'+str(projectid)
@@ -1796,6 +1803,15 @@ if __name__ == '__main__':
     )
     parser.set_defaults(reversesubtract=False)
 
+    parser.add_argument(
+        '--skipepd', dest='skipepd', action='store_true',
+        help=('skip EPD processing, run TFA on IRM mags')
+    )
+    parser.add_argument(
+        '--no-skipepd', dest='skipepd', action='store_false',
+        help=('do not skip EPD processing. run TFA on EPD mags.')
+    )
+    parser.set_defaults(skipepd=True)
 
     args = parser.parse_args()
 
@@ -1829,5 +1845,6 @@ if __name__ == '__main__':
          tfa_template_sigclip=args.tfa_template_sigclip,
          tfa_epdlc_sigclip=args.tfa_epdlc_sigclip,
          translateimages=args.trnsimgs,
-         reversesubtract=args.reversesubtract
+         reversesubtract=args.reversesubtract,
+         skipepd=args.skipepd
     )

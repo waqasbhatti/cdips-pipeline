@@ -22,7 +22,7 @@ sector='s0001'
 #################################
 tuneparameters=true
 nworkers=20
-aperturelist="1.45:7.0:6.0,2.2:7.0:6.0,2.95:7.0:6.0"
+aperturelist="1:7.0:6.0,1.5:7.0:6.0,2.25:7.0:6.0"
 epdsmooth=11
 epdsigclip=10000
 photdisjointradius=2
@@ -37,6 +37,8 @@ photreffluxthreshold=3000
 extractsources=0
 binlightcurves=0
 translateimages=1
+reversesubtract=0
+skipepd=1
 
 ##########################################
 ##########################################
@@ -67,6 +69,17 @@ else
   translateoption=no-translateimages
 fi
 
+if [ "$reversesubtract" = 1 ] ; then
+  rsuboption=reversesubtract
+else
+  rsuboption=no-reversesubtract
+fi
+
+if [ "$skipepd" = 1 ] ; then
+  skipepdoption=skipepd
+else
+  skipepdoption=no-skipepd
+fi
 
 ###############################################################################
 # define paths. trimmed, single-extension fits images get worked on in fitsdir.
@@ -130,4 +143,5 @@ python -u TESS_reduction.py \
   --photreffluxthreshold $photreffluxthreshold \
   --extractsources $extractsources --$binlcoption \
   --camnum $camnum --ccdnum $ccdnum --$translateoption \
+  --$rsuboption --$skipepdoption \
   &> logs/$logname &
