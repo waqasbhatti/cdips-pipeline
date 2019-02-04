@@ -259,7 +259,9 @@ def convert_grcollect_to_fits_lc_worker(task):
 
     hdulist = fits.HDUList([primary_hdu, hdutimeseries])
 
-    hdulist.writeto(outpath, overwrite=True)
+    if os.path.exists(outpath):
+        os.remove(outpath)
+    hdulist.writeto(outpath, overwrite=False)
     print('{} wrote {}'.format(datetime.utcnow().isoformat(), outpath))
 
 
@@ -588,7 +590,9 @@ def epd_fitslightcurve_imagesub(fitsilcfile, outfile, smooth=21, sigmaclip=3.0,
     primary_hdu.header['DTR_EPD'] = True
 
     outhdulist = fits.HDUList([primary_hdu, new_timeseries_hdu])
-    outhdulist.writeto(outfile, overwrite=True)
+    if os.path.exists(outfile):
+        os.remove(outfile)
+    outhdulist.writeto(outfile, overwrite=False)
 
     inhdulist.close()
 
@@ -1028,7 +1032,9 @@ def merge_tfa_lc_worker(task):
 
         outhdulist = fits.HDUList([inhdulist[0], new_timeseries_hdu])
         outfile = lcpath
-        outhdulist.writeto(outfile, overwrite=True)
+        if os.path.exists(outfile):
+            os.remove(outfile)
+        outhdulist.writeto(outfile, overwrite=False)
 
         inhdulist.close()
         tfahdulist.close()
@@ -1077,7 +1083,9 @@ def merge_tfa_lc_worker(task):
 
         outhdulist = fits.HDUList([inhdulist[0], new_timeseries_hdu])
         outfile = lcpath
-        outhdulist.writeto(outfile, overwrite=True)
+        if os.path.exists(outfile):
+            os.remove(outfile)
+        outhdulist.writeto(outfile, overwrite=False)
 
         inhdulist.close()
 
@@ -1179,7 +1187,9 @@ def apply_barycenter_time_correction(fitsilcfile):
     primary_hdu.header['TIMEUNIT'] = 'd'
 
     outhdulist = fits.HDUList([primary_hdu, new_timeseries_hdu])
-    outhdulist.writeto(fitsilcfile, overwrite=True)
+    if os.path.exists(fitsilcfile):
+        os.remove(fitsilcfile)
+    outhdulist.writeto(fitsilcfile, overwrite=False)
 
     inhdulist.close()
 
