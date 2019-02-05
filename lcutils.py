@@ -834,8 +834,7 @@ tfafromirmcmd = (
     'IRQ3:IRQ3:string,id:RSTFC:string,RSTFC:RSTFC:string,TMID_UTC:TMID_UTC:double,'
     'XIC:XIC:double,YIC:YIC:double,CCDTEMP:CCDTEMP:double,'
     'NTEMPS:NTEMPS:int,'
-    't:TMID_BJD:double,TMID_BJD:TMID_BJD:double,BJDCORR:BJDCORR:double,'
-    'EP1:EP1:double,EP2:EP2:double,EP3:EP3:double '
+    't:TMID_BJD:double,TMID_BJD:TMID_BJD:double,BJDCORR:BJDCORR:double '
     '-expr \'mag=IRM1\' -expr \'err=IRE1\' '
     '-TFA {trendlist_tfa_ap1} readformat 0 RSTFC IRM1 {dates_tfa} '
     '{npixexclude} xycol 2 3 1 0 0 '
@@ -971,6 +970,7 @@ def run_tfa(tfalclist_path, trendlisttfa_paths, datestfa_path, lcdirectory,
     else:
         print('ERR! {}Z: TFA+BLS+LS+KILLHARM cmd failed'.format(
               datetime.utcnow().isoformat()))
+        raise AssertionError
         return 0
 
 
@@ -1004,12 +1004,45 @@ def merge_tfa_lc_worker(task):
                   format(lcpath))
             return 0
 
-        np.testing.assert_equal(
-            data['RSTFC'], tfadata['RSTFC'],
-            err_msg='frame ids in TFA/MAIN LC must be equal, else need to sort'
-        )
+        if np.array_equal(tfadata['RSTFC'],data['RSTFC']):
+            pass
+        elif (not np.array_equal(tfadata['RSTFC'],data['RSTFC']) and
+            len(tfadata['RSTFC']) < len(data['RSTFC'])
+        ):
+            #  TFA LC has too few frame stamps. find the entries in the TFA
+            #  lightcurve that are missing frameids, and put nans in those
+            #  cases.
+            inarr = np.in1d(data['RSTFC'], tfadata['RSTFC'])
 
-        # create the "TF1", "TF2", "EPN" keys, format keys, and data columns.
+            n_to_add = len(inarr[~inarr])
+
+            inds_to_add = np.argwhere(~inarr)
+
+            tfakeys = ['TFA1','TFA2','TFA3']
+            tfadatacols = []
+            for k in tfakeys:
+                thiscol = tfadata[k]
+                try:
+                    thiscol = np.insert(thiscol, inds_to_add.flatten(), np.array(np.nan))
+                except:
+                    import IPython; IPython.embed()
+                tfadatacols.append(thiscol)
+
+            wrn_msg = (
+                'WRN! {}: found {} missing frameids. added NaNs'.
+                format(lcpath, n_to_add)
+            )
+            print(wrn_msg)
+
+        else:
+            err_msg = (
+                'ERR! {}: got bad frameids in TFA/MAIN LC. need to debug!'.
+                format(lcpath)
+            )
+            print(err_msg)
+            raise AssertionError
+
+        # create the "TF1", "TF2", "TFN" keys, format keys, and data columns.
         n_apertures = len([t[1] for t in hdr.cards if 'IRM' in str(t[1])])
         irm_ap_keys = ['IRM{}'.format(i) for i in range(1,n_apertures+1)]
         tfanames = [k.replace('IRM','TFA') for k in irm_ap_keys]
