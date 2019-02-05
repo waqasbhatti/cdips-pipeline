@@ -4642,6 +4642,7 @@ def get_lc_statistics(lcfile,
                       rfcols=None,
                       sigclip=4.0,
                       tfalcrequired=False,
+                      epdlcrequired=True,
                       fitslcnottxt=False):
     """
     This calculates the following statistics for the magnitude columns in the
@@ -4672,13 +4673,24 @@ def get_lc_statistics(lcfile,
             rm1 = hdulist[1].data['IRM1']
             rm2 = hdulist[1].data['IRM2']
             rm3 = hdulist[1].data['IRM3']
-            ep1 = hdulist[1].data['EP1']
-            ep2 = hdulist[1].data['EP2']
-            ep3 = hdulist[1].data['EP3']
+            if epdlcrequired:
+                ep1 = hdulist[1].data['EP1']
+                ep2 = hdulist[1].data['EP2']
+                ep3 = hdulist[1].data['EP3']
+        elif not hdulist[0].header['DTR_EPD'] and not epdlcrequired:
+            # a hack. some code has been written to rely on "EPD"
+            # statistics. however, if you're skipping EPD, you want to
+            # instead rely on IRM statistics. populating the EPD statistics
+            # columns with IRM statistics is hacky, but fine.
+            rm1 = hdulist[1].data['IRM1']
+            rm2 = hdulist[1].data['IRM2']
+            rm3 = hdulist[1].data['IRM3']
+            ep1 = hdulist[1].data['IRM1']
+            ep2 = hdulist[1].data['IRM2']
+            ep3 = hdulist[1].data['IRM3']
         else:
-            raise AssertionError(
-                'expected DTR_EPD to be true in get_lc_statistics'
-            )
+            print('expected DTR_EPD to be true in get_lc_statistics')
+            raise AssertionError
 
         if hdulist[0].header['DTR_TFA']:
             tf1 = hdulist[1].data['TFA1']
@@ -5366,7 +5378,9 @@ def lc_statistics_worker(task):
     try:
         return get_lc_statistics(task[0], **task[1])
     except Exception as e:
-        print('SOMETHING WENT WRONG! task was %s' % task)
+        print('SOMETHING WENT WRONG! task was {}, exception was {}'.format(
+            repr(task), repr(e))
+        )
         return None
 
 
@@ -5387,7 +5401,8 @@ def parallel_lc_statistics(lcdir,
                            tfcols=[25,26,27],
                            rfcols=None,
                            correctioncoeffs=None,
-                           sigclip=4.0):
+                           sigclip=4.0,
+                           epdlcrequired=True):
     """
     This calculates statistics on all lc files in lcdir.
 
@@ -5407,6 +5422,12 @@ def parallel_lc_statistics(lcdir,
         fitslcnottxt (bool): if True, I/O will attempt to read
         INSTRUMENTAL/EPD/TFA magnitudes from a FITS-format lightcurve, not a
         text-file lightcurve. By default, false.
+
+        epdlcrequired (bool): a variety of aperturephot.py tools assume that if
+        you are creating statistics, you have run EPD. This isn't necessarily
+        true (you may wish to get statistics on the instrumental raw
+        magnitudes). If you set this to False, the statistics file will,
+        hackily, populate the "EPD statistics" with IRM values.
 
     Output:
 
@@ -5442,7 +5463,8 @@ def parallel_lc_statistics(lcdir,
                   'rfcols':rfcols,
                   'sigclip':sigclip,
                   'tfalcrequired':tfalcrequired,
-                  'fitslcnottxt':fitslcnottxt}] for x in lcfiles]
+                  'fitslcnottxt':fitslcnottxt,
+                  'epdlcrequired':epdlcrequired}] for x in lcfiles]
 
     pool = mp.Pool(nworkers,maxtasksperchild=workerntasks)
     results = pool.map(lc_statistics_worker, tasks)

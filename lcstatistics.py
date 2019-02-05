@@ -199,7 +199,7 @@ def compute_acf_statistics_worker(task, n_apertures=3, timename='TMID_BJD',
             'to generalize this you just need to interpolate, but I am lazy.'
             )
 
-        tfafile, outdir, eval_times_hr = task
+        tfafile, outdir, eval_times_hr, skipepd = task
 
         if not isfitslc:
             lcdata = read_tfa_lc(tfafile)
@@ -228,7 +228,8 @@ def compute_acf_statistics_worker(task, n_apertures=3, timename='TMID_BJD',
 
             time = lcdata[timename]
             flux_raw = lcdata[rawap]
-            flux_epd = lcdata[epdap]
+            if not skipepd:
+                flux_epd = lcdata[epdap]
             flux_tfa = lcdata[tfaap]
             err = lcdata[errap]
 
@@ -236,10 +237,11 @@ def compute_acf_statistics_worker(task, n_apertures=3, timename='TMID_BJD',
                                          fillgaps='noiselevel', sigclip=5,
                                          magsarefluxes=True,
                                          filterwindow=filterwindow)
-            acf_epd = autocorr_magseries(time, flux_epd, err, maxlags=None,
-                                         fillgaps='noiselevel', sigclip=5,
-                                         magsarefluxes=True,
-                                         filterwindow=filterwindow)
+            if not skipepd:
+                acf_epd = autocorr_magseries(time, flux_epd, err, maxlags=None,
+                                             fillgaps='noiselevel', sigclip=5,
+                                             magsarefluxes=True,
+                                             filterwindow=filterwindow)
             acf_tfa = autocorr_magseries(time, flux_tfa, err, maxlags=None,
                                          fillgaps='noiselevel', sigclip=5,
                                          magsarefluxes=True,
@@ -253,7 +255,9 @@ def compute_acf_statistics_worker(task, n_apertures=3, timename='TMID_BJD',
 
             apstr = 'AP{}'.format(ap)
             d_pkl[apstr] = {}
-            for acf, dtr in zip([acf_raw, acf_epd, acf_tfa],['raw','epd','tfa']):
+            acfs = [acf_raw, acf_epd, acf_tfa] if not skipepd else [acf_raw, acf_tfa]
+            dtrs = ['raw','epd','tfa'] if not skipepd else ['raw','tfa']
+            for acf, dtr in zip(acfs, dtrs):
 
                 d_pkl[apstr]['acf_{}'.format(dtr)] = acf['acf']
                 d_pkl[apstr]['lag_time_{}'.format(dtr)] = acf['lags']*acf['cadence']
@@ -275,10 +279,12 @@ def compute_acf_statistics_worker(task, n_apertures=3, timename='TMID_BJD',
             eval_times_hr = nparr(eval_times_hr)
             outdf['LAG_TIME_HR'] = eval_times_hr
 
-            for acf, colstr in zip(
-                [acf_raw, acf_epd, acf_tfa],
+            colstrs = (
                 ['RAW{:d}'.format(ap),'EPD{:d}'.format(ap),'TFA{:d}'.format(ap)]
-            ):
+                if not skipepd else
+                ['RAW{:d}'.format(ap),'TFA{:d}'.format(ap)]
+            )
+            for acf, colstr in zip(acfs, colstrs):
 
                 # wonky indexing scheme. 30 minute cadence -> e.g., 1hr lag is
                 # index number 2.
@@ -301,7 +307,7 @@ def compute_acf_statistics_worker(task, n_apertures=3, timename='TMID_BJD',
 
 def parallel_compute_acf_statistics(
     tfafiles, outdir, eval_times_hr=[1,2,6,12,24,48,60,96,120,144,192],
-    nworkers=16, maxworkertasks=1000):
+    nworkers=16, maxworkertasks=1000, skipepd=False):
     """
     Given list of TFA lightcurves, calculate autocorrelation functions and
     evaluate them at specific times, e.g., 1hr, 2hr, 6hr, 24hr.
@@ -325,7 +331,7 @@ def parallel_compute_acf_statistics(
 
     pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
-    tasks = [(x, outdir, eval_times_hr) for x in tfafiles]
+    tasks = [(x, outdir, eval_times_hr, skipepd) for x in tfafiles]
 
     # fire up the pool of workers
     results = pool.map(compute_acf_statistics_worker, tasks)
@@ -342,7 +348,7 @@ def parallel_compute_acf_statistics(
 # PLOTTING FUNCTIONS #
 ######################
 def acf_percentiles_stats_and_plots(statdir, outprefix, make_plot=True,
-                                    percentiles=[2,25,50,75,98]):
+                                    percentiles=[2,25,50,75,98], skipepd=False):
     """
     make csv files and (optionally) plots of ACF values at various time lags,
     evaluated at percentiles.
@@ -356,9 +362,12 @@ def acf_percentiles_stats_and_plots(statdir, outprefix, make_plot=True,
 
     # ACF vs time-lag statistics, summarized as percentiles at 2%, 25%, 50%,
     # 75%, and 98% percentiles.
-    for apstr in ['TFA1','TFA2','TFA3',
-                  'EPD1','EPD2','EPD3',
-                  'RAW1','RAW2','RAW3']:
+    apstrlist = (['TFA1','TFA2','TFA3','RAW1','RAW2','RAW3']
+                 if skipepd else
+                 ['TFA1','TFA2','TFA3', 'EPD1','EPD2','EPD3',
+                  'RAW1','RAW2','RAW3'])
+
+    for apstr in apstrlist:
         try:
             csvname = ( os.path.join(
                 statdir,'acf_percentiles_stats_{:s}.csv'.format(apstr.upper())
@@ -586,32 +595,38 @@ def percentiles_RMSorMAD_stats_and_plots(statdir, outprefix, binned=False,
 
 
 def plot_raw_epd_tfa(time, rawmag, epdmag, tfamag, ap_index, savpath=None,
-                     xlabel='BTJD = BJD - 2457000'):
+                     xlabel='BTJD = BJD - 2457000', skipepd=False):
     """
-    Plot a 3 row, 1 column plot with rows of:
+    Plot a 2 (or 3) row, 1 column plot with rows of:
         * raw mags vs time
-        * EPD mags vs time
+        * EPD mags vs time (optional)
         * TFA mags vs time.
 
     args:
         time, rawmag, epdmag, tfamag (np.ndarray)
 
         ap_index (int): integer, e.g., "2" for aperture #2.
+
+        skipepd (bool): if true, skips the EPD row.
     """
 
     from matplotlib.ticker import FormatStrFormatter
 
     plt.close('all')
-    fig, axs = plt.subplots(nrows=3, ncols=1, sharex=True, figsize=(6,4))
+    nrows = 2 if skipepd else 3
+    fig, axs = plt.subplots(nrows=nrows, ncols=1, sharex=True, figsize=(6,4))
 
     axs = axs.flatten()
 
     apstr = 'AP{:d}'.format(ap_index)
-    stagestrs = ['RM{:d}'.format(ap_index),
-                 'EP{:d}'.format(ap_index),
-                 'TF{:d}'.format(ap_index)]
+    stagestrs = (['RM{:d}'.format(ap_index), 'TF{:d}'.format(ap_index)]
+                 if skipepd else
+                 ['RM{:d}'.format(ap_index), 'EP{:d}'.format(ap_index),
+                  'TF{:d}'.format(ap_index)]
+                )
+    mags = [rawmag,tfamag] if skipepd else [rawmag,epdmag,tfamag]
 
-    for ax, mag, txt in zip(axs, [rawmag,epdmag,tfamag], stagestrs):
+    for ax, mag, txt in zip(axs, mags, stagestrs):
 
         ax.scatter(time, mag, c='black', alpha=0.9, zorder=2, s=3,
                    rasterized=True, linewidths=0)
@@ -628,7 +643,7 @@ def plot_raw_epd_tfa(time, rawmag, epdmag, tfamag, ap_index, savpath=None,
         ylim = ax.get_ylim()
         ax.set_ylim((max(ylim), min(ylim)))
 
-    axs[2].set_xlabel(xlabel, fontsize='small')
+    axs[-1].set_xlabel(xlabel, fontsize='small')
 
     # make the y label
     ax_hidden = fig.add_subplot(111, frameon=False)
@@ -648,7 +663,8 @@ def plot_lightcurve_and_ACF(
     rawlags, rawacf, epdlags, epdacf, tfalags, tfaacf,
     rawtime, rawflux, epdtime, epdflux, tfatime, tfaflux,
     ap, savpath=None,
-    xlabeltime='BJD - 2457000',xlabelacf='ACF lag [days]'):
+    xlabeltime='BJD - 2457000',xlabelacf='ACF lag [days]',
+    skipepd=False):
     """
     Plot a 3 row, 2 column plot with rows of:
         * raw mags vs time (and ACF)
@@ -665,20 +681,30 @@ def plot_lightcurve_and_ACF(
     from matplotlib.ticker import FormatStrFormatter
 
     plt.close('all')
-    fig, axs = plt.subplots(nrows=3, ncols=2, figsize=(7,4),
+    nrows = 2 if skipepd else 3
+    fig, axs = plt.subplots(nrows=nrows, ncols=2, figsize=(7,4),
                             gridspec_kw= {'width_ratios':[4,1],
-                                          'height_ratios':[1,1,1]})
-    a0,a1,a2,a3,a4,a5 = axs.flatten()
+                                          'height_ratios':[1]*nrows})
+    if skipepd:
+        a0,a1,a2,a3 = axs.flatten()
+    else:
+        a0,a1,a2,a3,a4,a5 = axs.flatten()
 
     apstr = 'AP{:d}'.format(ap)
-    stagestrs = ['RM{:d}'.format(ap),
-                 'EP{:d}'.format(ap),
-                 'TF{:d}'.format(ap)]
+    stagestrs = (['RM{:d}'.format(ap),
+                  'TF{:d}'.format(ap)]
+                 if skipepd else
+                 ['RM{:d}'.format(ap),
+                  'EP{:d}'.format(ap),
+                  'TF{:d}'.format(ap)]
+                )
 
-    for ax, mag, time, txt in zip(
-        (a0,a2,a4), [rawflux,epdflux,tfaflux], [rawtime,epdtime,tfatime],
-        stagestrs
-    ):
+    axlist = (a0,a2) if skipepd else (a0,a2,a4)
+    fluxlist = [rawflux,tfaflux] if skipepd else [rawflux,epdflux,tfaflux]
+    timelist = [rawtime,tfatime] if skipepd else [rawtime,epdtime,tfatime]
+
+    for ax, mag, time, txt in zip(axlist, fluxlist, timelist, stagestrs):
+
         ax.scatter(time, mag, c='black', alpha=0.9, zorder=2, s=3,
                    rasterized=True, linewidths=0)
 
@@ -697,12 +723,11 @@ def plot_lightcurve_and_ACF(
         ax.get_xaxis().set_tick_params(which='both', direction='in',
                                        labelsize='x-small')
 
-    for ax, acf, lag, txt in zip(
-        (a1,a3,a5),
-        [rawacf, epdacf, tfaacf],
-        [rawlags, epdlags, tfalags],
-        stagestrs
-    ):
+    axlist = (a1,a3) if skipepd else (a1,a3,a5)
+    acflist = [rawflux,tfaflux] if skipepd else [rawacf, epdacf, tfaacf]
+    laglist = [rawlags,tfalags] if skipepd else [rawlags, epdlags, tfalags]
+
+    for ax, acf, lag, txt in zip(axlist, acflist, laglist, stagestrs):
 
         ax.plot(lag, acf, c='k', linestyle='-', marker='o',
                 markerfacecolor='k', markeredgecolor='k', ms=1, lw=0.5,

@@ -634,7 +634,7 @@ def make_cluster_cutout_jpgs(sectornum, fitsdir, racenter, deccenter, field,
 
 def measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
                              statsdir, sectornum, minxmatchsep=3, nworkers=20,
-                             use_NEA=False, use_alerts=True):
+                             use_NEA=False, use_alerts=True, skipepd=False):
     """
     Args:
 
@@ -806,12 +806,13 @@ def measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
     ):
         _measure_planet_snr(plname, tfalc, statsdir, sectornum,
                             nworkers=nworkers, use_NEA=use_NEA,
-                            use_alerts=use_alerts)
+                            use_alerts=use_alerts, skipepd=skipepd)
 
 
 def _measure_planet_snr(plname, tfalc, statsdir, sectornum,
                         timename='TMID_BJD', nworkers=20,
-                        n_transit_durations=4, use_NEA=False, use_alerts=True):
+                        n_transit_durations=4, use_NEA=False, use_alerts=True,
+                        skipepd=False):
 
     plname = str(plname).replace(' ','')
     plname = str(plname).replace('.','-')
@@ -829,8 +830,14 @@ def _measure_planet_snr(plname, tfalc, statsdir, sectornum,
     time = lc[timename]
 
     plotpath = os.path.join(statsdir, str(plname)+'_AP1_lightcurve.png')
-    plot_raw_epd_tfa(time, lc['IRM1'], lc['EP1'], lc['TFA1'], 1,
-                     savpath=plotpath, xlabel='BTJD = BJD - 2457000')
+    if skipepd:
+        plot_raw_epd_tfa(time, lc['IRM1'], np.zeros_like(lc['IRM1']),
+                         lc['TFA1'], 1, savpath=plotpath,
+                         xlabel='BTJD = BJD - 2457000', skipepd=skipepd)
+    else:
+        plot_raw_epd_tfa(time, lc['IRM1'], lc['EP1'], lc['TFA1'], 1,
+                         savpath=plotpath, xlabel='BTJD = BJD - 2457000',
+                         skipepd=skipepd)
 
     outdir = os.path.join(statsdir, plname)
     if not os.path.exists(outdir):
@@ -871,6 +878,16 @@ def _measure_planet_snr(plname, tfalc, statsdir, sectornum,
                                            maxtransitduration=0.15,
                                            magsarefluxes=True, sigclip=None,
                                            perioddeltapercent=5)
+        if not isinstance(fitd,dict):
+            outdf = pd.DataFrame({'plname':plname, 'trapz_snr':np.nan,
+                                  'tfalc':tfalc}, index=[0])
+            outdf.to_csv(snrfit_savfile, index=False)
+            print('WRN! SNR calculation failed, but made {} anyway with nan'.
+                  format(snrfit_savfile))
+            print('{} made {}'.format(
+                datetime.utcnow().isoformat(), snrfit_savfile))
+            return 1
+
         bls_period = fitd['period']
         lcfit._make_fit_plot(fitd['phases'], fitd['phasedmags'], None,
                              fitd['blsmodel'], fitd['period'], fitd['epoch'],

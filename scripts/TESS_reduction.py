@@ -468,10 +468,11 @@ def examine_astrometric_shifts(fitsdir, astromref, statsdir,
     plt.close('all')
 
 
-def plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=10):
+def plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=10,
+                                     skipepd=False):
     """
-    make sequential (6 row?) RAW, EPD, TFA plots with ACFs., for n_desired
-    total files.
+    make sequential (6 row?) RAW, (optionally) EPD, TFA plots with ACFs., for
+    n_desired total files.
     """
 
     sel_acffiles = _get_random_acf_pkls(pickledir, n_desired=n_desired)
@@ -494,18 +495,35 @@ def plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=10):
             if os.path.exists(savpath):
                 continue
 
-            lcs.plot_lightcurve_and_ACF(
-                d[key]['lag_time_raw'], d[key]['acf_raw'],
-                d[key]['lag_time_epd'], d[key]['acf_epd'],
-                d[key]['lag_time_tfa'], d[key]['acf_tfa'],
-                d[key]['itimes_raw'], d[key]['ifluxs_raw'],
-                d[key]['itimes_epd'], d[key]['ifluxs_epd'],
-                d[key]['itimes_tfa'], d[key]['ifluxs_tfa'],
-                ap, savpath=savpath
-            )
+            if skipepd:
+                # hacky placeholder to prevent too much code rewrite in
+                # TFA-direct-from-IRM case
+                foo = np.zeros_like(d[key]['lag_time_raw'])
+
+                lcs.plot_lightcurve_and_ACF(
+                    d[key]['lag_time_raw'], d[key]['acf_raw'],
+                    foo, foo,
+                    d[key]['lag_time_tfa'], d[key]['acf_tfa'],
+                    d[key]['itimes_raw'], d[key]['ifluxs_raw'],
+                    foo, foo,
+                    d[key]['itimes_tfa'], d[key]['ifluxs_tfa'],
+                    ap, savpath=savpath, skipepd=skipepd
+                )
+
+            else:
+                lcs.plot_lightcurve_and_ACF(
+                    d[key]['lag_time_raw'], d[key]['acf_raw'],
+                    d[key]['lag_time_epd'], d[key]['acf_epd'],
+                    d[key]['lag_time_tfa'], d[key]['acf_tfa'],
+                    d[key]['itimes_raw'], d[key]['ifluxs_raw'],
+                    d[key]['itimes_epd'], d[key]['ifluxs_epd'],
+                    d[key]['itimes_tfa'], d[key]['ifluxs_tfa'],
+                    ap, savpath=savpath, skipepd=skipepd
+                )
 
 def plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20,
-                                     timename='TMID_BJD', isfitslc=True):
+                                     timename='TMID_BJD', isfitslc=True,
+                                     skipepd=False):
     """
     make sequential RAW, EPD, TFA plots for `n_desired_lcs`
     """
@@ -536,12 +554,22 @@ def plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20,
             if os.path.exists(savpath):
                 continue
 
-            lcs.plot_raw_epd_tfa(lcdata[timename],
-                                 lcdata[rawap],
-                                 lcdata[epdap],
-                                 lcdata[tfaap],
-                                 ap,
-                                 savpath=savpath)
+            if skipepd:
+                lcs.plot_raw_epd_tfa(lcdata[timename],
+                                     lcdata[rawap],
+                                     np.zeros_like(lcdata[rawap]),
+                                     lcdata[tfaap],
+                                     ap,
+                                     savpath=savpath,
+                                     skipepd=skipepd)
+            else:
+                lcs.plot_raw_epd_tfa(lcdata[timename],
+                                     lcdata[rawap],
+                                     lcdata[epdap],
+                                     lcdata[tfaap],
+                                     ap,
+                                     savpath=savpath,
+                                     skipepd=skipepd)
 
 def _plot_normalized_subtractedimg_histogram(
     subimg_normalized, subimgfile, zerooutnans=True):
@@ -1069,6 +1097,19 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
     else:
         print('already made EPD LC stats file')
 
+    if skipepd and not os.path.exists(tfastatfile):
+        # do the hack of getting "EPD" statistics that are actually IRM
+        # statistics, duplicated into all the EPD fields. (time pressure, and I
+        # guess poor planning, makes code like this happen).
+        ap.parallel_lc_statistics(lcdirectory, epdlcglob, reformed_cat_file,
+                                  tfalcrequired=False, epdlcrequired=False,
+                                  fitslcnottxt=True, fovcatcols=(0,6),
+                                  fovcatmaglabel='r', outfile=epdstatfile,
+                                  nworkers=nworkers, workerntasks=500,
+                                  rmcols=None, epcols=None, tfcols=None,
+                                  rfcols=None, correctioncoeffs=None,
+                                  sigclip=5.0, fovcathasgaiaids=True)
+
     epdmadplot = glob(os.path.join(statsdir, '*median-EP1-vs-mad-*png'))
     if (not epdmadplot and
         not os.path.exists(tfaboolstatusfile) and
@@ -1136,15 +1177,17 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
         # Catalog projection performed here does some useful things joel's
         # stats file does not for Gaia DR2, catalog mag col corresponds to G_Rp
         # (Gaia "R" band).
+        epdlcrequired = not skipepd
         ap.parallel_lc_statistics(lcdirectory, epdlcglob, reformed_cat_file,
-                                  tfalcrequired=True, fitslcnottxt=True,
+                                  tfalcrequired=True,
+                                  epdlcrequired=epdlcrequired,
+                                  fitslcnottxt=True,
                                   fovcatcols=(0,6), # objectid, magcol from
-                                  fovcatmaglabel='r',
-                                  outfile=tfastatfile, nworkers=nworkers,
-                                  workerntasks=500, rmcols=None, epcols=None,
-                                  tfcols=None, rfcols=None,
-                                  correctioncoeffs=None, sigclip=5.0,
-                                  fovcathasgaiaids=True)
+                                  fovcatmaglabel='r', outfile=tfastatfile,
+                                  nworkers=nworkers, workerntasks=500,
+                                  rmcols=None, epcols=None, tfcols=None,
+                                  rfcols=None, correctioncoeffs=None,
+                                  sigclip=5.0, fovcathasgaiaids=True)
     else:
         print('already made TFA LC stats file')
 
@@ -1259,7 +1302,8 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
                projcatalogpath, astromrefpath, sectornum, binned=False,
                make_percentiles_plot=True, percentiles_xlim=[4,17],
                percentiles_ylim=[1e-5,1e-1], nworkers=16,
-               moviedir='/nfs/phtess1/ar1/TESS/FFI/MOVIES/'):
+               moviedir='/nfs/phtess1/ar1/TESS/FFI/MOVIES/',
+               skipepd=False):
     """
     write files with summary statistics of run. also, make movies.
 
@@ -1294,19 +1338,23 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
         os.mkdir(outdir)
     lcs.parallel_compute_acf_statistics(
         acf_lcs, outdir, nworkers=nworkers,
-        eval_times_hr=[1,2,6,12,24,48,60,96,120,144,192])
+        eval_times_hr=[1,2,6,12,24,48,60,96,120,144,192],
+        skipepd=skipepd)
 
     # plot some lightcurves and their ACFs
     pickledir = os.path.join(statsdir, 'acf_stats')
-    plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=10)
+    plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=10,
+                                     skipepd=skipepd)
 
-    lcs.acf_percentiles_stats_and_plots(statsdir, outprefix, make_plot=True)
+    lcs.acf_percentiles_stats_and_plots(statsdir, outprefix, make_plot=True,
+                                        skipepd=skipepd)
 
     # check if image noise is gaussian
     is_image_noise_gaussian(fitsdir, projectid, field, camera, ccd)
 
     # just make some lightcurve plots to look at them
-    plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=10)
+    plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=10,
+                                     skipepd=skipepd)
 
     # count numbers of lightcurves #FIXME: or do it by nan parsing?
     n_rawlc = len(glob(os.path.join(lcdirectory,'*.grcollectilc')))
@@ -1317,7 +1365,8 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
     kponchippath = os.path.join(statsdir,'knownplanet_onchip.csv')
     if tu.are_known_planets_in_field(ra_nom, dec_nom, kponchippath):
         tu.measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
-                                    statsdir, sectornum, nworkers=nworkers)
+                                    statsdir, sectornum, nworkers=nworkers,
+                                    skipepd=skipepd)
     else:
         print('did not find any known HJs on this field')
 
@@ -1610,7 +1659,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                field, camera, ccd, tfastatfile, ra_nom, dec_nom,
                projcatalogpath, astromrefpath, sectornum, binned=False,
                make_percentiles_plot=True, percentiles_xlim=None,
-               nworkers=nworkers)
+               nworkers=nworkers, skipepd=skipepd)
 
 
 def check_args(args):
