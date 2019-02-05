@@ -200,6 +200,9 @@ def main():
     projid += 1
 
 
+    # 2019/01/30...
+    # NOTE: BELOW WAS AN ERROR THAT COST A DAY OR SO OF COMPUTE TIME ...
+    # SPOT IT ...
     # now ditto, for cam2ccd2, no bkg kernels. omit the one that was already
     # done!
     for kernel in nobkgkernellist[1:]:
@@ -219,13 +222,102 @@ def main():
             'anettweak':6,
             'anetradius':30,
             'initccdextent':"\"0:2048,0:2048\"",
-            'kernelspec':"i/5;b/5;d=3/2",
+            'kernelspec':"i/5;b/5;d=3/2", # NOTE ERROR!
             'catalog_faintrmag':14,      ## catalog_faintrmag=16
             'fiphotfluxthreshold':1000,  ## fiphotfluxthreshold=300
             'photreffluxthreshold':1000, ## photreffluxthreshold=300
             'extractsources':0,
             'binlightcurves':0,
             'translateimages':1
+        }
+
+        projid += 1
+
+    # 2019/02/02...
+    # test out nsub. timing test for cam1ccd2 full (for pending kernel tests.)
+    for tuneparam, faintmag in zip(['true','false'],[12,14]):
+        varyparamdict[projid] = {
+            'camnum':1,
+            'ccdnum':2,
+            'projectid':projid,     # increment this whenever new things go to PSQL database.
+            'sector':"'s0002'",        # match SPOC syntax, zfill to 4.
+            'tuneparameters':tuneparam,
+            'nworkers':32,
+            'aperturelist':apertureslist[0],
+            'epdsmooth':11,            # 11*30min = 5.5 hr median smooth in EPD pre-processing.
+            'epdsigclip':10000,
+            'photdisjointradius':2,
+            'anetfluxthreshold':50000,
+            'anettweak':6,
+            'anetradius':30,
+            'initccdextent':"\"0:2048,0:2048\"",
+            'kernelspec':"i/3;d=3/2", # best from 20190130
+            'catalog_faintrmag':faintmag,
+            'fiphotfluxthreshold':500,
+            'photreffluxthreshold':500,
+            'extractsources':0,
+            'binlightcurves':0,
+            'translateimages':1,
+            'reversesubtract':0
+        }
+
+        projid += 1
+
+    # cam2ccd2, no bkg kernels. omit the one that was already done!
+    for kernel in nobkgkernellist[1:]:
+        varyparamdict[projid] = {
+            'camnum':2,
+            'ccdnum':2,
+            'projectid':projid,     # increment this whenever new things go to PSQL database.
+            'sector':"'s0002'",        # match SPOC syntax, zfill to 4.
+            'tuneparameters':'false',
+            'nworkers':32,
+            'aperturelist':apertureslist[0],
+            'epdsmooth':11,            # 11*30min = 5.5 hr median smooth in EPD pre-processing.
+            'epdsigclip':10000,
+            'photdisjointradius':2,
+            'anetfluxthreshold':50000,
+            'anettweak':6,
+            'anetradius':30,
+            'initccdextent':"\"0:2048,0:2048\"",
+            'kernelspec':kernel,
+            'catalog_faintrmag':14,      ## catalog_faintrmag=16
+            'fiphotfluxthreshold':1000,  ## fiphotfluxthreshold=300
+            'photreffluxthreshold':1000, ## photreffluxthreshold=300
+            'extractsources':0,
+            'binlightcurves':0,
+            'translateimages':1,
+            'reversesubtract':1 # for cam2ccd2, everything else is rsub
+        }
+
+        projid += 1
+
+    # cam1ccd2, full kernel list. 13+9=22 kernels. at 2.5hr each, runtime is
+    # 2.5 clock days.
+    for kernel in list(kernellist + nobkgkernellist):
+        varyparamdict[projid] = {
+            'camnum':1,
+            'ccdnum':2,
+            'projectid':projid,     # increment this whenever new things go to PSQL database.
+            'sector':"'s0002'",        # match SPOC syntax, zfill to 4.
+            'tuneparameters':'false',
+            'nworkers':32,
+            'aperturelist':"\"1:7.0:6.0,1.5:7.0:6.0,2.25:7.0:6.0\"",
+            'epdsmooth':11,            # 11*30min = 5.5 hr median smooth in EPD pre-processing.
+            'epdsigclip':10000,
+            'photdisjointradius':2,
+            'anetfluxthreshold':50000,
+            'anettweak':6,
+            'anetradius':30,
+            'initccdextent':"\"0:2048,0:2048\"",
+            'kernelspec':kernel,
+            'catalog_faintrmag':14,      ## catalog_faintrmag=16
+            'fiphotfluxthreshold':1000,  ## fiphotfluxthreshold=300
+            'photreffluxthreshold':1000, ## photreffluxthreshold=300
+            'extractsources':0,
+            'binlightcurves':0,
+            'translateimages':1,
+            'reversesubtract':1 # for cam2ccd2, everything else is rsub
         }
 
         projid += 1
