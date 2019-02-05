@@ -587,7 +587,7 @@ def make_cluster_cutout_jpgs(sectornum, fitsdir, racenter, deccenter, field,
 
     wcsfiles = glob(os.path.join(fitsdir,'*.wcs'))
     calfitsimages = [w.replace('.wcs','.fits') for w in wcsfiles]
-    subfitsimages = glob(os.path.join(fitsdir,'rsub-*-tess*-xtrns.fits'))
+    subfitsimages = glob(os.path.join(fitsdir,'[r|n]sub-*-tess*-xtrns.fits'))
 
     if not len(wcsfiles)==len(subfitsimages)==len(calfitsimages):
         raise AssertionError
