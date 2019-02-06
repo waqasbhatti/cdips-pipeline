@@ -22,6 +22,7 @@ main
         make_ascii_files_for_vartools
         run_tfa
         parallel_merge_tfa_lcs
+        plot_stats_file
     assess_run
         percentiles_RMSorMAD_stats_and_plots
         parallel_compute_acf_statistics
@@ -113,36 +114,36 @@ def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid):
 
     # subtracted frame movies
     jpgglob = os.path.join(fitsdir, 'JPEG-SUB*CONV-*tess*cal_img-xtrns.jpg')
-    outmp4path = os.path.join(
+    outmovpath = os.path.join(
         moviedir,
-        '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_SUBTRACTEDCONV.mp4'.
+        '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_SUBTRACTEDCONV.mov'.
         format(field, typestr, int(camera), int(ccd), int(projectid)))
-    if not os.path.exists(outmp4path):
-        iu.make_mp4_from_jpegs(jpgglob, outmp4path)
+    if not os.path.exists(outmovpath):
+        iu.make_mov_from_jpegs(jpgglob, outmovpath)
     else:
-        print('found {}'.format(outmp4path))
+        print('found {}'.format(outmovpath))
 
     # NGC-labelled stars; astrometry.net zscale
     jpgglob = os.path.join(fitsdir, 'tess*_cal_img-ngc.png')
-    outmp4path = os.path.join(
+    outmovpath = os.path.join(
         moviedir,
-        '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_NGC.mp4'.
+        '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_NGC.mov'.
         format(field, typestr, int(camera), int(ccd), int(projectid)))
-    if not os.path.exists(outmp4path):
-        iu.make_mp4_from_jpegs(jpgglob, outmp4path)
+    if not os.path.exists(outmovpath):
+        iu.make_mov_from_jpegs(jpgglob, outmovpath)
     else:
-        print('found {}'.format(outmp4path))
+        print('found {}'.format(outmovpath))
 
     # regular old translated (xtrns) frames, pre-subtraction, but masked
     jpgglob = os.path.join(fitsdir, 'JPEG-XTRNS-tess*_cal_img-xtrns.jpg')
-    outmp4path = os.path.join(
+    outmovpath = os.path.join(
         moviedir,
-        '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_XTRNS.mp4'.
+        '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_XTRNS.mov'.
         format(field, typestr, int(camera), int(ccd), int(projectid)))
-    if not os.path.exists(outmp4path) and len(glob(jpgglob))>10:
-        iu.make_mp4_from_jpegs(jpgglob, outmp4path)
+    if not os.path.exists(outmovpath) and len(glob(jpgglob))>10:
+        iu.make_mov_from_jpegs(jpgglob, outmovpath)
     else:
-        print('found (or skipped) {}'.format(outmp4path))
+        print('found (or skipped) {}'.format(outmovpath))
 
     # cluster cut movies: (subtracted & grayscale), (subtracted & bwr), (CAL &
     # grayscale). first, get unique cluster names.  the pattern we're matching
@@ -169,24 +170,24 @@ def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid):
                  'CUT-{:s}_tess2*CAL.jpg'.
                  format(uclustername)
                 ],
-                ['{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_SUB_grayscale.mp4'.
+                ['{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_SUB_grayscale.mov'.
                  format(field, typestr, int(camera), int(ccd), int(projectid),
                         uclustername),
-                '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_SUB_bwr.mp4'.
+                '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_SUB_bwr.mov'.
                  format(field, typestr, int(camera), int(ccd), int(projectid),
                         uclustername),
-                '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_CAL.mp4'.
+                '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_CAL.mov'.
                  format(field, typestr, int(camera), int(ccd), int(projectid),
                         uclustername)
                 ]
             ):
 
                 jpgglob = os.path.join(fitsdir, jpgstr)
-                outmp4path = os.path.join(moviedir, outstr)
-                if not os.path.exists(outmp4path) and len(glob(jpgglob))>10:
-                    iu.make_mp4_from_jpegs(jpgglob, outmp4path)
+                outmovpath = os.path.join(moviedir, outstr)
+                if not os.path.exists(outmovpath) and len(glob(jpgglob))>10:
+                    iu.make_mov_from_jpegs(jpgglob, outmovpath)
                 else:
-                    print('found (or skipped) {}'.format(outmp4path))
+                    print('found (or skipped) {}'.format(outmovpath))
 
     else:
         print('WRN! did not make CUT movies, because did not find jpg matches')

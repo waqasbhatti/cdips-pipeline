@@ -1462,3 +1462,46 @@ def make_mp4_from_jpegs(jpgglob, outmp4path):
               (datetime.utcnow().isoformat(), outmp4path))
         print('ERR! command was %s' % cmdtorun)
         return 256
+
+
+def make_mov_from_jpegs(jpgglob, outmovpath):
+    """
+    similar to above, but makes .mov (a format that is compatible with e.g.,
+    keynote)
+
+    Args:
+        jpgglob: e.g.,
+        /nfs/phtess1/ar1/TESS/FFI/RED_IMGSUB/FULL/s0001/RED_3-2-1011_ISP/JPEG-SUBTRACTEDCONV-rsub-9ab2774b-tess*cal_img-xtrns.jpg
+
+        outmovpath: e.g.,
+        /nfs/phtess1/ar1/TESS/FFI/MOVIES/s0001_full_cam3_ccd2_projid1011_SUBTRACTEDCONV.mov
+    """
+
+    returncode = os.system('which ffmpeg')
+    if not returncode==0:
+        raise AssertionError(
+            '`ffmpeg` must be installed to use make_mov_from_jpegs')
+
+    FFMPEGCMD = (
+        "ffmpeg -framerate 24 "
+        "-pattern_type "
+        "glob -i '{jpgglob}' "
+        "-c:v libx264 "
+        "-pix_fmt yuv420p "
+        "-preset fast "
+        "{outmovpath}"
+    )
+
+    cmdtorun = FFMPEGCMD.format(jpgglob=jpgglob, outmp4path=outmp4path)
+
+    returncode = os.system(cmdtorun)
+
+    if returncode == 0:
+        print('%sZ: made movie %s' %
+              (datetime.utcnow().isoformat(), outmp4path))
+        return 0
+    else:
+        print('ERR! %sZ: failed to make movie %s' %
+              (datetime.utcnow().isoformat(), outmp4path))
+        print('ERR! command was %s' % cmdtorun)
+        return 256
