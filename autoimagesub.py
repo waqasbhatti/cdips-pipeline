@@ -926,13 +926,7 @@ def arefshifted_frame_to_database(
         # put together the query and execute it, inserting the object into the
         # database and overwriting if told to do so
         if overwrite:
-
-            raise NotImplementedError
-
-        else:
-
             if didwarpcheck:
-
                 query = ("insert into arefshiftedframes ("
                          "arefshiftedframe, "
                          "origframekey, "
@@ -944,19 +938,75 @@ def arefshifted_frame_to_database(
                          "warpcheckthresh, "
                          "warpinfopickle "
                          ") values ("
-                         "%s, "
-                         "%s, "
-                         "%s, "
-                         "%s, "
-                         "%s, "
-                         "%s, "
-                         "%s, "
-                         "%s, "
+                         "%s, %s, %s, %s, %s, "
+                         "%s, %s, %s, %s "
+                         ") on conflict (arefshiftedframe) "
+                         "do update set "
+                         "origframekey = %s, "
+                         "astromref = %s, "
+                         "shiftisok = %s, didwarpcheck = %s, "
+                         "warpcheckmargin = %s, warpcheckthresh = %s, "
+                         "warpinfopickle = %s, "
+                         "entryts = current_timestamp")
+                params = (arefshiftedframe, origframekey,
+                          astromref['framepath'],
+                          itrans, shiftisok,
+                          didwarpcheck,
+                          warpcheckmargin, warpcheckthresh,
+                          warpinfopickle,
+                          origframekey, astromref['framepath'],
+                          shiftisok, didwarpcheck,
+                          warpcheckmargin, warpcheckthresh,
+                          warpinfopickle
+                         )
+
+            else:
+                query = ("insert into arefshiftedframes ("
+                         "arefshiftedframe, "
+                         "origframekey, "
+                         "astromref, "
+                         "itrans, "
+                         "shiftisok, "
+                         "didwarpcheck "
+                         ") values ("
+                         "%s, %s, %s, %s, %s, "
                          "%s "
+                         ") on conflict (arefshiftedframe) "
+                         "do update set "
+                         "origframekey = %s, astromref = %s, "
+                         "shiftisok = %s, didwarpcheck = %s, "
+                         "entryts = current_timestamp"
+                         )
+                params = (arefshiftedframe,
+                          origframekey,
+                          astromref['framepath'],
+                          itrans,
+                          shiftisok,
+                          didwarpcheck,
+                          origframekey, astromref['framepath'],
+                          shiftisok, didwarpcheck
+                         )
+
+
+        else:
+            if didwarpcheck:
+                query = ("insert into arefshiftedframes ("
+                         "arefshiftedframe, "
+                         "origframekey, "
+                         "astromref, "
+                         "itrans, "
+                         "shiftisok, "
+                         "didwarpcheck, "
+                         "warpcheckmargin, "
+                         "warpcheckthresh, "
+                         "warpinfopickle "
+                         ") values ("
+                         "%s, %s, %s, %s, %s, "
+                         "%s, %s, %s, %s "
                          ") ")
                 params = (arefshiftedframe,
                           origframekey,
-                          astromref['fits'],
+                          astromref['framepath'],
                           itrans,
                           shiftisok,
                           didwarpcheck,
@@ -966,7 +1016,6 @@ def arefshifted_frame_to_database(
                          )
 
             else:
-
                 query = ("insert into arefshiftedframes ("
                          "arefshiftedframe, "
                          "origframekey, "
@@ -975,16 +1024,12 @@ def arefshifted_frame_to_database(
                          "shiftisok, "
                          "didwarpcheck "
                          ") values ("
-                         "%s, "
-                         "%s, "
-                         "%s, "
-                         "%s, "
-                         "%s, "
+                         "%s, %s, %s, %s, %s, "
                          "%s "
                          ") ")
                 params = (arefshiftedframe,
                           origframekey,
-                          astromref['fits'],
+                          astromref['framepath'],
                           itrans,
                           shiftisok,
                           didwarpcheck
@@ -1571,14 +1616,14 @@ def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
                 areftargetfiphot = areftargetfits.replace('.fits','.fiphot')
 
                 # copy the frame, jpeg, and fistar to the reference-frames dir
-                shutil.copy(arefinfo['fits'],os.path.join(REFBASEDIR,
+                shutil.copy(arefinfo['fits'],os.path.join(refdir,
                                                           areftargetfits))
-                shutil.copy(arefinfo['jpg'],os.path.join(REFBASEDIR,
+                shutil.copy(arefinfo['jpg'],os.path.join(refdir,
                                                          areftargetjpeg))
                 shutil.copy(arefinfo['fistar'],
-                            os.path.join(REFBASEDIR, areftargetfistar))
+                            os.path.join(refdir, areftargetfistar))
                 shutil.copy(arefinfo['fiphot'],
-                            os.path.join(REFBASEDIR, areftargetfiphot))
+                            os.path.join(refdir, areftargetfiphot))
 
                 # now, update the astomrefs table in the database
                 if overwrite and (
@@ -2031,35 +2076,25 @@ def frames_astromref_worker(task):
             if fieldinfo is None:
                 frameelems = get_header_keyword_list(frame, ['object', 'projid'])
                 felems = FRAMEREGEX.findall(os.path.basename(frame))
-
+                fieldinfo = {'field': frameelems['object'],
+                             'ccd': felems[0][2],
+                             'projectid': frameelems['projid'],
+                             'camera': 0}
         elif observatory=='tess':
-            frameelems = {}
-            frameelems['object'] = fieldinfo['field']
-            frameelems['projid'] = fieldinfo['projectid']
+            pass
+        else:
+            raise NotImplementedError
 
         framefistar = frame.replace('.fits','.fistar')
 
-        if os.path.exists(framefistar) and ( (observatory=='hatpi' and felems
-                                              and felems[0]) or
-                                            (observatory=='tess') ):
-
-            if observatory=='hatpi':
-                camera = 0
-                ccd = felems[0][2]
-            elif observatory=='tess':
-                camera = fieldinfo['camera']
-                ccd = fieldinfo['ccd']
-
-            frameinfo = {'field':frameelems['object'],
-                         'ccd':ccd,
-                         'projectid':frameelems['projid']}
-
+        if os.path.exists(framefistar):
             # find this frame's associated active astromref
-            framearef = dbget_astromref(frameinfo['projectid'],
-                                        frameinfo['field'],
-                                        frameinfo['ccd'],
-                                        camera=camera)
+            framearef = dbget_astromref(fieldinfo['projectid'],
+                                        fieldinfo['field'],
+                                        fieldinfo['ccd'],
+                                        camera=fieldinfo['camera'])
             areffistar = framearef['framepath'].replace('.fits','.fistar')
+            print(areffistar)
 
             # calculate the shift and write the itrans back to the frame's
             # directory
@@ -2195,9 +2230,7 @@ def frames_astromref_worker(task):
                 return frame, None
 
         else:
-
-            print('ERR! %sZ: could not figure out '
-                  'CCD info or fistar for frame: %s' %
+            print('ERR! %sZ: could not find fistar for frame: %s' %
                   (datetime.utcnow().isoformat(), frame))
             return frame, None
 
@@ -2254,7 +2287,7 @@ def framelist_make_xtrnsfits(fitsfiles,
             return
 
         else:
-            fitsfiles = [fitsdir+sd+'.fits' for sd in setdiff]
+            fitsfiles = [os.path.join(fitsdir, sd+'.fits') for sd in setdiff]
 
 
     print('%sZ: %s files to astrometrically shift' %
@@ -3223,6 +3256,15 @@ def get_combined_photref(projectid,
         cur.execute(query, params)
         rows = cur.fetchone()
 
+        if rows is None:
+            print('ERR! %sZ: No combinedphotref in database for '
+                  'projectid = %s, camera = %s, ccd = %s, field = %s, '
+                  'photreftype = %s' %
+                  (datetime.utcnow().isoformat(), projectid,
+                   camera, ccd, field, photreftype))
+            db.close()
+            return None
+
         cphotref = {x:y for (x,y) in zip(('field','projectid','camera','ccd',
                                           'photreftype','unixtime',
                                           'framepath','jpegpath',
@@ -3257,7 +3299,6 @@ def get_combined_photref(projectid,
         returnval = None
 
         raise
-
 
     db.close()
     return returnval
