@@ -47,6 +47,7 @@ from astropy import units as units, constants as constants
 from datetime import datetime
 
 from numpy import array as nparr
+from scipy.stats import sigmaclip as stats_sigmaclip
 
 from astrobase.periodbase import macf
 from astrobase.varbase.autocorr import autocorr_magseries
@@ -128,9 +129,9 @@ def read_tfa_lc(tfafile,
     28 ep2    EPD magnitude for aperture 2
     29 ep3    EPD magnitude for aperture 3
 
-    30 ep1    TFA magnitude for aperture 1
-    31 ep2    TFA magnitude for aperture 2
-    32 ep3    TFA magnitude for aperture 3
+    30 tf1    TFA magnitude for aperture 1
+    31 tf2    TFA magnitude for aperture 2
+    32 tf3    TFA magnitude for aperture 3
     ------------------------------------------
     """
 
@@ -181,6 +182,79 @@ def read_acf_stat_files(acfstatfiles, N_acf_types=9):
                    ignore_index = True)
 
     return df
+
+def read_stats_file(statsfile, fovcathasgaiaids=False):
+    """
+    Reads the stats file into a numpy recarray.
+    """
+
+    if fovcathasgaiaids:
+        idstrlength = 19
+    else:
+        idstrlength = 17
+
+    # open the statfile and read all the columns
+    stats = np.genfromtxt(
+        statsfile,
+        dtype=(
+            'U{:d},f8,'
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM1
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM2
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM3
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP1
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP2
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP3
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF1
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF2
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF3
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RF1
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RF2
+            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RF3
+            'f8,f8,f8'.format(idstrlength)    # corrmags
+        ),
+        names=[
+            'lcobj','cat_mag',
+            'med_rm1','mad_rm1','mean_rm1','stdev_rm1','ndet_rm1',
+            'med_sc_rm1','mad_sc_rm1','mean_sc_rm1','stdev_sc_rm1',
+            'ndet_sc_rm1',
+            'med_rm2','mad_rm2','mean_rm2','stdev_rm2','ndet_rm2',
+            'med_sc_rm2','mad_sc_rm2','mean_sc_rm2','stdev_sc_rm2',
+            'ndet_sc_rm2',
+            'med_rm3','mad_rm3','mean_rm3','stdev_rm3','ndet_rm3',
+            'med_sc_rm3','mad_sc_rm3','mean_sc_rm3','stdev_sc_rm3',
+            'ndet_sc_rm3',
+            'med_ep1','mad_ep1','mean_ep1','stdev_ep1','ndet_ep1',
+            'med_sc_ep1','mad_sc_ep1','mean_sc_ep1','stdev_sc_ep1',
+            'ndet_sc_ep1',
+            'med_ep2','mad_ep2','mean_ep2','stdev_ep2','ndet_ep2',
+            'med_sc_ep2','mad_sc_ep2','mean_sc_ep2','stdev_sc_ep2',
+            'ndet_sc_ep2',
+            'med_ep3','mad_ep3','mean_ep3','stdev_ep3','ndet_ep3',
+            'med_sc_ep3','mad_sc_ep3','mean_sc_ep3','stdev_sc_ep3',
+            'ndet_sc_ep3',
+            'med_tf1','mad_tf1','mean_tf1','stdev_tf1','ndet_tf1',
+            'med_sc_tf1','mad_sc_tf1','mean_sc_tf1','stdev_sc_tf1',
+            'ndet_sc_tf1',
+            'med_tf2','mad_tf2','mean_tf2','stdev_tf2','ndet_tf2',
+            'med_sc_tf2','mad_sc_tf2','mean_sc_tf2','stdev_sc_tf2',
+            'ndet_sc_tf2',
+            'med_tf3','mad_tf3','mean_tf3','stdev_tf3','ndet_tf3',
+            'med_sc_tf3','mad_sc_tf3','mean_sc_tf3','stdev_sc_tf3',
+            'ndet_sc_tf3',
+            'med_rf1','mad_rf1','mean_rf1','stdev_rf1','ndet_rf1',
+            'med_sc_rf1','mad_sc_rf1','mean_sc_rf1','stdev_sc_rf1',
+            'ndet_sc_rf1',
+            'med_rf2','mad_rf2','mean_rf2','stdev_rf2','ndet_rf2',
+            'med_sc_rf2','mad_sc_rf2','mean_sc_rf2','stdev_sc_rf2',
+            'ndet_sc_rf2',
+            'med_rf3','mad_rf3','mean_rf3','stdev_rf3','ndet_rf3',
+            'med_sc_rf3','mad_sc_rf3','mean_sc_rf3','stdev_sc_rf3',
+            'ndet_sc_rf3',
+            'corr_mag_ap1','corr_mag_ap2','corr_mag_ap3',
+        ]
+    )
+
+    return stats
 
 #####################################
 # FUNCTIONS TO CALCULATE STATISTICS #
@@ -341,6 +415,406 @@ def parallel_compute_acf_statistics(
     pool.join()
 
     return {result for result in results}
+
+def compute_lc_statistics(lcfile,
+                          rmcols=[19,20,21],
+                          epcols=[22,23,24],
+                          tfcols=[25,26,27],
+                          rfcols=None,
+                          sigclip=4.0,
+                          num_aps=3,
+                          epdlcrequired=True,
+                          tfalcrequired=False,
+                          fitslcnottxt=None):
+    """
+    Compute mean, median, MAD, stdev magnitudes for a given lightcurve.
+
+    Args:
+        lcfile: Either a text .epdlc, .tfalc file or a fits LC.
+
+        rmcols, epcols, tfcols, rfcols: list of magnitude columns for text LC files.
+
+        num_aps (int): Number of apertures. Required for fits LC files.
+
+        epdlcrequired (bool): Use epdlc columns.
+
+        tfalcrequired (bool): Search for tfalc file (if only epdlc provided).
+
+        fitslcnottxt: Does nothing, for maintaining backward compatibility.
+
+    Returns:
+        result (dict): Dictionary containing the following fields
+            'lcfile': full path to lightcurve
+            'lcobj': name of object
+            ('median', 'mad', 'mean', 'stdev', 'ndet') +
+            ('', '_sigclip') +
+            ('_rf', '_rm', '_ep', '_tf') + aperture number
+    """
+    lcext = os.path.splitext(lcfile)[1]
+    # Use dictionary to collect stats for extensibility
+    mags = {}
+
+    #################
+    # read lc files #
+    #################
+    # Using fits lc
+    if lcext == '.fits':
+        hdulist = fits.open(lcfile)
+
+        if hdulist[0].header['DTR_EPD']:
+            mags['rm'] = []
+            for i in range(num_aps):
+                mags['rm'].append(hdulist[1].data['IRM%d' % (i+1)])
+            if epdlcrequired:
+                mags['ep'] = []
+                for i in range(num_aps):
+                    mags['ep'].append(hdulist[1].data['EP%d' % (i+1)])
+
+        elif not hdulist[0].header['DTR_EPD'] and not epdlcrequired:
+            # a hack. some code has been written to rely on "EPD"
+            # statistics. however, if you're skipping EPD, you want to
+            # instead rely on IRM statistics. populating the EPD statistics
+            mags['rm'] = []
+            mags['ep'] = []
+            for i in range(num_aps):
+                mags['rm'].append(hdulist[1].data['IRM%d' % (i+1)])
+                mags['ep'].append(hdulist[1].data['IRM%d' % (i+1)])
+        else:
+            print('expected DTR_EPD to be true in compute_lc_statistics')
+            raise AssertionError
+
+        if hdulist[0].header['DTR_TFA']:
+            mags['tf'] = []
+            for i in range(num_aps):
+                mags['tf'].append(hdulist[1].data['TFA%d' % (i+1)])
+        elif not hdulist[0].header['DTR_TFA'] and tfalcrequired:
+            print(
+                '{:s}Z: no TFA for {:s} and TFA is required, skipping...'.
+                format(datetime.utcnow().isoformat(), lcfile))
+            return None
+    # Using text lightcurve files
+    elif lcext == '.epdlc' or lcext == '.tfalc':
+        # Check for tfalc
+        if tfalcrequired and lcext == '.epdlc':
+            tfalcfile = lcfile.replace('.epdlc', '.tfalc')
+            if not os.path.exists(tfalcfile):
+                print('%sZ: no TFA mags available for %s and '
+                      'TFALC is required, skipping...' %
+                      (datetime.utcnow().isoformat(), lcfile))
+                raise FileNotFoundError
+            lcfile = tfalcfile
+        elif lcext == '.tfalc':
+            tfalcrequired = True
+
+        # Check that file is not empty
+        if os.stat(lcfile).st_size == 0:
+            print('%sZ: no mags available for %s, skipping...' %
+                  (datetime.utcnow().isoformat(), lcfile))
+            return None
+
+        # RM and EP
+        try:
+            mags['rm'] = np.genfromtxt(lcfile, usecols=rmcols, unpack=True)
+            mags['ep'] = np.genfromtxt(lcfile, usecols=epcols, unpack=True)
+        except:
+            if not epdlcrequired: 
+                mags['ep'] = mags['rm']
+            else:
+                print('%sZ: no EPD mags available for %s!' %
+                      (datetime.utcnow().isoformat(), lcfile))
+        # TF
+        if tfalcrequired:
+            try:
+                mags['tf'] = np.genfromtxt(lcfile, usecols=tfcols, unpack=True)
+            except:
+                print('%sZ: no TFA mags available for %s!' %
+                      (datetime.utcnow().isoformat(), lcfile))
+        # RF
+        if rfcols:
+            mags['rf'] = np.genfromtxt(lcfile, usecols=rfcols, unpack=True)
+
+    else:
+        raise NotImplementedError
+
+    ##################################
+    # get statistics for each column #
+    ##################################
+
+    # Create results dict
+    results = {'lcfile': lcfile,
+               'lcobj': os.path.splitext(os.path.basename(lcfile))[0]}
+
+    # Now, get statistics for each column
+    keys = ['rf', 'rm', 'ep', 'tf']
+    statkeys = ['median', 'mad', 'mean', 'stdev', 'ndet']
+    cols = [(x, ap) for x in keys for ap in range(num_aps)]
+
+    for (k, ap) in cols:
+        suf = '_%s%d' % (k, ap+1)
+        if k not in mags:
+            for s in statkeys:
+                results[s+suf] = np.nan
+                results[s+'_sigclip'+suf] = np.nan
+            continue
+
+        mag = mags[k][ap]
+
+        if len(mag) > 4:
+            finiteind = np.isfinite(mag)
+            mag = mag[finiteind]
+            med = np.median(mag)
+            results['median'+suf] = med
+            results['mad'+suf] = np.median(np.fabs(mag - med))
+            results['mean'+suf] = np.mean(mag)
+            results['stdev'+suf] = np.std(mag)
+            results['ndet'+suf] = len(mag)
+
+            if sigclip:
+                sigclip_mag, lo, hi = stats_sigmaclip(mag,
+                                                      low=sigclip,
+                                                      high=sigclip)
+                med_sigclip = np.median(sigclip_mag)
+                results['median'+'_sigclip'+suf] = med_sigclip
+                results['mad'+'_sigclip'+suf] = np.median(np.fabs(sigclip_mag -
+                                                                  med_sigclip))
+                results['mean'+'_sigclip'+suf] = np.mean(sigclip_mag)
+                results['stdev'+'_sigclip'+suf] = np.std(sigclip_mag)
+                results['ndet'+'_sigclip'+suf] = len(sigclip_mag)
+            else:
+                for s in ['median', 'mad', 'mean', 'stdev', 'ndet']:
+                    results[s+'_sigclip'+suf] = np.nan
+        else:
+            for s in ['median', 'mad', 'mean', 'stdev', 'ndet']:
+                results[s+suf] = np.nan
+                results[s+'_sigclip'+suf] = np.nan
+
+
+    print('%sZ: done with statistics for %s' %
+          (datetime.utcnow().isoformat(), lcfile))
+
+    return results
+
+
+def lc_statistics_worker(task):
+    """
+    Wrapper for compute_lc_statistics function.
+    """
+    try:
+        return compute_lc_statistics(task[0], **task[1])
+    except Exception as e:
+        print('SOMETHING WENT WRONG! task was %s' % task)
+        return None
+
+
+def parallel_compute_lc_statistics(lcdir, lcglob,
+                                   fovcatalog, fovcathasgaiaids=False,
+                                   tfalcrequired=False, num_aps=3,
+                                   fovcatcols=(0,9), fovcatmaglabel='r',
+                                   outfile=None,
+                                   nworkers=16, workerntasks=500,
+                                   rmcols=[14,19,24], epcols=[27,28,29],
+                                   tfcols=[30,31,32], rfcols=None,
+                                   correctioncoeffs=None,
+                                   sigclip=4.0, epdlcrequired=True,
+                                   outheader=None):
+    """
+    This calculates statistics on all lc files in lcdir.
+
+    Args:
+        lcdir (str): directory containing lightcurves
+
+        lcglob (str): glob to epd lcs, inside lcdir. E.g., '*.epdlc'. These
+        contain the rlc, and are used to derive the filenames of the tfalcs.
+
+        fovcatalog (str): path to the REFORMED fov catalog, which gets the
+        catalog magnitude corresponding to canonical magnitude for any star.
+
+        fovcathasgaiaids (bool): if the reformed FOV catalog has Gaia ids, set
+        this to be true. The default is to assume HAT-IDs, which have different
+        string lengths & and are read differently.
+
+        num_aps (int): Number of apertures (default=3)
+
+        epdlcrequired (bool): a variety of aperturephot.py tools assume that if
+        you are creating statistics, you have run EPD. This isn't necessarily
+        true (you may wish to get statistics on the instrumental raw
+        magnitudes). If you set this to False, the statistics file will,
+        hackily, populate the "EPD statistics" with IRM values.
+
+    Output:
+
+        Puts the results in text file outfile.
+        outfile contains the following columns:
+
+            object, ndet,
+            median RM[1-3], MAD RM[1-3], mean RM[1-3], stdev RM[1-3],
+            median EP[1-3], MAD EP[1-3], mean EP[1-3], stdev EP[1-3],
+            median TF[1-3], MAD TF[1-3], mean TF[1-3], stdev TF[1-3]
+
+        if a value is missing, it will be np.nan.
+
+    Notes:
+        For ISM, consider using correctioncoeffs as well. These are c1, c2
+        resulting from a fit to the catalogmag-flux relation using the
+        expression:
+
+        catrmag = -2.5 * log10(flux/c1) + c2
+
+        where the fit is done in the bright limit (8.0 < r < 12.0). this
+        corrects for too-faint catalog mags because of crowding and blending.
+
+        correctioncoeffs is like:
+            [[ap1_c1,ap1_c2],[ap2_c1,ap2_c2],[ap3_c1,ap3_c2]]
+
+    """
+    lcfiles = glob(os.path.join(lcdir, lcglob))[:10]
+    print('%sZ: %s %s lightcurves to process.' %
+          (datetime.utcnow().isoformat(), len(lcfiles), lcglob))
+
+    tasks = [[f, {'rmcols':rmcols,
+                  'epcols':epcols,
+                  'tfcols':tfcols,
+                  'rfcols':rfcols,
+                  'sigclip':sigclip,
+                  'num_aps':num_aps,
+                  'epdlcrequired':epdlcrequired,
+                  'tfalcrequired':tfalcrequired}] for f in lcfiles]
+
+    pool = mp.Pool(nworkers,maxtasksperchild=workerntasks)
+    results = pool.map(lc_statistics_worker, tasks)
+    pool.close()
+    pool.join()
+
+    print('%sZ: done. %s lightcurves processed.' %
+          (datetime.utcnow().isoformat(), len(lcfiles)))
+
+    if not outfile:
+        outfile = os.path.join(lcdir, 'lightcurve-statistics.txt')
+
+    outf = open(outfile, 'wb')
+
+    # Write header for stats.
+    default_header = '# total objects: %s, sigmaclip used: %s\n' % (
+        len(lcfiles), sigclip)
+    outf.write(default_header.encode('utf-8'))
+    if outheader is not None:
+        outf.write(outheader.encode('utf-8'))
+
+    apkeys = ['rm', 'ep', 'tf', 'rf']
+    # tuples of column names and format string
+    statkeys = [('median', '%.6f'), ('mad', '%.6f'), ('mean', '%.6f'),
+                ('stdev', '%.6f'), ('ndet', '%s')]
+    stat_cols = [{'name':'object', 'format':'%s', 'key':'lcobj'},
+                 {'name':'catalog mag %s' % fovcatmaglabel, 'format':'%.3f',
+                  'key':'catmag'}]
+    outcolumnkey = ('# columns are:\n'
+                    '# 0,1: object, catalog mag %s\n') % fovcatmaglabel
+    # Generate list of columns
+    for (ap, apnum) in itertools.product(apkeys, range(1, num_aps+1)):
+        outcolkey = ('# ' + ('%d,'*(len(statkeys)-1)) + '%d: ')
+        outcolkey %= tuple(range(len(stat_cols),
+                                 len(stat_cols) + len(statkeys)))
+
+        for stat in statkeys:
+            stat_cols.append({'name':stat[0], 'format': stat[1],
+                              'key':'%s_%s%s' % (stat[0], ap, apnum)})
+            outcolkey = outcolkey + ('%s %s%d, ' % (stat[0], ap.upper(), apnum))
+        outcolumnkey = outcolumnkey + outcolkey[:-2] + '\n'
+
+        outcolkey = ('# ' + ('%d,'*(len(statkeys)-1)) + '%d: sigma-clipped ')
+        outcolkey %= tuple(range(len(stat_cols),
+                                 len(stat_cols) + len(statkeys)))
+        for stat in statkeys:
+            stat_cols.append({'name':stat[0], 'format': stat[1],
+                              'key':'%s_sigclip_%s%s' % (stat[0], ap, apnum)})
+            outcolkey = outcolkey + ('%s %s%d, ' % (stat[0], ap.upper(), apnum))
+        outcolumnkey = outcolumnkey + outcolkey[:-2] + '\n'
+
+    # Columns for corrected cat mag
+    outcolkey = ('# ' + ('%d,'*(num_aps-1)) + '%d: ')
+    outcolkey %= tuple(range(len(stat_cols),
+                             len(stat_cols) + num_aps))
+    for apnum in range(1,num_aps+1):
+        stat_cols.append({'name':'corrmag', 'format':'%.3f',
+                          'key':'corrmag_ap%s' % apnum})
+        outcolkey += ('corrected cat mag AP%d, ' % apnum)
+    outcolumnkey = outcolumnkey + outcolkey[:-2] + '\n'
+
+    # Write header column to file
+    outf.write(outcolumnkey.encode('utf-8'))
+
+    # Generate format string
+    formatstr = ''
+    for col in stat_cols:
+        formatstr = formatstr + col['format'] + ' '
+    formatstr = formatstr[:-1] + '\n'
+
+    # open the fovcatalog and read in the column magnitudes and hatids
+    if not fovcathasgaiaids:
+        # assume HAT-IDs, HAT-123-4567890, 17 character strings
+        fovcat = np.genfromtxt(fovcatalog,
+                               usecols=fovcatcols,
+                               dtype='U17,f8',
+                               names=['objid','mag'])
+    else:
+        # assume GAIA-IDs. From gaia2read, with "GAIA" id option, this is just
+        # 19 character integers.
+        fovcat = np.genfromtxt(fovcatalog,
+                               usecols=fovcatcols,
+                               dtype='U19,f8',
+                               names=['objid','mag'])
+    # Using a dictionary leads to ~ 300x speedup
+    fovdict = dict(fovcat)
+
+    # Now output the stats
+    for stat in results:
+        if stat is None:
+            continue
+        # find catalog mag for this object
+        if stat['lcobj'] in fovdict:
+            stat['catmag'] = fovdict[stat['lcobj']]
+        elif not np.isnan(stat['median_tf3']):
+            print('no catalog mag for %s, using median TF3 mag' % stat['lcobj'])
+            stat['catmag'] = stat['median_tf3']
+        elif not np.isnan(stat['median_ep3']):
+            print('no catalog or median_tf3 mag for %s, using median EP3 mag' %
+                  stat['lcobj'])
+            stat['catmag'] = stat['median_ep3']
+        else:
+            print('WRN! no catalog, TF3 or EP3 mag for {:s}. using nan'.
+                  format(stat['lcobj']))
+            stat['catmag'] = np.nan
+
+        # calculate corrected mags if present
+        if (correctioncoeffs and len(correctioncoeffs) == 3 and
+            rfcols and len(rfcols) == 3):
+
+            ap1_c1, ap1_c2 = correctioncoeffs[0]
+            ap2_c1, ap2_c2 = correctioncoeffs[1]
+            ap3_c1, ap3_c2 = correctioncoeffs[2]
+
+            stat['corrmag_ap1'] =-2.5*np.log10(stat['median_rf1']/ap1_c1)+ap1_c2
+            stat['corrmag_ap2'] =-2.5*np.log10(stat['median_rf2']/ap1_c1)+ap1_c2
+            stat['corrmag_ap3'] =-2.5*np.log10(stat['median_rf3']/ap1_c1)+ap1_c2
+
+        else:
+            stat['corrmag_ap1'] = stat['catmag']
+            stat['corrmag_ap2'] = stat['catmag']
+            stat['corrmag_ap3'] = stat['catmag']
+
+        statvals = []
+        for col in stat_cols:
+            statvals.append(stat[col['key']])
+        outline = formatstr % tuple(statvals)
+
+        outf.write(outline.encode('utf-8'))
+
+    outf.close()
+
+    print('%sZ: wrote statistics to file %s' %
+          (datetime.utcnow().isoformat(), outfile))
+
+    return results
 
 
 
