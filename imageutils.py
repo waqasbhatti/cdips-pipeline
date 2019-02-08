@@ -1492,16 +1492,16 @@ def make_mov_from_jpegs(jpgglob, outmovpath):
         "{outmovpath}"
     )
 
-    cmdtorun = FFMPEGCMD.format(jpgglob=jpgglob, outmp4path=outmp4path)
+    cmdtorun = FFMPEGCMD.format(jpgglob=jpgglob, outmovpath=outmovpath)
 
     returncode = os.system(cmdtorun)
 
     if returncode == 0:
         print('%sZ: made movie %s' %
-              (datetime.utcnow().isoformat(), outmp4path))
+              (datetime.utcnow().isoformat(), outmovpath))
         return 0
     else:
         print('ERR! %sZ: failed to make movie %s' %
-              (datetime.utcnow().isoformat(), outmp4path))
+              (datetime.utcnow().isoformat(), outmovpath))
         print('ERR! command was %s' % cmdtorun)
         return 256
