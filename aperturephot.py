@@ -4669,6 +4669,10 @@ def get_lc_statistics(lcfile,
 
         hdulist = pyfits.open(lcfile)
 
+        # by default, raw fluxes are not populated. however, they are useful to
+        # get a true estimate of the expected shot noise.
+        rf1, rf2, rf3 = [], [], []
+
         if hdulist[0].header['DTR_EPD']:
             rm1 = hdulist[1].data['IRM1']
             rm2 = hdulist[1].data['IRM2']
@@ -4677,6 +4681,9 @@ def get_lc_statistics(lcfile,
                 ep1 = hdulist[1].data['EP1']
                 ep2 = hdulist[1].data['EP2']
                 ep3 = hdulist[1].data['EP3']
+            rf1 = hdulist[1].data['IFL1']
+            rf2 = hdulist[1].data['IFL2']
+            rf3 = hdulist[1].data['IFL3']
         elif not hdulist[0].header['DTR_EPD'] and not epdlcrequired:
             # a hack. some code has been written to rely on "EPD"
             # statistics. however, if you're skipping EPD, you want to
@@ -4688,6 +4695,9 @@ def get_lc_statistics(lcfile,
             ep1 = hdulist[1].data['IRM1']
             ep2 = hdulist[1].data['IRM2']
             ep3 = hdulist[1].data['IRM3']
+            rf1 = hdulist[1].data['IFL1']
+            rf2 = hdulist[1].data['IFL2']
+            rf3 = hdulist[1].data['IFL3']
         else:
             print('expected DTR_EPD to be true in get_lc_statistics')
             raise AssertionError
@@ -4704,9 +4714,6 @@ def get_lc_statistics(lcfile,
             return None
         else:
             tf1,tf2,tf3 = [], [], []
-
-        # no need to use the raw fluxes, that I know of.
-        rf1, rf2, rf3 = [], [], []
 
     else:
 
