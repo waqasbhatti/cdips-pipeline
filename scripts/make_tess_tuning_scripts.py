@@ -321,6 +321,40 @@ def main():
         }
 
         projid += 1
+    # note: rsub on above was an error. but c'est la vie.
+
+    #FIXME
+    projid = 1187 # MANUAL, bc i did some manual projids
+
+    # cam3ccd1
+    for kernel in list(kernellist + nobkgkernellist):
+        varyparamdict[projid] = {
+            'camnum':4,
+            'ccdnum':3, #southern beehive
+            'projectid':projid,     # increment this whenever new things go to PSQL database.
+            'sector':"'s0001'",        # match SPOC syntax, zfill to 4.
+            'tuneparameters':'false',
+            'nworkers':32,
+            'aperturelist':"\"1:7.0:6.0,1.5:7.0:6.0,2.25:7.0:6.0\"",
+            'epdsmooth':11,            # 11*30min = 5.5 hr median smooth in EPD pre-processing.
+            'epdsigclip':10000,
+            'photdisjointradius':2,
+            'anetfluxthreshold':50000,
+            'anettweak':6,
+            'anetradius':30,
+            'initccdextent':"\"0:2048,0:2048\"",
+            'kernelspec':kernel,
+            'catalog_faintrmag':14,      ## catalog_faintrmag=16
+            'fiphotfluxthreshold':1000,  ## fiphotfluxthreshold=300
+            'photreffluxthreshold':1000, ## photreffluxthreshold=300
+            'extractsources':0,
+            'binlightcurves':0,
+            'translateimages':1,
+            'reversesubtract':0
+        }
+
+        projid += 1
+
 
     projids = np.sort(list(varyparamdict.keys()))
 

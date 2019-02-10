@@ -30,8 +30,9 @@ main
         acf_percentiles_stats_and_plots
         is_image_noise_gaussian
         plot_random_lightcurve_subsample
-        measure_known_HJ_SNR
-        are_known_HJs_in_field
+        are_known_planets_in_field
+        measure_known_planet_SNR
+        make_cluster_cutout_jpgs
 
 minor functions:
     record_reduction_parameters
@@ -1327,6 +1328,7 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
         lcs.percentiles_RMSorMAD_stats_and_plots(
             statsdir, outprefix, binned=binned,
             make_percentiles_plot=make_percentiles_plot,
+            percentiles=[25,50,75],
             percentiles_xlim=percentiles_xlim,
             percentiles_ylim=percentiles_ylim, yaxisval='RMS')
     else:
@@ -1344,17 +1346,18 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
 
     # plot some lightcurves and their ACFs
     pickledir = os.path.join(statsdir, 'acf_stats')
-    plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=10,
+    plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=1,
                                      skipepd=skipepd)
 
     lcs.acf_percentiles_stats_and_plots(statsdir, outprefix, make_plot=True,
+                                        percentiles=[25,50,75],
                                         skipepd=skipepd)
 
     # check if image noise is gaussian
     is_image_noise_gaussian(fitsdir, projectid, field, camera, ccd)
 
     # just make some lightcurve plots to look at them
-    plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=10,
+    plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=1,
                                      skipepd=skipepd)
 
     # count numbers of lightcurves #FIXME: or do it by nan parsing?
