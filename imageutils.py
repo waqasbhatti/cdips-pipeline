@@ -37,6 +37,7 @@ image-sectioning and image-writing functions:
 
 movie-making functions:
     make_mp4_from_jpegs
+    make_mov_from_jpegs
 ====================
 '''
 
@@ -502,22 +503,36 @@ def clipped_logscale_img(img_array,
                          cap=255.0,
                          lomult=2.0,
                          himult=2.0,
+                         loclip=None,
+                         hiclip=None,
                          coeff=1000.0):
     '''
-    This clips the image between the values:
+    This clips the image between values, and then log-scales it. If lomult and
+    himult are passed, the clipping happens between
 
-    [median(img_array) - lomult*stdev(img_array),
-     median(img_array) + himult*stdev(img_array)]
+        [median(img_array) - lomult*stdev(img_array),
+         median(img_array) + himult*stdev(img_array)]
 
-    and returns a log-scaled image using the cap given.
+    else if loclip and hiclip are passed, the clipping happens between
+
+        [loclip, hiclip].
+
+    The log-scaled image is returned using the cap given.
 
     logscale_img = np.log(coeff*(img/max(img))+1)/np.log(coeff)
     '''
 
     img_med, img_stdev = np.median(img_array), np.std(img_array)
-    clipped_linear_img = np.clip(img_array,
-                                 img_med-lomult*img_stdev,
-                                 img_med+himult*img_stdev)
+    if isinstance(lomult, float) and isinstance(himult, float):
+        clipped_linear_img = np.clip(img_array,
+                                     img_med-lomult*img_stdev,
+                                     img_med+himult*img_stdev)
+    elif isinstance(loclip, float) and isinstance(hiclip, float):
+        clipped_linear_img = np.clip(img_array, loclip, hiclip)
+    else:
+        raise AssertionError(
+            'expected either (lomult,himult), or (loclip,hiclip) to be passed'
+        )
 
     clipped_linear_img = clipped_linear_img/(img_med+himult*img_stdev)
 
