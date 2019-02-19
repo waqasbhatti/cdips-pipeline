@@ -4077,6 +4077,7 @@ def run_tfa_singlelc(epdlc,
                                      dtype=str, usecols=[1,last_col])
                 epd_df = epd_df.merge(tfa_df, on=1, how='outer')
 
+            epd_df.sort_values(by=0, inplace=True)
             epd_df.to_csv(outfile, sep='\t', na_rep='nan', header=False,
                           index=False)
 

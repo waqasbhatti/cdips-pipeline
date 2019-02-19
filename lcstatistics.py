@@ -21,6 +21,12 @@ Stat calculation functions
     parallel_compute_acf_statistics:
         compute autocorrelation function stats for many lightcurves
 
+    compute_dacf:
+        uses VARTOOLS to compute the discrete autocorrelation
+
+    compute_correction_coeffs:
+        fit catalog mags to fluxes to obtain a corrected catalog mag
+
     compute_lc_statistics:
         worker to compute median, MAD, mean, stdev for each lightcurve
 
@@ -427,6 +433,91 @@ def parallel_compute_acf_statistics(
     pool.join()
 
     return {result for result in results}
+
+
+def compute_dacf(times, mags, errs,
+                 lagmin=0.0, lagmax=10.0, lagstep=0.1):
+    '''
+    Compute the discrete autocorrelation function for a lightcurve.
+
+    Follows the definition of DACF in Edelson & Krolik (1988).
+    This works better for ground-based (HATPI) data with large data gaps,
+    avoiding the need to fill gaps with white noise as in astrobase.
+    Equivalent to the VARTOOLS implementation, but can run on multiple
+    LC columns simultaneously.
+
+    Args:
+        times (array):  Array of times
+        mags (array):   Magnitude column(s)
+        errs (array):   Error column(s)
+        lagmin (float): Minimum lag to evaluate
+        lagmax (float): Maximum lag
+        lagstep (float):Size of lag bins
+    '''
+    # TODO: Check dimensions of inputs
+    times = np.asarray(times)
+    mags = np.asarray(mags)
+    errs = np.asarray(errs)
+
+    if mags.ndim == 1:
+        mags = np.asarray([mags])
+
+    # Note: will ignore complete rows that have NaNs.
+    finite_inds = np.full(len(times), True)
+    for i in range(mags.shape[0]):
+        finite_inds &= np.isfinite(mags[i])
+    finite_inds &= np.isfinite(errs)
+    times = times[finite_inds]
+    mags = mags[:, finite_inds]
+    errs = errs[finite_inds]
+
+    # For now, just have a single set of errors but with multiple magnitudes
+    if lagmin is None:
+        lagmin = 0.0
+    if lagmax is None:
+        lagmax = np.max(times) - np.min(times)
+    nbins = int(np.ceil((lagmax - lagmin)/lagstep) + 1)
+
+    # Pre compute values
+    # Error-weighted average
+    mags_avg = np.average(mags, weights=1/errs**2, axis=1)
+    # Error-weighted mean-centered mag
+    mags_ce = (mags - mags_avg[:, None]) / errs
+    mags_cesq = mags_ce**2
+    # Compute all point-wise correlations and squared errors
+    dcf = mags_ce[:, None, :] * mags_ce[:, :, None]
+    edcf = mags_cesq[:, None, :] + mags_cesq[:, :, None]
+
+    # Create matrix of bins
+    bins = np.empty((len(times), len(times)))
+    for i in range(len(times)):
+        bins[i, :] = times - lagmin - times[i] + lagstep/2.
+    bins = np.floor(bins / lagstep)
+    # Other empty matrices
+    udcf = np.zeros((mags.shape[0], nbins))
+    eudcf = np.zeros((mags.shape[0], nbins))
+    Nudcf = np.zeros(nbins, dtype=int)
+    ones = np.ones_like(bins, dtype=int)
+
+    for b in range(nbins):
+        # Find indices which fall into particular bins
+        flag = (bins == b)
+        Nudcf[b] = np.sum(ones[flag])
+        udcf[:,b] = np.sum(dcf[:,flag], axis=1)
+        eudcf[:,b] = np.sum(edcf[:,flag], axis=1)
+
+    # Normalize by number of points in each bin
+    udcf = udcf / Nudcf
+    eudcf = np.sqrt(eudcf) / Nudcf
+
+    return {
+        'udcf': udcf,
+        'eudcf': eudcf,
+        'Nudcf': Nudcf,
+        'nbins': nbins,
+        'timestep': lagstep,
+        'lags': lagmin + np.asarray(range(nbins))*lagstep
+    }
 
 
 def compute_correction_coeffs(catmags, fluxes):
