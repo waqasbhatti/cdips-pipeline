@@ -3,36 +3,48 @@ from __future__ import division, print_function
 """
 functions for assessing statistics of lightcurves you've made.
 
-read_tfa_lc:
-    read TFA lightcurve
+Reading functions
+    read_tfa_lc:
+        read TFA lightcurve
 
-read_acf_stat_files:
-    read stack of csv files with autocorrelation functions evaluated at
-    selected time lags.
+    read_acf_stat_files:
+        read stack of csv files with autocorrelation functions evaluated at
+        selected time lags.
 
-compute_acf_statistics_worker:
-    worker to compute autocorrelation function statistics
+    read_stats_file:
+        read compiled epd or tfa stat files (originally from aperturephot)
 
-parallel_compute_acf_statistics:
-    compute autocorrelation function stats for many lightcurves
+Stat calculation functions
+    compute_acf_statistics_worker:
+        worker to compute autocorrelation function statistics
 
-percentiles_RMSorMAD_stats_and_plots
-    make csv files and (optionally) percentiles plots of MAD vs magnitude.
+    parallel_compute_acf_statistics:
+        compute autocorrelation function stats for many lightcurves
 
-acf_percentiles_stats_and_plots:
-    make csv files & plots summarizing ACF statistics for many stars
+    compute_lc_statistics:
+        worker to compute median, MAD, mean, stdev for each lightcurve
 
-plot_raw_epd_tfa:
-    Plot a 2 (or 3) row, 1 column plot with rows of:
-        * raw mags vs time
-        (* EPD mags vs time)
-        * TFA mags vs time.
+    parallel_compute_lc_statistics:
+        compute above statistics for a directory of lightcurves and compile
 
-plot_lightcurve_and_ACF:
-    Plot a 3 row, 2 column plot with rows of:
-        * raw mags vs time (and ACF)
-        * EPD mags vs time (and ACF)
-        * TFA mags vs time. (and ACF)
+Plotting functions
+    percentiles_RMSorMAD_stats_and_plots
+        make csv files and (optionally) percentiles plots of MAD vs magnitude.
+
+    acf_percentiles_stats_and_plots:
+        make csv files & plots summarizing ACF statistics for many stars
+
+    plot_raw_epd_tfa:
+        Plot a 2 (or 3) row, 1 column plot with rows of:
+            * raw mags vs time
+            (* EPD mags vs time)
+            * TFA mags vs time.
+
+    plot_lightcurve_and_ACF:
+        Plot a 3 row, 2 column plot with rows of:
+            * raw mags vs time (and ACF)
+            * EPD mags vs time (and ACF)
+            * TFA mags vs time. (and ACF)
 
 TODO:
 move items from aperturephot.py here, and update all respective calls.
@@ -213,44 +225,44 @@ def read_stats_file(statsfile, fovcathasgaiaids=False):
             'f8,f8,f8'.format(idstrlength)    # corrmags
         ),
         names=[
-            'lcobj','cat_mag',
-            'med_rm1','mad_rm1','mean_rm1','stdev_rm1','ndet_rm1',
-            'med_sc_rm1','mad_sc_rm1','mean_sc_rm1','stdev_sc_rm1',
-            'ndet_sc_rm1',
-            'med_rm2','mad_rm2','mean_rm2','stdev_rm2','ndet_rm2',
-            'med_sc_rm2','mad_sc_rm2','mean_sc_rm2','stdev_sc_rm2',
-            'ndet_sc_rm2',
-            'med_rm3','mad_rm3','mean_rm3','stdev_rm3','ndet_rm3',
-            'med_sc_rm3','mad_sc_rm3','mean_sc_rm3','stdev_sc_rm3',
-            'ndet_sc_rm3',
-            'med_ep1','mad_ep1','mean_ep1','stdev_ep1','ndet_ep1',
-            'med_sc_ep1','mad_sc_ep1','mean_sc_ep1','stdev_sc_ep1',
-            'ndet_sc_ep1',
-            'med_ep2','mad_ep2','mean_ep2','stdev_ep2','ndet_ep2',
-            'med_sc_ep2','mad_sc_ep2','mean_sc_ep2','stdev_sc_ep2',
-            'ndet_sc_ep2',
-            'med_ep3','mad_ep3','mean_ep3','stdev_ep3','ndet_ep3',
-            'med_sc_ep3','mad_sc_ep3','mean_sc_ep3','stdev_sc_ep3',
-            'ndet_sc_ep3',
-            'med_tf1','mad_tf1','mean_tf1','stdev_tf1','ndet_tf1',
-            'med_sc_tf1','mad_sc_tf1','mean_sc_tf1','stdev_sc_tf1',
-            'ndet_sc_tf1',
-            'med_tf2','mad_tf2','mean_tf2','stdev_tf2','ndet_tf2',
-            'med_sc_tf2','mad_sc_tf2','mean_sc_tf2','stdev_sc_tf2',
-            'ndet_sc_tf2',
-            'med_tf3','mad_tf3','mean_tf3','stdev_tf3','ndet_tf3',
-            'med_sc_tf3','mad_sc_tf3','mean_sc_tf3','stdev_sc_tf3',
-            'ndet_sc_tf3',
-            'med_rf1','mad_rf1','mean_rf1','stdev_rf1','ndet_rf1',
-            'med_sc_rf1','mad_sc_rf1','mean_sc_rf1','stdev_sc_rf1',
-            'ndet_sc_rf1',
-            'med_rf2','mad_rf2','mean_rf2','stdev_rf2','ndet_rf2',
-            'med_sc_rf2','mad_sc_rf2','mean_sc_rf2','stdev_sc_rf2',
-            'ndet_sc_rf2',
-            'med_rf3','mad_rf3','mean_rf3','stdev_rf3','ndet_rf3',
-            'med_sc_rf3','mad_sc_rf3','mean_sc_rf3','stdev_sc_rf3',
-            'ndet_sc_rf3',
-            'corr_mag_ap1','corr_mag_ap2','corr_mag_ap3',
+            'lcobj','catmag',
+            'median_rm1','mad_rm1','mean_rm1','stdev_rm1','ndet_rm1',
+            'median_sigclip_rm1','mad_sigclip_rm1','mean_sigclip_rm1',
+            'stdev_sigclip_rm1','ndet_sigclip_rm1',
+            'median_rm2','mad_rm2','mean_rm2','stdev_rm2','ndet_rm2',
+            'median_sigclip_rm2','mad_sigclip_rm2','mean_sigclip_rm2',
+            'stdev_sigclip_rm2','ndet_sigclip_rm2',
+            'median_rm3','mad_rm3','mean_rm3','stdev_rm3','ndet_rm3',
+            'median_sigclip_rm3','mad_sigclip_rm3','mean_sigclip_rm3',
+            'stdev_sigclip_rm3','ndet_sigclip_rm3',
+            'median_ep1','mad_ep1','mean_ep1','stdev_ep1','ndet_ep1',
+            'median_sigclip_ep1','mad_sigclip_ep1','mean_sigclip_ep1',
+            'stdev_sigclip_ep1','ndet_sigclip_ep1',
+            'median_ep2','mad_ep2','mean_ep2','stdev_ep2','ndet_ep2',
+            'median_sigclip_ep2','mad_sigclip_ep2','mean_sigclip_ep2',
+            'stdev_sigclip_ep2','ndet_sigclip_ep2',
+            'median_ep3','mad_ep3','mean_ep3','stdev_ep3','ndet_ep3',
+            'median_sigclip_ep3','mad_sigclip_ep3','mean_sigclip_ep3',
+            'stdev_sigclip_ep3','ndet_sigclip_ep3',
+            'median_tf1','mad_tf1','mean_tf1','stdev_tf1','ndet_tf1',
+            'median_sigclip_tf1','mad_sigclip_tf1','mean_sigclip_tf1',
+            'stdev_sigclip_tf1','ndet_sigclip_tf1',
+            'median_tf2','mad_tf2','mean_tf2','stdev_tf2','ndet_tf2',
+            'median_sigclip_tf2','mad_sigclip_tf2','mean_sigclip_tf2',
+            'stdev_sigclip_tf2','ndet_sigclip_tf2',
+            'median_tf3','mad_tf3','mean_tf3','stdev_tf3','ndet_tf3',
+            'median_sigclip_tf3','mad_sigclip_tf3','mean_sigclip_tf3',
+            'stdev_sigclip_tf3','ndet_sigclip_tf3',
+            'median_rf1','mad_rf1','mean_rf1','stdev_rf1','ndet_rf1',
+            'median_sigclip_rf1','mad_sigclip_rf1','mean_sigclip_rf1',
+            'stdev_sigclip_rf1','ndet_sigclip_rf1',
+            'median_rf2','mad_rf2','mean_rf2','stdev_rf2','ndet_rf2',
+            'median_sigclip_rf2','mad_sigclip_rf2','mean_sigclip_rf2',
+            'stdev_sigclip_rf2','ndet_sigclip_rf2',
+            'median_rf3','mad_rf3','mean_rf3','stdev_rf3','ndet_rf3',
+            'median_sigclip_rf3','mad_sigclip_rf3','mean_sigclip_rf3',
+            'stdev_sigclip_rf3','ndet_sigclip_rf3',
+            'corrmag_ap1','corrmag_ap2','corrmag_ap3',
         ]
     )
 
@@ -416,11 +428,46 @@ def parallel_compute_acf_statistics(
 
     return {result for result in results}
 
+
+def compute_correction_coeffs(catmags, fluxes):
+    """
+    Fit raw fluxes to the catalog mags to correct for too-faint catalog mags,
+    according to:
+        catmag = -2.5 * log10(flux/c1) + c2
+
+    This function sets c1 = 1 and fits only for c2, essentially the new zero-point.
+    Fit is only performed in the bright limit, 8.0 < catmag < 12.0.
+
+    Args:
+        catmags (np.array): Catalog mags
+        fluxes (1d or 2d np.array): (list of) raw fluxes for each aperture
+
+    Returns:
+        correctioncoeffs (2d np.array)
+    """
+    bright_limit = np.logical_and(catmags < 12.0, catmags > 8.0)
+    fluxes = pd.DataFrame(fluxes)[bright_limit]
+    catmags = catmags[bright_limit]
+
+    correctioncoeffs = []
+    for ap_col in fluxes:
+        try:
+            c2 = np.polyfit(np.zeros_like(catmags),
+                            catmags + 2.5*np.log10(fluxes[ap_col]), 0)[0]
+            correctioncoeffs.append([1.0, c2])
+        except:
+            print('ERR! %sZ: could not compute correction coefficients' %
+                  datetime.utcnow().isoformat())
+            return None
+
+    return correctioncoeffs
+
+
 def compute_lc_statistics(lcfile,
-                          rmcols=[19,20,21],
-                          epcols=[22,23,24],
-                          tfcols=[25,26,27],
-                          rfcols=None,
+                          rmcols=[14,19,24],
+                          epcols=[27,28,29],
+                          tfcols=[30,31,32],
+                          rfcols=[12,17,22],
                           sigclip=4.0,
                           num_aps=3,
                           epdlcrequired=True,
@@ -446,9 +493,12 @@ def compute_lc_statistics(lcfile,
         result (dict): Dictionary containing the following fields
             'lcfile': full path to lightcurve
             'lcobj': name of object
-            ('median', 'mad', 'mean', 'stdev', 'ndet') +
-            ('', '_sigclip') +
-            ('_rf', '_rm', '_ep', '_tf') + aperture number
+            Stat cols:
+            Raw magnitudes:
+                'median_rm[1-3]', 'mad_rm[1-3]', 'mean_rm[1-3]', 'stdev_rm[1-3]',
+                'ndet_rm[1-3]',
+                'median_sigclip_rm[1-3]', 'mad_sigclip_rm[1-3]', ...
+            And similarly for EPD mags (_ep), TFA mags (_tf), raw fluxes (_rf)
     """
     lcext = os.path.splitext(lcfile)[1]
     # Use dictionary to collect stats for extensibility
@@ -587,11 +637,8 @@ def compute_lc_statistics(lcfile,
             for s in ['median', 'mad', 'mean', 'stdev', 'ndet']:
                 results[s+suf] = np.nan
                 results[s+'_sigclip'+suf] = np.nan
-
-
     print('%sZ: done with statistics for %s' %
           (datetime.utcnow().isoformat(), lcfile))
-
     return results
 
 
@@ -609,11 +656,11 @@ def lc_statistics_worker(task):
 def parallel_compute_lc_statistics(lcdir, lcglob,
                                    fovcatalog, fovcathasgaiaids=False,
                                    tfalcrequired=False, num_aps=3,
-                                   fovcatcols=(0,9), fovcatmaglabel='r',
+                                   fovcatcols=(0,5), fovcatmaglabel='G',
                                    outfile=None,
                                    nworkers=16, workerntasks=500,
                                    rmcols=[14,19,24], epcols=[27,28,29],
-                                   tfcols=[30,31,32], rfcols=None,
+                                   tfcols=[30,31,32], rfcols=[12,17,22],
                                    correctioncoeffs=None,
                                    sigclip=4.0, epdlcrequired=True,
                                    outheader=None):
@@ -646,10 +693,12 @@ def parallel_compute_lc_statistics(lcdir, lcglob,
         Puts the results in text file outfile.
         outfile contains the following columns:
 
-            object, ndet,
-            median RM[1-3], MAD RM[1-3], mean RM[1-3], stdev RM[1-3],
-            median EP[1-3], MAD EP[1-3], mean EP[1-3], stdev EP[1-3],
-            median TF[1-3], MAD TF[1-3], mean TF[1-3], stdev TF[1-3]
+            object, catmag,
+            median RM[1-3], MAD RM[1-3], mean RM[1-3], stdev RM[1-3], ndet RM[1-3],
+            median EP[1-3], MAD EP[1-3], mean EP[1-3], stdev EP[1-3], ndet EP[1-3],
+            median TF[1-3], MAD TF[1-3], mean TF[1-3], stdev TF[1-3], ndet TF[1-3],
+            median RF[1-3], MAD RF[1-3], mean RF[1-3], stdev RF[1-3], ndet RF[1-3],
+            corr_catmag AP[1-3]
 
         if a value is missing, it will be np.nan.
 
@@ -667,7 +716,7 @@ def parallel_compute_lc_statistics(lcdir, lcglob,
             [[ap1_c1,ap1_c2],[ap2_c1,ap2_c2],[ap3_c1,ap3_c2]]
 
     """
-    lcfiles = glob(os.path.join(lcdir, lcglob))[:10]
+    lcfiles = glob(os.path.join(lcdir, lcglob))
     print('%sZ: %s %s lightcurves to process.' %
           (datetime.utcnow().isoformat(), len(lcfiles), lcglob))
 
@@ -766,7 +815,7 @@ def parallel_compute_lc_statistics(lcdir, lcglob,
     # Using a dictionary leads to ~ 300x speedup
     fovdict = dict(fovcat)
 
-    # Now output the stats
+    # Cross-match objects with catalog to get catmags
     for stat in results:
         if stat is None:
             continue
@@ -785,6 +834,16 @@ def parallel_compute_lc_statistics(lcdir, lcglob,
                   format(stat['lcobj']))
             stat['catmag'] = np.nan
 
+    # Compute correction coefficients
+    if correctioncoeffs is True:
+        stat_df = pd.DataFrame(results)
+        fluxcols = ''.join('median_rf%d ' % (ap+1) for ap in range(num_aps))
+        correctioncoeffs = compute_correction_coeffs(stat_df['catmag'],
+                                                     stat_df[fluxcols.split()])
+
+    for stat in results:
+        if stat is None:
+            continue
         # calculate corrected mags if present
         if (correctioncoeffs and len(correctioncoeffs) == 3 and
             rfcols and len(rfcols) == 3):
@@ -794,8 +853,8 @@ def parallel_compute_lc_statistics(lcdir, lcglob,
             ap3_c1, ap3_c2 = correctioncoeffs[2]
 
             stat['corrmag_ap1'] =-2.5*np.log10(stat['median_rf1']/ap1_c1)+ap1_c2
-            stat['corrmag_ap2'] =-2.5*np.log10(stat['median_rf2']/ap1_c1)+ap1_c2
-            stat['corrmag_ap3'] =-2.5*np.log10(stat['median_rf3']/ap1_c1)+ap1_c2
+            stat['corrmag_ap2'] =-2.5*np.log10(stat['median_rf2']/ap2_c1)+ap2_c2
+            stat['corrmag_ap3'] =-2.5*np.log10(stat['median_rf3']/ap3_c1)+ap3_c2
 
         else:
             stat['corrmag_ap1'] = stat['catmag']
@@ -815,7 +874,6 @@ def parallel_compute_lc_statistics(lcdir, lcglob,
           (datetime.utcnow().isoformat(), outfile))
 
     return results
-
 
 
 ######################
@@ -1251,3 +1309,6 @@ def plot_lightcurve_and_ACF(
     fig.tight_layout(h_pad=0., w_pad=0)
     fig.savefig(savpath, dpi=250, bbox_inches='tight')
     print('%sZ: made plot: %s' % (datetime.utcnow().isoformat(), savpath))
+
+
+
