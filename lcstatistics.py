@@ -16,7 +16,7 @@ compute_acf_statistics_worker:
 parallel_compute_acf_statistics:
     compute autocorrelation function stats for many lightcurves
 
-percentiles_MAD_stats_and_plots:
+percentiles_RMSorMAD_stats_and_plots
     make csv files and (optionally) percentiles plots of MAD vs magnitude.
 
 acf_percentiles_stats_and_plots:
@@ -900,6 +900,8 @@ def acf_percentiles_stats_and_plots(statdir, outprefix, make_plot=True,
                                linewidth=1.0,
                                linestyle=':')
 
+                ax.set_ylim((-1,1))
+
                 savname = ( os.path.join(
                     statdir,'acf_percentiles_stats_{:s}.png'.format(apstr.upper())
                 ))
@@ -1005,7 +1007,7 @@ def percentiles_RMSorMAD_stats_and_plots(statdir, outprefix, binned=False,
                 # show the sullivan+2015 interpolated model
                 if yaxisval=='RMS':
                     # overplot toy model I interpolated from that paper
-                    Tmag = np.linspace(6, 13, num=200)
+                    Tmag = np.linspace(6, 16, num=200)
                     lnA = 3.29685004771
                     B = 0.8500214657
                     C = -0.2850416324
