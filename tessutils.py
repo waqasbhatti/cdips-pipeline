@@ -8,6 +8,8 @@ parallel_bkgd_subtract: estimate sky background (with a median filter)
 
 parallel_plot_median_filter_quad: plot sky bkgd.
 
+    plot_median_filter_quad
+
 parallel_mask_saturated_stars: mask saturated stars given saturation level
 
     mask_saturated_stars_worker
@@ -1587,16 +1589,23 @@ def plot_median_filter_quad(task):
     fig, axs = plt.subplots(ncols=2, nrows=2)
 
     norm = colors.LogNorm(vmin=vmin, vmax=vmax)
-    cset1 = axs[0,0].imshow(cal_img, cmap='viridis', vmin=vmin, vmax=vmax, norm=norm)
-    axs[0,1].imshow(bkgd_img, cmap='viridis', vmin=vmin, vmax=vmax, norm=norm)
+
+    cset1 = axs[0,1].imshow(cal_img, cmap='viridis', vmin=vmin, vmax=vmax,
+                            norm=norm)
+
+    axs[0,0].imshow(bkgd_img - np.median(cal_img), cmap='RdBu_r', vmin=vmin,
+                    vmax=vmax, norm=norm)
 
     diff_vmin, diff_vmax = -1000, 1000
+
     diffnorm = colors.SymLogNorm(linthresh=0.03, linscale=0.03, vmin=diff_vmin,
                                  vmax=diff_vmax)
+
     cset2 = axs[1,0].imshow(cal_img - bkgd_img, cmap='RdBu_r', vmin=diff_vmin,
                     vmax=diff_vmax, norm=diffnorm)
-    axs[1,1].imshow(cal_img - np.median(cal_img), cmap='RdBu_r', vmin=diff_vmin,
-                    vmax=diff_vmax, norm=diffnorm)
+
+    axs[1,1].imshow(cal_img - np.median(cal_img), cmap='RdBu_r',
+                    vmin=diff_vmin, vmax=diff_vmax, norm=diffnorm)
 
     for ax in axs.flatten():
         ax.set_xticklabels('')
