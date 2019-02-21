@@ -575,7 +575,6 @@ def fitslist_frameinfo(fitslist,
 ######################################
 
 def calibrated_frame_to_database(fitsfile,
-                                 projid=None,
                                  observatory='hatpi',
                                  overwrite=False,
                                  badframetag='badframes',
@@ -600,9 +599,6 @@ def calibrated_frame_to_database(fitsfile,
         fitsfile (str): path to fits file
 
     Kwargs:
-
-        projid (None or int): if passed, overwrites the projid read from the
-        fits file when doing the database insert.
 
         observatory (str): hatpi or tess
 
@@ -660,12 +656,6 @@ def calibrated_frame_to_database(fitsfile,
 
         # get header keywords from header_list
         headerdata = get_header_keyword_list(fitsfile, header_list)
-        if isinstance(projid,int):
-            # if forced, overwrite PROJID from the fits header with whatever is
-            # passed. this is relevant for PSQL bookkeeping situations in which
-            # you are using the same calibrated frames across different
-            # projids (to save disk space).
-            headerdata['PROJID'] = projid
 
         # get the frame's photometry info (useful for selecting refs)
         photfits, photinfo = get_frame_info(fitsfile)
@@ -742,8 +732,16 @@ def calibrated_frame_to_database(fitsfile,
         fitsheader = {(k if not pd.isnull(v) else k):
                       (v if not pd.isnull(v) else 'NaN')
                       for k,v in fitsheader.items()}
-        if custom_projid is not None:
+
+        if custom_projid is not None and isinstance(custom_projid,int):
+
+            # if forced, overwrite PROJID from the fits header with whatever is
+            # passed. this is relevant for PSQL bookkeeping situations in which
+            # you are using the same calibrated frames across different
+            # projids (to save disk space).
+
             fitsheader['PROJID'] = custom_projid
+
         fitsheaderjson = Json(fitsheader)
 
         if photinfo:
