@@ -1035,7 +1035,12 @@ def merge_tfa_lc_worker(task):
             for k in tfakeys:
                 thiscol = tfadata[k]
 
-                thiscol = np.insert(thiscol, inds_to_add.flatten(), np.array(np.nan))
+                try:
+                    thiscol = np.insert(thiscol, inds_to_add.flatten(), np.array(np.nan))
+                except IndexError as e:
+                    print('{}: ERR! -- {} index out of bounds. Details: {}'.
+                         format(datetime.utcnow().isoformat(), lcpath, repr(e)))
+                    return 42
 
                 tfadatacols.append(thiscol)
 
