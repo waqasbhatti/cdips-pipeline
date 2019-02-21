@@ -159,10 +159,10 @@ def convert_grcollect_to_fits_lc_worker(task):
     earliestframepath = os.path.join(fitsdir, earliestframename+'.fits')
 
     kwlist=['SIMPLE', 'SIMDATA', 'TELESCOP', 'INSTRUME', 'CAMERA', 'CCD',
-            'EXPOSURE', 'TIMEREF', 'TASSIGN', 'TIMESYS', 'BJDREFI', 'BJDREFF',
+            'EXPOSURE', 'TIMEREF', 'TASSIGN', 'TIMESYS', 'BJDREFF',
             'TIMEUNIT', 'TELAPSE', 'LIVETIME', 'TSTART', 'TSTOP', 'DATE-OBS',
             'DATE-END', 'DEADC', 'TIMEPIXR', 'TIERRELA',
-            'BARYCORR', 'INT_TIME', 'READ_TIME', 'FRAMETIM',
+            'INT_TIME', 'FRAMETIM',
             'NUM_FRM', 'TIMEDEL', 'NREADOUT']
 
     hdict = iu.get_header_keyword_list(earliestframepath, kwlist, ext=0)
@@ -1021,32 +1021,34 @@ def merge_tfa_lc_worker(task):
         elif (not np.array_equal(tfadata['RSTFC'],data['RSTFC']) and
             len(tfadata['RSTFC']) < len(data['RSTFC'])
         ):
-            #  TFA LC has too few frame stamps. find the entries in the TFA
-            #  lightcurve that are missing frameids, and put nans in those
-            #  cases.
+            # TFA LC has too few frame stamps (for whatever reason -- often
+            # because NaNs are treated differently by VARTOOLS TFA, so they are
+            # omitted). The follow code findd entries in the TFA lightcurve
+            # that are missing frameids, and put nans in those cases. It does
+            # this by first making an array of NaNs with length equal to the
+            # original RAW data. It then puts the TFA values at the appropriate
+            # indices, through the frame-id matching ("RSTFC" ids).
             inarr = np.in1d(data['RSTFC'], tfadata['RSTFC'])
 
-            n_to_add = len(inarr[~inarr])
-
-            inds_to_add = np.argwhere(~inarr)
+            inds_to_put = np.argwhere(inarr).flatten()
 
             tfakeys = ['TFA1','TFA2','TFA3']
             tfadatacols = []
             for k in tfakeys:
-                thiscol = tfadata[k]
+                thiscol_short = tfadata[k]
 
-                try:
-                    thiscol = np.insert(thiscol, inds_to_add.flatten(), np.array(np.nan))
-                except IndexError as e:
-                    print('{}: ERR! -- {} index out of bounds. Details: {}'.
-                         format(datetime.utcnow().isoformat(), lcpath, repr(e)))
-                    return 42
+                thiscol_full = (
+                    np.ones_like(np.arange(len(data['RSTFC']),
+                                           dtype=np.float))*np.nan
+                )
 
-                tfadatacols.append(thiscol)
+                thiscol_full[ inds_to_put ] = thiscol_short
+
+                tfadatacols.append(thiscol_full)
 
             wrn_msg = (
                 'WRN! {}: found {} missing frameids. added NaNs'.
-                format(lcpath, n_to_add)
+                format(lcpath, len(inarr[~inarr]))
             )
             print(wrn_msg)
 
