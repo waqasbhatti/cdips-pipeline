@@ -884,7 +884,7 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
 
     # Step ISP0.
     _ = ais.parallel_frames_to_database(fitsdir, 'calibratedframes',
-                                        projid=projectid,
+                                        custom_projid=projectid,
                                         observatory='tess', fitsglob=fitsglob,
                                         overwrite=False,
                                         badframetag='badframes',
