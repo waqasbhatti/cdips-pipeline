@@ -5236,8 +5236,14 @@ def get_lc_statistics(lcfile,
     print('%sZ: done with statistics for %s' %
           (datetime.utcnow().isoformat(), lcfile))
 
+    lcobj = os.path.splitext(os.path.basename(lcfile))[0]
+    if '_llc' in lcobj:
+        # TESS filenaming format: {gaiaid}_llc.fits -- so if we want to
+        # retrieve the Gaia-ID, must omit "_llc" here.
+        lcobj = lcobj.replace('_llc','')
+
     return {'lcfile':lcfile,
-            'lcobj':os.path.splitext(os.path.basename(lcfile))[0],
+            'lcobj':lcobj,
 
             # reduced mags aperture 1
             'median_rf1':median_rf1,
