@@ -1438,9 +1438,10 @@ def check_frame_warping(frame,
         return True, warpinfo
 
 
-def make_mp4_from_jpegs(jpgglob, outmp4path):
+def make_mp4_from_jpegs(jpgglob, outmp4path, ffmpegpath='ffmpeg'):
     """
-    note: some duplication of functionality with framecalib.make_frame_movie
+    Make mp4 movie from jpg images. (Codec/preset configured to work with
+    ffmpeg v3.4. Fails for v4.X).
 
     Args:
         jpgglob: e.g.,
@@ -1456,7 +1457,7 @@ def make_mp4_from_jpegs(jpgglob, outmp4path):
             '`ffmpeg` must be installed to use make_mp4_from_jpegs')
 
     FFMPEGCMD = (
-        "ffmpeg -framerate 24 "
+        "{ffmpegpath} -framerate 24 "
         "-pattern_type "
         "glob -i '{jpgglob}' "
         "-c:v libx264 "
@@ -1464,7 +1465,9 @@ def make_mp4_from_jpegs(jpgglob, outmp4path):
         "{outmp4path}"
     )
 
-    cmdtorun = FFMPEGCMD.format(jpgglob=jpgglob, outmp4path=outmp4path)
+    cmdtorun = FFMPEGCMD.format(jpgglob=jpgglob,
+                                outmp4path=outmp4path,
+                                ffmpegpath=ffmpegpath)
 
     returncode = os.system(cmdtorun)
 
@@ -1479,10 +1482,12 @@ def make_mp4_from_jpegs(jpgglob, outmp4path):
         return 256
 
 
-def make_mov_from_jpegs(jpgglob, outmovpath):
+def make_mov_from_jpegs(jpgglob, outmovpath, ffmpegpath='ffmpeg'):
     """
-    similar to above, but makes .mov (a format that is compatible with e.g.,
-    keynote)
+    Similar to above, but makes .mov (a format that is compatible with e.g.,
+    keynote) (Codec/preset configured to work with ffmpeg v3.4. Fails for
+    v4.X).
+
 
     Args:
         jpgglob: e.g.,
@@ -1498,7 +1503,7 @@ def make_mov_from_jpegs(jpgglob, outmovpath):
             '`ffmpeg` must be installed to use make_mov_from_jpegs')
 
     FFMPEGCMD = (
-        "ffmpeg -framerate 24 "
+        "{ffmpegpath} -framerate 24 "
         "-pattern_type "
         "glob -i '{jpgglob}' "
         "-c:v libx264 "
@@ -1507,7 +1512,11 @@ def make_mov_from_jpegs(jpgglob, outmovpath):
         "{outmovpath}"
     )
 
-    cmdtorun = FFMPEGCMD.format(jpgglob=jpgglob, outmovpath=outmovpath)
+    cmdtorun = FFMPEGCMD.format(
+        ffmpegpath=ffmpegpath,
+        jpgglob=jpgglob,
+        outmovpath=outmovpath
+    )
 
     returncode = os.system(cmdtorun)
 
