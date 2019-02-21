@@ -1918,8 +1918,21 @@ def subframe_convolution_worker(task, **kwargs):
     input frame, subtract them, and then return the subtracted frame. Used by
     convolve_and_subtract_frames below.
 
-    task[0] -> the frame to convolve (AKA: reference)
-    task[1] -> the frame to use as the convolution target (AKA: image)
+    D_xy = I_xy - M_xy, for
+
+    M_xy = (R \conv K)_xy   + B_xy,
+
+    to minimize
+
+    chi^2 = \sum_xy  (I_xy - M_xy)^2.
+
+    where I_xy is the target image, D_xy is the difference image, M_xy is the
+    static background model, R is the reference image, K is the convolution
+    kernel, and B_xy is a background term that can be added in (e.g., Alard
+    2000 -- the `fitsh` "b/N" term).
+
+    task[0] -> the frame to convolve (AKA: reference, R)
+    task[1] -> the frame to use as the convolution target (AKA: image, I)
     task[2] -> the convolution target's registration info file
     task[3] -> the kernel specification for the convolution
     task[4] -> the output directory where to place the results
