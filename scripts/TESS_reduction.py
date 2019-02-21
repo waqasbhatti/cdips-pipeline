@@ -5,8 +5,16 @@ $ python TESS_reduction.py --help
 contents:
 
 main
+        parallel_trim_get_single_extension
+        parallel_bkgd_subtract
+        parallel_plot_median_filter_quad
+        parallel_mask_saturated_stars
+        parallel_mask_dquality_flag_frames
+        make_ccd_temperature_timeseries_pickle
+        parallel_append_ccd_temperature_to_hdr
     get_files_needed_before_image_subtraction
     run_imagesubtraction
+        parallel_frames_to_database
         framelist_make_xtrnsfits
         generate_photref_candidates_from_xtrns
         generate_combined_photref
@@ -74,8 +82,6 @@ from astropy.coordinates import SkyCoord
 
 def _get_random_tfa_lcs(lcdirectory, n_desired_lcs=100):
 
-    np.random.seed(42)
-
     tfafiles = np.array(glob(os.path.join(lcdirectory,'*_llc.fits')))
     n_possible_lcs = len(tfafiles)
 
@@ -114,44 +120,47 @@ def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid):
     typestr = 'full' if 'FULL' in fitsdir else 'tune'
 
     # subtracted frame movies
-    jpgglob = os.path.join(fitsdir, 'JPEG-SUB*CONV-*tess*cal_img-xtrns.jpg')
-    outmovpath = os.path.join(
+    jpgglob = os.path.join(fitsdir, 'JPEG-SUB*CONV-*tess*cal_img_bkgdsub-xtrns.jpg')
+    outmp4path = os.path.join(
         moviedir,
-        '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_SUBTRACTEDCONV.mov'.
+        '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_SUBTRACTEDCONV.mp4'.
         format(field, typestr, int(camera), int(ccd), int(projectid)))
-    if not os.path.exists(outmovpath):
-        iu.make_mov_from_jpegs(jpgglob, outmovpath)
+    if not os.path.exists(outmp4path):
+        iu.make_mp4_from_jpegs(jpgglob, outmp4path,
+                               ffmpegpath='/home/lbouma/bin/ffmpeg')
     else:
-        print('found {}'.format(outmovpath))
+        print('found {}'.format(outmp4path))
 
     # NGC-labelled stars; astrometry.net zscale
-    jpgglob = os.path.join(fitsdir, 'tess*_cal_img-ngc.png')
-    outmovpath = os.path.join(
+    jpgglob = os.path.join(fitsdir, 'tess*_cal_img_bkgdsub-ngc.png')
+    outmp4path = os.path.join(
         moviedir,
-        '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_NGC.mov'.
+        '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_NGC.mp4'.
         format(field, typestr, int(camera), int(ccd), int(projectid)))
-    if not os.path.exists(outmovpath):
-        iu.make_mov_from_jpegs(jpgglob, outmovpath)
+    if not os.path.exists(outmp4path):
+        iu.make_mp4_from_jpegs(jpgglob, outmp4path,
+                               ffmpegpath='/home/lbouma/bin/ffmpeg')
     else:
-        print('found {}'.format(outmovpath))
+        print('found {}'.format(outmp4path))
 
     # regular old translated (xtrns) frames, pre-subtraction, but masked
-    jpgglob = os.path.join(fitsdir, 'JPEG-XTRNS-tess*_cal_img-xtrns.jpg')
-    outmovpath = os.path.join(
+    jpgglob = os.path.join(fitsdir, 'JPEG-XTRNS-tess*_cal_img_bkgdsub-xtrns.jpg')
+    outmp4path = os.path.join(
         moviedir,
-        '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_XTRNS.mov'.
+        '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_XTRNS.mp4'.
         format(field, typestr, int(camera), int(ccd), int(projectid)))
-    if not os.path.exists(outmovpath) and len(glob(jpgglob))>10:
-        iu.make_mov_from_jpegs(jpgglob, outmovpath)
+    if not os.path.exists(outmp4path) and len(glob(jpgglob))>10:
+        iu.make_mp4_from_jpegs(jpgglob, outmp4path,
+                               ffmpegpath='/home/lbouma/bin/ffmpeg')
     else:
-        print('found (or skipped) {}'.format(outmovpath))
+        print('found (or skipped) {}'.format(outmp4path))
 
     # cluster cut movies: (subtracted & grayscale), (subtracted & bwr), (CAL &
     # grayscale). first, get unique cluster names.  the pattern we're matching
     # is:
-    # CUT-NGC_2516_rsub-9ab2774b-tess2018232225941-s0001-4-3-0120_cal_img-xtrns_SUB_grayscale.jpg
+    # CUT-NGC_2516_rsub-9ab2774b-tess2018232225941-s0001-4-3-0120_cal_img_bkgdsub-xtrns_SUB_grayscale.jpg
     clusterjpgs = glob(os.path.join(
-        fitsdir, 'CUT-*_[r|n]sub-*-tess2*_cal_img*_SUB_grayscale.jpg'))
+        fitsdir, 'CUT-*_[r|n]sub-*-tess2*_cal_img_bkgdsub*_SUB_grayscale.jpg'))
     if len(clusterjpgs)>1:
 
         clusternames = nparr(
@@ -171,24 +180,25 @@ def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid):
                  'CUT-{:s}_tess2*CAL.jpg'.
                  format(uclustername)
                 ],
-                ['{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_SUB_grayscale.mov'.
+                ['{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_SUB_grayscale.mp4'.
                  format(field, typestr, int(camera), int(ccd), int(projectid),
                         uclustername),
-                '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_SUB_bwr.mov'.
+                '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_SUB_bwr.mp4'.
                  format(field, typestr, int(camera), int(ccd), int(projectid),
                         uclustername),
-                '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_CAL.mov'.
+                '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_CAL.mp4'.
                  format(field, typestr, int(camera), int(ccd), int(projectid),
                         uclustername)
                 ]
             ):
 
                 jpgglob = os.path.join(fitsdir, jpgstr)
-                outmovpath = os.path.join(moviedir, outstr)
-                if not os.path.exists(outmovpath) and len(glob(jpgglob))>10:
-                    iu.make_mov_from_jpegs(jpgglob, outmovpath)
+                outmp4path = os.path.join(moviedir, outstr)
+                if not os.path.exists(outmp4path) and len(glob(jpgglob))>10:
+                    iu.make_mp4_from_jpegs(jpgglob, outmp4path,
+                                           ffmpegpath='/home/lbouma/bin/ffmpeg')
                 else:
-                    print('found (or skipped) {}'.format(outmovpath))
+                    print('found (or skipped) {}'.format(outmp4path))
 
     else:
         print('WRN! did not make CUT movies, because did not find jpg matches')
@@ -222,9 +232,9 @@ def make_fake_xtrnsfits(fitsdir, fitsglob, fieldinfo):
     # should be the identity
     areffname = os.path.basename(areffistar)
 
-    parsearef = search('{}-astromref-{}_cal_img.fistar', areffistar)
+    parsearef = search('{}-astromref-{}_cal_img_bkgdsub.fistar', areffistar)
     arefid = parsearef[1]
-    areforiginalfistar = os.path.join(fitsdir, arefid+'_cal_img.fistar')
+    areforiginalfistar = os.path.join(fitsdir, arefid+'_cal_img_bkgdsub.fistar')
 
     outdir = fitsdir
     shifted_fistar, shifted_itrans = ism.astromref_shift_worker(
@@ -254,7 +264,7 @@ def initial_wcs_worked_well_enough(outdir, fitsglob):
         return True
 
 
-def is_presubtraction_complete(outdir, fitsglob, lcdir, percentage_required=95,
+def is_presubtraction_complete(outdir, fitsglob, lcdir, RED_dir, percentage_required=95,
                                extractsources=False):
     """
     require at least e.g., 95% of the initial astrometry, photometry, etc to
@@ -262,7 +272,7 @@ def is_presubtraction_complete(outdir, fitsglob, lcdir, percentage_required=95,
     found, move on to image subtraction.  else, returns False.
     """
 
-    N_fitsfiles = len(glob(outdir+fitsglob))
+    N_fitsfiles = len(glob(os.path.join(RED_dir,fitsglob)))
     N_fistarfiles = len(glob(outdir+fitsglob.replace('.fits','.fistar')))
     N_wcsfiles = len(glob(outdir+fitsglob.replace('.fits','.wcs')))
     N_projcatalog = len(glob(outdir+fitsglob.replace('.fits','.projcatalog')))
@@ -359,10 +369,10 @@ def examine_astrometric_shifts(fitsdir, astromref, statsdir,
         tmids = tstarts + (tstops - tstarts)/2.
 
         # get astromref wcs file
-        parsearef = search('{}-astromref-{}_cal_img.fits',
+        parsearef = search('{}-astromref-{}_cal_img_bkgdsub.fits',
                            os.path.basename(astromref))
         arefid = parsearef[1]
-        arefwcsfile = os.path.join(fitsdir, arefid+'_cal_img.wcs')
+        arefwcsfile = os.path.join(fitsdir, arefid+'_cal_img_bkgdsub.wcs')
         print('matching against astromref {}'.format(arefwcsfile))
 
         if not os.path.exists(arefwcsfile):
@@ -525,7 +535,8 @@ def plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=10,
 
 def plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20,
                                      timename='TMID_BJD', isfitslc=True,
-                                     skipepd=False):
+                                     skipepd=False,
+                                     ext='.fits'):
     """
     make sequential RAW, EPD, TFA plots for `n_desired_lcs`
     """
@@ -549,7 +560,7 @@ def plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20,
             savdir = os.path.join(os.path.dirname(tfafile),'stats_files')
             savpath = os.path.join(
                 savdir,
-                os.path.basename(tfafile).rstrip('.tfalc')+
+                os.path.basename(tfafile).rstrip(ext)+
                 '_AP{:d}'.format(ap)+'.png'
             )
 
@@ -694,7 +705,8 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
                                 photreffluxthreshold, extractsources,
                                 binlightcurves, get_masks,
                                 tfa_template_sigclip, tfa_epdlc_sigclip,
-                                translateimages, reversesubtract, skipepd):
+                                translateimages, reversesubtract, skipepd,
+                                useimagenotfistar):
     """
     each "reduction version" is identified by a project ID. the parameters
     corresponding to each project ID are written in a pickle file, so that we
@@ -735,7 +747,8 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
         "tfa_epdlc_sigclip":tfa_epdlc_sigclip,
         "translateimages":translateimages,
         "reversesubtract":reversesubtract,
-        "skipepd":skipepd
+        "skipepd":skipepd,
+        "useimagenotfistar":useimagenotfistar
     }
 
     outpicklename = "projid_{:s}.pickle".format(repr(projectid))
@@ -757,7 +770,7 @@ def get_files_needed_before_image_subtraction(
         ra_nom, dec_nom,
         catra, catdec, catboxsize,
         catalog, catalog_file, reformed_cat_file,
-        fnamestr='*-1-1-0016_cal_img.fits', anetfluxthreshold=20000,
+        fnamestr='*-1-1-0016_cal_img_bkgdsub.fits', anetfluxthreshold=20000,
         fistarglob='*.fistar',
         width=13, anettweak=6, anetradius=30, xpix=2048, ypix=2048, cols=(2,3),
         brightrmag=5.0, faintrmag=13.0,
@@ -790,11 +803,12 @@ def get_files_needed_before_image_subtraction(
 
     if useastrometrydotnet:
 
-        ap.fistardir_to_xy(fitsdir, fistarglob=fistarglob)
+        if not useimagenotfistar:
+            ap.fistardir_to_xy(outdir, fistarglob=fistarglob)
 
         ap.parallel_astrometrydotnet(
             fitsdir, outdir, ra_nom, dec_nom,
-            fistarfitsxyglob=fistarglob.replace('.fistar','.fistar-fits-xy'),
+            fistarfitsxyglob='tess*_bkgdsub.fistar-fits-xy',
             tweakorder=anettweak, radius=anetradius, xpix=xpix, ypix=ypix,
             nworkers=nworkers, scalelow=10, scalehigh=30,
             scaleunits='arcsecperpix', nobjs=200, xcolname='ximage',
@@ -803,7 +817,8 @@ def get_files_needed_before_image_subtraction(
         )
 
     else:
-        ap.parallel_anet(fitsdir, outdir, ra_nom, dec_nom,
+        raise AssertionError('we don\'t use anet')
+        ap.parallel_anet(outdir, outdir, ra_nom, dec_nom,
                          fistarglob=fistarglob,
                          infofromframe=False, width=width, tweak=anettweak,
                          radius=anetradius,
@@ -856,7 +871,7 @@ def get_files_needed_before_image_subtraction(
 
 def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
                          photreftype, dbtype, reformed_cat_file, xtrnsglob,
-                         iphotpattern, lcdirectory, kernelspec='b/4;i/4;d=4/4',
+                         iphotpattern, lcdirectory, outdir, projectid, kernelspec='b/4;i/4;d=4/4',
                          refdir=sv.REFBASEDIR, nworkers=1,
                          aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
                          photdisjointradius=2, colorscheme='bwr',
@@ -869,6 +884,7 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
 
     # Step ISP0.
     _ = ais.parallel_frames_to_database(fitsdir, 'calibratedframes',
+                                        projid=projectid,
                                         observatory='tess', fitsglob=fitsglob,
                                         overwrite=False,
                                         badframetag='badframes',
@@ -891,7 +907,8 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
     # moved to badframes that are not in fact badframes. The warpthreshold is a bad
     # empirical thing that should be avoided.
     if translateimages:
-        _ = ais.framelist_make_xtrnsfits(fits_list, fitsdir, fitsglob, outdir=None,
+        _ = ais.framelist_make_xtrnsfits(fits_list, fitsdir, fitsglob,
+                                         outdir=outdir,
                                          refinfo='foobar', warpcheck=False,
                                          warpthreshold=15000.0, warpmargins=100,
                                          nworkers=nworkers, observatory='tess',
@@ -939,7 +956,7 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
     if len(glob(os.path.join(fitsdir,'*.iphot')))<10:
         _ = ais.parallel_xtrnsfits_convsub(
             xtrnsfiles, photreftype, fitsdir=fitsdir, fitsglob=fitsglob,
-            outdir=None, observatory='tess', fieldinfo=fieldinfo,
+            outdir=outdir, observatory='tess', fieldinfo=fieldinfo,
             reversesubtract=reversesubtract, kernelspec=kernelspec,
             nworkers=nworkers, maxworkertasks=1000, colorscheme=colorscheme)
     else:
@@ -949,14 +966,16 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
     # With 30 workers, at best process ~few frames per second.
 
     if len(glob(os.path.join(fitsdir,'*.iphot')))<10:
-        subfitslist = glob(fitsdir+'[r|n]sub-????????-'+
-                           fitsglob.replace('.fits','-xtrns.fits'))
-        _ = ais.parallel_convsubfits_staticphot(
+        subfitslist = glob(os.path.join(fitsdir,'[r|n]sub-????????-'+
+                                        fitsglob.replace('.fits','-xtrns.fits')))
+        out = ais.parallel_convsubfits_staticphot(
             subfitslist, fitsdir=fitsdir, fitsglob=fitsglob,
             photreftype=photreftype, kernelspec=kernelspec,
             lcapertures=aperturelist, photdisjointradius=photdisjointradius,
-            outdir=None, fieldinfo=fieldinfo, observatory='tess',
+            outdir=outdir, fieldinfo=fieldinfo, observatory='tess',
             nworkers=nworkers, maxworkertasks=1000, photparams=photparams)
+        if out==42:
+            raise AssertionError('fatal error in convsubfits_staticphot')
     else:
         print('found .iphot files. skipping their production.')
 
@@ -1028,7 +1047,7 @@ def _get_ok_lightcurve_files(lcfiles):
 
 def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
                    epdlcglob, reformed_cat_file, statsdir, field, fitsdir,
-                   fitsglob, camera, ccd,
+                   fitsglob, camera, ccd, projectid,
                    epdsmooth=11, epdsigclip=10, nworkers=10,
                    binlightcurves=False, tfa_template_sigclip=5.0,
                    tfa_epdlc_sigclip=5.0, skipepd=True):
@@ -1056,8 +1075,8 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
         temperaturedfpath = temperaturedfpath[0]
 
         lcu.parallel_convert_grcollect_to_fits_lc(
-            lcdirectory, fitsdir, catfile=catfile, ilcglob='*.grcollectilc',
-            nworkers=nworkers, observatory='tess',
+            lcdirectory, fitsdir, projectid, catfile=catfile,
+            ilcglob='*.grcollectilc', nworkers=nworkers, observatory='tess',
             temperaturedfpath=temperaturedfpath
         )
 
@@ -1123,7 +1142,6 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
                            fovcathasgaiaids=True, yaxisval='RMS')
     else:
         print('skipped making EPD LC plots')
-
 
     # choose the TFA template stars
     if not os.path.exists(os.path.join(
@@ -1346,7 +1364,7 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
 
     # plot some lightcurves and their ACFs
     pickledir = os.path.join(statsdir, 'acf_stats')
-    plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=1,
+    plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=10,
                                      skipepd=skipepd)
 
     lcs.acf_percentiles_stats_and_plots(statsdir, outprefix, make_plot=True,
@@ -1357,7 +1375,7 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
     is_image_noise_gaussian(fitsdir, projectid, field, camera, ccd)
 
     # just make some lightcurve plots to look at them
-    plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=1,
+    plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=10,
                                      skipepd=skipepd)
 
     # count numbers of lightcurves #FIXME: or do it by nan parsing?
@@ -1421,7 +1439,8 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
          catalog_faintrmag=13, fiphotfluxthreshold=1000,
          photreffluxthreshold=1000, extractsources=True, binlightcurves=False,
          get_masks=1, tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0,
-         translateimages=True, reversesubtract=False, skipepd=True
+         translateimages=True, reversesubtract=False, skipepd=True,
+         useimagenotfistar=True
          ):
     """
     args:
@@ -1464,7 +1483,8 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                                 photreffluxthreshold, extractsources,
                                 binlightcurves, get_masks,
                                 tfa_template_sigclip, tfa_epdlc_sigclip,
-                                translateimages, reversesubtract, skipepd)
+                                translateimages, reversesubtract, skipepd,
+                                useimagenotfistar)
 
     starttime = datetime.utcnow()
 
@@ -1476,15 +1496,15 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     sectornum = int(field[1:])
 
     if is_ete6:
-        RED_dir = '/nfs/phtess1/ar1/TESS/SIMFFI/ARCHIVAL/'
+        CAL_dir = '/nfs/phtess1/ar1/TESS/SIMFFI/ARCHIVAL/'
         mast_calibrated_ffi_list = np.sort(
-            glob(RED_dir+fitsglob.replace('_cal_img.fits','-s_ffic.fits'))
+            glob(CAL_dir+fitsglob.replace('_cal_img.fits','-s_ffic.fits'))
         )
     else:
-        RED_dir = '/nfs/phtess1/ar1/TESS/FFI/RED/sector-{:d}'.format(sectornum)
+        CAL_dir = '/nfs/phtess1/ar1/TESS/FFI/CAL/sector-{:d}'.format(sectornum)
         mast_calibrated_ffi_list = np.sort(
             glob(os.path.join(
-                RED_dir,fitsglob.replace('_cal_img.fits','-s_ffic.fits')))
+                CAL_dir,fitsglob.replace('_cal_img_bkgdsub.fits','-s_ffic.fits')))
         )
 
     if tuneparameters=='true':
@@ -1493,7 +1513,13 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     else:
         pass
 
-    fits_list = np.sort(glob(os.path.join(fitsdir, fitsglob)))
+    RED_dir = (
+        '/nfs/phtess1/ar1/TESS/FFI/RED/sector-{:d}/cam{}_ccd{}'.
+        format(sectornum, camnum, ccdnum)
+    )
+    if not os.path.exists(RED_dir):
+        os.mkdir(RED_dir)
+    fits_list = np.sort(glob(os.path.join(RED_dir, fitsglob)))
     exists = np.array(list(os.path.exists(f) for f in fits_list)).astype(bool)
     mostexist = len(exists)!=0
     if len(exists)>0:
@@ -1501,14 +1527,43 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
 
     if convert_to_fitsh_compatible and get_masks and not mostexist:
 
+        # First, trim each frame, and turn it into a single extension FITS
+        # image. Then pass a median filter over it, over box size 64 x 64.
+        # Plot the results, make a movie of them. Then mask saturated stars,
+        # and frames with the DQUALITY=32 flag.
         tu.parallel_trim_get_single_extension(mast_calibrated_ffi_list,
-                                              outdir, projectid,
+                                              RED_dir, projectid,
                                               nworkers=nworkers)
 
-        fits_list = np.sort(glob(os.path.join(fitsdir, fitsglob)))
+        fits_list = np.sort(glob(os.path.join(
+            RED_dir,
+            fitsglob.replace('_cal_img_bkgdsub.fits','_cal_img.fits')))
+        )
 
-        # get mask for pixels greater than 2^16 - 1
-        tu.parallel_mask_saturated_stars(fits_list, saturationlevel=65535,
+        tu.parallel_bkgd_subtract(fits_list, method='boxmedian', isfull=True,
+                                  k=48, outdir=RED_dir, nworkers=nworkers)
+
+        tu.parallel_plot_median_filter_quad(RED_dir, nworkers=nworkers)
+
+        moviedir='/nfs/phtess1/ar1/TESS/FFI/MOVIES/'
+        outmp4path = os.path.join(
+            moviedir, 'sector{}_cam{}_ccd{}_quad_bkgd.mp4'.
+            format(sectornum, camnum, ccdnum)
+        )
+        quadglob = os.path.join(RED_dir, 'tess*_cal_img_bkgd.png')
+        if not os.path.exists(outmp4path):
+            iu.make_mp4_from_jpegs(quadglob, outmp4path,
+                                   ffmpegpath='/home/lbouma/bin/ffmpeg')
+
+        # The TESS handbook quotes saturation beginning at "around 2e5
+        # electrons". gain ~= 5 electrons per ADU, so this corresponds to
+        # saturation at ~40000 ADU. From inspection of the frames, the
+        # mustaches start to become clearly visible around 1e5 ADU. We don't
+        # want to set the saturation level too low, and mask many stars,
+        # particularly in crowded regions.
+        fits_list = np.sort(glob(os.path.join(RED_dir, fitsglob)))
+
+        tu.parallel_mask_saturated_stars(fits_list, saturationlevel=80000,
                                          nworkers=nworkers)
 
         # get mask for frames tagged as momentum dumps
@@ -1530,9 +1585,23 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
         )
 
     elif convert_to_fitsh_compatible and get_masks and mostexist:
+        print('skipping initial trimming & background filtering')
         pass
     else:
         raise NotImplementedError
+
+    # symlink images so that they "live" in each reduction directory.
+    fits_list = np.sort(glob(os.path.join(RED_dir,fitsglob)))
+    for fitspath in fits_list:
+        dstname = os.path.basename(fitspath)
+        dstdir = fitsdir
+        dstpath = os.path.join(dstdir, dstname)
+        if not os.path.exists(dstpath):
+            os.symlink(fitspath, dstpath)
+            print('symlink {}->{}'.format(fitspath, dstpath))
+        else:
+            print('SKIP symlink {}->{}'.format(fitspath, dstpath))
+    fits_list = np.sort(glob(os.path.join(fitsdir,fitsglob)))
 
     ###########################################################################
 
@@ -1558,12 +1627,12 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     )
     reformed_cat_file = catalog_file.replace('.catalog', '.reformed_catalog')
 
-    catalog_file = outdir + catalog_file
-    reformed_cat_file = outdir + reformed_cat_file
+    catalog_file = os.path.join(outdir, catalog_file)
+    reformed_cat_file = os.path.join(outdir, reformed_cat_file)
 
     ###########################################################################
 
-    if not is_presubtraction_complete(outdir, fitsglob, lcdirectory,
+    if not is_presubtraction_complete(outdir, fitsglob, lcdirectory, RED_dir,
                                       extractsources=extractsources):
         get_files_needed_before_image_subtraction(
             fitsdir, fitsglob, outdir, initccdextent, ccdgain, zeropoint, exptime,
@@ -1573,7 +1642,8 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
             fistarglob='*.fistar', width=13, anettweak=anettweak, xpix=2048,
             ypix=2048, cols=(2,3), brightrmag=6.0, faintrmag=catalog_faintrmag,
             fiphotfluxthreshold=fiphotfluxthreshold, aperturelist=aperturelist,
-            nworkers=nworkers, extractsources=extractsources)
+            nworkers=nworkers, extractsources=extractsources,
+            useimagenotfistar=useimagenotfistar)
 
     else:
         print('found fistar, fiphot, and wcs files. proceeding to image '
@@ -1621,7 +1691,8 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
 
         run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams,
                              fits_list, photreftype, dbtype, reformed_cat_file,
-                             xtrnsglob, iphotpattern, lcdirectory,
+                             xtrnsglob, iphotpattern, lcdirectory, outdir,
+                             projectid,
                              kernelspec=kernelspec, refdir=sv.REFBASEDIR,
                              nworkers=nworkers, aperturelist=aperturelist,
                              photdisjointradius=photdisjointradius,
@@ -1635,7 +1706,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
 
     run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
                    epdlcglob, reformed_cat_file, statsdir, field, fitsdir,
-                   fitsglob, camera, ccd,
+                   fitsglob, camera, ccd, projectid,
                    epdsmooth=epdsmooth, epdsigclip=epdsigclip,
                    nworkers=nworkers, binlightcurves=binlightcurves,
                    tfa_template_sigclip=tfa_template_sigclip,
@@ -1656,8 +1727,10 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                str(ccd))
     )
     astromrefpath = glob(astromrefglob)
-    if not len(astromrefpath)==1:
-        raise AssertionError('astromrefglob wrong for run assessment')
+    if len(astromrefpath)==0:
+        #FIXME this is a bug.
+        print('ERR! astromrefglob wrong for run assessment')
+        import IPython; IPython.embed()
     astromrefpath = astromrefpath[0]
     assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
                field, camera, ccd, tfastatfile, ra_nom, dec_nom,

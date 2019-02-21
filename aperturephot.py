@@ -412,9 +412,9 @@ def astrometrydotnet_solve_frame(srclist,
 
         solve-field --ra 274.5 --dec 58.0 --radius 30 --scale-low 1
         --scale-high 30 --scale-units arcsecperpix --tweak-order 2
-        --wcs /dirname/tess2019135090826-4-2-0016_cal_img.wcs
+        --wcs /dirname/tess2019135090826-4-2-0016_cal_img_bkgdsub.wcs
         --overwrite --objs 200 -w 2048 -e 2048 --x-column ximage --y-column yimage
-        /dirname/tess2019135090826-4-2-0016_cal_img.fistar-fits-xy
+        /dirname/tess2019135090826-4-2-0016_cal_img_bkgdsub.fistar-fits-xy
 
     For astrometry.net to work, you need to install it, and get all the index
     files. See http://astrometry.net/doc/readme.html.
@@ -783,7 +783,7 @@ def parallel_astrometrydotnet(
         srclistdir,
         outdir,
         ra, dec,
-        fistarfitsxyglob='tess2019135090826-4-2-0016_cal_img.fistar-fits-xy',
+        fistarfitsxyglob='tess2019135090826-4-2-0016_cal_img_bkgdsub.fistar-fits-xy',
         nworkers=10,
         maxtasksperworker=1000,
         radius=30,
@@ -806,7 +806,17 @@ def parallel_astrometrydotnet(
     """
 
     # get a list of all fits files in the directory
-    fistarfitsxylist = glob.glob(os.path.join(srclistdir, fistarfitsxyglob))
+    if useimagenotfistar:
+        fistarfitsxylist = glob.glob(
+            os.path.join(srclistdir,
+                         fistarfitsxyglob.replace('fistar-fits-xy','fits'))
+        )
+        intailstr = '.fits'
+    else:
+        fistarfitsxylist = glob.glob(
+            os.path.join(srclistdir, fistarfitsxyglob)
+        )
+        intailstr = '.fistar-fits-xy'
 
     print('%sZ: found %s fistar files in %s, starting astrometry...' %
           (datetime.utcnow().isoformat(),
@@ -821,15 +831,13 @@ def parallel_astrometrydotnet(
 
     # get the files for which astrometry hasn't already been done
     fistarfitsxylist = check_files(fistarfitsxylist, 'astrometry', outdir,
-                                   intailstr='.fistar-fits-xy',
+                                   intailstr=intailstr,
                                    outtailstr='.wcs', skipifpartial=False)
     if type(fistarfitsxylist) == int:
         if fistarfitsxylist == -1:
             return -1
 
-    pool = mp.Pool(nworkers, maxtasksperchild=maxtasksperworker)
-
-    inpostfix = os.path.splitext(fistarfitsxyglob)[-1]
+    inpostfix = os.path.splitext(fistarfitsxylist[0])[-1]
 
     tasks = [
         [x, os.path.join(
@@ -852,6 +860,8 @@ def parallel_astrometrydotnet(
         ]
         for x in fistarfitsxylist
     ]
+
+    pool = mp.Pool(nworkers, maxtasksperchild=maxtasksperworker)
 
     # fire up the pool of workers
     results = pool.map(parallel_astrometrydotnet_worker, tasks)

@@ -2192,7 +2192,8 @@ def subframe_photometry_worker(task):
                                                    frameinfo[0][1],
                                                    frameinfo[0][2])
         elif observatory=='tess':
-            namesub = re.findall('tess20.*?-[0-9][0-9][0-9][0-9]_cal_img', subframe)
+            namesub = re.findall(
+                'tess20.*?-[0-9][0-9][0-9][0-9]_cal_img_bkgdsub', subframe)
             if not len(namesub) == 1:
                 raise AssertionError(
                     'expected only one subframe, got {:s}'.
@@ -2495,8 +2496,8 @@ def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
     for ix, photpath in enumerate(photpaths):
 
         if observatory=='tess':
-            framekey = re.findall('tess20.*?-[0-9][0-9][0-9][0-9]_cal_img',
-                                  photpath)
+            framekey = re.findall(
+                'tess20.*?-[0-9][0-9][0-9][0-9]_cal_img_bkgdsub', photpath)
             if not len(framekey) == 1:
                 raise AssertionError(
                     'expected only one photframe, got {:s}'.

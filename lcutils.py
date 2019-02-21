@@ -83,7 +83,7 @@ def _map_key_to_format(key):
     elif 'tmid_utc' in key: # timestamp
         return 'D'
     elif 'rstfc' in key: # frame id
-        return '40A'
+        return '48A'
 
 def _map_key_to_comment(k):
     kcd = {
@@ -118,7 +118,10 @@ def _map_key_to_comment(k):
         "ntemps"  : "number of temperatures avgd to get ccdtemp",
         'dtr_isub': "img subtraction photometry performed",
         'dtr_epd' : "EPD detrending performed",
-        'dtr_tfa' : "TFA detrending performed"
+        'dtr_tfa' : "TFA detrending performed",
+        'projid' :  "PIPE-TREX identifier for software version",
+        'btc_ra' : "Right ascen in barycentric time correction",
+        'btc_dec' : "Declination in barycentric time correction"
     }
     return kcd[k]
 
@@ -132,7 +135,7 @@ def convert_grcollect_to_fits_lc_worker(task):
     """
 
     (grclcpath, outpath, catdf, temperaturedf,
-     observatory, lcdir, fitsdir) = task
+     observatory, lcdir, fitsdir, projectid) = task
 
     if observatory != 'tess':
         # if not TESS, you may need to modify the header reads, and the overall
@@ -158,8 +161,8 @@ def convert_grcollect_to_fits_lc_worker(task):
     kwlist=['SIMPLE', 'SIMDATA', 'TELESCOP', 'INSTRUME', 'CAMERA', 'CCD',
             'EXPOSURE', 'TIMEREF', 'TASSIGN', 'TIMESYS', 'BJDREFI', 'BJDREFF',
             'TIMEUNIT', 'TELAPSE', 'LIVETIME', 'TSTART', 'TSTOP', 'DATE-OBS',
-            'DATE-END', 'DEADC', 'TIMEPIXR', 'TIERRELA', 'BTC_PIX1',
-            'BTC_PIX2', 'BARYCORR', 'INT_TIME', 'READ_TIME', 'FRAMETIM',
+            'DATE-END', 'DEADC', 'TIMEPIXR', 'TIERRELA',
+            'BARYCORR', 'INT_TIME', 'READ_TIME', 'FRAMETIM',
             'NUM_FRM', 'TIMEDEL', 'NREADOUT']
 
     hdict = iu.get_header_keyword_list(earliestframepath, kwlist, ext=0)
@@ -249,12 +252,20 @@ def convert_grcollect_to_fits_lc_worker(task):
     for k in lcd['objectinfo'].keys():
         primary_hdu.header['HIERARCH '+k] = lcd['objectinfo'][k]
 
+    kwlist=['SIMPLE', 'SIMDATA', 'TELESCOP', 'INSTRUME', 'CAMERA', 'CCD',
+            'EXPOSURE', 'TIMEREF', 'TASSIGN', 'TIMESYS', 'BJDREFI', 'BJDREFF',
+            'TIMEUNIT', 'TELAPSE', 'LIVETIME', 'TSTART', 'TSTOP', 'DATE-OBS',
+            'DATE-END', 'DEADC', 'TIMEPIXR', 'TIERRELA', 'BTC_PIX1',
+            'BTC_PIX2', 'BARYCORR', 'INT_TIME', 'READ_TIME', 'FRAMETIM',
+            'NUM_FRM', 'TIMEDEL', 'NREADOUT']
+
     primary_hdu.header['XCC'] = np.mean(lcd['xcc'])
     primary_hdu.header['YCC'] = np.mean(lcd['ycc'])
+    primary_hdu.header['PROJID'] = projectid
     primary_hdu.header['DTR_ISUB'] = True
     primary_hdu.header['DTR_EPD'] = False
     primary_hdu.header['DTR_TFA'] = False
-    for k in ['xcc','ycc','DTR_ISUB','DTR_EPD','DTR_TFA']:
+    for k in ['xcc','ycc','PROJID','DTR_ISUB','DTR_EPD','DTR_TFA']:
         primary_hdu.header.comments[k] = _map_key_to_comment(k.lower())
 
     hdulist = fits.HDUList([primary_hdu, hdutimeseries])
@@ -267,6 +278,7 @@ def convert_grcollect_to_fits_lc_worker(task):
 
 def parallel_convert_grcollect_to_fits_lc(lcdirectory,
                                           fitsdir,
+                                          projectid,
                                           catfile='/nfs/phtess1/ar1/TESS/FFI/RED_IMGSUB/TUNE/s0002/RED_4-4-1028_ISP/GAIADR2-RA98.4609411225734-DEC-58.5412164069738-SIZE12.catalog',
                                           ilcglob='*.grcollectilc',
                                           nworkers=16,
@@ -327,7 +339,7 @@ def parallel_convert_grcollect_to_fits_lc(lcdirectory,
     else:
 
         tasks = [(x, y, catdf, temperaturedf, observatory, lcdirectory,
-                  fitsdir) for x,y in zip(ilclist, outlist)]
+                  fitsdir, projectid) for x,y in zip(ilclist, outlist)]
 
         pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
         results = pool.map(convert_grcollect_to_fits_lc_worker, tasks)
@@ -693,7 +705,7 @@ def _make_dates_tfa(fitsdir, fitsimgglob, statsdir):
     the most obvious (and complete) way to generate them is directly from the
     images.
 
-    tess2018241202941-s0002-4-4-0121_cal_img 1360.3540539999999
+    tess2018241202941-s0002-4-4-0121_cal_img_bkgdsub 1360.3540539999999
     """
 
     imgfiles = glob(os.path.join(fitsdir, fitsimgglob))
@@ -1022,10 +1034,9 @@ def merge_tfa_lc_worker(task):
             tfadatacols = []
             for k in tfakeys:
                 thiscol = tfadata[k]
-                try:
-                    thiscol = np.insert(thiscol, inds_to_add.flatten(), np.array(np.nan))
-                except:
-                    import IPython; IPython.embed()
+
+                thiscol = np.insert(thiscol, inds_to_add.flatten(), np.array(np.nan))
+
                 tfadatacols.append(thiscol)
 
             wrn_msg = (
@@ -1047,7 +1058,12 @@ def merge_tfa_lc_worker(task):
         irm_ap_keys = ['IRM{}'.format(i) for i in range(1,n_apertures+1)]
         tfanames = [k.replace('IRM','TFA') for k in irm_ap_keys]
         tfaformats = ['D'] * len(tfanames)
-        tfadatacols = [tfadata[k] for k in tfanames]
+        if isinstance(tfadatacols,list):
+            # We made the TFA data columns above, appropriately ordered. Skip.
+            pass
+        else:
+            # We got np.array_equal(tfadata['RSTFC'],data['RSTFC']) true.
+            tfadatacols = [tfadata[k] for k in tfanames]
 
         tfacollist = [fits.Column(name=n, format=f, array=a) for n,f,a in
                       zip(tfanames, tfaformats, tfadatacols)]
@@ -1088,8 +1104,8 @@ def merge_tfa_lc_worker(task):
         )
 
         if primaryhdr['DTR_TFA']:
-            print('WRN! {} found TFA had been performed; skipping'.
-                  format(lcpath))
+            print('{}: WRN! {} found TFA had been performed; skipping'.
+                  format(datetime.utcnow().isoformat(),lcpath))
             return 0
 
         # create the "TF1", "TF2", "EPN" keys, format keys, and data columns.
@@ -1218,6 +1234,11 @@ def apply_barycenter_time_correction(fitsilcfile):
     # update primary HDU time meta-data
     primary_hdu.header['TIMESYS'] = 'TDB'
     primary_hdu.header['TIMEUNIT'] = 'd'
+    primary_hdu.header['BTC_RA'] = ra.value
+    primary_hdu.header['BTC_DEC'] = dec.value
+
+    for k in ['BTC_RA','BTC_DEC']:
+        primary_hdu.header.comments[k] = _map_key_to_comment(k.lower())
 
     outhdulist = fits.HDUList([primary_hdu, new_timeseries_hdu])
     if os.path.exists(fitsilcfile):

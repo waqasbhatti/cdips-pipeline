@@ -575,6 +575,7 @@ def fitslist_frameinfo(fitslist,
 ######################################
 
 def calibrated_frame_to_database(fitsfile,
+                                 projid=None,
                                  observatory='hatpi',
                                  overwrite=False,
                                  badframetag='badframes',
@@ -598,6 +599,9 @@ def calibrated_frame_to_database(fitsfile,
         fitsfile (str): path to fits file
 
     Kwargs:
+
+        projid (None or int): if passed, overwrites the projid read from the
+        fits file when doing the database insert.
 
         observatory (str): hatpi or tess
 
@@ -653,6 +657,12 @@ def calibrated_frame_to_database(fitsfile,
 
         # get header keywords from header_list
         headerdata = get_header_keyword_list(fitsfile, header_list)
+        if isinstance(projid,int):
+            # if forced, overwrite PROJID from the fits header with whatever is
+            # passed. this is relevant for PSQL bookkeeping situations in which
+            # you are using the same calibrated frames across different
+            # projids (to save disk space).
+            headerdata['PROJID'] = projid
 
         # get the frame's photometry info (useful for selecting refs)
         photfits, photinfo = get_frame_info(fitsfile)
@@ -1038,6 +1048,7 @@ def arefshifted_frame_to_db_worker(task):
 
 def parallel_frames_to_database(fitsbasedir,
                                 frametype,
+                                projid=None,
                                 observatory='hatpi',
                                 fitsglob='1-???????_?.fits',
                                 overwrite=False,
@@ -1063,59 +1074,50 @@ def parallel_frames_to_database(fitsbasedir,
 
     """
     # find all the FITS files
-    try:
+    print('%sZ: finding all FITS frames matching %s starting in %s' %
+          (datetime.utcnow().isoformat(), fitsglob, fitsbasedir))
 
-        print('%sZ: finding all FITS frames matching %s starting in %s' %
-              (datetime.utcnow().isoformat(), fitsglob, fitsbasedir))
+    fitslist = np.sort(glob.glob(os.path.join(fitsbasedir, fitsglob)))
 
-        fitslist = np.sort(glob.glob(os.path.join(fitsbasedir, fitsglob)))
+    # generate the task list
 
-        # generate the task list
+    # choose the frame to database worker
+    if not (frametype=='calibratedframes'
+            or frametype=='arefshifted_frames'):
+        raise NotImplementedError
 
-        # choose the frame to database worker
-        if not (frametype=='calibratedframes'
-                or frametype=='arefshifted_frames'):
-            raise NotImplementedError
-
-        if frametype == 'calibratedframes':
-            frame_to_db_worker = calframe_to_db_worker
-            tasks = [(x, {'observatory':observatory,
-                          'overwrite':overwrite,
-                          'nonwcsframes_are_ok':nonwcsframes_are_ok,
-                          'badframetag':badframetag}) for x in fitslist]
-        elif frametype == 'arefshifted_frames':
-            frame_to_db_worker = arefshifted_frame_to_db_worker
-            tasks = [(x, {'overwrite':overwrite,
-                          'nonwcsframes_are_ok':nonwcsframes_are_ok,
-                          'badframetag':badframetag}) for x in fitslist]
+    if frametype == 'calibratedframes':
+        frame_to_db_worker = calframe_to_db_worker
+        tasks = [(x, {'observatory':observatory,
+                      'projid':projid,
+                      'overwrite':overwrite,
+                      'nonwcsframes_are_ok':nonwcsframes_are_ok,
+                      'badframetag':badframetag}) for x in fitslist]
+    elif frametype == 'arefshifted_frames':
+        frame_to_db_worker = arefshifted_frame_to_db_worker
+        tasks = [(x, {'overwrite':overwrite,
+                      'nonwcsframes_are_ok':nonwcsframes_are_ok,
+                      'badframetag':badframetag}) for x in fitslist]
 
 
-        print('%sZ: %s files to send to db' %
-              (datetime.utcnow().isoformat(), len(tasks)))
+    print('%sZ: %s files to send to db' %
+          (datetime.utcnow().isoformat(), len(tasks)))
 
-        if len(tasks) > 0:
+    if len(tasks) > 0:
 
-            pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+        pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+        results = pool.map(frame_to_db_worker, tasks)
 
-            # fire up the pool of workers
-            results = pool.map(frame_to_db_worker, tasks)
+        # wait for the processes to complete work
+        pool.close()
+        pool.join()
 
-            # wait for the processes to complete work
-            pool.close()
-            pool.join()
+        return {x:y for (x,y) in results}
 
-            return {x:y for (x,y) in results}
+    else:
 
-        else:
-
-            print('ERR! %sZ: none of the files specified exist, bailing out...' %
-                  (datetime.utcnow().isoformat(),))
-            return
-
-    except subprocess.CalledProcessError:
-
-        print('ERR! %sZ: no files in directory %s, bailing out...' %
-              (datetime.utcnow().isoformat(), fitsbasedir))
+        print('ERR! %sZ: none of the files specified exist, bailing out...' %
+              (datetime.utcnow().isoformat(),))
         return
 
 
@@ -1517,7 +1519,6 @@ def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
                       'good astrometric reference frame! all tests failed!' %
                       (datetime.utcnow().isoformat(), ))
                 arefinfo = None
-
 
             # update the astromrefs table in the database if we found an
             # astromref frame, and copy it to the reference-frames directory
@@ -2246,14 +2247,13 @@ def framelist_make_xtrnsfits(fitsfiles,
     print('%sZ: %s files to astrometrically shift' %
           (datetime.utcnow().isoformat(), len(fitsfiles)))
 
-    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
-
     tasks = [(x, outdir, refinfo, warpcheck,
               {'threshold':warpthreshold, 'margins':warpmargins},
              observatory, fieldinfo)
              for x in fitsfiles if os.path.exists(x)]
 
     # fire up the pool of workers
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
     results = pool.map(frames_astromref_worker, tasks)
 
     # wait for the processes to complete work
@@ -3497,7 +3497,7 @@ def convsubfits_staticphot_worker(task):
 
         if observatory=='tess':
 
-            namesub = re.findall('tess20.*?-[0-9][0-9][0-9][0-9]_cal_img', subframe)
+            namesub = re.findall('tess20.*?-[0-9][0-9][0-9][0-9]_cal_img_bkgdsub', subframe)
             if not len(namesub) == 1:
                 raise AssertionError(
                     'expected only one subframe, got {:s}'.
@@ -3576,7 +3576,7 @@ def parallel_convsubfits_staticphot(
     # and overwrite == False, then do not re-run photometry.
 
     existingiphot = glob.glob(os.path.join(
-        fitsdir,'[r|n]sub-????????-'+ fitsglob.replace('.fits','iphot')))
+        fitsdir,'[r|n]sub-????????-'+ fitsglob.replace('.fits','.iphot')))
 
     if len(existingiphot) > 0 and not overwrite:
 
@@ -3621,7 +3621,7 @@ def parallel_convsubfits_staticphot(
         print('ERR! {:s}Z:'.format(datetime.utcnow().isoformat()) + ' the '+
               'files that reached convsubfits_staticphot_worker do not exist.'+
               ' bailing out...' )
-        return
+        return 42
 
 
 
