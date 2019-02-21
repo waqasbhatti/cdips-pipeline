@@ -4,6 +4,10 @@ functions for reducing TESS data.  contents are as follows, where "sub-tasks"
 in a conceptual sense are listed below the main task:
 ------------------------------------------
 
+parallel_bkgd_subtract: estimate sky background (with a median filter)
+
+parallel_plot_median_filter_quad: plot sky bkgd.
+
 parallel_mask_saturated_stars: mask saturated stars given saturation level
 
     mask_saturated_stars_worker
@@ -44,6 +48,7 @@ import shared_variables as sv
 
 import os, pickle, re
 import numpy as np, pandas as pd, matplotlib.pyplot as plt
+import matplotlib.colors as colors
 from glob import glob
 from parse import search
 
@@ -65,6 +70,9 @@ from lcstatistics import read_tfa_lc, plot_raw_epd_tfa
 from astrobase.periodbase import kbls
 from astrobase.varbase import lcfit
 from astrobase.varbase.transits import get_transit_times
+from astrobase import lcmath
+
+from scipy.ndimage import median_filter
 
 ##########################################
 
@@ -229,8 +237,9 @@ def parallel_trim_get_single_extension(fitslist, outdir, projid, nworkers=16,
     path_exists = []
     for ix, fitsname in enumerate(fitslist):
         outname = (
-            outdir + os.path.basename(
+            os.path.join(outdir, os.path.basename(
                 fitsname.replace('-s_ffic.fits', '_cal_img.fits'))
+            )
         )
         if os.path.exists(outname):
             path_exists.append(1)
@@ -285,8 +294,8 @@ def from_CAL_to_fitsh_compatible(task):
         raise AssertionError('expected calibrated FFI from MAST.')
 
     outname = (
-        outdir + os.path.basename(
-            fitsname.replace('-s_ffic.fits', '_cal_img.fits'))
+        os.path.join(outdir, os.path.basename(
+            fitsname.replace('-s_ffic.fits', '_cal_img.fits')))
     )
 
     data, hdr = iu.read_fits(fitsname, ext=1)
@@ -889,9 +898,9 @@ def _measure_planet_snr(plname, tfalc, statsdir, sectornum,
             return 1
 
         bls_period = fitd['period']
-        lcfit._make_fit_plot(fitd['phases'], fitd['phasedmags'], None,
-                             fitd['blsmodel'], fitd['period'], fitd['epoch'],
-                             fitd['epoch'], blsfit_savfile, magsarefluxes=True)
+        lcfit.make_fit_plot(fitd['phases'], fitd['phasedmags'], None,
+                            fitd['blsmodel'], fitd['period'], fitd['epoch'],
+                            fitd['epoch'], blsfit_savfile, magsarefluxes=True)
         ingduration_guess = fitd['transitduration']*0.2
         transitparams = [fitd['period'], fitd['epoch'], fitd['transitdepth'],
                          fitd['transitduration'], ingduration_guess ]
@@ -1093,7 +1102,7 @@ def append_ccd_temperature_to_hdr_worker(task):
 
     # get the temperature time series appropriate for this CAM/CCD pair using
     # the file name.  match: tess2018206192942-s0001-4-3-0120_cal_img.fits
-    sr = search('{}/tess2{}-{}-{}-{}-{}_cal_img.fits', fitsname)
+    sr = search('{}/tess2{}-{}-{}-{}-{}_cal_img_bkgdsub.fits', fitsname)
     cam = sr[3]
     ccd = sr[4]
 
@@ -1170,7 +1179,7 @@ def parallel_append_ccd_temperature_to_hdr(fitslist, temperaturepklpath,
     outdf = pd.DataFrame(results, columns=['framekey','ccdtemp','ntemps'])
 
     framekey = outdf['framekey'].iloc[0]
-    res = search('tess{}-{}_cal_img', framekey)
+    res = search('tess{}-{}_cal_img_bkgdsub', framekey)
     keystring = res[-1]
     outname = '{}_key_temperature_count.csv'.format(keystring)
 
@@ -1308,7 +1317,7 @@ def read_tess_txt_lightcurve(
                   'ifl1', 'ife1', 'irm1', 'ire1', 'irq1',
                   'ifl2', 'ife2', 'irm2', 'ire2', 'irq2',
                   'ifl3', 'ife3', 'irm3', 'ire3', 'irq3' ]
-    dtypelist = ('f8,U40,U19,'+
+    dtypelist = ('f8,U48,U19,'+
                  'f8,f8,f8,f8,f8,f8,f8,'+
                  'f8,f8,'+
                  'f8,f8,f8,f8,U1,'+
@@ -1374,6 +1383,265 @@ def read_object_reformed_catalog(reformedcatalogfile, isgaiaid=False):
                                )
     return catarr
 
+def median_filter_frame(task):
+
+    imgfile, outbkgdpath, outbkgdsubpath, n_sigma, k = task
+
+    if os.path.exists(outbkgdpath) and os.path.exists(outbkgdsubpath):
+        print('{} found and skipped {}'.format(
+            datetime.utcnow().isoformat(), outbkgdpath))
+        return 1
+
+    hdulist = fits.open(imgfile)
+    hdr, data = hdulist[0].header, hdulist[0].data
+
+    std_data = np.std(data)
+    med_data = np.median(data)
+
+    # overwrite stars with the median value... (because otherwise the scipy
+    # median filter faults out)
+    from copy import deepcopy
+    img = deepcopy(data)
+
+    sel_inds = data > (med_data + n_sigma*std_data)
+    data[sel_inds] = med_data
+
+    thisbkgd = median_filter(data, size=(k, k), mode='reflect')
+
+    hdu_bkgd = fits.PrimaryHDU(thisbkgd)
+    hdulist_bkgd = fits.HDUList([hdu_bkgd])
+
+    hdu_sub = fits.PrimaryHDU(data = img - thisbkgd,
+                              header=hdr)
+    hdulist_sub = fits.HDUList([hdu_sub])
+
+    outdir = os.path.dirname(outbkgdpath)
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+
+    for outhdu, outfile in zip(
+        [hdu_bkgd, hdu_sub],
+        [outbkgdpath, outbkgdsubpath]
+    ):
+        if not os.path.exists(outfile):
+            outhdu.writeto(outfile)
+            print('{}: made {}'.
+                  format(datetime.utcnow().isoformat(), outfile))
+        else:
+            print('{}: found & skipped {}'.
+                  format(datetime.utcnow().isoformat(), outfile))
+
+    hdulist_bkgd.close()
+
+
+def parallel_bkgd_subtract(fitslist, method='boxmedian', isfull=True, k=32,
+                           outdir=None, nworkers=32, maxworkertasks=1000,
+                           n_sigma=2):
+    """
+    Given list of FITS files, estimate the bulk sky background. Two additional
+    files are made for each FITS image passed:
+
+        1) "{fitsimg}_bkgd.fits": background image.
+        2) "{fitsimg}_bkgdsub.fits": target image minus the background image.
+        This is what should be used in subsequent image processing.
+
+    This subtraction step is needed because the local background model
+    attempted by `ficonv` (the "b" term in the kernel) is a poor model for the
+    scattered light in TESS.  A box median filter (by default, 32 x 32 on each
+    frame) does a good job.  (The same will probably be true for HATPI.)
+
+    kwargs:
+
+        method (str): 'boxmedian' (only one implemented).
+
+        k (int): box median size.
+
+        n_sigma (float): in background estimation, the first step is to replace
+        all pixels > n_sigma away from the median with the median background
+        value. This masks stars, but without leaving nans. The median filter is
+        then run on this masked image.
+
+        outdir (str): if passed, writes images to this directory. Else, writes
+        to directory implicit in fitslist.
+
+        isfull (bool): if a "FULL" reduction, expects 2 orbits (TESS-specific).
+
+    NOTES:
+    ----------
+    The call is to scipy.ndimage.median_filter, which runs in O(N*k) time, for
+    N the number of pixels in the image, k the kernel size.  Though faster
+    algorithms exist (Perreault & Hebert 2007), I could not find any that were
+    implemented in python (I checked PIL, astropy, and scikit learn).
+
+    The faster algorithms seem to mostly rely on smart cacheing and updating
+    histograms of the pixels in the kernel.  Some algorithms also rely on
+    assuming the image is in UINT8 or UINT16, which allows some binary tree
+    speedups too. The latter won't work for us.
+
+    Possible future method to implement: "boxmedianplustime", for a spatial box
+    median, plus a continuity condition in time (e.g., 32 x 32 spatial, plus a
+    window of [-3 cadences, 3 cadences]).
+    """
+    if method != 'boxmedian':
+        raise NotImplementedError(
+            'boxmedian is only implemented bkgd subtraction method, for now'
+        )
+
+    # Pass a N x N median filter over the FFIs. N x N is the physical box
+    # size in pixels. The Earth/Moon blobs move over a timescale of an
+    # orbit (27.8 days). Adding a time dimension is a possible future todo.
+
+    fitslist = np.sort(fitslist) # ensure we're time-ordered.
+
+    if isinstance(outdir,str):
+        pass
+    else:
+        outdir = os.path.dirname(fitslist[0])
+
+    outbkgdnames = [ os.path.join(outdir, n.replace(".fits", "_bkgd.fits")) for
+                    n in list(map(os.path.basename, fitslist)) ]
+
+    outbkgdsubnames = [ os.path.join(outdir, n.replace(
+        ".fits", "_bkgdsub.fits")) for n in
+        list(map(os.path.basename, fitslist))
+    ]
+
+    # TESS-specific: split by orbits, because of sharp features at
+    # beginning/end of orbits. 
+    tstarts, tstops = [], []
+    print('getting times for bkgd subtraction')
+    for img in fitslist:
+        d = iu.get_header_keyword_list(img, ['TSTART','TSTOP'], ext=0)
+        tstarts.append(d['TSTART'])
+        tstops.append(d['TSTOP'])
+    print('got times for bkgd subtraction')
+    tstarts, tstops = nparr(tstarts), nparr(tstops)
+    times = tstarts + (tstops-tstarts)/2.
+
+    orbitgap = 1. # days
+    expected_norbits = 2 if isfull else 1
+    norbits, groups = lcmath.find_lc_timegroups(times, mingap=orbitgap)
+
+    if norbits != expected_norbits:
+        outmsg = (
+            'bkgd estimation assumes given two orbits. {} orbits. Time {}'.
+            format(norbits, repr(times))
+        )
+        raise AssertionError(outmsg)
+
+    # Do background subtraction for each orbit separately.
+    for group_ix, group in enumerate(groups):
+
+        groupind = np.zeros_like(times)
+        groupind[group.start : group.stop] += 1
+        groupind = groupind.astype(np.bool)
+
+        tg_times = times[groupind]
+        tg_fitsimgs = fitslist[groupind]
+        tg_outbkgdnames = nparr(outbkgdnames)[groupind]
+        tg_outbkgdsubnames = nparr(outbkgdsubnames)[groupind]
+
+        print('{} starting median filter for orbit {}'.
+              format(datetime.utcnow().isoformat(), group_ix))
+
+        print('%sZ: %s files to median filter' %
+              (datetime.utcnow().isoformat(), len(tg_fitsimgs)))
+
+        pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+        tasks = [(x, y, z, n_sigma, k) for x, y, z in zip(tg_fitsimgs,
+                                                          tg_outbkgdnames,
+                                                          tg_outbkgdsubnames) ]
+
+        results = pool.map(median_filter_frame, tasks)
+
+        # wait for the processes to complete work
+        pool.close()
+        pool.join()
+
+        print('%sZ: finished median filtering' %
+              (datetime.utcnow().isoformat()))
+
+    return 1
+
+
+def plot_median_filter_quad(task):
+
+    bkgdfile, calfile, outdir = task
+
+    vmin, vmax = 10, int(1e3)
+
+    outpath = (
+        os.path.join(outdir,
+                     os.path.basename(bkgdfile).replace('.fits','.png'))
+    )
+
+    if os.path.exists(outpath):
+        print('found {}. continue'.format(outpath))
+        return 0
+
+    bkgd_img, _ = iu.read_fits(bkgdfile)
+    cal_img, _ = iu.read_fits(calfile)
+
+    plt.close('all')
+    fig, axs = plt.subplots(ncols=2, nrows=2)
+
+    norm = colors.LogNorm(vmin=vmin, vmax=vmax)
+    cset1 = axs[0,0].imshow(cal_img, cmap='viridis', vmin=vmin, vmax=vmax, norm=norm)
+    axs[0,1].imshow(bkgd_img, cmap='viridis', vmin=vmin, vmax=vmax, norm=norm)
+
+    diff_vmin, diff_vmax = -1000, 1000
+    diffnorm = colors.SymLogNorm(linthresh=0.03, linscale=0.03, vmin=diff_vmin,
+                                 vmax=diff_vmax)
+    cset2 = axs[1,0].imshow(cal_img - bkgd_img, cmap='RdBu_r', vmin=diff_vmin,
+                    vmax=diff_vmax, norm=diffnorm)
+    axs[1,1].imshow(cal_img - np.median(cal_img), cmap='RdBu_r', vmin=diff_vmin,
+                    vmax=diff_vmax, norm=diffnorm)
+
+    for ax in axs.flatten():
+        ax.set_xticklabels('')
+        ax.set_yticklabels('')
+        ax.get_xaxis().set_tick_params(which='both', direction='in')
+        ax.get_yaxis().set_tick_params(which='both', direction='in')
+        ax.xaxis.set_ticks_position('none')
+        ax.yaxis.set_ticks_position('none')
+
+    cb1 = fig.colorbar(cset1, ax=axs[0,1], extend='both')
+    cb2 = fig.colorbar(cset2, ax=axs[1,1], extend='both')
+    cb2.set_ticks([-1e3,-1e2,-1e1,0,1e1,1e2,1e3])
+    cb2.set_ticklabels(['-$10^3$','-$10^2$','-$10^1$','0',
+                        '$10^1$','$10^2$','$10^3$'])
+
+    fig.tight_layout(h_pad=0.1, w_pad=-7.3, pad=0)
+
+    fig.savefig(outpath, bbox_inches='tight', dpi=300)
+    print('{}: made {}'.format(datetime.utcnow().isoformat(), outpath))
+
+
+def parallel_plot_median_filter_quad(fitsdir, nworkers=16, maxworkertasks=1000):
+    """
+    make 2x2 plots of:
+        calibrated image          |     bkgd estimate
+        cal - bkgd                |     cal - constant median
+    """
+    bkgdfits = glob(os.path.join(fitsdir, '*_cal_img_bkgd.fits'))
+    _fitslist = [b.replace('_bkgd','') for b in bkgdfits]
+
+    outdir = fitsdir
+
+    print('%sZ: %s files to plot median filter quad' %
+          (datetime.utcnow().isoformat(), len(bkgdfits)))
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+    tasks = [(x,y,outdir) for x,y in zip(bkgdfits, _fitslist)]
+
+    results = pool.map(plot_median_filter_quad, tasks)
+
+    pool.close()
+    pool.join()
+
+    return 1
 
 def read_object_catalog(catalogfile):
     """
