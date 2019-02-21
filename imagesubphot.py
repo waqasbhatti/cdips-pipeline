@@ -165,6 +165,7 @@ different from the aperture photometry lightcurves.
 import os, glob, time, shutil
 import os.path
 import multiprocessing as mp
+import pandas as pd
 
 try:
     import subprocess32 as subprocess
@@ -3962,12 +3963,18 @@ def run_tfa_singlelc(epdlc,
                      epdlc_jdcol=0,
                      epdlc_magcol=(27,28,29),
                      template_sigclip=5.0,
-                     epdlc_sigclip=5.0):
+                     epdlc_sigclip=5.0,
+                     keep_epdlc=True):
     """
     This runs TFA for all apertures defined in epdlc_magcol for the input
     epdlc file, given an existing TFA template list in templatefile. If outfile
     is None, the output TFA LC will be in the same directory as epdlc but with
     an extension of .tfalc.
+
+    Args:
+        keep_epdlc (bool): If False, removes the epdlc file (since the same information
+            is contained in the tfalc anyway). If TFA failed, will simply rename
+            epdlc to tfalc.
     """
 
     tfacmdstr = ("tfa -i {epdlc} -t {templatefile} "
@@ -4053,43 +4060,35 @@ def run_tfa_singlelc(epdlc,
                 tfalc_output.append(None)
 
         try:
-            # make the .tfalc file, by moving the .tfalc.TF{1..3} end columns
-            tfa_ap1_lc = outfile+'.TF1'
-            tfa_ap2_lc = outfile+'.TF2'
-            tfa_ap3_lc = outfile+'.TF3'
+            # make the .tfalc file using an outer join.
+            # pandas read_csv is significantly faster than np.genfromtxt
+            # merge on epd file
+            epd_df = pd.read_csv(epdlc, delim_whitespace=True, comment='#',
+                                 header=None, dtype=str)
 
-            ap1_handle = open(tfa_ap1_lc, 'r')
-            ap2_handle = open(tfa_ap2_lc, 'r')
-            ap3_handle = open(tfa_ap3_lc, 'r')
+            # Get number of columns in tfalc files
+            last_col = len(pd.read_csv(outfile+'.TF1', delim_whitespace=True,
+                                       comment='#', header=None,
+                                       nrows=1).columns) - 1
 
-            ap1_lines = ap1_handle.readlines()
-            ap2_lines = ap2_handle.readlines()
-            ap3_lines = ap3_handle.readlines()
+            for i in range(len(epdlc_magcol)):
+                tfa_df = pd.read_csv(outfile+('.TF%d' % (i+1)), header=None,
+                                     delim_whitespace=True, comment='#',
+                                     dtype=str, usecols=[1,last_col])
+                epd_df = epd_df.merge(tfa_df, on=1, how='outer')
 
-            if not (len(ap3_lines) == len(ap2_lines) == len(ap1_lines)):
-                print(('%sZ: ERR! .tfalc.TF{1..3} files need equal number of '+
-                      'to make tfalc %s') % (datetime.utcnow().isoformat(), outfile)
-                     )
-                raise AssertionError
-
-            outlines = [ ' '.join(
-                            [a1.rstrip('\n'),
-                             a2.split(' ')[-1].split('\t')[-1].strip('\n'),
-                             a3.split(' ')[-1].split('\t')[-1].strip('\n')
-                            ]
-                        ) + '\n'
-                        for a1,a2,a3 in zip(ap1_lines, ap2_lines, ap3_lines)
-                        if not a1.startswith('#')
-                       ]
-
-            out_handle = open(outfile, 'w')
-            out_handle.writelines(outlines)
-
-            for handle in [ap1_handle, ap2_handle, ap3_handle, out_handle]:
-                handle.close()
+            epd_df.to_csv(outfile, sep='\t', na_rep='nan', header=False,
+                          index=False)
 
             print('%sZ: made %s' % (
                   datetime.utcnow().isoformat(), outfile))
+
+            # Remove .TF{1, 2, 3}
+            for i in range(len(epdlc_magcol)):
+                os.remove(outfile+('.TF%d' % (i+1)))
+
+            if not keep_epdlc:
+                os.remove(epdlc)
 
         except Exception as e:
 
@@ -4102,6 +4101,10 @@ def run_tfa_singlelc(epdlc,
 
         print('ERR! %sZ: no TFA possible for %s! ndet < 2 x n(TFA templates)' %
               (datetime.utcnow().isoformat(), epdlc))
+
+        if not keep_epdlc:
+            os.rename(epdlc, outfile)
+
         return None
 
 
@@ -4134,7 +4137,8 @@ def parallel_run_tfa(lcdir,
                      nworkers=16,
                      overwrite=False,
                      workerntasks=1000,
-                     tfalc_glob='*.tfalc'):
+                     tfalc_glob='*.tfalc',
+                     keep_epdlc=True):
     """
     This runs TFA on the EPD lightcurves.
     """
@@ -4176,7 +4180,8 @@ def parallel_run_tfa(lcdir,
     tasks = [(x, templatefiles, {'epdlc_jdcol':epdlc_jdcol,
                                  'epdlc_magcol':epdlc_magcol,
                                  'template_sigclip':template_sigclip,
-                                 'epdlc_sigclip':epdlc_sigclip})
+                                 'epdlc_sigclip':epdlc_sigclip,
+                                 'keep_epdlc':keep_epdlc})
              for x in epdlcfiles]
 
     print('%sZ: %s objects to process, starting parallel TFA...' %
