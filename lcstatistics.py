@@ -23,9 +23,9 @@ acf_percentiles_stats_and_plots:
     make csv files & plots summarizing ACF statistics for many stars
 
 plot_raw_epd_tfa:
-    Plot a 3 row, 1 column plot with rows of:
+    Plot a 2 (or 3) row, 1 column plot with rows of:
         * raw mags vs time
-        * EPD mags vs time
+        (* EPD mags vs time)
         * TFA mags vs time.
 
 plot_lightcurve_and_ACF:

@@ -3391,6 +3391,9 @@ def parallel_xtrnsfits_convsub(xtrnsfits,
                                colorscheme=None):
     """
     This convolves, and subtracts all FITS files in the xtrnsfits list.
+
+    WARNING: KNOWN BUG is that if reversesubtract is set to be false ("nsub"),
+    you introduce a sign error in the resulting magnitudes.
     """
 
     # first, check if the convolved, subtracted frames already exist. if so,
