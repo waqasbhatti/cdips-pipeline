@@ -121,7 +121,9 @@ def _map_key_to_comment(k):
         'dtr_tfa' : "TFA detrending performed",
         'projid' :  "PIPE-TREX identifier for software version",
         'btc_ra' : "Right ascen in barycentric time correction",
-        'btc_dec' : "Declination in barycentric time correction"
+        'btc_dec' : "Declination in barycentric time correction",
+        'rdistpx': "Distance from pixel (1024,1024) [pixels]",
+        'thetadeg': "Azimuth angle from pixel center [degrees]"
     }
     return kcd[k]
 
@@ -259,13 +261,25 @@ def convert_grcollect_to_fits_lc_worker(task):
             'BTC_PIX2', 'BARYCORR', 'INT_TIME', 'READ_TIME', 'FRAMETIM',
             'NUM_FRM', 'TIMEDEL', 'NREADOUT']
 
-    primary_hdu.header['XCC'] = np.mean(lcd['xcc'])
-    primary_hdu.header['YCC'] = np.mean(lcd['ycc'])
+    xcc, ycc = np.mean(lcd['xcc']), np.mean(lcd['ycc'])
+
+    # get polar coordinates from the field center. arctan2 is the numpy
+    # function appropriate for quadrant-specific arctangent.
+    x_mid, y_mid = 1024, 1024
+    r = np.sqrt((xcc - x_mid)**2 + (ycc - y_mid)**2)
+    theta_deg = np.arctan2( ycc-y_mid, xcc-x_mid ) * 180 / np.pi
+
+    primary_hdu.header['XCC'] = xcc
+    primary_hdu.header['YCC'] = ycc
+    primary_hdu.header['RDISTPX'] = r
+    primary_hdu.header['THETADEG'] = theta_deg
     primary_hdu.header['PROJID'] = projectid
     primary_hdu.header['DTR_ISUB'] = True
     primary_hdu.header['DTR_EPD'] = False
     primary_hdu.header['DTR_TFA'] = False
-    for k in ['xcc','ycc','PROJID','DTR_ISUB','DTR_EPD','DTR_TFA']:
+    for k in ['xcc','ycc','PROJID','DTR_ISUB','DTR_EPD','DTR_TFA',
+              'THETADEG','RDISTPX'
+    ]:
         primary_hdu.header.comments[k] = _map_key_to_comment(k.lower())
 
     hdulist = fits.HDUList([primary_hdu, hdutimeseries])
