@@ -1107,15 +1107,31 @@ def plot_raw_epd_tfa(time, rawmag, epdmag, tfamag, ap_index, savpath=None,
         ax.scatter(time, mag, c='black', alpha=0.9, zorder=2, s=3,
                    rasterized=True, linewidths=0)
 
-        txt_x, txt_y = 0.99, 0.98
+        txt_x, txt_y = 0.99, 0.02
         t = ax.text(txt_x, txt_y, txt, horizontalalignment='right',
+                verticalalignment='bottom', fontsize='small', zorder=3,
+                transform=ax.transAxes)
+
+        txt_x, txt_y = 0.99, 0.98
+        stdmmag = np.nanstd(mag)*1e3
+        if stdmmag > 0.1:
+            stattxt = '$\sigma$ = {:.1f} mmag'.format(stdmmag)
+            ndigits = 2
+        elif stdmmag > 0.01:
+            stattxt = '$\sigma$ = {:.2f} mmag'.format(stdmmag)
+            ndigits = 3
+        else:
+            stattxt = '$\sigma$ = {:.3f} mmag'.format(stdmmag)
+            ndigits = 4
+        _ = ax.text(txt_x, txt_y, stattxt, horizontalalignment='right',
                 verticalalignment='top', fontsize='small', zorder=3,
                 transform=ax.transAxes)
-        ax.yaxis.set_major_formatter(FormatStrFormatter('%.3f'))
         ax.get_yaxis().set_tick_params(which='both', direction='in',
                                        labelsize='x-small')
         ax.get_xaxis().set_tick_params(which='both', direction='in',
                                        labelsize='x-small')
+
+    for ax in axs:
         ylim = ax.get_ylim()
         ax.set_ylim((max(ylim), min(ylim)))
 
@@ -1125,7 +1141,7 @@ def plot_raw_epd_tfa(time, rawmag, epdmag, tfamag, ap_index, savpath=None,
     ax_hidden = fig.add_subplot(111, frameon=False)
     ax_hidden.tick_params(labelcolor='none', top=False, bottom=False,
                           left=False, right=False)
-    ax_hidden.set_ylabel('instrument mag', fontsize='small', labelpad=3)
+    ax_hidden.set_ylabel('Magnitude', fontsize='small', labelpad=5)
 
     if not savpath:
         savpath = 'temp_{:s}.png'.format(apstr)
