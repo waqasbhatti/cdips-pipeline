@@ -5,6 +5,7 @@ $ python TESS_reduction.py --help
 contents:
 
 main
+        record_reduction_parameters
         parallel_trim_get_single_extension
         parallel_bkgd_subtract
         parallel_plot_median_filter_quad
@@ -43,7 +44,6 @@ main
         make_cluster_cutout_jpgs
 
 minor functions:
-    record_reduction_parameters
     _plot_normalized_subtractedimg_histogram
     examine_astrometric_shifts
     is_imagesubtraction_complete
@@ -64,14 +64,12 @@ import aperturephot as ap, shared_variables as sv, autoimagesub as ais, \
        imagesubphot as ism, tessutils as tu, lcstatistics as lcs, \
        imageutils as iu, lcutils as lcu
 from glob import glob
-from tqdm import tqdm
 from astropy.io import fits
 from astropy import units as units, constants as constants
 from astropy import wcs
 from datetime import datetime
-import argparse
+import argparse, re, pickle
 from parse import parse, search
-import re, pickle
 
 from numpy import array as nparr
 from astropy.coordinates import SkyCoord
@@ -1190,7 +1188,7 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
                     do_bls_ls_killharm=False, npixexclude=npixexclude,
                     tfafromirm=tfafromirm)
 
-        lcu.parallel_merge_tfa_lcs(lcdirectory, nworkers=32)
+        lcu.parallel_merge_tfa_lcs(lcdirectory, nworkers=nworkers)
 
     if not os.path.exists(tfastatfile):
 
