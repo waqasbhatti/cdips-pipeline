@@ -1017,6 +1017,7 @@ def merge_tfa_lc_worker(task):
             return 0
 
         if np.array_equal(tfadata['RSTFC'],data['RSTFC']):
+            tfadatacols = None
             pass
         elif (not np.array_equal(tfadata['RSTFC'],data['RSTFC']) and
             len(tfadata['RSTFC']) < len(data['RSTFC'])
