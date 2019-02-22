@@ -29,3 +29,4 @@ GITREV
 examples/logs/
 scripts/log*
 scripts/tess_tuning_scripts/projid_????.sh
+scripts/mv*py
