@@ -1087,6 +1087,8 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
 
     if not os.path.exists(epdstatfile) and not skipepd:
 
+        raise AssertionError('in TESS reduction, we\'re skipping EPD!')
+
         fitsilcfiles = glob(os.path.join(lcdirectory,'*_llc.fits'))
         outfiles = fitsilcfiles
         hdulist = fits.open(fitsilcfiles[0])
@@ -1119,8 +1121,7 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
 
     if skipepd and not os.path.exists(tfastatfile):
         # do the hack of getting "EPD" statistics that are actually IRM
-        # statistics, duplicated into all the EPD fields. (time pressure, and I
-        # guess poor planning, makes code like this happen).
+        # statistics, duplicated into all the EPD fields.
         ap.parallel_lc_statistics(lcdirectory, epdlcglob, reformed_cat_file,
                                   tfalcrequired=False, epdlcrequired=False,
                                   fitslcnottxt=True, fovcatcols=(0,6),
@@ -1750,6 +1751,8 @@ def check_args(args):
         raise AssertionError('boolean tuneparameters must be set as string.')
     if not (args.camnum in [1,2,3,4]) and (args.ccdnum in [1,2,3,4]):
         print('camnum and ccdnum must be given')
+    if not args.skipepd:
+        raise AssertionError('skipepd must be true')
 
 
 if __name__ == '__main__':
