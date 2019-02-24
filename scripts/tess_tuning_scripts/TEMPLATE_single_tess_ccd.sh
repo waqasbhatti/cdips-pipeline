@@ -21,7 +21,7 @@ sector='s0001'
 # reduction-specific parameters #
 #################################
 tuneparameters=true
-nworkers=20
+nworkers=32
 aperturelist="1:7.0:6.0,1.5:7.0:6.0,2.25:7.0:6.0"
 epdsmooth=11
 epdsigclip=10000
@@ -30,15 +30,16 @@ anetfluxthreshold=50000
 anettweak=6
 anetradius=30
 initccdextent="0:2048,0:2048"
-kernelspec="b/4;i/4;d=5/2"
+kernelspec="i/3;d=3/2"
 catalog_faintrmag=13
 fiphotfluxthreshold=3000
 photreffluxthreshold=3000
 extractsources=0
 binlightcurves=0
 translateimages=1
-reversesubtract=0
+reversesubtract=1
 skipepd=1
+fixedtfatemplate="/nfs/phtess1/ar1/TESS/FFI/LC/FULL/s0002/STATS_FILES/ISP_2-2-1096_stats_files"
 
 ##########################################
 ##########################################
@@ -94,7 +95,7 @@ fi
 LOCAL_IMGBASE="/nfs/phtess1/ar1/TESS/FFI/RED_IMGSUB/"${tunefullstr}
 sectordir=$LOCAL_IMGBASE"/"${sector}"/"
 fitsdir=$sectordir"RED_"${camnum}"-"${ccdnum}"-"${projectid}"_ISP/"
-LOCAL_GLOBPATTERN='tess?????????????-'${sector}'-'${camnum}'-'${ccdnum}'-'${scid}'_cal_img.fits'
+LOCAL_GLOBPATTERN='tess?????????????-'${sector}'-'${camnum}'-'${ccdnum}'-'${scid}'_cal_img_bkgdsub.fits'
 fitsglob=$LOCAL_GLOBPATTERN
 lcbase="/nfs/phtess1/ar1/TESS/FFI/LC/"${tunefullstr}
 lcsector=$lcbase"/"${sector}"/"
@@ -143,5 +144,5 @@ python -u TESS_reduction.py \
   --photreffluxthreshold $photreffluxthreshold \
   --extractsources $extractsources --$binlcoption \
   --camnum $camnum --ccdnum $ccdnum --$translateoption \
-  --$rsuboption --$skipepdoption \
+  --$rsuboption --$skipepdoption --fixedtfatemplate $fixedtfatemplate \
   &> logs/$logname &
