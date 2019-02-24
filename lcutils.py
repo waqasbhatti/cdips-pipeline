@@ -774,7 +774,7 @@ def make_ascii_files_for_vartools(lcfiles, templatefiles, statsdir, fitsdir,
         dsts = []
         for src in pathstolink:
 
-            dst = os.path.join(statsdir, os.path.basename(path))
+            dst = os.path.join(statsdir, os.path.basename(src))
             dsts.append(dst)
 
             # now open the file, and replace all instances of e.g.,
