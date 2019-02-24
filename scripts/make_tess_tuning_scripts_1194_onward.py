@@ -119,7 +119,7 @@ def main():
             'binlightcurves':0,
             'translateimages':1,
             'reversesubtract':1,
-            'skipepd':0,
+            'skipepd':1,
             'fixedtfatemplate':fixedtfatemplate
         }
         projid += 1
@@ -151,7 +151,7 @@ def main():
             'binlightcurves':0,
             'translateimages':1,
             'reversesubtract':1,
-            'skipepd':0,
+            'skipepd':1,
             'fixedtfatemplate':fixedtfatemplate
         }
         projid += 1
