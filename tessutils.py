@@ -981,7 +981,7 @@ def _measure_planet_snr(plname, tfalc, statsdir, sectornum,
                                   'trapz_transitdepth':transitdepth,
                                   'oot_rms':subtractedrms,
                                   'npoints_in_transit':npoints_in_transit,
-                                  'ntransits':ntransits
+                                  'ntransits':ntransits,
                                   'tfalc':tfalc}, index=[0])
             outdf.to_csv(snrfit_savfile, index=False)
             print('made {}'.format(snrfit_savfile))
