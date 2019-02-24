@@ -30,11 +30,11 @@ parallel_apply_barycenter_time_correction
     astropy_utc_time_to_bjd_tdb
 """
 
-import os
+import os, sys, shutil
 import os.path
-import sys
 import logging
 from glob import glob
+from parse import search
 from datetime import datetime
 
 import numpy as np, pandas as pd, matplotlib.pyplot as plt
@@ -741,12 +741,68 @@ def _make_dates_tfa(fitsdir, fitsimgglob, statsdir):
 
 
 def make_ascii_files_for_vartools(lcfiles, templatefiles, statsdir, fitsdir,
-                                  fitsimgglob):
-    # lc_list_tfa, trendlist_tfa and dates_tfa
+                                  fitsimgglob, fixedtfatemplate=None):
+    """
+    lc_list_tfa: List of input light curve files to process.
+
+    trendlist_tfa: path to template lightcurve; XCC of template LC; YCC ditto.
+    (so that they're not too close to target star).
+
+    dates_tfa: list of all the image identifiers and times in the data set.
+
+    Kwargs:
+        fixedtfatemplate (str / None): if str, this is a path to a directory
+        already containing stats_files/trendlist_tfa_ap[1-3].txt files. These
+        files are symlinked to the current working directory and used for the
+        template stars.
+    """
 
     tfalclist_path = _make_tfa_lc_list(lcfiles, statsdir)
 
-    trendlisttfa_paths = _make_trendlist_tfa(templatefiles, statsdir)
+    # either make new lists of template stars, or use old ones if passed
+    # fixedtfatemplate
+    if not fixedtfatemplate:
+        trendlisttfa_paths = _make_trendlist_tfa(templatefiles, statsdir)
+
+    elif fixedtfatemplate and isinstance(fixedtfatemplate,str):
+        pathstolink = glob(os.path.join(
+            fixedtfatemplate,'trendlist_tfa_ap*.txt'))
+
+        if len(pathstolink) == 0 :
+            raise AssertionError('got no paths to link')
+
+        dsts = []
+        for src in pathstolink:
+
+            dst = os.path.join(statsdir, os.path.basename(path))
+            dsts.append(dst)
+
+            # now open the file, and replace all instances of e.g.,
+            # "/nfs/phtess1/ar1/TESS/FFI/LC/FULL/s0002/ISP_1-2-1163/2321703984136309248_llc.fits"
+            # with for example:
+            # "/nfs/phtess1/ar1/TESS/FFI/LC/FULL/s0002/ISP_1-2-1192/2321703984136309248_llc.fits"
+            with open(src, 'r') as f:
+                inlines = f.readlines()
+
+            pres = search('{}/ISP_{}/{}', inlines[0])
+            srcprojidstr = pres[1]
+
+            pres = search('{}/ISP_{}/{}', statsdir)
+            dstprojidstr = pres[1]
+
+            outlines = []
+            print('replacing {} with {}...'.format(srcprojidstr, dstprojidstr))
+            for l in inlines:
+                outlines.append(l.replace(srcprojidstr, dstprojidstr))
+
+            with open(dst, 'w') as f:
+                f.writelines(outlines)
+            print('made {} from {} source'.format(dst, src))
+
+        trendlisttfa_paths = dsts
+
+    else:
+        raise NotImplementedError
 
     datestfa_path = _make_dates_tfa(fitsdir, fitsimgglob, statsdir)
 
@@ -890,7 +946,8 @@ def run_tfa(tfalclist_path, trendlisttfa_paths, datestfa_path, lcdirectory,
     """
     Run TFA on all apertures. Optionally, if do_bls_ls_killharm, include a
     sequence of BLS, then Lomb-Scargle, then harmonic killing, then BLS on the
-    harmonic-subtracted residual.
+    harmonic-subtracted residual. If tfafromirm is True, TFA is called on IRM
+    mags, otherwise it is called on EPD mags.
 
     If running TFA alone, of order ~10k lightcurves per minute are created in
     os.path.join(lcdirectory, 'TFA_LCS'). If also doing BLS etc, it's of order

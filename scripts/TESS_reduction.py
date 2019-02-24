@@ -704,7 +704,7 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
                                 binlightcurves, get_masks,
                                 tfa_template_sigclip, tfa_epdlc_sigclip,
                                 translateimages, reversesubtract, skipepd,
-                                useimagenotfistar):
+                                useimagenotfistar, fixedtfatemplate):
     """
     each "reduction version" is identified by a project ID. the parameters
     corresponding to each project ID are written in a pickle file, so that we
@@ -746,7 +746,8 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
         "translateimages":translateimages,
         "reversesubtract":reversesubtract,
         "skipepd":skipepd,
-        "useimagenotfistar":useimagenotfistar
+        "useimagenotfistar":useimagenotfistar,
+        "fixedtfatemplate":fixedtfatemplate
     }
 
     outpicklename = "projid_{:s}.pickle".format(repr(projectid))
@@ -1048,7 +1049,7 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
                    fitsglob, camera, ccd, projectid,
                    epdsmooth=11, epdsigclip=10, nworkers=10,
                    binlightcurves=False, tfa_template_sigclip=5.0,
-                   tfa_epdlc_sigclip=5.0, skipepd=True):
+                   tfa_epdlc_sigclip=5.0, skipepd=True, fixedtfatemplate=None):
     """
     Step ISP11: do EPD on all the LCs, and collect stats on the results.
     for ISP LCs, use lcmagcols=([27,28,29],[30,],[30,],[30,])
@@ -1174,14 +1175,15 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
         # lc_list_tfa, trendlist_tfa and dates_tfa
         (tfalclist_path, trendlisttfa_paths, datestfa_path) = (
         lcu.make_ascii_files_for_vartools(lcfiles, templatefiles, statsdir,
-                                          fitsdir, fitsglob)
+                                          fitsdir, fitsglob,
+                                          fixedtfatemplate=fixedtfatemplate)
         )
 
         # Note that sometimes, you should do BLS + LS + killharm too.  for now
         # though, we are making lightcurves; these extra steps can come later.
         # If you skipped EPD, then you do TFA from IRM. otherwise, you do TFA
         # from EPD.
-        npixexclude = 10
+        npixexclude = 20
         tfafromirm = skipepd
         lcu.run_tfa(tfalclist_path, trendlisttfa_paths, datestfa_path,
                     lcdirectory, statsdir, nworkers=nworkers,
@@ -1438,7 +1440,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
          photreffluxthreshold=1000, extractsources=True, binlightcurves=False,
          get_masks=1, tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0,
          translateimages=True, reversesubtract=False, skipepd=True,
-         useimagenotfistar=True
+         useimagenotfistar=True, fixedtfatemplate=None
          ):
     """
     args:
@@ -1482,7 +1484,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                                 binlightcurves, get_masks,
                                 tfa_template_sigclip, tfa_epdlc_sigclip,
                                 translateimages, reversesubtract, skipepd,
-                                useimagenotfistar)
+                                useimagenotfistar, fixedtfatemplate)
 
     starttime = datetime.utcnow()
 
@@ -1708,7 +1710,8 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                    epdsmooth=epdsmooth, epdsigclip=epdsigclip,
                    nworkers=nworkers, binlightcurves=binlightcurves,
                    tfa_template_sigclip=tfa_template_sigclip,
-                   tfa_epdlc_sigclip=tfa_epdlc_sigclip, skipepd=skipepd)
+                   tfa_epdlc_sigclip=tfa_epdlc_sigclip, skipepd=skipepd,
+                   fixedtfatemplate=fixedtfatemplate)
 
     statsdir = os.path.dirname(epdstatfile)+'/'
     outprefix = str(field)+'-'+str(projectid)
@@ -1725,10 +1728,9 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                str(ccd))
     )
     astromrefpath = glob(astromrefglob)
-    if len(astromrefpath)==0:
-        #FIXME this is a bug.
-        print('ERR! astromrefglob wrong for run assessment')
-        import IPython; IPython.embed()
+    if len(astromrefpath) != 1:
+        print('FATAL ERR! astromrefglob wrong for run assessment')
+        raise AssertionError
     astromrefpath = astromrefpath[0]
     assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
                field, camera, ccd, tfastatfile, ra_nom, dec_nom,
@@ -1940,6 +1942,15 @@ if __name__ == '__main__':
     )
     parser.set_defaults(skipepd=True)
 
+    parser.add_argument(
+        '--fixedtfatemplate', type=str,
+        default=None,
+        help=('(for optimization): find the TFA template stars lists used in '
+              'VARTOOLS TFA call in this directory. idea is that you\'ve done a '
+              'previous run, and now want to fix the template stars to tweak '
+              'other things.')
+    )
+
     args = parser.parse_args()
 
     check_args(args)
@@ -1973,5 +1984,6 @@ if __name__ == '__main__':
          tfa_epdlc_sigclip=args.tfa_epdlc_sigclip,
          translateimages=args.trnsimgs,
          reversesubtract=args.reversesubtract,
-         skipepd=args.skipepd
+         skipepd=args.skipepd,
+         fixedtfatemplate=args.fixedtfatemplate
     )
