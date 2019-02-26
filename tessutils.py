@@ -878,6 +878,13 @@ def _measure_planet_snr(plname, tfalc, statsdir, sectornum,
         flux /= fluxmedian
         err_flux /= fluxmedian
 
+        finds = np.isfinite(flux) & np.isfinite(err_flux)
+        flux = flux[finds]
+        err_flux = err_flux[finds]
+        if len(time) > len(flux):
+            # hack to match indices on first iteration
+            time = time[finds]
+
         # fit BLS model; plot resulting phased LC.
         endp = 1.05*(np.nanmax(time) - np.nanmin(time))/2
         blsdict = kbls.bls_parallel_pfind(time, flux, err_flux,
