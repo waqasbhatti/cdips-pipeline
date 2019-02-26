@@ -1321,7 +1321,16 @@ def apply_barycenter_time_correction(fitsilcfile):
 
     outhdulist = fits.HDUList([primary_hdu, new_timeseries_hdu])
     if os.path.exists(fitsilcfile):
-        os.remove(fitsilcfile)
+        try:
+            os.remove(fitsilcfile)
+        except OSError as e:
+            # rare occasion, get OSError: [Errno 18] Invalid cross-device link.
+            # might be an issue at the nfs level.
+            print('{}Z: ERR! got {} in TMID_BJD write to {}'.
+                  format(datetime.utcnow().isoformat(), repr(e), fitsilcfile)
+            )
+            return
+
     outhdulist.writeto(fitsilcfile, overwrite=False)
 
     inhdulist.close()
