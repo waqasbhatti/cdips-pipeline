@@ -22,7 +22,7 @@ Stat calculation functions
         compute autocorrelation function stats for many lightcurves
 
     compute_dacf:
-        uses VARTOOLS to compute the discrete autocorrelation
+        compute the discrete autocorrelation function for a lightcurve
 
     compute_correction_coeffs:
         fit catalog mags to fluxes to obtain a corrected catalog mag
@@ -72,6 +72,7 @@ from astrobase.varbase.autocorr import autocorr_magseries
 
 from datetime import datetime
 import multiprocessing as mp
+from functools import partial
 
 from astropy.io import fits
 
@@ -435,9 +436,9 @@ def parallel_compute_acf_statistics(
     return {result for result in results}
 
 
-def compute_dacf(times, mags, errs,
-                 lagmin=0.0, lagmax=10.0, lagstep=0.1):
-    '''
+def compute_dacf(times, mags, errs, lagstep=0.1,
+                 lagmin=0.0, lagmax=10.0, laglist=None):
+    """
     Compute the discrete autocorrelation function for a lightcurve.
 
     Follows the definition of DACF in Edelson & Krolik (1988).
@@ -449,66 +450,111 @@ def compute_dacf(times, mags, errs,
     Args:
         times (array):  Array of times
         mags (array):   Magnitude column(s)
-        errs (array):   Error column(s)
+        errs (array):   Error column(s). There should either by one errcol
+                        for each magcol, or mags should be a list of magcols
+                        where each sublist corresponds to one errcol.
         lagmin (float): Minimum lag to evaluate
         lagmax (float): Maximum lag
         lagstep (float):Size of lag bins
-    '''
-    # TODO: Check dimensions of inputs
+        laglist (list): Only evaluate the lag at these points. Takes priority
+                        over lagmin, lagmax.
+    """
     times = np.asarray(times)
     mags = np.asarray(mags)
     errs = np.asarray(errs)
 
+    # Check dimensions
     if mags.ndim == 1:
         mags = np.asarray([mags])
+    # List of magcols provided
+    if mags.ndim == 2:
+        # One err col
+        if errs.ndim == 1:
+            errs = np.asarray([errs])
+            err_inds = [0 for i in range(mags.shape[0])]
+        # List of errcols
+        elif errs.ndim == 2:
+            assert errs.shape[0] == mags.shape[0]
+            err_inds = [i for i in range(mags.shape[0])]
+    # List of list of magcols
+    if mags.ndim == 3:
+        # Must provide list of errcols
+        assert errs.ndim == 2 and errs.shape[0] == mags.shape[0]
+        err_inds = []
+        for i in range(errs.shape[0]):
+            err_inds += [i for j in range(len(mags[i]))]
+        # Flatten magcols
+        mags = mags.reshape(-1, mags.shape[2])
 
     # Note: will ignore complete rows that have NaNs.
     finite_inds = np.full(len(times), True)
     for i in range(mags.shape[0]):
         finite_inds &= np.isfinite(mags[i])
-    finite_inds &= np.isfinite(errs)
+    for i in range(errs.shape[0]):
+        finite_inds &= np.isfinite(errs[i])
     times = times[finite_inds]
     mags = mags[:, finite_inds]
-    errs = errs[finite_inds]
+    errs = errs[:, finite_inds]
 
-    # For now, just have a single set of errors but with multiple magnitudes
-    if lagmin is None:
+    if laglist is None:
+        if lagmin is None:
+            lagmin = 0.0
+        if lagmax is None:
+            lagmax = np.max(times) - np.min(times)
+        nbins = int(np.ceil((lagmax - lagmin)/lagstep) + 1)
+        lagarr = lagmin + np.asarray(range(nbins))*lagstep
+    else:
         lagmin = 0.0
-    if lagmax is None:
-        lagmax = np.max(times) - np.min(times)
-    nbins = int(np.ceil((lagmax - lagmin)/lagstep) + 1)
-
-    # Pre compute values
-    # Error-weighted average
-    mags_avg = np.average(mags, weights=1/errs**2, axis=1)
-    # Error-weighted mean-centered mag
-    mags_ce = (mags - mags_avg[:, None]) / errs
-    mags_cesq = mags_ce**2
-    # Compute all point-wise correlations and squared errors
-    dcf = mags_ce[:, None, :] * mags_ce[:, :, None]
-    edcf = mags_cesq[:, None, :] + mags_cesq[:, :, None]
+        nbins = len(laglist)
+        lagarr = np.asarray(laglist)
 
     # Create matrix of bins
     bins = np.empty((len(times), len(times)))
     for i in range(len(times)):
         bins[i, :] = times - lagmin - times[i] + lagstep/2.
     bins = np.floor(bins / lagstep)
-    # Other empty matrices
-    udcf = np.zeros((mags.shape[0], nbins))
-    eudcf = np.zeros((mags.shape[0], nbins))
-    Nudcf = np.zeros(nbins, dtype=int)
     ones = np.ones_like(bins, dtype=int)
 
-    for b in range(nbins):
+    # Pre compute values
+    # Error-weighted average
+    mags_avg = np.average(mags, weights=1/errs[err_inds]**2, axis=1)
+    # Error-weighted mean-centered mag
+    mags_ce = (mags - mags_avg[:, None]) / errs[err_inds]
+    mags_cesq = mags_ce**2
+    # Compute all point-wise correlations and squared errors
+    pwc = [mags_ce[i] * mags_ce[i,:, None] for i in range(mags.shape[0])]
+    sqe = [mags_cesq[i] + mags_cesq[i,:,None] for i in range(mags.shape[0])]
+    # Other empty matrices
+    udcf = [np.empty(nbins) for i in range(mags.shape[0])]
+    eudcf = [np.empty(nbins) for i in range(mags.shape[0])]
+    Nudcf = np.zeros(nbins, dtype=int)
+
+    # Actually compute the cross-correlation
+    for (l, lag) in enumerate(lagarr):
         # Find indices which fall into particular bins
+        b = np.rint(lag / lagstep)
         flag = (bins == b)
-        Nudcf[b] = np.sum(ones[flag])
-        udcf[:,b] = np.sum(dcf[:,flag], axis=1)
-        eudcf[:,b] = np.sum(edcf[:,flag], axis=1)
+        Nudcf[l] = np.sum(ones[flag])
+        for i in range(mags.shape[0]):
+            udcf[i][l] = np.sum(pwc[i][flag])
+            eudcf[i][l] = np.sum(sqe[i][flag])
 
     # Normalize by number of points in each bin
-    udcf = udcf / Nudcf
-    eudcf = np.sqrt(eudcf) / Nudcf
+    udcf = np.asarray(udcf) / Nudcf
+    eudcf = np.sqrt(np.asarray(eudcf)) / Nudcf
+
+    # Only keep lags with non-zero points
+    if laglist is None:
+        nonzero = Nudcf > 0
+        udcf = udcf[:,nonzero]
+        eudcf = eudcf[:,nonzero]
+        Nudcf = Nudcf[nonzero]
+        lagarr = lagarr[nonzero]
+        nbins = len(lagarr)
+
+    if udcf.shape[0] == 1:
+        udcf = udcf.reshape(udcf.shape[1])
+        eudcf = eudcf.reshape(eudcf.shape[1])
 
     return {
         'udcf': udcf,
@@ -516,8 +562,172 @@ def compute_dacf(times, mags, errs,
         'Nudcf': Nudcf,
         'nbins': nbins,
         'timestep': lagstep,
-        'lags': lagmin + np.asarray(range(nbins))*lagstep
+        'lags': lagarr
     }
+
+
+def compute_dacf_worker(tfafile, outdir='./', lagstep=0.1,
+                        lagmin=0.0, lagmax=10.0, laglist=None,
+                        n_apertures=3, skipepd=False,
+                        writeoutfile=True):
+    """
+    Wrapper around compute_dacf.
+    """
+    lcext = os.path.splitext(tfafile)[1]
+    if lcext == '.fits':
+        raise NotImplementedError
+    else:
+        lcdata = read_tfa_lc(tfafile)
+        if lcdata.size == 0:
+            print('%sZ: WRN! %s is empty.' %
+                  (datetime.utcnow().isoformat(), tfafile))
+            return None
+
+    outfile = os.path.join(outdir,
+                           os.path.basename(tfafile).replace(lcext, '.autocorr'))
+    header = 'Lag Npairs '
+
+    times = lcdata['btjd']
+    mags = []
+    errs = []
+    for ap in range(1, n_apertures+1):
+        rawap = 'RM{:d}'.format(ap)
+        epdap = 'EP{:d}'.format(ap)
+        tfaap = 'TF{:d}'.format(ap)
+        errap = 'RMERR{:d}'.format(ap)
+
+        if not skipepd:
+            mags.append([lcdata[rawap], lcdata[epdap], lcdata[tfaap]])
+            header += 'AC_RM{0:d} AC_ERR_RM{0:d} AC_EP{0:d} AC_ERR_EP{0:d} '
+            header += 'AC_TF{0:d} AC_ERR_TF{0:d} '
+        else:
+            mags.append(list(lcdata[rawap], lcdata[tfaap]))
+            header += 'AC_RM{0:d} AC_ERR_RM{0:d} AC_TF{0:d} AC_ERR_TF{0:d} '
+        header = header.format(ap)
+        errs.append(lcdata[errap])
+
+    results = compute_dacf(times, mags, errs, lagstep=lagstep,
+                           lagmin=lagmin, lagmax=lagmax, laglist=laglist)
+
+    # Write results to output
+    if writeoutfile:
+        outf = open(outfile, 'w')
+        outf.write(header.strip() + '\n')
+        for r in range(results['nbins']):
+            row = '{:.7f} '.format(results['lags'][r])
+            row += '{:d} '.format(results['Nudcf'][r])
+            for col in range(results['udcf'].shape[0]):
+                row += '{:.6f} {:.6f} '.format(
+                    results['udcf'][col, r], results['eudcf'][col, r])
+            outf.write(row.strip() + '\n')
+    else:
+        results['lcobj'] = os.path.splitext(os.path.basename(tfafile))[0]
+    return results
+
+
+def parallel_compute_dacf(lcfiles, outdir=None, lagmin=0.0, lagmax=10.0,
+                          lagstep=0.1, n_apertures=3, skipepd=False,
+                          compilestats=True, overwrite=True,
+                          nworkers=20, workerntasks=1000):
+    """
+    Computes the ACF for a list of lightcurves.
+
+    Args:
+        lcfiles: List of lcfiles.
+    """
+    if outdir is None:
+        outdir = os.path.dirname(lcfiles[0])
+    elif not os.path.isdir(outdir):
+        os.mkdir(outdir)
+
+    if not overwrite:
+        lcfiles = [fn for fn in lcfiles \
+                   if os.path.exists(os.path.splitext(fn)[0] + '.autocorr')]
+        if len(lcfiles) == 0:
+            print('%sZ: autocorrelation already computed for all lcfiles...' %
+                  datetime.utcnow().isoformat())
+            return None
+
+    print('%sZ: %s lightcurves to calculate complete ACF.' %
+          (datetime.utcnow().isoformat(), len(lcfiles)))
+
+    pool = mp.Pool(nworkers,maxtasksperchild=workerntasks)
+    dacf_worker = partial(compute_dacf_worker, outdir=outdir,
+                          lagstep=lagstep, lagmin=lagmin, lagmax=lagmax,
+                          n_apertures=n_apertures, skipepd=skipepd)
+    results = pool.map(dacf_worker, lcfiles)
+    pool.close()
+    pool.join()
+
+    print('%sZ: done. %s lightcurves processed.' %
+          (datetime.utcnow().isoformat(), len(lcfiles)))
+
+    return results
+
+
+def parallel_compute_dacf_statistics(lcdir='./', lcglob='*.tfalc',
+                                     lcfiles = None,
+                                     outfile=None, lagstep=0.1,
+                                     laglist=[0.0, 0.1, 0.3, 1.0, 5.0, 10.0],
+                                     n_apertures=3, skipepd=False,
+                                     nworkers=20, workerntasks=1000,
+                                     outheader=None):
+    """
+    Evaluates the ACF at fixed positions for lightcurves and compiles results.
+
+    Args:
+        lcfiles: List of lcfiles.
+    """
+    if lcfiles is None:
+        lcfiles = glob(os.path.join(lcdir, lcglob))
+    print('%sZ: %s lightcurves to process.' %
+          (datetime.utcnow().isoformat(), len(lcfiles)))
+
+    if outfile is None:
+        outfile = './acf-statistics.txt'
+    outf = open(outfile, 'wb')
+
+    pool = mp.Pool(nworkers,maxtasksperchild=workerntasks)
+    dacf_stat_worker = partial(compute_dacf_worker, lagstep=lagstep,
+                               laglist=laglist, n_apertures=n_apertures,
+                               skipepd=skipepd, writeoutfile=False)
+    results = pool.map(dacf_stat_worker, lcfiles)
+    pool.close()
+
+    print('%sZ: done. %s lightcurves processed.' %
+          (datetime.utcnow().isoformat(), len(lcfiles)))
+
+    # Write header for stats.
+    if outheader is not None:
+        outf.write(outheader.encode('utf-8'))
+    outcolkey = '# object '
+
+    if not skipepd:
+        apcols = ['rm', 'ep', 'tf']
+    else:
+        apcols = ['rm', 'tf']
+    num_cols = n_apertures * len(apcols)
+    for (lag, apnum, ap) in itertools.product(laglist, range(1, n_apertures+1),
+                                              apcols):
+        outcolkey += '%s%d_lag_%.2f_day ' % (ap, apnum, lag)
+    outcolkey = outcolkey[:-1] + '\n'
+    outf.write(outcolkey.encode('utf-8'))
+
+    for stat in results:
+        if stat is None:
+            continue
+        outstr = stat['lcobj'] + ' '
+        for i in range(len(laglist)):
+            outstr += ('%f ' * num_cols)
+            outstr %= tuple(stat['udcf'][:, i])
+        outstr = outstr[:-1] + '\n'
+        outf.write(outstr.encode('utf-8'))
+
+    outf.close()
+    print('%sZ: wrote statistics to file %s' %
+          (datetime.utcnow().isoformat(), outfile))
+
+    return results
 
 
 def compute_correction_coeffs(catmags, fluxes):
