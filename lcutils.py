@@ -1276,7 +1276,9 @@ def parallel_apply_barycenter_time_correction(lcdirectory, nworkers=16,
 def apply_barycenter_time_correction_worker(task):
     # wrapper for common API
     fitsilcfile = task
-    apply_barycenter_time_correction(fitsilcfile)
+    result = apply_barycenter_time_correction(fitsilcfile)
+    return result
+
 
 
 def apply_barycenter_time_correction(fitsilcfile):
@@ -1326,10 +1328,14 @@ def apply_barycenter_time_correction(fitsilcfile):
         except OSError as e:
             # rare occasion, get OSError: [Errno 18] Invalid cross-device link.
             # might be an issue at the nfs level.
-            print('{}Z: ERR! got {} in TMID_BJD write to {}'.
+            print('{}Z: ERR! got {} in TMID_BJD write to {}. mv -> graveyard.'.
                   format(datetime.utcnow().isoformat(), repr(e), fitsilcfile)
             )
-            return
+            graveyarddir = "/nfs/phtess1/ar1/TESS/FFI/GRAVEYARD"
+            shutil.move(fitsilcfile,
+                        os.path.join(graveyarddir,
+                                     os.path.basename(fitsilcfile)))
+            return 42
 
     outhdulist.writeto(fitsilcfile, overwrite=False)
 
@@ -1338,6 +1344,8 @@ def apply_barycenter_time_correction(fitsilcfile):
     print('{}Z: wrote TMID_BJD and BARYCORR to {}'.
           format(datetime.utcnow().isoformat(), fitsilcfile)
     )
+
+    return 1
 
 
 def astropy_utc_time_to_bjd_tdb(tmid_utc, ra, dec, observatory='tess',
