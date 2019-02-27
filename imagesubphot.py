@@ -3640,7 +3640,7 @@ def epd_lightcurve_imagesub(ilcfile,
     ilc = np.genfromtxt(ilcfile,
                         usecols=tuple(xy + sdk + mags),
                         dtype='f8,f8,f8,f8,f8,f8,f8,f8',
-                        names=['xcc','ycc',
+                        names=['xic','yic',
                                'fsv','fdv','fkv',
                                'rm1','rm2','rm3'])
     if observatory=='hatpi':
@@ -3655,11 +3655,11 @@ def epd_lightcurve_imagesub(ilcfile,
     else:
         raise NotImplementedError('observatory must be "tess" or "hatpi"')
 
-    if len(ilc['xcc']) >= minndet:
+    if len(ilc['xic']) >= minndet:
 
         # get the indices where all columns are non-nan
-        combinedok = (npisfinite(ilc['xcc']) &
-                      npisfinite(ilc['ycc']) &
+        combinedok = (npisfinite(ilc['xic']) &
+                      npisfinite(ilc['yic']) &
                       npisfinite(ilc['fsv']) &
                       npisfinite(ilc['fdv']) &
                       npisfinite(ilc['fkv']) &
@@ -3673,8 +3673,8 @@ def epd_lightcurve_imagesub(ilcfile,
             ilc['fsv'][combinedok],
             ilc['fdv'][combinedok],
             ilc['fkv'][combinedok],
-            ilc['xcc'][combinedok],
-            ilc['ycc'][combinedok],
+            ilc['xic'][combinedok],
+            ilc['yic'][combinedok],
             smooth=smooth, sigmaclip=sigmaclip,
             observatory=observatory, temperatures=temperatures
             )
@@ -3684,8 +3684,8 @@ def epd_lightcurve_imagesub(ilcfile,
             ilc['fsv'][combinedok],
             ilc['fdv'][combinedok],
             ilc['fkv'][combinedok],
-            ilc['xcc'][combinedok],
-            ilc['ycc'][combinedok],
+            ilc['xic'][combinedok],
+            ilc['yic'][combinedok],
             smooth=smooth, sigmaclip=sigmaclip,
             observatory=observatory, temperatures=temperatures
             )
@@ -3695,8 +3695,8 @@ def epd_lightcurve_imagesub(ilcfile,
             ilc['fsv'][combinedok],
             ilc['fdv'][combinedok],
             ilc['fkv'][combinedok],
-            ilc['xcc'][combinedok],
-            ilc['ycc'][combinedok],
+            ilc['xic'][combinedok],
+            ilc['yic'][combinedok],
             smooth=smooth, sigmaclip=sigmaclip,
             observatory=observatory, temperatures=temperatures
             )
@@ -3749,13 +3749,13 @@ def epd_lightcurve_imagesub(ilcfile,
 
         print('%sZ: ilc %s with %s dets -> epdlc %s with %s dets' %
               (datetime.utcnow().isoformat(),
-               ilcfile, len(ilc['xcc']), outfile, len(inflines)))
+               ilcfile, len(ilc['xic']), outfile, len(inflines)))
 
         return outfile
 
     else:
         print('not running EPD for %s, ndet = %s < min ndet = %s' %
-              (ilcfile, len(ilc['xcc']), minndet))
+              (ilcfile, len(ilc['xic']), minndet))
         return None
 
 
