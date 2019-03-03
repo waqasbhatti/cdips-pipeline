@@ -819,6 +819,20 @@ def measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
                             nworkers=nworkers, use_NEA=use_NEA,
                             use_alerts=use_alerts, skipepd=skipepd)
 
+def _write_nan_df(plname, tfalc, snrfit_savfile):
+    outdf = pd.DataFrame({'plname':plname,
+                          'trapz_snr':np.nan,
+                          'trapz_transitdepth':np.nan,
+                          'oot_rms':np.nan,
+                          'npoints_in_transit':np.nan,
+                          'ntransits':np.nan,
+                          'tfalc':tfalc}, index=[0])
+    outdf.to_csv(snrfit_savfile, index=False)
+    print('WRN! SNR calculation failed, but made {} anyway with nan'.
+          format(snrfit_savfile))
+    print('{} made {}'.format(
+        datetime.utcnow().isoformat(), snrfit_savfile))
+
 
 def _measure_planet_snr(plname, tfalc, statsdir, sectornum,
                         timename='TMID_BJD', nworkers=20,
@@ -886,6 +900,9 @@ def _measure_planet_snr(plname, tfalc, statsdir, sectornum,
             time = time[finds]
 
         # fit BLS model; plot resulting phased LC.
+        if len(time)==0:
+            _write_nan_df(plname, tfalc, snrfit_savfile)
+            return 1
         endp = 1.05*(np.nanmax(time) - np.nanmin(time))/2
         blsdict = kbls.bls_parallel_pfind(time, flux, err_flux,
                                           magsarefluxes=True, startp=0.1,
@@ -897,13 +914,7 @@ def _measure_planet_snr(plname, tfalc, statsdir, sectornum,
                                            magsarefluxes=True, sigclip=None,
                                            perioddeltapercent=5)
         if not isinstance(fitd,dict):
-            outdf = pd.DataFrame({'plname':plname, 'trapz_snr':np.nan,
-                                  'tfalc':tfalc}, index=[0])
-            outdf.to_csv(snrfit_savfile, index=False)
-            print('WRN! SNR calculation failed, but made {} anyway with nan'.
-                  format(snrfit_savfile))
-            print('{} made {}'.format(
-                datetime.utcnow().isoformat(), snrfit_savfile))
+            _write_nan_df(plname, tfalc, snrfit_savfile)
             return 1
 
         bls_period = fitd['period']

@@ -1730,8 +1730,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     )
     astromrefpath = glob(astromrefglob)
     if len(astromrefpath) != 1:
-        print('FATAL ERR! astromrefglob wrong for run assessment')
-        raise AssertionError
+        raise AssertionError('FATAL ERR! astromrefglob wrong for run assessment')
     astromrefpath = astromrefpath[0]
     assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
                field, camera, ccd, tfastatfile, ra_nom, dec_nom,
