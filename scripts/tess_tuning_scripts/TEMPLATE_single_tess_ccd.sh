@@ -30,16 +30,15 @@ anetfluxthreshold=50000
 anettweak=6
 anetradius=30
 initccdextent="0:2048,0:2048"
-kernelspec="i/3;d=3/2"
-catalog_faintrmag=13
-fiphotfluxthreshold=3000
-photreffluxthreshold=3000
+kernelspec="i/2;d=3/2"
+catalog_faintrmag=16
+fiphotfluxthreshold=500
+photreffluxthreshold=500
 extractsources=0
 binlightcurves=0
 translateimages=1
 reversesubtract=1
 skipepd=1
-fixedtfatemplate="/nfs/phtess1/ar1/TESS/FFI/LC/FULL/s0002/STATS_FILES/ISP_2-2-1096_stats_files"
 
 ##########################################
 ##########################################
@@ -144,5 +143,5 @@ python -u TESS_reduction.py \
   --photreffluxthreshold $photreffluxthreshold \
   --extractsources $extractsources --$binlcoption \
   --camnum $camnum --ccdnum $ccdnum --$translateoption \
-  --$rsuboption --$skipepdoption --fixedtfatemplate $fixedtfatemplate \
+  --$rsuboption --$skipepdoption \
   &> logs/$logname &
