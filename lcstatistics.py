@@ -57,6 +57,9 @@ move items from aperturephot.py here, and update all respective calls.
 
 """
 
+from astrobase.periodbase import macf
+from astrobase.varbase.autocorr import autocorr_magseries
+
 import os, pickle, itertools
 import numpy as np, pandas as pd, matplotlib.pyplot as plt
 import aperturephot as ap
@@ -66,9 +69,6 @@ from datetime import datetime
 
 from numpy import array as nparr
 from scipy.stats import sigmaclip as stats_sigmaclip
-
-from astrobase.periodbase import macf
-from astrobase.varbase.autocorr import autocorr_magseries
 
 from datetime import datetime
 import multiprocessing as mp
@@ -212,66 +212,107 @@ def read_stats_file(statsfile, fovcathasgaiaids=False):
     else:
         idstrlength = 17
 
-    # open the statfile and read all the columns
-    stats = np.genfromtxt(
-        statsfile,
-        dtype=(
-            'U{:d},f8,'
-            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM1
-            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM2
-            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM3
-            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP1
-            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP2
-            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP3
-            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF1
-            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF2
-            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF3
-            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RF1
-            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RF2
-            'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RF3
-            'f8,f8,f8'.format(idstrlength)    # corrmags
-        ),
-        names=[
-            'lcobj','catmag',
-            'median_rm1','mad_rm1','mean_rm1','stdev_rm1','ndet_rm1',
-            'median_sigclip_rm1','mad_sigclip_rm1','mean_sigclip_rm1',
-            'stdev_sigclip_rm1','ndet_sigclip_rm1',
-            'median_rm2','mad_rm2','mean_rm2','stdev_rm2','ndet_rm2',
-            'median_sigclip_rm2','mad_sigclip_rm2','mean_sigclip_rm2',
-            'stdev_sigclip_rm2','ndet_sigclip_rm2',
-            'median_rm3','mad_rm3','mean_rm3','stdev_rm3','ndet_rm3',
-            'median_sigclip_rm3','mad_sigclip_rm3','mean_sigclip_rm3',
-            'stdev_sigclip_rm3','ndet_sigclip_rm3',
-            'median_ep1','mad_ep1','mean_ep1','stdev_ep1','ndet_ep1',
-            'median_sigclip_ep1','mad_sigclip_ep1','mean_sigclip_ep1',
-            'stdev_sigclip_ep1','ndet_sigclip_ep1',
-            'median_ep2','mad_ep2','mean_ep2','stdev_ep2','ndet_ep2',
-            'median_sigclip_ep2','mad_sigclip_ep2','mean_sigclip_ep2',
-            'stdev_sigclip_ep2','ndet_sigclip_ep2',
-            'median_ep3','mad_ep3','mean_ep3','stdev_ep3','ndet_ep3',
-            'median_sigclip_ep3','mad_sigclip_ep3','mean_sigclip_ep3',
-            'stdev_sigclip_ep3','ndet_sigclip_ep3',
-            'median_tf1','mad_tf1','mean_tf1','stdev_tf1','ndet_tf1',
-            'median_sigclip_tf1','mad_sigclip_tf1','mean_sigclip_tf1',
-            'stdev_sigclip_tf1','ndet_sigclip_tf1',
-            'median_tf2','mad_tf2','mean_tf2','stdev_tf2','ndet_tf2',
-            'median_sigclip_tf2','mad_sigclip_tf2','mean_sigclip_tf2',
-            'stdev_sigclip_tf2','ndet_sigclip_tf2',
-            'median_tf3','mad_tf3','mean_tf3','stdev_tf3','ndet_tf3',
-            'median_sigclip_tf3','mad_sigclip_tf3','mean_sigclip_tf3',
-            'stdev_sigclip_tf3','ndet_sigclip_tf3',
-            'median_rf1','mad_rf1','mean_rf1','stdev_rf1','ndet_rf1',
-            'median_sigclip_rf1','mad_sigclip_rf1','mean_sigclip_rf1',
-            'stdev_sigclip_rf1','ndet_sigclip_rf1',
-            'median_rf2','mad_rf2','mean_rf2','stdev_rf2','ndet_rf2',
-            'median_sigclip_rf2','mad_sigclip_rf2','mean_sigclip_rf2',
-            'stdev_sigclip_rf2','ndet_sigclip_rf2',
-            'median_rf3','mad_rf3','mean_rf3','stdev_rf3','ndet_rf3',
-            'median_sigclip_rf3','mad_sigclip_rf3','mean_sigclip_rf3',
-            'stdev_sigclip_rf3','ndet_sigclip_rf3',
-            'corrmag_ap1','corrmag_ap2','corrmag_ap3',
-        ]
-    )
+    cols = []
+    fmts = ''
+    with open(statsfile) as f:
+        # Find start of comments
+        line = f.readline()
+        while 'column' not in line:
+            line = f.readline()
+        line = f.readline()
+
+        # Get column names
+        while line.startswith('#'):
+            colnames = line.split(':')[1].strip()
+            if colnames.startswith('sigma'):
+                sigclip = True
+                colnames = colnames[14:]
+            else:
+                sigclip = False
+            colnames = [c.strip() for c in colnames.split(',')]
+
+            for c in colnames:
+                if 'object' in c:
+                    cols.append('lcobj')
+                    fmts += 'U{:d},'.format(idstrlength)
+                elif 'catalog' in c:
+                    cols.append('catmag')
+                    fmts += 'f8,'
+                elif 'corrected' in c:
+                    cols.append('corrmag_' + c[-3:].lower())
+                    fmts += 'f8,'
+                else:
+                    if sigclip:
+                        cols.append(c.lower().replace(' ', '_sigclip_'))
+                    else:
+                        cols.append(c.lower().replace(' ', '_'))
+                    if 'ndet' in c:
+                        fmts += 'i8,'
+                    else:
+                        fmts += 'f8,'
+            line = f.readline()
+
+    stats = np.genfromtxt(statsfile, dtype=fmts, names=cols)
+
+    #  stats = np.genfromtxt(
+    #      statsfile,
+    #      dtype=(
+    #          'U{:d},f8,'
+    #          'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM1
+    #          'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM2
+    #          'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RM3
+    #          'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP1
+    #          'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP2
+    #          'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # EP3
+    #          'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF1
+    #          'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF2
+    #          'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # TF3
+    #          'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RF1
+    #          'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RF2
+    #          'f8,f8,f8,f8,i8,f8,f8,f8,f8,i8,'  # RF3
+    #          'f8,f8,f8'.format(idstrlength)    # corrmags
+    #      ),
+    #      names=[
+    #          'lcobj','catmag',
+    #          'median_rm1','mad_rm1','mean_rm1','stdev_rm1','ndet_rm1',
+    #          'median_sigclip_rm1','mad_sigclip_rm1','mean_sigclip_rm1',
+    #          'stdev_sigclip_rm1','ndet_sigclip_rm1',
+    #          'median_rm2','mad_rm2','mean_rm2','stdev_rm2','ndet_rm2',
+    #          'median_sigclip_rm2','mad_sigclip_rm2','mean_sigclip_rm2',
+    #          'stdev_sigclip_rm2','ndet_sigclip_rm2',
+    #          'median_rm3','mad_rm3','mean_rm3','stdev_rm3','ndet_rm3',
+    #          'median_sigclip_rm3','mad_sigclip_rm3','mean_sigclip_rm3',
+    #          'stdev_sigclip_rm3','ndet_sigclip_rm3',
+    #          'median_ep1','mad_ep1','mean_ep1','stdev_ep1','ndet_ep1',
+    #          'median_sigclip_ep1','mad_sigclip_ep1','mean_sigclip_ep1',
+    #          'stdev_sigclip_ep1','ndet_sigclip_ep1',
+    #          'median_ep2','mad_ep2','mean_ep2','stdev_ep2','ndet_ep2',
+    #          'median_sigclip_ep2','mad_sigclip_ep2','mean_sigclip_ep2',
+    #          'stdev_sigclip_ep2','ndet_sigclip_ep2',
+    #          'median_ep3','mad_ep3','mean_ep3','stdev_ep3','ndet_ep3',
+    #          'median_sigclip_ep3','mad_sigclip_ep3','mean_sigclip_ep3',
+    #          'stdev_sigclip_ep3','ndet_sigclip_ep3',
+    #          'median_tf1','mad_tf1','mean_tf1','stdev_tf1','ndet_tf1',
+    #          'median_sigclip_tf1','mad_sigclip_tf1','mean_sigclip_tf1',
+    #          'stdev_sigclip_tf1','ndet_sigclip_tf1',
+    #          'median_tf2','mad_tf2','mean_tf2','stdev_tf2','ndet_tf2',
+    #          'median_sigclip_tf2','mad_sigclip_tf2','mean_sigclip_tf2',
+    #          'stdev_sigclip_tf2','ndet_sigclip_tf2',
+    #          'median_tf3','mad_tf3','mean_tf3','stdev_tf3','ndet_tf3',
+    #          'median_sigclip_tf3','mad_sigclip_tf3','mean_sigclip_tf3',
+    #          'stdev_sigclip_tf3','ndet_sigclip_tf3',
+    #          'median_rf1','mad_rf1','mean_rf1','stdev_rf1','ndet_rf1',
+    #          'median_sigclip_rf1','mad_sigclip_rf1','mean_sigclip_rf1',
+    #          'stdev_sigclip_rf1','ndet_sigclip_rf1',
+    #          'median_rf2','mad_rf2','mean_rf2','stdev_rf2','ndet_rf2',
+    #          'median_sigclip_rf2','mad_sigclip_rf2','mean_sigclip_rf2',
+    #          'stdev_sigclip_rf2','ndet_sigclip_rf2',
+    #          'median_rf3','mad_rf3','mean_rf3','stdev_rf3','ndet_rf3',
+    #          'median_sigclip_rf3','mad_sigclip_rf3','mean_sigclip_rf3',
+    #          'stdev_sigclip_rf3','ndet_sigclip_rf3',
+    #          'corrmag_ap1','corrmag_ap2','corrmag_ap3',
+    #      ]
+    #  )
 
     return stats
 
@@ -461,15 +502,21 @@ def compute_dacf(times, mags, errs, lagstep=0.1,
     """
     times = np.asarray(times)
     mags = np.asarray(mags)
-    errs = np.asarray(errs)
+    if type(errs) != str:
+        errs = np.asarray(errs)
 
     # Check dimensions
     if mags.ndim == 1:
         mags = np.asarray([mags])
     # List of magcols provided
     if mags.ndim == 2:
+        # Use stdev as errs
+        if type(errs) == str and errs == 'correcterrs':
+            errs = [np.nanstd(magcol) for magcol in mags]
+            errs = np.asarray([np.full(mags.shape[1], err) for err in errs])
+            err_inds = [i for i in range(mags.shape[0])]
         # One err col
-        if errs.ndim == 1:
+        elif errs.ndim == 1:
             errs = np.asarray([errs])
             err_inds = [0 for i in range(mags.shape[0])]
         # List of errcols
@@ -478,11 +525,16 @@ def compute_dacf(times, mags, errs, lagstep=0.1,
             err_inds = [i for i in range(mags.shape[0])]
     # List of list of magcols
     if mags.ndim == 3:
+        if type(errs) == str and errs == 'correcterrs':
+            errs = [np.nanstd(magcol) for maglvl in mags for magcol in maglvl]
+            errs = np.asarray([np.full(mags.shape[2], err) for err in errs])
+            err_inds = list(range(mags.shape[0] * mags.shape[1]))
         # Must provide list of errcols
-        assert errs.ndim == 2 and errs.shape[0] == mags.shape[0]
-        err_inds = []
-        for i in range(errs.shape[0]):
-            err_inds += [i for j in range(len(mags[i]))]
+        else:
+            assert errs.ndim == 2 and errs.shape[0] == mags.shape[0]
+            err_inds = []
+            for i in range(errs.shape[0]):
+                err_inds += [i for j in range(len(mags[i]))]
         # Flatten magcols
         mags = mags.reshape(-1, mags.shape[2])
 
@@ -566,6 +618,89 @@ def compute_dacf(times, mags, errs, lagstep=0.1,
     }
 
 
+def write_dacf(dacf, outfile, header=None, magtypes=['rm'], num_aps=3):
+    """
+    Writes a DACF to file.
+    """
+    outf = open(outfile, 'w')
+
+    # Write column headers
+    if header is None:
+        header = '#Lag Npairs '
+        cols = ['AC_{0:s}{1:d} AC_ERR_{0:s}{1:d}'.format(mag.upper(), apnum)
+                for apnum in range(1, num_aps+1) for mag in magtypes]
+        header += ' '.join(cols)
+    outf.write(header.strip() + '\n')
+
+    for r in range(dacf['nbins']):
+        row = '{:.3f} '.format(dacf['lags'][r])
+        row += '{:d} '.format(dacf['Nudcf'][r])
+        for col in range(dacf['udcf'].shape[0]):
+            row += '{:.6f} {:.6f} '.format(
+                dacf['udcf'][col, r], dacf['eudcf'][col, r])
+        outf.write(row.strip() + '\n')
+
+    outf.close()
+
+    return outfile
+
+
+def read_dacf(dacffile):
+    """
+    Reads a dacf object from file.
+    """
+    dacfarr = np.genfromtxt(dacffile, comments='#', names=True)
+    lagarr = dacfarr['Lag']
+    nbins = len(lagarr)
+    timestep = np.round(np.min(lagarr[1:] - lagarr[:-1]), 3)
+    Nudcf = dacfarr['Npairs']
+    accols = [c for c in dacfarr.dtype.names if (c.startswith('AC') and
+                                                  'ERR' not in c)]
+    acerrcols = [c for c in dacfarr.dtype.names if c.startswith('AC_ERR')]
+    udcf = []
+    eudcf = []
+    for ac, err in zip(accols, acerrcols):
+        udcf.append(dacfarr[ac])
+        eudcf.append(dacfarr[err])
+    return {
+        'udcf': np.asarray(udcf),
+        'eudcf': np.asarray(eudcf),
+        'Nudcf': Nudcf,
+        'nbins': nbins,
+        'timestep': timestep,
+        'lags': lagarr
+    }
+
+
+def resample_dacf(dacf, lagstep=0.1, lagmin=0.0, lagmax=10.0):
+    """
+    Resamples a dacf object
+    """
+    newlags = np.arange(lagmin, lagmax+1e-5, lagstep)
+    idxs = np.searchsorted(newlags, dacf['lags'])
+    if dacf['udcf'].ndim == 2:
+        newudcf = np.full((dacf['udcf'].shape[0], len(newlags)), np.nan)
+        neweudcf = np.full((dacf['eudcf'].shape[0], len(newlags)), np.nan)
+        newudcf[:,idxs] = dacf['udcf']
+        neweudcf[:,idxs] = dacf['eudcf']
+    else:
+        newudcf = np.full(len(newlags), np.nan)
+        neweudcf = np.full(len(newlags), np.nan)
+        newudcf[idxs] = dacf['udcf']
+        neweudcf[idxs] = dacf['eudcf']
+    newnudcf = np.zeros(len(newlags), dtype=int)
+    newnudcf[idxs] = dacf['Nudcf']
+
+    return {
+        'udcf': newudcf,
+        'eudcf': neweudcf,
+        'Nudcf': newnudcf,
+        'lags': newlags,
+        'timestep': lagstep,
+        'nbins': len(newlags)
+    }
+
+
 def compute_dacf_worker(tfafile, outdir='./', lagstep=0.1,
                         lagmin=0.0, lagmax=10.0, laglist=None,
                         n_apertures=3, skipepd=False,
@@ -611,15 +746,7 @@ def compute_dacf_worker(tfafile, outdir='./', lagstep=0.1,
 
     # Write results to output
     if writeoutfile:
-        outf = open(outfile, 'w')
-        outf.write(header.strip() + '\n')
-        for r in range(results['nbins']):
-            row = '{:.7f} '.format(results['lags'][r])
-            row += '{:d} '.format(results['Nudcf'][r])
-            for col in range(results['udcf'].shape[0]):
-                row += '{:.6f} {:.6f} '.format(
-                    results['udcf'][col, r], results['eudcf'][col, r])
-            outf.write(row.strip() + '\n')
+        write_dacf(results, outfile, header=header)
     else:
         results['lcobj'] = os.path.splitext(os.path.basename(tfafile))[0]
     return results
@@ -747,18 +874,23 @@ def compute_correction_coeffs(catmags, fluxes):
         correctioncoeffs (2d np.array)
     """
     bright_limit = np.logical_and(catmags < 12.0, catmags > 8.0)
-    fluxes = pd.DataFrame(fluxes)[bright_limit]
-    catmags = catmags[bright_limit]
+    finite_ind = np.isfinite(catmags) & bright_limit
+    fluxes = pd.DataFrame(fluxes)[finite_ind]
+    catmags = catmags[finite_ind]
 
     correctioncoeffs = []
     for ap_col in fluxes:
         try:
-            c2 = np.polyfit(np.zeros_like(catmags),
-                            catmags + 2.5*np.log10(fluxes[ap_col]), 0)[0]
+            idxs = fluxes[ap_col] > 0.0
+            catmags_cut = catmags[idxs]
+            c2 = np.polyfit(np.zeros_like(catmags_cut),
+                            catmags_cut +
+                            2.5*np.log10(fluxes[ap_col][idxs]), 0)[0]
             correctioncoeffs.append([1.0, c2])
-        except:
+        except Exception as e:
             print('ERR! %sZ: could not compute correction coefficients' %
                   datetime.utcnow().isoformat())
+            raise e
             return None
 
     return correctioncoeffs
@@ -773,7 +905,8 @@ def compute_lc_statistics(lcfile,
                           num_aps=3,
                           epdlcrequired=True,
                           tfalcrequired=False,
-                          fitslcnottxt=None):
+                          fitslcnottxt=None,
+                          verbose=True):
     """
     Compute mean, median, MAD, stdev magnitudes for a given lightcurve.
 
@@ -844,18 +977,25 @@ def compute_lc_statistics(lcfile,
                 format(datetime.utcnow().isoformat(), lcfile))
             return None
     # Using text lightcurve files
-    elif lcext == '.epdlc' or lcext == '.tfalc':
+    else:
         # Check for tfalc
-        if tfalcrequired and lcext == '.epdlc':
-            tfalcfile = lcfile.replace('.epdlc', '.tfalc')
+        if tfalcrequired and lcext != '.tfalc':
+            tfalcfile = lcfile.replace(lcext, '.tfalc')
             if not os.path.exists(tfalcfile):
                 print('%sZ: no TFA mags available for %s and '
                       'TFALC is required, skipping...' %
                       (datetime.utcnow().isoformat(), lcfile))
                 raise FileNotFoundError
             lcfile = tfalcfile
-        elif lcext == '.tfalc':
-            tfalcrequired = True
+
+        if epdlcrequired and (lcext != '.epdlc' or '.tfalc'):
+            epdlcfile = lcfile.replace(lcext, '.epdlc')
+            if not os.path.exists(epdlcfile):
+                print('%sZ: no EPD mags available for %s and '
+                      'EPDLC is required, skipping ...' %
+                      (datetime.utcnow().isoformat(), lcfile))
+                raise FileNotFoundError
+            lcfile = epdlcfile
 
         # Check that file is not empty
         if os.stat(lcfile).st_size == 0:
@@ -863,40 +1003,39 @@ def compute_lc_statistics(lcfile,
                   (datetime.utcnow().isoformat(), lcfile))
             return None
 
-        # RM and EP
-        try:
-            mags['rm'] = np.genfromtxt(lcfile, usecols=rmcols, unpack=True)
-            mags['ep'] = np.genfromtxt(lcfile, usecols=epcols, unpack=True)
-        except:
-            if not epdlcrequired: 
-                mags['ep'] = mags['rm']
-            else:
+        # RM
+        mags['rm'] = np.genfromtxt(lcfile, usecols=rmcols, unpack=True)
+        keys = ['rm']
+        # EP
+        if epdlcrequired:
+            try:
+                mags['ep'] = np.genfromtxt(lcfile, usecols=epcols, unpack=True)
+                keys.append('ep')
+            except:
                 print('%sZ: no EPD mags available for %s!' %
                       (datetime.utcnow().isoformat(), lcfile))
         # TF
         if tfalcrequired:
             try:
                 mags['tf'] = np.genfromtxt(lcfile, usecols=tfcols, unpack=True)
+                keys.append('tf')
             except:
                 print('%sZ: no TFA mags available for %s!' %
                       (datetime.utcnow().isoformat(), lcfile))
         # RF
         if rfcols:
             mags['rf'] = np.genfromtxt(lcfile, usecols=rfcols, unpack=True)
+            keys.append('rf')
 
-    else:
-        raise NotImplementedError
 
     ##################################
     # get statistics for each column #
     ##################################
-
     # Create results dict
     results = {'lcfile': lcfile,
                'lcobj': os.path.splitext(os.path.basename(lcfile))[0]}
 
     # Now, get statistics for each column
-    keys = ['rf', 'rm', 'ep', 'tf']
     statkeys = ['median', 'mad', 'mean', 'stdev', 'ndet']
     cols = [(x, ap) for x in keys for ap in range(num_aps)]
 
@@ -938,27 +1077,18 @@ def compute_lc_statistics(lcfile,
             for s in ['median', 'mad', 'mean', 'stdev', 'ndet']:
                 results[s+suf] = np.nan
                 results[s+'_sigclip'+suf] = np.nan
-    print('%sZ: done with statistics for %s' %
-          (datetime.utcnow().isoformat(), lcfile))
+    if verbose:
+        print('%sZ: done with statistics for %s' %
+              (datetime.utcnow().isoformat(), lcfile))
+
     return results
-
-
-def lc_statistics_worker(task):
-    """
-    Wrapper for compute_lc_statistics function.
-    """
-    try:
-        return compute_lc_statistics(task[0], **task[1])
-    except Exception as e:
-        print('SOMETHING WENT WRONG! task was %s' % task)
-        return None
 
 
 def parallel_compute_lc_statistics(lcdir, lcglob,
                                    fovcatalog, fovcathasgaiaids=False,
                                    tfalcrequired=False, num_aps=3,
                                    fovcatcols=(0,5), fovcatmaglabel='G',
-                                   outfile=None,
+                                   verbose=True, outfile=None,
                                    nworkers=16, workerntasks=500,
                                    rmcols=[14,19,24], epcols=[27,28,29],
                                    tfcols=[30,31,32], rfcols=[12,17,22],
@@ -1021,17 +1151,14 @@ def parallel_compute_lc_statistics(lcdir, lcglob,
     print('%sZ: %s %s lightcurves to process.' %
           (datetime.utcnow().isoformat(), len(lcfiles), lcglob))
 
-    tasks = [[f, {'rmcols':rmcols,
-                  'epcols':epcols,
-                  'tfcols':tfcols,
-                  'rfcols':rfcols,
-                  'sigclip':sigclip,
-                  'num_aps':num_aps,
-                  'epdlcrequired':epdlcrequired,
-                  'tfalcrequired':tfalcrequired}] for f in lcfiles]
-
+    lc_statistics_worker = partial(compute_lc_statistics, rmcols=rmcols,
+                                   epcols=epcols, tfcols=tfcols, rfcols=rfcols,
+                                   sigclip=sigclip, num_aps=num_aps,
+                                   epdlcrequired=epdlcrequired,
+                                   tfalcrequired=tfalcrequired,
+                                   verbose=verbose)
     pool = mp.Pool(nworkers,maxtasksperchild=workerntasks)
-    results = pool.map(lc_statistics_worker, tasks)
+    results = pool.map(lc_statistics_worker, lcfiles)
     pool.close()
     pool.join()
 
@@ -1044,13 +1171,20 @@ def parallel_compute_lc_statistics(lcdir, lcglob,
     outf = open(outfile, 'wb')
 
     # Write header for stats.
+    if outheader is not None:
+        outheader += '\n'
+        outf.write(outheader.encode('utf-8'))
     default_header = '# total objects: %s, sigmaclip used: %s\n' % (
         len(lcfiles), sigclip)
     outf.write(default_header.encode('utf-8'))
-    if outheader is not None:
-        outf.write(outheader.encode('utf-8'))
 
-    apkeys = ['rm', 'ep', 'tf', 'rf']
+    apkeys=  ['rm']
+    if epdlcrequired:
+        apkeys.append('ep')
+    if tfalcrequired:
+        apkeys.append('tf')
+    if rfcols:
+        apkeys.append('rf')
     # tuples of column names and format string
     statkeys = [('median', '%.6f'), ('mad', '%.6f'), ('mean', '%.6f'),
                 ('stdev', '%.6f'), ('ndet', '%s')]
@@ -1123,10 +1257,10 @@ def parallel_compute_lc_statistics(lcdir, lcglob,
         # find catalog mag for this object
         if stat['lcobj'] in fovdict:
             stat['catmag'] = fovdict[stat['lcobj']]
-        elif not np.isnan(stat['median_tf3']):
+        elif 'median_tf3' in stat and not np.isnan(stat['median_tf3']):
             print('no catalog mag for %s, using median TF3 mag' % stat['lcobj'])
             stat['catmag'] = stat['median_tf3']
-        elif not np.isnan(stat['median_ep3']):
+        elif 'median_ep3' in stat and not np.isnan(stat['median_ep3']):
             print('no catalog or median_tf3 mag for %s, using median EP3 mag' %
                   stat['lcobj'])
             stat['catmag'] = stat['median_ep3']
