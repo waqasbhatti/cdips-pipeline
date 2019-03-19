@@ -1543,7 +1543,17 @@ def parallel_bkgd_subtract(fitslist, method='boxmedian', isfull=True, k=32,
     tstarts, tstops = nparr(tstarts), nparr(tstops)
     times = tstarts + (tstops-tstarts)/2.
 
-    orbitgap = 1. # days
+    from parse import parse
+    res = parse('{}/sector-{}/{}',fitslist[0])
+    sectornum = int(res[1])
+    if sectornum in [1,2,4,5]:
+        orbitgap = 1. # days
+    elif sectornum in [3]:
+        orbitgap = 0.15 # days
+    else:
+        errmsg = 'need manual orbitgap to be implemented in bkgdsub'
+        raise NotImplementedError(errmsg)
+
     expected_norbits = 2 if isfull else 1
     norbits, groups = lcmath.find_lc_timegroups(times, mingap=orbitgap)
 
