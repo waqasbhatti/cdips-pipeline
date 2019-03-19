@@ -1685,6 +1685,7 @@ def photometry_on_combined_photref(
         searchradius=8.0,
         photreffluxthreshold=50000,
         observatory='hatpi',
+        useimagenotfistar=False
         ):
     """
     This does source extraction, WCS, catalog projection, and then runs fiphot
@@ -1796,17 +1797,18 @@ def photometry_on_combined_photref(
                                    radius=searchradius)
     elif observatory=='tess':
 
-        fistarfile_to_xy(astromfistar)
+        if not useimagenotfistar:
+            fistarfile_to_xy(astromfistar)
 
         wcsfile = astrometrydotnet_solve_frame(
-            astromfistar.replace('.fistar','.fistar-fits-xy'),
+            astromfistar.replace(os.path.splitext(astromfistar)[-1],'.fistar-fits-xy'),
             wcsf,
             frame_ra,
             frame_dec,
             scalelow=1,
             scalehigh=30,
             scaleunits='arcsecperpix',
-            useimagenotfistar=False
+            useimagenotfistar=useimagenotfistar
         )
 
     # THIRD: run do_photometry to get a .sourcelist file with HATID,X,Y

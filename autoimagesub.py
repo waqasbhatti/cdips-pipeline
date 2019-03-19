@@ -2745,7 +2745,8 @@ def generate_combined_photref(
         maxworkertasks=1000,
         fieldinfo=None,
         observatory='hatpi',
-        overwrite=False):
+        overwrite=False,
+        useimagenotfistar=False):
     """
     This generates a combined photref from photref target and candidates and
     updates the sqlite or postgres database.
@@ -2777,6 +2778,12 @@ def generate_combined_photref(
             {'ccd': 1, 'camera': 1, 'field': 'ete6_field0', 'projectid': 42},
 
         fovcatalog: the REFORMED FoV catalog file (12 columns)
+
+        useimagenotfistar (bool): if True, does astrometry.net internal source
+        extract (when observatory=='tess'). Otherwise, uses the fistar source
+        positions in the astrometry solver. A benefit of setting to True for
+        wide fields is that it enables easy downsampling, which can help with
+        wide-field astrometry convergence problems.
 
     Returns:
 
@@ -3007,7 +3014,8 @@ def generate_combined_photref(
         framewidth=framewidth,
         searchradius=searchradius,
         photreffluxthreshold=photreffluxthreshold,
-        observatory=observatory
+        observatory=observatory,
+        useimagenotfistar=useimagenotfistar
     )
 
     if not (cphotref_photometry and
