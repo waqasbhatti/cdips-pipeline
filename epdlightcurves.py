@@ -94,8 +94,10 @@ def read_lc(lcfile, cols=None, colnames=None,
               'fl3', 'fe3', 'rm3', 're3', 'rq3']
     if epmags:
         LCCOLS += ['ep1', 'ep2', 'ep3']
+        cols = 'all'
     if tfmags:
         LCCOLS += ['tf1', 'tf2', 'tf3']
+        cols = 'all'
     LCCOLNUMS = [0, 1, 5, 6, 7, 8, 9,
                  14, 15, 19, 20, 24, 25]
 
@@ -182,7 +184,8 @@ def generate_newcols(lc, funcs):
     return lc
 
 # Note: this should probably be in a different file
-def get_new_filelist(infilelist, outext=None, outfilefunc=None,
+def get_new_filelist(infilelist, outext=None, outprefix='',
+                     outfilefunc=None,
                      outfileglob=None, outdir=None):
     '''
     Utility function that takes an input list of files, finds the expected
@@ -191,7 +194,8 @@ def get_new_filelist(infilelist, outext=None, outfilefunc=None,
 
     Args:
         infilelist: Input file list
-        outext: Extension of output file, or
+        outext: Extension of output file, with
+        outprefix: optional prefix of output file.
         outfilefunc: Callable that generates output filename from each
             input file. Takes precedence over outext.
             outext and outfilefunc cannot both be None.
@@ -202,6 +206,7 @@ def get_new_filelist(infilelist, outext=None, outfilefunc=None,
     Returns:
         newfilelist: Files that task should be run on.
     '''
+    infilelist = [f for f in infilelist if f is not None]
     if outdir is None:
         outdir = os.path.dirname(infilelist[0])
 
@@ -211,8 +216,8 @@ def get_new_filelist(infilelist, outext=None, outfilefunc=None,
     if outfilefunc is not None:
         outfilelist = list(map(outfilefunc, infiles))
     elif outext is not None:
-        outfilelist = list(map(lambda f: os.path.splitext(f)[0] + outext,
-                               infiles))
+        outfilelist = list(map(lambda f: outprefix + os.path.splitext(f)[0]
+                               + outext, infiles))
     else:
         raise ValueError
 
@@ -226,7 +231,7 @@ def get_new_filelist(infilelist, outext=None, outfilefunc=None,
     alreadyexists = list(map(os.path.basename, alreadyexists))
 
     # Find differences between the two lists
-    ae_mask = np.isin(outfilelist, alreadyexists)
+    ae_mask = np.isin(outfilelist, alreadyexists, assume_unique=True)
     filelist = [f[0] for f in zip(infilelist, ae_mask) if not f[1]]
 
     return filelist
@@ -277,16 +282,13 @@ def run_epd(lcfile, epdparams=None, lccols=None, lccolnames=None, addcols=None,
     for col in epdcols:
         finite_params &= np.isfinite(lc[col])
 
-    failedall = True
     # Run for each aperture
+    epcols = []
     for ap in range(1, num_aps+1):
         magcol = 'rm%d' % ap
         finiteind = np.isfinite(lc[magcol]) & finite_params
         if np.sum(np.ones_like(finiteind)[finiteind]) < minndet:
-            failedall &= True
             continue
-        else:
-            failedall = False
 
         mag_median = np.nanmedian(lc[magcol])
         mag_stdev = np.nanstd(lc[magcol])
@@ -313,10 +315,11 @@ def run_epd(lcfile, epdparams=None, lccols=None, lccolnames=None, addcols=None,
         # Now compute full EPD mags
         lc.loc[:,'ep%d' % ap] = (lc[magcol] - np.dot(coeffs, epdmatrix.T)
                                  + mag_median)
+        epcols.append('ep%d' % ap)
 
     # Save lcfile if at least one epdcolumn was generated
     lcid = os.path.splitext(os.path.basename(lcfile))[0]
-    if failedall:
+    if len(epcols) == 0:
         print('%sZ: EPD failed for %s.' % (datetime.utcnow().isoformat(),
                                            lcid + '.grcollectilc'))
         return None
@@ -331,7 +334,6 @@ def run_epd(lcfile, epdparams=None, lccols=None, lccolnames=None, addcols=None,
         inf.close()
 
         outf = open(outfile, 'wb')
-        epcols = ['ep%d' % (i+1) for i in range(num_aps)]
         for line, row in zip(inflines, lc.iterrows()):
             epmags = [('%.6f' % row[1][col]) for col in epcols]
             inline = line.decode('utf-8').rstrip('\n')
@@ -362,9 +364,6 @@ def parallel_run_epd(lcdir, fieldinfo, lcglob='*.grcollectilc', outdir=None,
     if outdir is not None and not os.path.isdir(outdir):
         os.mkdir(outdir)
 
-    # For testing
-    lcfiles = lcfiles[:5]
-
     # Get additional parameter columns from database
     if dbparams == 'default':
         dbparams = DEFAULT_DBPARAMS
@@ -389,6 +388,5 @@ def parallel_run_epd(lcdir, fieldinfo, lcglob='*.grcollectilc', outdir=None,
            sum(l is not None for l in results)))
 
     return results
-
 
 
