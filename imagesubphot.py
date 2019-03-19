@@ -1816,7 +1816,8 @@ def photometry_on_combined_photref(
             os.path.abspath(fovcatalog),
             outdir=os.path.dirname(os.path.abspath(photref_frame)),
             extractsources=extractsources,
-            zeropoint=zeropoint
+            zeropoint=zeropoint,
+            aperturelist=apertures
         )
     elif observatory=='tess':
         # nb. fiphot_xycols is adjusted inside `do_photometry` to match
@@ -1838,7 +1839,8 @@ def photometry_on_combined_photref(
             binaryoutput=False,
             observatory='tess',
             fluxthreshold=photreffluxthreshold,
-            extractforsdk=extractforsdk
+            extractforsdk=extractforsdk,
+            aperturelist-apertures
         )
 
     if extractsources:
