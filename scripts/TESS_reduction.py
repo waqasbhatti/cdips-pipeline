@@ -875,7 +875,8 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
                          aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
                          photdisjointradius=2, colorscheme='bwr',
                          photreffluxthreshold=30000, extractsources=True,
-                         translateimages=True, reversesubtract=False):
+                         translateimages=True, reversesubtract=False,
+                         useimagenotfistar=True):
 
     ccdgain = photparams['ccdgain']
     exptime = photparams['ccdexptime']
@@ -946,7 +947,8 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
         ccdexptime=exptime, extractsources=extractsources,
         apertures=aperturelist, framewidth=None, searchradius=8.0,
         nworkers=nworkers, maxworkertasks=1000, observatory='tess',
-        fieldinfo=fieldinfo, photreffluxthreshold=photreffluxthreshold)
+        fieldinfo=fieldinfo, photreffluxthreshold=photreffluxthreshold,
+        useimagenotfistar=useimagenotfistar)
 
     # Step ISP7: convolve and subtract all FITS files in the xtrnsfits list from the
     # photometric reference.  With 30 workers, at best process ~few frames per
@@ -1701,7 +1703,8 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                              photreffluxthreshold=photreffluxthreshold,
                              extractsources=extractsources,
                              translateimages=translateimages,
-                             reversesubtract=reversesubtract)
+                             reversesubtract=reversesubtract,
+                             useimagenotfistar=useimagenotfistar)
     else:
         print('found that image subtraction is complete.')
 
