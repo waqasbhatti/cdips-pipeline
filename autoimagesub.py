@@ -420,6 +420,7 @@ def get_frame_info(frame):
                 dtype='f8,f8,U5',
                 names=['mag','err','flag']
                 )
+            photdata = np.atleast_1d(photdata)
 
         # 3. get the data from the fistar file
         srcdata = np.genfromtxt(srclistpath,
@@ -428,6 +429,7 @@ def get_frame_info(frame):
                                 names=['background',
                                        'svalue',
                                        'dvalue'])
+        srcdata = np.atleast_1d(srcdata)
 
         # process fiphot data
         if '--binary-output' in header.decode('utf-8'):
@@ -759,10 +761,12 @@ def calibrated_frame_to_database(fitsfile,
                      "%s, %s, %s, %s, %s, %s, "
                      "%s) on conflict "
                      "(fits) do update "
-                     "set fitsheader = %s,"
-                     "photinfo = %s, entryts = current_timestamp")
+                     "set fistar = %s, fiphot = %s, wcs = %s, "
+                     "fitsheader = %s, photinfo = %s, frameisok = %s, "
+                     "entryts = current_timestamp")
             params = (fits, fistar, fiphot, wcs, fitsheaderjson, photinfojson,
-                     frameisok, fitsheaderjson, photinfojson)
+                      frameisok, fistar, fiphot, wcs,
+                      fitsheaderjson, photinfojson, frameisok)
         else:
             # one row per fits image. if the fits image already has a row, do
             # nothing.
@@ -948,8 +952,9 @@ def arefshifted_frame_to_database(
                          ") values ("
                          "%s, %s, %s, %s, %s, "
                          "%s, %s, %s, %s "
-                         ") on conflict (arefshiftedframe) "
-                         "do update set "
+                         ") on conflict ( "
+                         " arefshiftedframe, astromref "
+                         ") do update set "
                          "origframekey = %s, "
                          "astromref = %s, "
                          "shiftisok = %s, didwarpcheck = %s, "
@@ -979,9 +984,11 @@ def arefshifted_frame_to_database(
                          ") values ("
                          "%s, %s, %s, %s, %s, "
                          "%s "
-                         ") on conflict (arefshiftedframe) "
-                         "do update set "
-                         "origframekey = %s, astromref = %s, "
+                         ") on conflict ("
+                         " arefshiftedframe, astromref "
+                         ") do update set "
+                         "origframekey = %s, "
+                         "itrans = %s, "
                          "shiftisok = %s, didwarpcheck = %s, "
                          "entryts = current_timestamp"
                          )
@@ -991,7 +998,7 @@ def arefshifted_frame_to_database(
                           itrans,
                           shiftisok,
                           didwarpcheck,
-                          origframekey, astromref['framepath'],
+                          origframekey, itrans,
                           shiftisok, didwarpcheck
                          )
 
@@ -1390,10 +1397,10 @@ def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
             fistar = np.array([x[2] for x in rows])
             fiphot = np.array([x[3] for x in rows])
 
-            mfs = np.array([x[4] for x in rows])
-            mfd = np.array([x[5] for x in rows])
-            mbg = np.array([x[6] for x in rows])
-            ngo = np.array([x[7] for x in rows])
+            mfs = np.array([x[4] for x in rows], dtype=np.float)
+            mfd = np.array([x[5] for x in rows], dtype=np.float)
+            mbg = np.array([x[6] for x in rows], dtype=np.float)
+            ngo = np.array([x[7] for x in rows], dtype=np.float)
 
             print('%sZ: total frames to process: %s' %
                   (datetime.utcnow().isoformat(), len(fits)))
@@ -1707,6 +1714,8 @@ def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
                   'good astrometric reference frame for %s!'
                   ' no frames exist' %
                   (datetime.utcnow().isoformat(), repr(fieldinfo)))
+            print(params)
+            print(cursor.query)
             returnval = None
 
     # catch the overwrite = False scenario
