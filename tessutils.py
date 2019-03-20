@@ -1244,6 +1244,8 @@ def make_ccd_temperature_timeseries_pickle(sectornum):
         ))
         if len(fnames) > 1:
             raise AssertionError('expected one engineering file per sector')
+        elif len(fnames)==0:
+            raise AssertionError('got no engineering files for this sector!!')
         fname = fnames[0]
     else:
         raise NotImplementedError
