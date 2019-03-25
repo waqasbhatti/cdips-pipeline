@@ -1840,7 +1840,7 @@ def photometry_on_combined_photref(
             observatory='tess',
             fluxthreshold=photreffluxthreshold,
             extractforsdk=extractforsdk,
-            aperturelist-apertures
+            aperturelist=apertures
         )
 
     if extractsources:
