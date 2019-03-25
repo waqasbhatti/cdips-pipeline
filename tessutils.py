@@ -227,8 +227,8 @@ def parallel_mask_dquality_flag_frames(fitslist, flagvalues=[-1,4,32,36],
         release notes.
     '''
 
-    print('%sZ: %s files to check for DQUALITY=%d in' %
-          (datetime.utcnow().isoformat(), len(fitslist), flagvalue))
+    print('%sZ: %s files to check for DQUALITY=%s in' %
+          (datetime.utcnow().isoformat(), len(fitslist), repr(flagvalues)))
 
     pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
