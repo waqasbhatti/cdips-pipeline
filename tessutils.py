@@ -155,13 +155,35 @@ def mask_dquality_flag_frame(task):
     mask is metadata.
     """
 
-    fitsname, flagvalue = task
+    fitsname, flagvalues = task
 
     # open the header, check if the quality flag matches the passed value.
     data, hdr = iu.read_fits(fitsname, ext=0)
 
+    isbadtime = False
+    if -1 in flagvalues:
+        # get frame time in TJD. if its within any known bad times for TESS,
+        # then set isbadtime to True, and mask the frame.
+
+        # get frametime in TJD = BTJD - LTT_corr
+        tjd = hdr['TSTART'] - hdr['BARYCORR']
+
+        # bad times quoted in data release notes are all in TJD (no barycentric
+        # correction applied). this is b/c they're from POC, not SPOC.
+        badtimewindows = [
+            (1347, 1349), # sector 1, coarse pointing
+            (1382.03986, 1385.896635), # sector 3, orbit 13 start
+            (1406.29246, 1409.388295), # sector 3, orbit 14 end
+            (1418.53690, 1421.211685), # sector 4 instrument anomaly
+            (1465.212615, 1468.269985), # sector 6 PRF time
+        ]
+
+        for window in badtimewindows:
+            if tjd > min(window) and tjd < max(window):
+                isbadtime = True
+
     # if it matches, mask out everything. otherwise, do nothing.
-    if hdr['DQUALITY'] == flagvalue:
+    if hdr['DQUALITY'] in flagvalues or isbadtime:
 
         # if you pass `fiign` "0" as the saturation value, you don't get a
         # correct mask. so we mask out non-positive values, and set the
@@ -175,8 +197,8 @@ def mask_dquality_flag_frame(task):
         returncode = os.system(cmdtorun)
 
         if returncode == 0:
-            print('%sZ: appended DQUALITY=%d mask to %s' %
-                  (datetime.utcnow().isoformat(), flagvalue, fitsname))
+            print('%sZ: appended DQUALITY=%s mask to %s' %
+                  (datetime.utcnow().isoformat(), repr(flagvalues), fitsname))
             return fitsname
         else:
             print('ERR! %sZ: DQUALITY mask construction failed for %s' %
@@ -188,18 +210,21 @@ def mask_dquality_flag_frame(task):
 
 
 
-def parallel_mask_dquality_flag_frames(fitslist, flagvalue=32,
+def parallel_mask_dquality_flag_frames(fitslist, flagvalues=[-1,4,32,36],
                                        nworkers=16, maxworkertasks=1000):
     '''
-    Append mask to fits header of an ENTIRE CALIBRATED FRAME if it matches the
-    passed data quality flag value.
+    Append mask to fits header of an ENTIRE CALIBRATED FRAME if it matches any
+    of the passed data quality flag value.
 
     See e.g., EXP-TESS-ARC-ICD-TM-0014 for a description of the flag values.
 
     Kwargs:
-        flagvalue (int): integer that tells you something about the data
-        quality. E.g., "32" is a "reaction wheel desaturation event", AKA a
-        "momentum dump".
+        flagvalues (list): list of integers that tells you something about the
+        data quality. E.g., "32" is a "reaction wheel desaturation event", AKA
+        a "momentum dump".  The value "-1" is special because it is the
+        manually-imposed "Manual Exclude" flag from within pipe-trex. These
+        come from a list of known bad times, which are read from the data
+        release notes.
     '''
 
     print('%sZ: %s files to check for DQUALITY=%d in' %
@@ -207,7 +232,7 @@ def parallel_mask_dquality_flag_frames(fitslist, flagvalue=32,
 
     pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
-    tasks = [(x, flagvalue) for x in fitslist]
+    tasks = [(x, flagvalues) for x in fitslist]
 
     # fire up the pool of workers
     results = pool.map(mask_dquality_flag_frame, tasks)
@@ -216,8 +241,8 @@ def parallel_mask_dquality_flag_frames(fitslist, flagvalue=32,
     pool.close()
     pool.join()
 
-    print('%sZ: finished checking for DQUALITY=%d' %
-          (datetime.utcnow().isoformat(), flagvalue))
+    print('%sZ: finished checking for DQUALITY=%s' %
+          (datetime.utcnow().isoformat(), flagvalues))
 
     return {result for result in results}
 

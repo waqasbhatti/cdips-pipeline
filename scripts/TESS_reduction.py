@@ -1569,8 +1569,12 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
         tu.parallel_mask_saturated_stars(fits_list, saturationlevel=80000,
                                          nworkers=nworkers)
 
-        # get mask for frames tagged as momentum dumps
-        tu.parallel_mask_dquality_flag_frames(fits_list, flagvalue=32,
+        # get mask for frames tagged as momentum dumps, tagged as coarse point,
+        # and tagged as both. further, mask frames that are at known BAD TIMES.
+        # (these would get bit value 128 in LCs processed by SPOC; they get
+        # value -1 in pipe-trex).
+        tu.parallel_mask_dquality_flag_frames(fits_list,
+                                              flagvalues=[-1,4,32,36],
                                               nworkers=nworkers)
 
         # append CCD temperature information to headers
