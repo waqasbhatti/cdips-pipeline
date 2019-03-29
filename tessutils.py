@@ -48,7 +48,7 @@ import aperturephot as ap
 import imageutils as iu
 import shared_variables as sv
 
-import os, pickle, re
+import os, pickle, re, shutil
 import numpy as np, pandas as pd, matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from glob import glob
@@ -147,6 +147,16 @@ def parallel_mask_saturated_stars(fitslist, saturationlevel=65535, nworkers=16,
     return {result for result in results}
 
 
+# bad times quoted in data release notes are all in TJD (no barycentric
+# correction applied). this is b/c they're from POC, not SPOC.
+badtimewindows = [
+    (1347, 1349), # sector 1, coarse pointing
+    (1382.03986, 1385.896635), # sector 3, orbit 13 start
+    (1406.29246, 1409.388295), # sector 3, orbit 14 end
+    (1418.53690, 1421.211685), # sector 4 instrument anomaly
+    (1465.212615, 1468.269985), # sector 6 PRF time
+]
+
 def mask_dquality_flag_frame(task):
     """
     Mask the entire frame if dquality flag from SPOC is raised. Overwrites
@@ -167,16 +177,6 @@ def mask_dquality_flag_frame(task):
 
         # get frametime in TJD = BTJD - LTT_corr
         tjd = hdr['TSTART'] - hdr['BARYCORR']
-
-        # bad times quoted in data release notes are all in TJD (no barycentric
-        # correction applied). this is b/c they're from POC, not SPOC.
-        badtimewindows = [
-            (1347, 1349), # sector 1, coarse pointing
-            (1382.03986, 1385.896635), # sector 3, orbit 13 start
-            (1406.29246, 1409.388295), # sector 3, orbit 14 end
-            (1418.53690, 1421.211685), # sector 4 instrument anomaly
-            (1465.212615, 1468.269985), # sector 6 PRF time
-        ]
 
         for window in badtimewindows:
             if tjd > min(window) and tjd < max(window):
@@ -209,7 +209,6 @@ def mask_dquality_flag_frame(task):
 
     else:
         return 1
-
 
 
 def parallel_mask_dquality_flag_frames(fitslist, flagvalues=[-1,4,32,36],
@@ -247,6 +246,81 @@ def parallel_mask_dquality_flag_frames(fitslist, flagvalues=[-1,4,32,36],
           (datetime.utcnow().isoformat(), flagvalues))
 
     return {result for result in results}
+
+
+def move_badframe(task):
+    """
+    Move the entire frame to "badframe" subdirectory, if it matches particular
+    quality flags or time windows.
+    """
+
+    fitsname, flagvalues = task
+
+    # open the header, check if the quality flag matches the passed value.
+    data, hdr = iu.read_fits(fitsname, ext=0)
+
+    isbadtime = False
+    if -1 in flagvalues:
+        # get frame time in TJD. if its within any known bad times for TESS,
+        # then set isbadtime to True, and mask the frame.
+
+        # get frametime in TJD = BTJD - LTT_corr
+        tjd = hdr['TSTART'] - hdr['BARYCORR']
+
+        for window in badtimewindows:
+            if tjd > min(window) and tjd < max(window):
+                isbadtime = True
+
+    # if it matches, move. otherwise, do nothing.
+    if hdr['DQUALITY'] in flagvalues or isbadtime:
+
+        dstdir = os.path.join(os.path.dirname(fitsname),'badframes')
+        dstpath = os.path.join(dstdir,os.path.basename(fitsname))
+
+        shutil.move(fitsname, dstpath)
+        print('{}Z: BADFRAME moved {} -> {}'.format(
+            datetime.utcnow().isoformat(), fitsname, dstpath))
+        return dstpath
+
+    else:
+        return 1
+
+
+def parallel_move_badframes(fitslist, flagvalues=[-1,4,32,36], nworkers=16,
+                            maxworkertasks=1000):
+    '''
+    Move frame to badframes dir it matches any of the passed data quality flag
+    value.  See e.g., EXP-TESS-ARC-ICD-TM-0014 for a description of the flag
+    values.
+
+    Kwargs:
+        flagvalues (list): list of integers that tells you something about the
+        data quality. E.g., "32" is a "reaction wheel desaturation event", AKA
+        a "momentum dump".  The value "-1" is special because it is the
+        manually-imposed "Manual Exclude" flag from within pipe-trex. These
+        come from a list of known bad times, which are read from the data
+        release notes.
+    '''
+
+    print('%sZ: %s files to check for DQUALITY=%s in (BADFRAME MOVE)' %
+          (datetime.utcnow().isoformat(), len(fitslist), repr(flagvalues)))
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+    tasks = [(x, flagvalues) for x in fitslist]
+
+    # fire up the pool of workers
+    results = pool.map(move_badframe, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    print('%sZ: finished checking for DQUALITY=%s (BADFRAME MOVE)' %
+          (datetime.utcnow().isoformat(), flagvalues))
+
+    return {result for result in results}
+
 
 
 def parallel_trim_get_single_extension(fitslist, outdir, projid, nworkers=16,

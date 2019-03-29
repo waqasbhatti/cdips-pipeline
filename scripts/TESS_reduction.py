@@ -704,7 +704,7 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
                                 binlightcurves, get_masks,
                                 tfa_template_sigclip, tfa_epdlc_sigclip,
                                 translateimages, reversesubtract, skipepd,
-                                useimagenotfistar, fixedtfatemplate):
+                                useimagenotfistar, fixedtfatemplate, flagvalues):
     """
     each "reduction version" is identified by a project ID. the parameters
     corresponding to each project ID are written in a pickle file, so that we
@@ -747,7 +747,8 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
         "reversesubtract":reversesubtract,
         "skipepd":skipepd,
         "useimagenotfistar":useimagenotfistar,
-        "fixedtfatemplate":fixedtfatemplate
+        "fixedtfatemplate":fixedtfatemplate,
+        "flagvalues":flagvalues
     }
 
     outpicklename = "projid_{:s}.pickle".format(repr(projectid))
@@ -1443,7 +1444,8 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
          photreffluxthreshold=1000, extractsources=True, binlightcurves=False,
          get_masks=1, tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0,
          translateimages=True, reversesubtract=False, skipepd=True,
-         useimagenotfistar=True, fixedtfatemplate=None
+         useimagenotfistar=True, fixedtfatemplate=None,
+         flagvalues=[-1,4,32,36]
          ):
     """
     args:
@@ -1487,7 +1489,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                                 binlightcurves, get_masks,
                                 tfa_template_sigclip, tfa_epdlc_sigclip,
                                 translateimages, reversesubtract, skipepd,
-                                useimagenotfistar, fixedtfatemplate)
+                                useimagenotfistar, fixedtfatemplate, flagvalues)
 
     starttime = datetime.utcnow()
 
@@ -1573,9 +1575,11 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
         # and tagged as both. further, mask frames that are at known BAD TIMES.
         # (these would get bit value 128 in LCs processed by SPOC; they get
         # value -1 in pipe-trex).
-        tu.parallel_mask_dquality_flag_frames(fits_list,
-                                              flagvalues=[-1,4,32,36],
-                                              nworkers=nworkers)
+
+        # #FIXME useless, if we're moving the frames anyway. also doesn't seem to
+        # #work so... forget this idea.
+        # tu.parallel_mask_dquality_flag_frames(fits_list, flagvalues=flagvalues,
+        #                                       nworkers=nworkers)
 
         # append CCD temperature information to headers
         engdatadir = '/nfs/phtess1/ar1/TESS/FFI/ENGINEERING/'
@@ -1609,6 +1613,11 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
         else:
             print('SKIP symlink {}->{}'.format(fitspath, dstpath))
     fits_list = np.sort(glob(os.path.join(fitsdir,fitsglob)))
+
+    # move images with bad quality flags, and at bad times, to the badframes
+    # directory.
+    tu.parallel_move_badframes(fits_list, flagvalues=flagvalues,
+                               nworkers=nworkers)
 
     ###########################################################################
 
