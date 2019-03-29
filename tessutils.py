@@ -84,7 +84,7 @@ SATURATIONMASKCMD = ('fiign {fitsfile} -o {outfitsfile} '
                      '-s {saturationlevel} --an')
 
 DQUALITYMASKCMD = ('fiign {fitsfile} -o {outfitsfile} '
-                   '-s {minimumreadout} --ignore-nonpositive')
+                   '-s {minimumreadout:.10f} --ignore-nonpositive')
 
 def mask_saturated_stars_worker(task):
     """
@@ -188,17 +188,19 @@ def mask_dquality_flag_frame(task):
         # if you pass `fiign` "0" as the saturation value, you don't get a
         # correct mask. so we mask out non-positive values, and set the
         # saturation value below the lowest positive value.
-        minabsdata = np.min(np.abs(data))
-        minimumreadout = minabsdata - minabsdata/2
+        minabsdata = np.nanmin(np.abs(data[data>0]))
+        minimumreadout = minabsdata - minabsdata/2.
 
+        minimumreadout = max([minimumreadout, 1e-10])
         cmdtorun = DQUALITYMASKCMD.format(fitsfile=fitsname, outfitsfile=fitsname,
                                           minimumreadout=minimumreadout)
 
         returncode = os.system(cmdtorun)
 
         if returncode == 0:
-            print('%sZ: appended DQUALITY=%s mask to %s' %
-                  (datetime.utcnow().isoformat(), repr(flagvalues), fitsname))
+            print('%sZ: dquality %s (or badtime). masked %s w/ minread %s' %
+                  (datetime.utcnow().isoformat(), repr(hdr['DQUALITY']),
+                   fitsname, repr(minimumreadout)))
             return fitsname
         else:
             print('ERR! %sZ: DQUALITY mask construction failed for %s' %
