@@ -955,15 +955,16 @@ def _measure_planet_snr(plname, tfalc, statsdir, sectornum,
 
     time = lc[timename]
 
-    plotpath = os.path.join(statsdir, str(plname)+'_AP1_lightcurve.png')
+    plotpath = os.path.join(statsdir, str(plname)+'_AP2_lightcurve.png')
     if skipepd:
-        plot_raw_epd_tfa(time, lc['IRM1'], np.zeros_like(lc['IRM1']),
-                         lc['TFA1'], 1, savpath=plotpath,
+        plot_raw_epd_tfa(time, lc['IRM2'], np.zeros_like(lc['IRM2']),
+                         lc['TFA2'], 1, savpath=plotpath,
                          xlabel='BJD$_\mathrm{TDB}$ [days]', skipepd=skipepd)
     else:
-        plot_raw_epd_tfa(time, lc['IRM1'], lc['EP1'], lc['TFA1'], 1,
+        plot_raw_epd_tfa(time, lc['IRM2'], lc['EP2'], lc['TFA2'], 1,
                          savpath=plotpath, xlabel='BTJD = BJD - 2457000',
                          skipepd=skipepd)
+
 
     outdir = os.path.join(statsdir, plname)
     if not os.path.exists(outdir):
