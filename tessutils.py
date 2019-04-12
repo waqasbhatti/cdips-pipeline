@@ -75,6 +75,8 @@ from astrobase.varbase.transits import get_transit_times
 from astrobase import lcmath
 
 from scipy.ndimage import median_filter
+from scipy.ndimage.filters import gaussian_filter
+from copy import deepcopy
 
 ##########################################
 
@@ -150,7 +152,7 @@ def parallel_mask_saturated_stars(fitslist, saturationlevel=65535, nworkers=16,
 # bad times quoted in data release notes are all in TJD (no barycentric
 # correction applied). this is b/c they're from POC, not SPOC.
 badtimewindows = [
-    (1347, 1349), # sector 1, coarse pointing
+    (1347, 1349.5), # sector 1, coarse pointing
     (1382.03986, 1385.896635), # sector 3, orbit 13 start
     (1406.29246, 1409.388295), # sector 3, orbit 14 end
     (1418.53690, 1421.211685), # sector 4 instrument anomaly
@@ -1514,7 +1516,7 @@ def read_object_reformed_catalog(reformedcatalogfile, isgaiaid=False):
 
 def median_filter_frame(task):
 
-    imgfile, outbkgdpath, outbkgdsubpath, n_sigma, k = task
+    imgfile, outbkgdpath, outbkgdsubpath, n_sigma, k, k_sigma = task
 
     if os.path.exists(outbkgdpath) and os.path.exists(outbkgdsubpath):
         print('{} found and skipped {}'.format(
@@ -1529,13 +1531,14 @@ def median_filter_frame(task):
 
     # overwrite stars with the median value... (because otherwise the scipy
     # median filter faults out)
-    from copy import deepcopy
     img = deepcopy(data)
 
     sel_inds = data > (med_data + n_sigma*std_data)
     data[sel_inds] = med_data
 
     thisbkgd = median_filter(data, size=(k, k), mode='reflect')
+    thisbkgd = gaussian_filter(thisbkgd, k_sigma, order=0, output=None,
+                               mode='reflect', truncate=4.0)
 
     hdu_bkgd = fits.PrimaryHDU(thisbkgd)
     hdulist_bkgd = fits.HDUList([hdu_bkgd])
@@ -1563,9 +1566,51 @@ def median_filter_frame(task):
     hdulist_bkgd.close()
 
 
-def parallel_bkgd_subtract(fitslist, method='boxmedian', isfull=True, k=32,
-                           outdir=None, nworkers=32, maxworkertasks=1000,
-                           n_sigma=2):
+def none_filter_frame(task):
+
+    imgfile, outbkgdpath, outbkgdsubpath, n_sigma, k, k_sigma = task
+
+    if os.path.exists(outbkgdpath) and os.path.exists(outbkgdsubpath):
+        print('{} found and skipped {}'.format(
+            datetime.utcnow().isoformat(), outbkgdpath))
+        return 1
+
+    hdulist = fits.open(imgfile)
+    hdr, data = hdulist[0].header, hdulist[0].data
+
+    thisbkgd = np.zeros_like(data)
+
+    hdu_bkgd = fits.PrimaryHDU(thisbkgd)
+    hdulist_bkgd = fits.HDUList([hdu_bkgd])
+
+    img = deepcopy(data)
+    hdu_sub = fits.PrimaryHDU(data = img - thisbkgd,
+                              header=hdr)
+    hdulist_sub = fits.HDUList([hdu_sub])
+
+    outdir = os.path.dirname(outbkgdpath)
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+
+    for outhdu, outfile in zip(
+        [hdu_bkgd, hdu_sub],
+        [outbkgdpath, outbkgdsubpath]
+    ):
+        if not os.path.exists(outfile):
+            outhdu.writeto(outfile)
+            print('{}: made {}'.
+                  format(datetime.utcnow().isoformat(), outfile))
+        else:
+            print('{}: found & skipped {}'.
+                  format(datetime.utcnow().isoformat(), outfile))
+
+    hdulist_bkgd.close()
+
+
+
+def parallel_bkgd_subtract(fitslist, method='boxblurmedian', isfull=True, k=32,
+                           k_sigma=32, outdir=None, nworkers=32,
+                           maxworkertasks=1000, n_sigma=2):
     """
     Given list of FITS files, estimate the bulk sky background. Two additional
     files are made for each FITS image passed:
@@ -1576,14 +1621,17 @@ def parallel_bkgd_subtract(fitslist, method='boxmedian', isfull=True, k=32,
 
     This subtraction step is needed because the local background model
     attempted by `ficonv` (the "b" term in the kernel) is a poor model for the
-    scattered light in TESS.  A box median filter (by default, 32 x 32 on each
-    frame) does a good job.  (The same will probably be true for HATPI.)
+    scattered light in TESS.  A box median filter (e.g., 48 x 48 on each
+    frame), convolved with a gaussian kernel, does a good job.  (The same will
+    probably be true for HATPI.)
 
     kwargs:
 
-        method (str): 'boxmedian' (only one implemented).
+        method (str): 'boxblurmedian', or 'none'.
 
         k (int): box median size.
+
+        k_sigma (int): standard deviation of gaussian blur kernel
 
         n_sigma (float): in background estimation, the first step is to replace
         all pixels > n_sigma away from the median with the median background
@@ -1607,13 +1655,13 @@ def parallel_bkgd_subtract(fitslist, method='boxmedian', isfull=True, k=32,
     assuming the image is in UINT8 or UINT16, which allows some binary tree
     speedups too. The latter won't work for us.
 
-    Possible future method to implement: "boxmedianplustime", for a spatial box
+    Possible future method to implement: "boxblurmedianplustime", for a spatial box
     median, plus a continuity condition in time (e.g., 32 x 32 spatial, plus a
     window of [-3 cadences, 3 cadences]).
     """
-    if method != 'boxmedian':
+    if method not in ['boxblurmedian','none']:
         raise NotImplementedError(
-            'boxmedian is only implemented bkgd subtraction method, for now'
+            'boxblurmedian is only implemented bkgd subtraction method, for now'
         )
 
     # Pass a N x N median filter over the FFIs. N x N is the physical box
@@ -1688,11 +1736,13 @@ def parallel_bkgd_subtract(fitslist, method='boxmedian', isfull=True, k=32,
 
         pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
-        tasks = [(x, y, z, n_sigma, k) for x, y, z in zip(tg_fitsimgs,
-                                                          tg_outbkgdnames,
-                                                          tg_outbkgdsubnames) ]
+        tasks = [(x, y, z, n_sigma, k, k_sigma) for x, y, z in
+                 zip(tg_fitsimgs, tg_outbkgdnames, tg_outbkgdsubnames) ]
 
-        results = pool.map(median_filter_frame, tasks)
+        if method == 'boxblurmedian':
+            results = pool.map(median_filter_frame, tasks)
+        elif method == 'none':
+            results = pool.map(none_filter_frame, tasks)
 
         # wait for the processes to complete work
         pool.close()
@@ -1723,23 +1773,26 @@ def plot_median_filter_quad(task):
     cal_img, _ = iu.read_fits(calfile)
 
     plt.close('all')
+    plt.rcParams['xtick.direction'] = 'in'
+    plt.rcParams['ytick.direction'] = 'in'
+
     fig, axs = plt.subplots(ncols=2, nrows=2)
 
     norm = colors.LogNorm(vmin=vmin, vmax=vmax)
 
-    cset1 = axs[0,1].imshow(cal_img, cmap='viridis', vmin=vmin, vmax=vmax,
+    cset1 = axs[0,1].imshow(cal_img, cmap='binary_r', vmin=vmin, vmax=vmax,
                             norm=norm)
-
-    axs[0,0].imshow(bkgd_img - np.median(cal_img), cmap='RdBu_r', vmin=vmin,
-                    vmax=vmax, norm=norm)
 
     diff_vmin, diff_vmax = -1000, 1000
 
     diffnorm = colors.SymLogNorm(linthresh=0.03, linscale=0.03, vmin=diff_vmin,
                                  vmax=diff_vmax)
 
+    axs[0,0].imshow(bkgd_img - np.median(cal_img), cmap='RdBu_r',
+                    vmin=diff_vmin, vmax=diff_vmax, norm=diffnorm)
+
     cset2 = axs[1,0].imshow(cal_img - bkgd_img, cmap='RdBu_r', vmin=diff_vmin,
-                    vmax=diff_vmax, norm=diffnorm)
+                            vmax=diff_vmax, norm=diffnorm)
 
     axs[1,1].imshow(cal_img - np.median(cal_img), cmap='RdBu_r',
                     vmin=diff_vmin, vmax=diff_vmax, norm=diffnorm)
