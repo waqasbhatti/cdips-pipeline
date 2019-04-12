@@ -93,7 +93,7 @@ import scipy.stats
 import numpy.random as nprand
 
 import matplotlib
-matplotlib.use('AGG')
+matplotlib.use('AGG', warn=False)
 import matplotlib.pyplot as plt
 
 import astropy.io.fits as pyfits
@@ -1880,7 +1880,8 @@ def do_photometry(fits,
                   maxframebgv=2000.0,
                   minnstars=500,
                   observatory='hatpi',
-                  extractforsdk=False):
+                  extractforsdk=False,
+                  overwrite=True):
     """
     This rolls up the sourcelist and fiphot functions above.
 
@@ -1927,28 +1928,37 @@ def do_photometry(fits,
         print('output fiphot will be %s' % outfiphot)
 
     # make the .projcatalog files (projects catalog onto the frame)
-    projcatfile = make_frameprojected_catalog(fits,
-                                              reformedfovcatalog,
-                                              ccdextent=ccdextent,
-                                              out=outprojcat,
-                                              removetemp=removesourcetemp,
-                                              pixborders=pixborders)
+    if overwrite or not os.path.exists(outprojcat):
+        projcatfile = make_frameprojected_catalog(fits,
+                                                  reformedfovcatalog,
+                                                  ccdextent=ccdextent,
+                                                  out=outprojcat,
+                                                  removetemp=removesourcetemp,
+                                                  pixborders=pixborders)
+    else:
+        print('%sZ: %s already exists, skipping making projcatalog.' %
+              (datetime.utcnow().isoformat(), outprojcat))
+        projcatfile = outprojcat
+
     if projcatfile:
 
         # if we're supposed to extract sources and run photometry on them
         # instead of just the sources in the projected fovcatalog, do so
         if extractsources:
+            outfistar = os.path.join(outdir, re.sub(sv.FITS_TAIL, '.fistar',
+                    os.path.basename(fits)))
 
             # extract sources
             if observatory=='hatpi':
-                framesources = extract_frame_sources(
-                    fits,
-                    os.path.join(
-                        outdir,
-                        re.sub(sv.FITS_TAIL,'.fistar',os.path.basename(fits))
-                        ),
-                    fluxthreshold=fluxthreshold
-                )
+                if overwrite or not os.path.exists(outfistar):
+                    framesources = extract_frame_sources(
+                        fits, outfistar,
+                        fluxthreshold=fluxthreshold
+                    )
+                else:
+                    print('%sZ: %s already exists, skipping fistar.' %
+                          (datetime.utcnow().isoformat(), outfistar))
+                    framesources = outfistar
 
             elif observatory=='tess':
                 framesources = extract_frame_sources(
@@ -2180,7 +2190,8 @@ def parallel_fitsdir_photometry(
                'observatory':observatory,
                'fovcat_xycols':fovcat_xycols,
                'projcat_xycols':projcat_xycols,
-               'fiphot_xycols':fiphot_xycols}, rejectbadframes] for x in fitslist]
+               'fiphot_xycols':fiphot_xycols,
+               'overwrite':overwrite}, rejectbadframes] for x in fitslist]
 
     # if the badframes directory doesn't exist, make it
     badframesdir = os.path.join(outdir, 'badframes')
