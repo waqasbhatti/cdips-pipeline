@@ -34,6 +34,15 @@ plot_lightcurve_and_ACF:
         * EPD mags vs time (and ACF)
         * TFA mags vs time. (and ACF)
 
+plot_raw_tfa_bkgd:
+    Plot a 3 row, 1 column plot with rows of:
+        * raw mags vs time
+        * TFA mags vs time.
+        * background vs time
+
+plot_raw_tfa_bkgd_fits
+    Wrapper to above, given a *llc.fits lightcurve.
+
 TODO:
 move items from aperturephot.py here, and update all respective calls.
 
@@ -1086,8 +1095,6 @@ def plot_raw_epd_tfa(time, rawmag, epdmag, tfamag, ap_index, savpath=None,
         skipepd (bool): if true, skips the EPD row.
     """
 
-    from matplotlib.ticker import FormatStrFormatter
-
     plt.close('all')
     nrows = 2 if skipepd else 3
     fig, axs = plt.subplots(nrows=nrows, ncols=1, sharex=True, figsize=(6,4))
@@ -1151,11 +1158,149 @@ def plot_raw_epd_tfa(time, rawmag, epdmag, tfamag, ap_index, savpath=None,
     print('%sZ: made plot: %s' % (datetime.utcnow().isoformat(), savpath))
 
 
+def plot_tfa_templates(tfa_templates_path, savdir):
+
+    df = pd.read_csv(tfa_templates_path, sep=' ', header=None,
+                     names=['fname','x','y'])
+
+    for fname in df['fname']:
+        plot_raw_tfa_bkgd_fits(fname, savdir)
+
+
+def plot_raw_tfa_bkgd_fits(fitspath, savdir, maskbadtimes=True, ap_index=2,
+                           customstr=''):
+
+    # define savpath
+    savpath = os.path.join(
+        savdir,
+        os.path.basename(fitspath).replace('.fits','_raw_tfa_bkgd.png')
+    )
+
+    # load lc
+    hdulist = fits.open(fitspath)
+    hdr = hdulist[0].header
+    time_bjd = hdulist[1].data['TMID_BJD']
+    barycorr = hdulist[1].data['BJDCORR']
+    tfa_mag = hdulist[1].data['TFA{}'.format(ap_index)]
+    raw_mag = hdulist[1].data['IRM{}'.format(ap_index)]
+    bkgd = hdulist[1].data['BGV']
+    hdulist.close()
+
+    if maskbadtimes:
+        from tessutils import badtimewindows
+        # BJD = TJD + LTT_corr
+        tjd = time_bjd - barycorr
+        toffset = 2457000
+        tjd -= toffset
+
+        good_inds = np.ones_like(tjd).astype(bool)
+        for window in badtimewindows:
+            bad_window_inds = (tjd > min(window)) & (tjd < max(window))
+            good_windows_inds = ~bad_window_inds
+            good_inds &= good_windows_inds
+
+        time = time_bjd[good_inds]
+        tfa_mag = tfa_mag[good_inds]
+        raw_mag = raw_mag[good_inds]
+        bkgd = bkgd[good_inds]
+
+    else:
+        time = time_bjd
+
+    plot_raw_tfa_bkgd(time, raw_mag, tfa_mag, bkgd, ap_index, savpath,
+                      customstr=customstr)
+
+
+
+def plot_raw_tfa_bkgd(time, rawmag, tfamag, bkgdval, ap_index, savpath=None,
+                      xlabel='BJDTDB', customstr=''):
+    """
+    Plot a 2 (or 3) row, 1 column plot with rows of:
+        * raw mags vs time
+        * EPD mags vs time (optional)
+        * TFA mags vs time.
+
+    args:
+        time, rawmag, epdmag, tfamag (np.ndarray)
+
+        ap_index (int): integer, e.g., "2" for aperture #2.
+
+        skipepd (bool): if true, skips the EPD row.
+    """
+
+    plt.close('all')
+    nrows = 3
+    fig, axs = plt.subplots(nrows=nrows, ncols=1, sharex=True, figsize=(6,4))
+
+    axs = axs.flatten()
+
+    apstr = 'AP{:d}'.format(ap_index)
+    stagestrs = ( ['RM{:d}'.format(ap_index),
+                   'TF{:d}'.format(ap_index),
+                   'BKGD{:d}'.format(ap_index)] )
+
+    yvals = [rawmag,tfamag,bkgdval]
+    nums = list(range(len(yvals)))
+
+    for ax, yval, txt, num in zip(axs, yvals, stagestrs, nums):
+
+        ax.scatter(time, yval, c='black', alpha=0.9, zorder=2, s=3,
+                   rasterized=True, linewidths=0)
+
+        #txt_x, txt_y = 0.99, 0.02
+        #t = ax.text(txt_x, txt_y, txt, horizontalalignment='right',
+        #            verticalalignment='bottom', fontsize='small', zorder=3,
+        #            transform=ax.transAxes)
+
+        if num in [0]:
+            txt_x, txt_y = 0.99, 0.98
+            mag = yval
+            stdmmag = np.nanstd(mag)*1e3
+            if stdmmag > 0.1:
+                stattxt = '$\sigma$ = {:.1f} mmag{}'.format(stdmmag, customstr)
+                ndigits = 2
+            elif stdmmag > 0.01:
+                stattxt = '$\sigma$ = {:.2f} mmag{}'.format(stdmmag, customstr)
+                ndigits = 3
+            else:
+                stattxt = '$\sigma$ = {:.3f} mmag{}'.format(stdmmag, customstr)
+                ndigits = 4
+            _ = ax.text(txt_x, txt_y, stattxt, horizontalalignment='right',
+                    verticalalignment='top', fontsize='small', zorder=3,
+                    transform=ax.transAxes)
+        ax.get_yaxis().set_tick_params(which='both', direction='in',
+                                       labelsize='x-small')
+        ax.get_xaxis().set_tick_params(which='both', direction='in',
+                                       labelsize='x-small')
+
+    for ax in axs:
+        ylim = ax.get_ylim()
+        ax.set_ylim((max(ylim), min(ylim)))
+
+    axs[-1].set_xlabel(xlabel, fontsize='small')
+
+    # make the y label
+    ax_hidden = fig.add_subplot(111, frameon=False)
+    ax_hidden.tick_params(labelcolor='none', top=False, bottom=False,
+                          left=False, right=False)
+    ax_hidden.set_ylabel('IRM / TFA / bkgdval', fontsize='small', labelpad=5)
+
+    if not savpath:
+        savpath = 'temp_{:s}.png'.format(apstr)
+
+    fig.tight_layout(h_pad=-0.3)
+    fig.savefig(savpath, dpi=250, bbox_inches='tight')
+    print('%sZ: made plot: %s' % (datetime.utcnow().isoformat(), savpath))
+
+
+
+
+
 def plot_lightcurve_and_ACF(
     rawlags, rawacf, epdlags, epdacf, tfalags, tfaacf,
     rawtime, rawflux, epdtime, epdflux, tfatime, tfaflux,
     ap, savpath=None,
-    xlabeltime='BJD - 2457000',xlabelacf='ACF lag [days]',
+    xlabeltime='BJDTDB',xlabelacf='ACF lag [days]',
     skipepd=False):
     """
     Plot a 3 row, 2 column plot with rows of:
@@ -1201,8 +1346,8 @@ def plot_lightcurve_and_ACF(
                    rasterized=True, linewidths=0)
 
         ax.set_ylim(
-            (np.mean(mag)  - 3*np.std(mag),
-             np.mean(mag)  + 3*np.std(mag))
+            (np.mean(mag)  - 4*np.std(mag),
+             np.mean(mag)  + 4*np.std(mag))
         )
 
         txt_x, txt_y = 0.99, 0.98
@@ -1226,13 +1371,13 @@ def plot_lightcurve_and_ACF(
                 zorder=1, rasterized=True)
 
         ax.set_xscale('log')
-        ax.yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
+        #ax.yaxis.set_major_formatter(FormatStrFormatter('%.1f'))
         ax.get_yaxis().set_tick_params(which='both', direction='in',
                                        labelsize='x-small')
         ax.get_xaxis().set_tick_params(which='both', direction='in',
                                        labelsize='x-small')
 
-    for ax in (a0,a2,a1,a3):
+    for ax in (a0,a1):
         ax.set_xticklabels([])
 
     fig.text(0.45,0.05, xlabeltime, ha='center')
@@ -1243,7 +1388,7 @@ def plot_lightcurve_and_ACF(
     ax_hidden.tick_params(labelcolor='none', top=False, bottom=False,
                           left=False, right=False)
     ax_hidden.set_ylabel('instrument mag (left), ACF (right)',
-                         fontsize='small', labelpad=3)
+                         fontsize='small', labelpad=5)
 
     if not savpath:
         savpath = 'temp_{:s}.png'.format(apstr)
