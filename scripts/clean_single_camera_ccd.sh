@@ -10,18 +10,18 @@
 # clear out calibratedframes table.
 # clear frameinfo cache from past week. 
 camnum=2
-ccdnum=2
-projectid=1000
-sector='s0001'
-tuneparameters=true
+ccdnum=1
+projectid=1320
+sector='s0003'
+tuneparameters=false
 
 ##########
 
 psql -U hpx -h xphtess1 hpx -c \
-  "delete from astromrefs where camera = "${camnum}" and ccd = "${ccdnum}";"
+  "delete from astromrefs where projectid = "${projectid}" and camera = "${camnum}" and ccd = "${ccdnum}";"
 
 psql -U hpx -h xphtess1 hpx -c \
-  "delete from photrefs where camera = "${camnum}" and ccd = "${ccdnum}";"
+  "delete from photrefs where projectid = "${projectid}" and camera = "${camnum}" and ccd = "${ccdnum}";"
 
 ##########
 
@@ -37,7 +37,7 @@ fi
 LOCAL_IMGBASE="/nfs/phtess1/ar1/TESS/FFI/RED_IMGSUB/"${tunefullstr}
 sectordir=$LOCAL_IMGBASE"/"${sector}"/"
 fitsdir=$sectordir"RED_"${camnum}"-"${ccdnum}"-"${projectid}"_ISP/"
-LOCAL_GLOBPATTERN='tess?????????????-'${sector}'-'${camnum}'-'${ccdnum}'-'${scid}'_cal_img.fits'
+LOCAL_GLOBPATTERN='tess?????????????-'${sector}'-'${camnum}'-'${ccdnum}'-'${scid}'_cal_img_bkgdsub.fits'
 fitsglob=$LOCAL_GLOBPATTERN
 lcbase="/nfs/phtess1/ar1/TESS/FFI/LC/"${tunefullstr}
 lcsector=$lcbase"/"${sector}"/"
@@ -62,11 +62,12 @@ mv ${lcdir} ${lcdirold}
 echo "removing lightcurves from "${lcdirold}
 rm -rf ${lcdirold}
 
+#FIXME: old
 # remove specific reference files (otherwise bad old cached files get collected)
 echo "removing all reference files"
 
 rm /nfs/phtess1/ar1/TESS/FFI/BASE/reference-frames/*proj${projectid}-camera${camnum}-ccd${ccdnum}*
-
+# 
 # for the frameinfo-cache, the name is tricky. But if you're running this, it's
 # probably safe to remove everything from the past week.
 echo "removing frameinfo cache from past week"
@@ -77,10 +78,10 @@ rm -rf `find /nfs/phtess1/ar1/TESS/FFI/BASE/frameinfo-cache/* -mtime -7 -print`
 # https://www.postgresql.org/docs/9.5/static/functions-matching.html
 
 psql -U hpx -h xphtess1 hpx -c \
-  "DELEte from calibratedframes where fits like '"${fitsdir}"%';"
+  "DELETE from calibratedframes where fits like '"${fitsdir}"%';"
 
-# clean cache
-echo "removing all reference files"
-rm /nfs/phtess1/ar1/TESS/FFI/BASE/reference-frames/*cam${camnum}-ccd${ccdnum}*
-rm /nfs/phtess1/ar1/TESS/FFI/BASE/reference-frames/*camera${camnum}-ccd${ccdnum}*
-rm -rf /nfs/phtess1/ar1/TESS/FFI/BASE/frameinfo-cache/*
+# # clean cache
+# echo "removing all reference files"
+# rm /nfs/phtess1/ar1/TESS/FFI/BASE/reference-frames/*cam${camnum}-ccd${ccdnum}*
+# rm /nfs/phtess1/ar1/TESS/FFI/BASE/reference-frames/*camera${camnum}-ccd${ccdnum}*
+# rm -rf /nfs/phtess1/ar1/TESS/FFI/BASE/frameinfo-cache/*

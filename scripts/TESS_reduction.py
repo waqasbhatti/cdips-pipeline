@@ -13,6 +13,7 @@ main
         parallel_mask_dquality_flag_frames
         make_ccd_temperature_timeseries_pickle
         parallel_append_ccd_temperature_to_hdr
+    parallel_move_badframes
     get_files_needed_before_image_subtraction
     run_imagesubtraction
         parallel_frames_to_database
@@ -1153,7 +1154,7 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
         if 'TUNE' in statsdir:
             target_nstars, max_nstars = 40, 42
         elif 'FULL' in statsdir:
-            target_nstars, max_nstars = 500, 502
+            target_nstars, max_nstars = 120, 122
         else:
             raise NotImplementedError
 
@@ -1164,7 +1165,7 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
                                    target_nstars=target_nstars,
                                    max_nstars=max_nstars,
                                    brightest_mag=8.5, faintest_mag=13.0,
-                                   max_rms=0.1, max_sigma_above_rmscurve=4.0,
+                                   max_rms=0.01, max_sigma_above_rmscurve=2.0,
                                    outprefix=statsdir, tfastage1=False,
                                    fovcathasgaiaids=True, epdlcext='_llc.fits')
 
@@ -1323,10 +1324,10 @@ def run_detrending_on_raw_photometry():
 
 def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
                field, camera, ccd, tfastatfile, ra_nom, dec_nom,
-               projcatalogpath, astromrefpath, sectornum, binned=False,
-               make_percentiles_plot=True, percentiles_xlim=[4,17],
-               percentiles_ylim=[1e-5,1e-1], nworkers=16,
-               moviedir='/nfs/phtess1/ar1/TESS/FFI/MOVIES/',
+               projcatalogpath, astromrefpath, sectornum, tfa_templates_path,
+               binned=False, make_percentiles_plot=True,
+               percentiles_xlim=[4,17], percentiles_ylim=[1e-5,1e-1],
+               nworkers=16, moviedir='/nfs/phtess1/ar1/TESS/FFI/MOVIES/',
                skipepd=False):
     """
     write files with summary statistics of run. also, make movies.
@@ -1356,7 +1357,7 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
     else:
         print('found percentiles plots')
 
-    # do ACF statistics for say 100 lightcurves NOTE: might want more...
+    # do ACF statistics for say 100 lightcurves
     acf_lcs = _get_random_tfa_lcs(lcdirectory, n_desired_lcs=100)
     outdir = os.path.join(statsdir,'acf_stats')
     if not os.path.exists(outdir):
@@ -1365,6 +1366,8 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
         acf_lcs, outdir, nworkers=nworkers,
         eval_times_hr=[1,2,6,12,24,48,60,96,120,144,192],
         skipepd=skipepd)
+
+    lcs.plot_tfa_templates(tfa_templates_path, statsdir)
 
     # plot some lightcurves and their ACFs
     pickledir = os.path.join(statsdir, 'acf_stats')
@@ -1530,7 +1533,16 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     if len(exists)>0:
         mostexist &= len(exists[exists])/len(exists)>0.8
 
-    if convert_to_fitsh_compatible and get_masks and not mostexist:
+    statsdir = os.path.dirname(lcdirectory) + '/stats_files/'
+    camera = int(camnum)
+    ccd = int(ccdnum)
+    tfastatfile = os.path.join(statsdir, 'camera' + str(camera) +
+                               '_ccd' + str(ccd) + '.tfastats')
+    alreadydone = os.path.exists(tfastatfile)
+
+    if (convert_to_fitsh_compatible and get_masks
+        and not mostexist and not alreadydone
+    ):
 
         # First, trim each frame, and turn it into a single extension FITS
         # image. Then pass a median filter over it, over box size 64 x 64.
@@ -1545,8 +1557,12 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
             fitsglob.replace('_cal_img_bkgdsub.fits','_cal_img.fits')))
         )
 
-        tu.parallel_bkgd_subtract(fits_list, method='boxmedian', isfull=True,
-                                  k=48, outdir=RED_dir, nworkers=nworkers)
+        #tu.parallel_bkgd_subtract(fits_list, method='none',
+        #                          isfull=True, k=None, k_sigma=None,
+        #                          outdir=RED_dir, nworkers=nworkers)
+        tu.parallel_bkgd_subtract(fits_list, method='boxblurmedian',
+                                  isfull=True, k=48, k_sigma=48,
+                                  outdir=RED_dir, nworkers=nworkers)
 
         tu.parallel_plot_median_filter_quad(RED_dir, nworkers=nworkers)
 
@@ -1571,16 +1587,6 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
         tu.parallel_mask_saturated_stars(fits_list, saturationlevel=80000,
                                          nworkers=nworkers)
 
-        # get mask for frames tagged as momentum dumps, tagged as coarse point,
-        # and tagged as both. further, mask frames that are at known BAD TIMES.
-        # (these would get bit value 128 in LCs processed by SPOC; they get
-        # value -1 in pipe-trex).
-
-        # #FIXME useless, if we're moving the frames anyway. also doesn't seem to
-        # #work so... forget this idea.
-        # tu.parallel_mask_dquality_flag_frames(fits_list, flagvalues=flagvalues,
-        #                                       nworkers=nworkers)
-
         # append CCD temperature information to headers
         engdatadir = '/nfs/phtess1/ar1/TESS/FFI/ENGINEERING/'
         temperaturepklpath = os.path.join(
@@ -1595,29 +1601,33 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
             fits_list, temperaturepklpath
         )
 
-    elif convert_to_fitsh_compatible and get_masks and mostexist:
+    else:
         print('skipping initial trimming & background filtering')
         pass
-    else:
-        raise NotImplementedError
 
     # symlink images so that they "live" in each reduction directory.
-    fits_list = np.sort(glob(os.path.join(RED_dir,fitsglob)))
-    for fitspath in fits_list:
-        dstname = os.path.basename(fitspath)
-        dstdir = fitsdir
-        dstpath = os.path.join(dstdir, dstname)
-        if not os.path.exists(dstpath):
-            os.symlink(fitspath, dstpath)
-            print('symlink {}->{}'.format(fitspath, dstpath))
-        else:
-            print('SKIP symlink {}->{}'.format(fitspath, dstpath))
-    fits_list = np.sort(glob(os.path.join(fitsdir,fitsglob)))
+    if not alreadydone:
+        fits_list = np.sort(glob(os.path.join(RED_dir,fitsglob)))
+        for fitspath in fits_list:
+            dstname = os.path.basename(fitspath)
+            dstdir = fitsdir
+            dstpath = os.path.join(dstdir, dstname)
+            if not os.path.exists(dstpath):
+                os.symlink(fitspath, dstpath)
+                print('symlink {}->{}'.format(fitspath, dstpath))
+            else:
+                print('SKIP symlink {}->{}'.format(fitspath, dstpath))
+        fits_list = np.sort(glob(os.path.join(fitsdir,fitsglob)))
 
-    # move images with bad quality flags, and at bad times, to the badframes
-    # directory.
-    tu.parallel_move_badframes(fits_list, flagvalues=flagvalues,
-                               nworkers=nworkers)
+        # remove frames tagged as momentum dumps, tagged as coarse point, and
+        # tagged as both. further, mask frames that are at known BAD TIMES.
+        # (these would get bit value 128 in LCs processed by SPOC; they get
+        # value -1 in pipe-trex).  move images with bad quality flags, and at
+        # bad times, to the badframes directory.
+        if not os.path.exists(os.path.join(fitsdir,'badframes')):
+            os.mkdir(os.path.join(fitsdir,'badframes'))
+        tu.parallel_move_badframes(fits_list, flagvalues=flagvalues,
+                                   nworkers=nworkers)
 
     ###########################################################################
 
@@ -1648,7 +1658,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
 
     ###########################################################################
 
-    if not is_presubtraction_complete(outdir, fitsglob, lcdirectory, RED_dir,
+    if not is_presubtraction_complete(outdir, fitsglob, lcdirectory, outdir,
                                       extractsources=extractsources):
         get_files_needed_before_image_subtraction(
             fitsdir, fitsglob, outdir, initccdextent, ccdgain, zeropoint, exptime,
@@ -1721,14 +1731,15 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     else:
         print('found that image subtraction is complete.')
 
-    run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
-                   epdlcglob, reformed_cat_file, statsdir, field, fitsdir,
-                   fitsglob, camera, ccd, projectid,
-                   epdsmooth=epdsmooth, epdsigclip=epdsigclip,
-                   nworkers=nworkers, binlightcurves=binlightcurves,
-                   tfa_template_sigclip=tfa_template_sigclip,
-                   tfa_epdlc_sigclip=tfa_epdlc_sigclip, skipepd=skipepd,
-                   fixedtfatemplate=fixedtfatemplate)
+    if not alreadydone:
+        run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
+                       epdlcglob, reformed_cat_file, statsdir, field, fitsdir,
+                       fitsglob, camera, ccd, projectid,
+                       epdsmooth=epdsmooth, epdsigclip=epdsigclip,
+                       nworkers=nworkers, binlightcurves=binlightcurves,
+                       tfa_template_sigclip=tfa_template_sigclip,
+                       tfa_epdlc_sigclip=tfa_epdlc_sigclip, skipepd=skipepd,
+                       fixedtfatemplate=fixedtfatemplate)
 
     statsdir = os.path.dirname(epdstatfile)+'/'
     outprefix = str(field)+'-'+str(projectid)
@@ -1748,10 +1759,13 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     if len(astromrefpath) != 1:
         raise AssertionError('FATAL ERR! astromrefglob wrong for run assessment')
     astromrefpath = astromrefpath[0]
+    tfa_templates_path = os.path.join(statsdir,'trendlist_tfa_ap2.txt')
+    if not os.path.exists(tfa_templates_path):
+        raise AssertionError('where is tfa templates???')
     assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
                field, camera, ccd, tfastatfile, ra_nom, dec_nom,
-               projcatalogpath, astromrefpath, sectornum, binned=False,
-               make_percentiles_plot=True, percentiles_xlim=None,
+               projcatalogpath, astromrefpath, sectornum, tfa_templates_path,
+               binned=False, make_percentiles_plot=True, percentiles_xlim=None,
                nworkers=nworkers, skipepd=skipepd)
 
 

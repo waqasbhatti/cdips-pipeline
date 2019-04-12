@@ -15,6 +15,7 @@ parallel_mask_saturated_stars: mask saturated stars given saturation level
     mask_saturated_stars_worker
 
 parallel_mask_dquality_flag_frames: mask entire frames based on DQUALITY flag
+    (OUTDATED)
 
     mask_dquality_flag_frame
 
@@ -216,6 +217,8 @@ def mask_dquality_flag_frame(task):
 def parallel_mask_dquality_flag_frames(fitslist, flagvalues=[-1,4,32,36],
                                        nworkers=16, maxworkertasks=1000):
     '''
+    OUTDATED. USE parallel_move_badframes INSTEAD.
+
     Append mask to fits header of an ENTIRE CALIBRATED FRAME if it matches any
     of the passed data quality flag value.
 
