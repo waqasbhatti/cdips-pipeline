@@ -8,6 +8,8 @@ grcollect) to FITS lightcurves. Running EPD on FITS lightcurves. Getting
 barycentric time correction for FITS lightcurves. And making input lists TFA
 needs, from FITS LCs.
 
+plot_fits_lightcurve
+
 parallel_convert_grcollect_to_fits_lc
     convert_grcollect_to_fits_lc_worker
 
@@ -53,6 +55,93 @@ import astropy
 import astropy.coordinates as coord
 
 DEBUG = False
+
+def plot_fits_lightcurve(filename, apstr, outdir, customstr='',
+                         maskbadtimes=True):
+    """
+    given path to a *_llcs.fits lightcurve, plot it.
+
+    args:
+        filename: /dir/to/*_llcs.fits
+        apstr: e.g., 'TFA2'
+        outdir: to write the lightcurve image
+
+    kwargs:
+        customstr: string to print, under the RMS info. e.g., "\nhidude"
+        maskbadtimes: needed only if you want to try masking times that weren't
+        already masked in badframes during LC construction.
+    """
+
+    # define outpath
+    outext = '_{}.png'.format(apstr)
+    outpath = os.path.join(
+        outdir, os.path.basename(filename).replace('.fits',outext))
+
+    # load lc
+    hdulist = fits.open(filename)
+    hdr = hdulist[0].header
+    time_bjd = hdulist[1].data['TMID_BJD']
+    barycorr = hdulist[1].data['BJDCORR']
+    mag = hdulist[1].data[apstr]
+    hdulist.close()
+
+    from matplotlib.ticker import FormatStrFormatter
+
+    plt.close('all')
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(6,2))
+
+    if maskbadtimes:
+        from tessutils import badtimewindows
+        # BJD = TJD + LTT_corr
+        tjd = time_bjd - barycorr
+        toffset = 2457000
+        tjd -= toffset
+
+        good_inds = np.ones_like(tjd).astype(bool)
+        for window in badtimewindows:
+            bad_window_inds = (tjd > min(window)) & (tjd < max(window))
+            good_windows_inds = ~bad_window_inds
+            good_inds &= good_windows_inds
+
+        time = time_bjd[good_inds]
+        mag = mag[good_inds]
+
+    else:
+        time = time_bjd
+
+    ax.scatter(time, mag, c='black', alpha=0.9, zorder=2, s=3, rasterized=True,
+               linewidths=0)
+
+    txt_x, txt_y = 0.99, 0.98
+    stdmmag = np.nanstd(mag)*1e3
+    if stdmmag > 0.1:
+        stattxt = '$\sigma$ = {:.1f} mmag{}'.format(stdmmag, customstr)
+        ndigits = 2
+    elif stdmmag > 0.01:
+        stattxt = '$\sigma$ = {:.2f} mmag{}'.format(stdmmag, customstr)
+        ndigits = 3
+    else:
+        stattxt = '$\sigma$ = {:.3f} mmag{}'.format(stdmmag, customstr)
+        ndigits = 4
+    _ = ax.text(txt_x, txt_y, stattxt, horizontalalignment='right',
+            verticalalignment='top', fontsize='small', zorder=3,
+            transform=ax.transAxes)
+    ax.get_yaxis().set_tick_params(which='both', direction='in',
+                                   labelsize='x-small')
+    ax.get_xaxis().set_tick_params(which='both', direction='in',
+                                   labelsize='x-small')
+
+    ylim = ax.get_ylim()
+    ax.set_ylim((max(ylim), min(ylim)))
+
+    ax.set_xlabel('BJD-tdb', fontsize='small')
+    ax.set_ylabel(apstr, fontsize='small')
+
+    fig.tight_layout(h_pad=-0.5)
+    fig.savefig(outpath, dpi=250, bbox_inches='tight')
+    print('%sZ: made plot: %s' % (datetime.utcnow().isoformat(), outpath))
+
+
 
 
 def _map_key_to_format(key):
