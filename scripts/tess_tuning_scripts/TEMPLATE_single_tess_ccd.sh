@@ -31,7 +31,8 @@ anettweak=6
 anetradius=30
 initccdextent="0:2048,0:2048"
 kernelspec="i/2;d=3/2"
-catalog_faintrmag=16
+cluster_faint_Rp_mag=16
+field_faint_Rp_mag=14
 fiphotfluxthreshold=500
 photreffluxthreshold=500
 extractsources=0
@@ -56,6 +57,8 @@ elif [ "$sector" = 's0003' ] ; then
   scid=0123
 elif [ "$sector" = 's0004' ] ; then
   scid=0124
+elif [ "$sector" = 's0005' ] ; then
+  scid=0125
 else
   echo 'error: need to hard-code in scid for sector s000X'
   exit 42
@@ -142,7 +145,8 @@ python -u TESS_reduction.py \
   --epdsigclip $epdsigclip --photdisjointradius $photdisjointradius \
   --tuneparameters $tuneparameters --anetfluxthreshold $anetfluxthreshold \
   --anettweak $anettweak --initccdextent $initccdextent \
-  --anetradius $anetradius --catalog_faintrmag $catalog_faintrmag \
+  --anetradius $anetradius --cluster_faint_Rp_mag $cluster_faint_Rp_mag \
+  --field_faint_Rp_mag $field_faint_Rp_mag \
   --fiphotfluxthreshold $fiphotfluxthreshold \
   --photreffluxthreshold $photreffluxthreshold \
   --extractsources $extractsources --$binlcoption \

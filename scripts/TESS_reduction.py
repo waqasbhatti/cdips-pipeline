@@ -10,7 +10,7 @@ main
         parallel_bkgd_subtract
         parallel_plot_median_filter_quad
         parallel_mask_saturated_stars
-        parallel_mask_dquality_flag_frames
+        (parallel_mask_dquality_flag_frames)
         make_ccd_temperature_timeseries_pickle
         parallel_append_ccd_temperature_to_hdr
     parallel_move_badframes
@@ -61,9 +61,9 @@ import os, time, warnings
 import matplotlib as mpl
 mpl.use('AGG')
 import numpy as np, pandas as pd, matplotlib.pyplot as plt
-import aperturephot as ap, shared_variables as sv, autoimagesub as ais, \
-       imagesubphot as ism, tessutils as tu, lcstatistics as lcs, \
-       imageutils as iu, lcutils as lcu
+import (aperturephot as ap, shared_variables as sv, autoimagesub as ais,
+       imagesubphot as ism, tessutils as tu, lcstatistics as lcs,
+       imageutils as iu, lcutils as lcu)
 from glob import glob
 from astropy.io import fits
 from astropy import units as units, constants as constants
@@ -119,7 +119,8 @@ def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid):
     typestr = 'full' if 'FULL' in fitsdir else 'tune'
 
     # subtracted frame movies
-    jpgglob = os.path.join(fitsdir, 'JPEG-SUB*CONV-*tess*cal_img_bkgdsub-xtrns.jpg')
+    jpgglob = os.path.join(fitsdir,
+                           'JPEG-SUB*CONV-*tess*cal_img_bkgdsub-xtrns.jpg')
     outmp4path = os.path.join(
         moviedir,
         '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_SUBTRACTEDCONV.mp4'.
@@ -143,7 +144,8 @@ def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid):
         print('found {}'.format(outmp4path))
 
     # regular old translated (xtrns) frames, pre-subtraction, but masked
-    jpgglob = os.path.join(fitsdir, 'JPEG-XTRNS-tess*_cal_img_bkgdsub-xtrns.jpg')
+    jpgglob = os.path.join(fitsdir,
+                           'JPEG-XTRNS-tess*_cal_img_bkgdsub-xtrns.jpg')
     outmp4path = os.path.join(
         moviedir,
         '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_XTRNS.mp4'.
@@ -194,8 +196,10 @@ def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid):
                 jpgglob = os.path.join(fitsdir, jpgstr)
                 outmp4path = os.path.join(moviedir, outstr)
                 if not os.path.exists(outmp4path) and len(glob(jpgglob))>10:
-                    iu.make_mp4_from_jpegs(jpgglob, outmp4path,
-                                           ffmpegpath='/home/lbouma/bin/ffmpeg')
+                    iu.make_mp4_from_jpegs(
+                        jpgglob, outmp4path,
+                        ffmpegpath='/home/lbouma/bin/ffmpeg'
+                    )
                 else:
                     print('found (or skipped) {}'.format(outmp4path))
 
@@ -233,7 +237,8 @@ def make_fake_xtrnsfits(fitsdir, fitsglob, fieldinfo):
 
     parsearef = search('{}-astromref-{}_cal_img_bkgdsub.fistar', areffistar)
     arefid = parsearef[1]
-    areforiginalfistar = os.path.join(fitsdir, arefid+'_cal_img_bkgdsub.fistar')
+    areforiginalfistar = os.path.join(fitsdir,
+                                      arefid+'_cal_img_bkgdsub.fistar')
 
     outdir = fitsdir
     shifted_fistar, shifted_itrans = ism.astromref_shift_worker(
@@ -263,8 +268,8 @@ def initial_wcs_worked_well_enough(outdir, fitsglob):
         return True
 
 
-def is_presubtraction_complete(outdir, fitsglob, lcdir, RED_dir, percentage_required=95,
-                               extractsources=False):
+def is_presubtraction_complete(outdir, fitsglob, lcdir, RED_dir,
+                               percentage_required=95, extractsources=False):
     """
     require at least e.g., 95% of the initial astrometry, photometry, etc to
     exist to return True. in that case, or if any stats_files products are
@@ -700,12 +705,13 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
                                 anettweak, initccdextent, anetradius,
                                 zeropoint, epdsmooth, epdsigclip,
                                 photdisjointradius, tuneparameters, is_ete6,
-                                catalog_faintrmag, fiphotfluxthreshold,
-                                photreffluxthreshold, extractsources,
-                                binlightcurves, get_masks,
+                                cluster_faint_Rp_mag, field_faint_Rp_mag,
+                                fiphotfluxthreshold, photreffluxthreshold,
+                                extractsources, binlightcurves, get_masks,
                                 tfa_template_sigclip, tfa_epdlc_sigclip,
                                 translateimages, reversesubtract, skipepd,
-                                useimagenotfistar, fixedtfatemplate, flagvalues):
+                                useimagenotfistar, fixedtfatemplate,
+                                flagvalues, do_cdips_merge):
     """
     each "reduction version" is identified by a project ID. the parameters
     corresponding to each project ID are written in a pickle file, so that we
@@ -736,7 +742,8 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
         "photdisjointradius":photdisjointradius,
         "tuneparameters":tuneparameters,
         "is_ete6":is_ete6,
-        "catalog_faintrmag":catalog_faintrmag,
+        "cluster_faint_Rp_mag":cluster_faint_Rp_mag,
+        "field_faint_Rp_mag":field_faint_Rp_mag,
         "fiphotfluxthreshold":fiphotfluxthreshold,
         "photreffluxthreshold":photreffluxthreshold,
         "extractsources":extractsources,
@@ -749,7 +756,8 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
         "skipepd":skipepd,
         "useimagenotfistar":useimagenotfistar,
         "fixedtfatemplate":fixedtfatemplate,
-        "flagvalues":flagvalues
+        "flagvalues":flagvalues,
+        "do_cdips_merge":do_cdips_merge
     }
 
     outpicklename = "projid_{:s}.pickle".format(repr(projectid))
@@ -770,7 +778,7 @@ def get_files_needed_before_image_subtraction(
         fitsdir, fitsglob, outdir, initccdextent, ccdgain, zeropoint, exptime,
         ra_nom, dec_nom,
         catra, catdec, catboxsize,
-        catalog, catalog_file, reformed_cat_file,
+        catalog, catalog_file, reformed_cat_file, field_faint_Rp_mag,
         fnamestr='*-1-1-0016_cal_img_bkgdsub.fits', anetfluxthreshold=20000,
         fistarglob='*.fistar',
         width=13, anettweak=6, anetradius=30, xpix=2048, ypix=2048, cols=(2,3),
@@ -780,7 +788,8 @@ def get_files_needed_before_image_subtraction(
         nworkers=20,
         useastrometrydotnet=True,
         useimagenotfistar=True,
-        extractsources=True
+        extractsources=True,
+        do_cdips_merge=True
     ):
     """
     get .fistar, .fiphot, and .wcs files needed before image subtraction
@@ -845,6 +854,11 @@ def get_files_needed_before_image_subtraction(
         # you could use ap.reform_fov_catalog, but you should be using Gaia.
         raise ValueError
 
+    # reduce number of LCs. merge against CDIPS stars.
+    if do_cdips_merge:
+        tu.merge_object_catalog_vs_cdips(reformed_cat_file, reformed_cat_file,
+                                         G_Rp_cut=field_faint_Rp_mag)
+
     if extractsources==True:
         fiphot_xycols = '7,8'
     else:
@@ -872,8 +886,9 @@ def get_files_needed_before_image_subtraction(
 
 def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
                          photreftype, dbtype, reformed_cat_file, xtrnsglob,
-                         iphotpattern, lcdirectory, outdir, projectid, kernelspec='b/4;i/4;d=4/4',
-                         refdir=sv.REFBASEDIR, nworkers=1,
+                         iphotpattern, lcdirectory, outdir, projectid,
+                         kernelspec='b/4;i/4;d=4/4', refdir=sv.REFBASEDIR,
+                         nworkers=1,
                          aperturelist='1.95:7.0:6.0,2.45:7.0:6.0,2.95:7.0:6.0',
                          photdisjointradius=2, colorscheme='bwr',
                          photreffluxthreshold=30000, extractsources=True,
@@ -1154,7 +1169,7 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
         if 'TUNE' in statsdir:
             target_nstars, max_nstars = 40, 42
         elif 'FULL' in statsdir:
-            target_nstars, max_nstars = 120, 122
+            target_nstars, max_nstars = 200, 202
         else:
             raise NotImplementedError
 
@@ -1385,7 +1400,6 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
     plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=10,
                                      skipepd=skipepd)
 
-    # count numbers of lightcurves #FIXME: or do it by nan parsing?
     n_rawlc = len(glob(os.path.join(lcdirectory,'*.grcollectilc')))
     n_epdlc = len(glob(os.path.join(lcdirectory,'*.epdlc')))
     n_tfalc = len(glob(os.path.join(lcdirectory,'*.tfalc')))
@@ -1443,12 +1457,12 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
          zeropoint=11.82,
          epdsmooth=21, epdsigclip=10, photdisjointradius=2,
          tuneparameters='true', is_ete6=False,
-         catalog_faintrmag=13, fiphotfluxthreshold=1000,
-         photreffluxthreshold=1000, extractsources=True, binlightcurves=False,
-         get_masks=1, tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0,
-         translateimages=True, reversesubtract=False, skipepd=True,
-         useimagenotfistar=True, fixedtfatemplate=None,
-         flagvalues=[-1,4,32,36]
+         cluster_faint_Rp_mag=13, field_faint_Rp_mag=11,
+         fiphotfluxthreshold=1000, photreffluxthreshold=1000,
+         extractsources=True, binlightcurves=False, get_masks=1,
+         tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0, translateimages=True,
+         reversesubtract=False, skipepd=True, useimagenotfistar=True,
+         fixedtfatemplate=None, flagvalues=[-1,4,32,36], do_cdips_merge=True
          ):
     """
     args:
@@ -1477,7 +1491,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
         extractsources (bool): if True, uses fistar for source extraction
         (with the fiphotfluxthreshold). if False, uses the background catalog
         (e.g., 2MASS), projected onto the frame with WCS, and the
-        catalog_faintrmag cutoff to make the list of sources.
+        cluster_faint_Rp_mag cutoff to make the list of sources.
     """
 
     record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
@@ -1487,12 +1501,13 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                                 anettweak, initccdextent, anetradius,
                                 zeropoint, epdsmooth, epdsigclip,
                                 photdisjointradius, tuneparameters, is_ete6,
-                                catalog_faintrmag, fiphotfluxthreshold,
-                                photreffluxthreshold, extractsources,
-                                binlightcurves, get_masks,
+                                cluster_faint_Rp_mag, field_faint_Rp_mag,
+                                fiphotfluxthreshold, photreffluxthreshold,
+                                extractsources, binlightcurves, get_masks,
                                 tfa_template_sigclip, tfa_epdlc_sigclip,
                                 translateimages, reversesubtract, skipepd,
-                                useimagenotfistar, fixedtfatemplate, flagvalues)
+                                useimagenotfistar, fixedtfatemplate,
+                                flagvalues, do_cdips_merge)
 
     starttime = datetime.utcnow()
 
@@ -1663,13 +1678,13 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
         get_files_needed_before_image_subtraction(
             fitsdir, fitsglob, outdir, initccdextent, ccdgain, zeropoint, exptime,
             ra_nom, dec_nom, catra, catdec, catboxsize, catalog, catalog_file,
-            reformed_cat_file, fnamestr=fitsglob,
+            reformed_cat_file, field_faint_Rp_mag, fnamestr=fitsglob,
             anetfluxthreshold=anetfluxthreshold, anetradius=anetradius,
             fistarglob='*.fistar', width=13, anettweak=anettweak, xpix=2048,
-            ypix=2048, cols=(2,3), brightrmag=6.0, faintrmag=catalog_faintrmag,
+            ypix=2048, cols=(2,3), brightrmag=6.0, faintrmag=cluster_faint_Rp_mag,
             fiphotfluxthreshold=fiphotfluxthreshold, aperturelist=aperturelist,
             nworkers=nworkers, extractsources=extractsources,
-            useimagenotfistar=useimagenotfistar)
+            useimagenotfistar=useimagenotfistar, do_cdips_merge=do_cdips_merge)
 
     else:
         print('found fistar, fiphot, and wcs files. proceeding to image '
@@ -1917,10 +1932,13 @@ if __name__ == '__main__':
               'Otherwise, run in FULL reduction mode.')
     )
 
-    parser.add_argument('--catalog_faintrmag', type=float, default=13.0,
-        help=('faint 2MASS catalog r magnitude used to make fovcat, '
-              'which sets the stars that get photometered (TODO: is this '
-              'true?)'))
+    parser.add_argument('--cluster_faint_Rp_mag', type=float, default=13.0,
+        help=('faint GAIA catalog Rp magnitude used to make fovcat, '
+              'which sets the cluster stars that get photometered'))
+    parser.add_argument('--field_faint_Rp_mag', type=float, default=11.0,
+        help=('faint GAIA catalog Rp magnitude used to make fovcat, '
+              'which sets the field stars that get photometered'))
+
     parser.add_argument('--fiphotfluxthreshold', type=int, default=1000,
         help=('faint flux threshold used to do initial raw photometry on '
               'frame, in pre-img subtraction.'
@@ -1935,7 +1953,7 @@ if __name__ == '__main__':
             'extractsources (int): if 1, uses fistar for source extraction '
             '(with the fiphotfluxthreshold). if 0, use the background catalog '
             '(e.g., 2MASS), projected onto the frame with WCS, and the '
-            'catalog_faintrmag cutoff to make the list of sources. ')
+            'cluster_faint_Rp_mag cutoff to make the list of sources. ')
          )
 
     parser.add_argument('--tfa_template_sigclip', type=float, default=5.,
@@ -2007,7 +2025,8 @@ if __name__ == '__main__':
          anetfluxthreshold=args.anetfluxthreshold,
          anettweak=args.anettweak, initccdextent=args.initccdextent,
          anetradius=args.anetradius,
-         catalog_faintrmag=args.catalog_faintrmag,
+         cluster_faint_Rp_mag=args.cluster_faint_Rp_mag,
+         field_faint_Rp_mag=args.field_faint_Rp_mag,
          fiphotfluxthreshold=args.fiphotfluxthreshold,
          photreffluxthreshold=args.photreffluxthreshold,
          extractsources=extractsources,

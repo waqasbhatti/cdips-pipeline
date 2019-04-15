@@ -78,9 +78,10 @@ def main():
                     'anetradius':30,
                     'initccdextent':"\"0:2048,0:2048\"",
                     'kernelspec':"\"i/2;d=3/2\"",
-                    'catalog_faintrmag':16,     ## catalog_faintrmag=16
-                    'fiphotfluxthreshold':300,  ## fiphotfluxthreshold=300
-                    'photreffluxthreshold':300, ## photreffluxthreshold=300
+                    'cluster_faint_Rp_mag':16,
+                    'field_faint_Rp_mag':14,
+                    'fiphotfluxthreshold':300,
+                    'photreffluxthreshold':300,
                     'extractsources':0,
                     'binlightcurves':0,
                     'translateimages':1,
