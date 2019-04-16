@@ -1937,7 +1937,8 @@ def merge_object_catalog_vs_cdips(
         print('[WRN!] N_stars for LCs before cut: {}'.format(len(field_df)))
         print('[WRN!] N_stars for LCs after: {}'.format(len(outdf)))
 
-    outdf.to_csv(out_reformed_cat_file, sep=' ', index=False, header=False)
+    outdf.to_csv(out_reformed_cat_file, sep=' ', index=False, header=False,
+                 na_rep='n/a')
     print('wrote {}'.format(out_reformed_cat_file))
 
     if np.any(is_cdips):

@@ -61,9 +61,9 @@ import os, time, warnings
 import matplotlib as mpl
 mpl.use('AGG')
 import numpy as np, pandas as pd, matplotlib.pyplot as plt
-import (aperturephot as ap, shared_variables as sv, autoimagesub as ais,
-       imagesubphot as ism, tessutils as tu, lcstatistics as lcs,
-       imageutils as iu, lcutils as lcu)
+import aperturephot as ap, shared_variables as sv, autoimagesub as ais, \
+       imagesubphot as ism, tessutils as tu, lcstatistics as lcs, \
+       imageutils as iu, lcutils as lcu
 from glob import glob
 from astropy.io import fits
 from astropy import units as units, constants as constants
