@@ -1852,7 +1852,7 @@ if __name__ == '__main__':
     )
 
     parser.add_argument(
-        '--photdisjointradius', type=int, default=2,
+        '--photdisjointradius', type=float, default=2,
         help=('https://fitsh.net/wiki/man/fiphot gives details. '
               'During the bacground determination on the aperture annuli, '
               'omit the pixels which are closer to the other centroids than '

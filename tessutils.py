@@ -158,6 +158,7 @@ badtimewindows = [
     (1406.29246, 1409.388295), # sector 3, orbit 14 end
     (1418.53690, 1421.211685), # sector 4 instrument anomaly
     (1465.212615, 1468.269985), # sector 6 PRF time
+    (1477.01998, 1478.11304), # sector 6 downlink
 ]
 
 def mask_dquality_flag_frame(task):

@@ -66,18 +66,26 @@
 # 20190320. above died at making the ccd temperature pickles, b/c i hadn't
 # downloaded the engineering files to drive. but ran
 # 20190320 sector 3, cameras 1 through 3.
-( source activate trex_37; source projid_1316.sh; wait ) & wait
-( source activate trex_37; source projid_1317.sh; wait ) & wait
-( source activate trex_37; source projid_1318.sh; wait ) & wait
-( source activate trex_37; source projid_1319.sh; wait ) & wait
-( source activate trex_37; source projid_1320.sh; wait ) & wait
-( source activate trex_37; source projid_1321.sh; wait ) & wait
-( source activate trex_37; source projid_1322.sh; wait ) & wait
-( source activate trex_37; source projid_1323.sh; wait ) & wait
-( source activate trex_37; source projid_1324.sh; wait ) & wait
-( source activate trex_37; source projid_1325.sh; wait ) & wait
-( source activate trex_37; source projid_1326.sh; wait ) & wait
-( source activate trex_37; source projid_1327.sh; wait ) & wait
+# ( source activate trex_37; source projid_1316.sh; wait ) & wait
+# ( source activate trex_37; source projid_1317.sh; wait ) & wait
+# ( source activate trex_37; source projid_1318.sh; wait ) & wait
+# ( source activate trex_37; source projid_1319.sh; wait ) & wait
+# ( source activate trex_37; source projid_1320.sh; wait ) & wait
+# ( source activate trex_37; source projid_1321.sh; wait ) & wait
+# ( source activate trex_37; source projid_1322.sh; wait ) & wait
+# ( source activate trex_37; source projid_1323.sh; wait ) & wait
+# ( source activate trex_37; source projid_1324.sh; wait ) & wait
+# ( source activate trex_37; source projid_1325.sh; wait ) & wait
+# ( source activate trex_37; source projid_1326.sh; wait ) & wait
+# ( source activate trex_37; source projid_1327.sh; wait ) & wait
+
+# 20190415. attempting s0002, cam4 with CDIPS list merge.
+# ( source activate trex_37; source projid_1312.sh; wait ) & wait
+
+# 20190416. continuing s0002, cam4 with CDIPS list merge.
+( source activate trex_37; source projid_1313.sh; wait ) & wait
+( source activate trex_37; source projid_1314.sh; wait ) & wait
+( source activate trex_37; source projid_1315.sh; wait ) & wait
 
 # # sector 4, cameras 1 through 3. NOTE: before running automatically, might
 # need to fine-tune the orbitgap!!
