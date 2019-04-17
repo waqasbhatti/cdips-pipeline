@@ -1546,7 +1546,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     exists = np.array(list(os.path.exists(f) for f in fits_list)).astype(bool)
     mostexist = len(exists)!=0
     if len(exists)>0:
-        mostexist &= len(exists[exists])/len(exists)>0.8
+        mostexist &= len(exists[exists])/len(exists)>0.9
 
     statsdir = os.path.dirname(lcdirectory) + '/stats_files/'
     camera = int(camnum)
