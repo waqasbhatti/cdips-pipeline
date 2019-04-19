@@ -481,9 +481,10 @@ def are_known_planets_in_field(ra_center, dec_center, outname, use_NEA=False,
             hj_coords, cam_tuple, withgaps=False)
 
     elif use_alerts:
+        # sectors 1-7
         df = pd.read_csv(
             '/home/lbouma/proj/pipe-trex/data/'
-            'hlsp_tess-data-alerts_tess_phot_alert-summary-s01+s02+s03+s04_tess_v9_spoc.csv'
+            'toi-plus-2019-04-18'
         )
         kp_coords = SkyCoord(nparr(df['RA'])*u.deg,
                              nparr(df['Dec'])*u.deg,
