@@ -1102,7 +1102,7 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
             lcdirectory, nworkers=nworkers
         )
     else:
-        print('found >10 fits LCs from grcollect. continuing.')
+        print('found >10 fits LCs from grcollect. skip grcollect convert.')
 
     if not os.path.exists(epdstatfile) and not skipepd:
 
@@ -1169,7 +1169,8 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
         if 'TUNE' in statsdir:
             target_nstars, max_nstars = 40, 42
         elif 'FULL' in statsdir:
-            target_nstars, max_nstars = 200, 202
+            # initial "round-1", take many stars. will cut down after.
+            target_nstars, max_nstars = 400, 402
         else:
             raise NotImplementedError
 
@@ -1183,6 +1184,7 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
                                    max_rms=0.01, max_sigma_above_rmscurve=2.0,
                                    outprefix=statsdir, tfastage1=False,
                                    fovcathasgaiaids=True, epdlcext='_llc.fits')
+
 
     if not os.path.exists(vartoolstfastatfile):
         templatefiles = glob(os.path.join(
@@ -1199,12 +1201,53 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
                                           fixedtfatemplate=fixedtfatemplate)
         )
 
+        #
         # Note that sometimes, you should do BLS + LS + killharm too.  for now
         # though, we are making lightcurves; these extra steps can come later.
         # If you skipped EPD, then you do TFA from IRM. otherwise, you do TFA
         # from EPD.
+        #
+        # Ah. There is also a second stage of TFA template star selection. It
+        # is to first run TFA on the template stars themselves. Then apply a
+        # "eta-normal" (see astrobase) variability cut on the TFA'd template
+        # stars. If they are still variable, they can be omitted.
+        #
+        # The logic here is: sometimes you have lightcurves that have
+        # astrophysical-looking, but actually systematic variability. E.g., for
+        # TESS, the 1-day scattered light signal can in some cases look like an
+        # EB. You can't apply the eta-normal cut on the reduced mag LCs,
+        # because this would throw out stars with a systematic signal that you
+        # want to remove.
+        #
         npixexclude = 20
         tfafromirm = skipepd
+
+        lcu.initial_tfa(trendlisttfa_paths, datestfa_path, lcdirectory,
+                        statsdir, nworkers=nworkers,
+                        npixexclude=npixexclude, tfafromirm=tfafromirm)
+
+        #
+        # given a directory of candidate template stars with initial TFA
+        # applied to them, construct a list of all their eta-normal indices (or
+        # other variability metrics, like lomb-scargle FAP).
+        # sort it and cut it. make raw/dtr/bkgd plots to verify the sort is
+        # sensible. then cut the lists down to ~200 template stars. (or at
+        # minimum, n_min_tfa_templates)
+        # 
+        for ix, apnum in enumerate([1,2,3]):
+            templatedir = os.path.join(lcdirectory,
+                                       'INITIAL_TFA_LCS',
+                                       'ap{}'.format(apnum))
+            cand_template_lcpaths = glob(
+                os.path.join(templatedir,'*_llc.fits'))
+            assert 'ap{}'.format(apnum) in trendlisttfa_paths[ix]
+            lcu.round_two_tfa_selection(cand_template_lcpaths,
+                                        apnum,
+                                        lcdirectory,
+                                        trendlisttfa_paths[ix],
+                                        n_min_tfa_templates=120,
+                                        n_desired_tfa_templates=200)
+
         lcu.run_tfa(tfalclist_path, trendlisttfa_paths, datestfa_path,
                     lcdirectory, statsdir, nworkers=nworkers,
                     do_bls_ls_killharm=False, npixexclude=npixexclude,

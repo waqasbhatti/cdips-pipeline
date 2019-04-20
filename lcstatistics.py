@@ -1706,7 +1706,7 @@ def plot_raw_tfa_bkgd_fits(fitspath, savdir, maskbadtimes=True, ap_index=2,
 
 
 def plot_raw_tfa_bkgd(time, rawmag, tfamag, bkgdval, ap_index, savpath=None,
-                      xlabel='BJDTDB', customstr=''):
+                      xlabel='BJDTDB', customstr='', tfatime=None):
     """
     Plot a 2 (or 3) row, 1 column plot with rows of:
         * raw mags vs time
@@ -1719,6 +1719,13 @@ def plot_raw_tfa_bkgd(time, rawmag, tfamag, bkgdval, ap_index, savpath=None,
         ap_index (int): integer, e.g., "2" for aperture #2.
 
         skipepd (bool): if true, skips the EPD row.
+
+    kwargs:
+        customstr: string that goes on top right of plot
+
+        tfatime: if passed, "time" is used to plot rawmag and bkgdval,
+        "tfatime" is used to plot tfamag. Otherwise "time" is used for all of
+        them.
     """
 
     plt.close('all')
@@ -1737,8 +1744,12 @@ def plot_raw_tfa_bkgd(time, rawmag, tfamag, bkgdval, ap_index, savpath=None,
 
     for ax, yval, txt, num in zip(axs, yvals, stagestrs, nums):
 
-        ax.scatter(time, yval, c='black', alpha=0.9, zorder=2, s=3,
-                   rasterized=True, linewidths=0)
+        if isinstance(tfatime, np.ndarray) and 'TF' in txt:
+            ax.scatter(tfatime, yval, c='black', alpha=0.9, zorder=2, s=3,
+                       rasterized=True, linewidths=0)
+        else:
+            ax.scatter(time, yval, c='black', alpha=0.9, zorder=2, s=3,
+                       rasterized=True, linewidths=0)
 
         #txt_x, txt_y = 0.99, 0.02
         #t = ax.text(txt_x, txt_y, txt, horizontalalignment='right',
