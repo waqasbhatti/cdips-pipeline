@@ -74,6 +74,7 @@ from astrobase.periodbase import kbls
 from astrobase.varbase import lcfit
 from astrobase.varbase.transits import get_transit_times
 from astrobase import lcmath
+from astrobase.lcfit.utils import make_fit_plot
 
 from scipy.ndimage import median_filter
 from scipy.ndimage.filters import gaussian_filter
@@ -1028,9 +1029,9 @@ def _measure_planet_snr(plname, tfalc, statsdir, sectornum,
             return 1
 
         bls_period = fitd['period']
-        lcfit.make_fit_plot(fitd['phases'], fitd['phasedmags'], None,
-                            fitd['blsmodel'], fitd['period'], fitd['epoch'],
-                            fitd['epoch'], blsfit_savfile, magsarefluxes=True)
+        make_fit_plot(fitd['phases'], fitd['phasedmags'], None,
+                      fitd['blsmodel'], fitd['period'], fitd['epoch'],
+                      fitd['epoch'], blsfit_savfile, magsarefluxes=True)
         ingduration_guess = fitd['transitduration']*0.2
         transitparams = [fitd['period'], fitd['epoch'], fitd['transitdepth'],
                          fitd['transitduration'], ingduration_guess ]
