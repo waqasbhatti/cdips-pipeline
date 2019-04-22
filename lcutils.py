@@ -22,6 +22,8 @@ make_ascii_files_for_vartools
     _make_trendlist_tfa
     _make_dates_tfa
 
+initial_tfa
+
 run_tfa
 
 parallel_merge_tfa_lcs
@@ -1025,13 +1027,36 @@ tfafromirmcmd = (
     '> {outstatsfile}'
 )
 
+inittfafromirmcmd = (
+    '/home/jhartman/SVN/HATpipe/bin/vartools -l {init_lc_list_tfa} -matchstringid '
+    ' -inputlcformat BGE:BGE:double,BGV:BGV:double,FDV:FDV:double,'
+    'FKV:FKV:double,FSV:FSV:double,IFE1:IFE1:double,IFE2:IFE2:double,'
+    'IFE3:IFE3:double,IFL1:IFL1:double,IFL2:IFL2:double,IFL3:IFL3:double,'
+    'IRE1:IRE1:double,IRE2:IRE2:double,IRE3:IRE3:double,IRM1:IRM1:double,'
+    'IRM2:IRM2:double,IRM3:IRM3:double,IRQ1:IRQ1:string,IRQ2:IRQ2:string,'
+    'IRQ3:IRQ3:string,id:RSTFC:string,RSTFC:RSTFC:string,TMID_UTC:TMID_UTC:double,'
+    'XIC:XIC:double,YIC:YIC:double,CCDTEMP:CCDTEMP:double,'
+    'NTEMPS:NTEMPS:int,'
+    't:TMID_BJD:double,TMID_BJD:TMID_BJD:double,BJDCORR:BJDCORR:double '
+    '-expr \'mag=IRM{apnum}\' -expr \'err=IRE{apnum}\' '
+    '-TFA {trendlist_tfa_ap_N} readformat 0 RSTFC IRM{apnum} {dates_tfa} '
+    '{npixexclude} xycol 2 3 1 0 0 '
+    '-expr \'TFA{apnum}=mag\' '
+    '-stats TFA{apnum} stddev,MAD '
+    '-o {outlcdir_tfa} columnformat RSTFC:\"Image\",'
+    'TMID_BJD:\"BJDTDB midexp time\",TFA{apnum}:mag '
+    'fits copyheader logcommandline -header -numbercolumns -parallel {nproc} '
+    '> {outstatsfile}'
+)
+
 
 def run_tfa(tfalclist_path, trendlisttfa_paths, datestfa_path, lcdirectory,
             statsdir,
             nworkers=16, do_bls_ls_killharm=True, npixexclude=10,
             blsqmin=0.002, blsqmax=0.1, blsminper=0.2, blsmaxper=30.0,
             blsnfreq=20000, blsnbins=1000, lsminp=0.1, lsmaxp=30.0,
-            lssubsample=0.1, killharmnharm=10, tfafromirm=False):
+            lssubsample=0.1, killharmnharm=10, tfafromirm=False,
+            outlcdir_tfa=None):
     """
     Run TFA on all apertures. Optionally, if do_bls_ls_killharm, include a
     sequence of BLS, then Lomb-Scargle, then harmonic killing, then BLS on the
@@ -1068,7 +1093,8 @@ def run_tfa(tfalclist_path, trendlisttfa_paths, datestfa_path, lcdirectory,
 
     outblsmodeldir_iter1 = os.path.join(lcdirectory,'BLS_MODEL_ITER1')
     outblsmodeldir_iter2 = os.path.join(lcdirectory,'BLS_MODEL_ITER2')
-    outlcdir_tfa = os.path.join(lcdirectory,'TFA_LCS')
+    if not isinstance(outlcdir_tfa,str):
+        outlcdir_tfa = os.path.join(lcdirectory,'TFA_LCS')
     outstatsfile = os.path.join(statsdir, 'vartools_tfa_stats.txt')
 
     for d in [outblsmodeldir_iter1, outblsmodeldir_iter2, outlcdir_tfa]:
@@ -1144,6 +1170,218 @@ def run_tfa(tfalclist_path, trendlisttfa_paths, datestfa_path, lcdirectory,
               datetime.utcnow().isoformat()))
         raise AssertionError
         return 0
+
+
+def initial_tfa(trendlisttfa_paths, datestfa_path, lcdirectory, statsdir,
+                nworkers=16, npixexclude=10, tfafromirm=True,
+                outlcdir_tfa=None, N_to_remove=100):
+    """
+    Run initial TFA on candidate template stars. Then remove the "most
+    variable" N_to_remove stars from the template star lists, as measured by
+    their variability in the resulting TFA LCs.
+
+    TFA parameters:
+        npixexclude: trend stars exclusion radius, in units of pixels.
+    """
+
+    trendlist_tfa_ap1 = [t for t in trendlisttfa_paths if 'ap1' in t][0]
+    trendlist_tfa_ap2 = [t for t in trendlisttfa_paths if 'ap2' in t][0]
+    trendlist_tfa_ap3 = [t for t in trendlisttfa_paths if 'ap3' in t][0]
+
+    outlcdir_tfa = os.path.join(lcdirectory,'INITIAL_TFA_LCS')
+    outstatsfile = os.path.join(statsdir, 'initial_vartools_tfa_stats.txt')
+    outlcdir_tfa_ap1 = os.path.join(lcdirectory,'INITIAL_TFA_LCS','ap1')
+    outlcdir_tfa_ap2 = os.path.join(lcdirectory,'INITIAL_TFA_LCS','ap2')
+    outlcdir_tfa_ap3 = os.path.join(lcdirectory,'INITIAL_TFA_LCS','ap3')
+
+    outlcdirs = [outlcdir_tfa_ap1, outlcdir_tfa_ap2, outlcdir_tfa_ap3]
+
+    for d in [outlcdir_tfa, outlcdir_tfa_ap1,
+              outlcdir_tfa_ap2, outlcdir_tfa_ap3]:
+        if not os.path.exists(d):
+            os.mkdir(d)
+
+    for ix, apnum in enumerate([1,2,3]):
+        if tfafromirm:
+
+            cmdtorun = inittfafromirmcmd.format(
+                init_lc_list_tfa = trendlisttfa_paths[ix],
+                trendlist_tfa_ap_N = trendlisttfa_paths[ix],
+                apnum = apnum,
+                dates_tfa = datestfa_path,
+                npixexclude = npixexclude,
+                outlcdir_tfa = outlcdirs[ix],
+                outstatsfile = outstatsfile,
+                nproc = nworkers
+            )
+
+        else:
+            raise NotImplementedError
+
+        print(cmdtorun)
+
+        returncode = os.system(cmdtorun)
+
+        if returncode == 0:
+            print('{}Z: initial TFA{} cmd ran'.format(
+                  datetime.utcnow().isoformat(), apnum))
+        else:
+            print('ERR! {}Z: initial TFA{} cmd failed'.format(
+                  datetime.utcnow().isoformat(), apnum))
+            raise AssertionError
+
+
+def round_two_tfa_selection(cand_template_lcpaths, apnum,
+                            lcdirectory,
+                            trendlisttfa_path,
+                            max_fap=0.001,
+                            n_min_tfa_templates=120,
+                            n_desired_tfa_templates=200):
+    """
+    given a list of candidate TFA template star LC paths, with initial TFA
+    applied to them (in lcutils.initial_tfa), construct a list of their
+    eta-normal indices, and their LS FAPs.
+
+    sort it. make raw/dtr/bkgd plots to verify the sort is sensible. then cut
+    the lists down to ~200 template stars.
+
+    args:
+
+        cand_template_lcpaths: list of candidate TFA template star LC paths.
+        these are LCs output by the vartools tfa call, and contain only RSTFC,
+        TMID_BJD, and TFA{N}, for {N} the aperture number.
+
+        apnum: integer aperture number
+
+        lcdirectory: str used to get the reduced mags and bkgd measurements
+        corresponding to each cand_template_lcpath
+    """
+
+    from astrobase.varclass.varfeatures import lightcurve_ptp_measures
+    from astropy.stats import LombScargle
+    from lcstatistics import plot_raw_tfa_bkgd
+
+    eta_normals, eta_robusts, faps = [],[],[]
+    print('beginning lomb scargle for ap{}'.format(apnum))
+    for ix, cand_template_lcpath in enumerate(cand_template_lcpaths):
+
+        if ix%10==0:
+            print('{}/{}'.format(ix,len(cand_template_lcpaths)))
+
+        data, hdr = iu.read_fits(cand_template_lcpath, ext=1)
+
+        tfa_mag = data['TFA{}'.format(apnum)]
+        tfa_time = data['TMID_BJD']
+
+        sel = (
+            np.isfinite(tfa_mag) &
+            np.isfinite(tfa_time)
+        )
+
+        d = lightcurve_ptp_measures(tfa_time[sel], tfa_mag[sel],
+                                    np.ones_like(tfa_time[sel]))
+
+        # Lomb scargle w/ uniformly weighted points.
+        ls = LombScargle(tfa_time, tfa_mag, tfa_mag*1e-3)
+        freq, power = ls.autopower()
+        # Say FAP = 0.4%. Then "under the assumption that there is no periodic
+        # signal in the data, we will observe a peak this high or higher
+        # approximately 0.4% of the time, which gives a strong indication that
+        # a periodic signal is present in the data."
+        fap = ls.false_alarm_probability(power.max())
+
+        eta_normals.append(d['eta_normal'])
+        eta_robusts.append(d['eta_robust'])
+        faps.append(fap)
+
+    df = pd.DataFrame({'eta_normal':np.array(eta_normals),
+                       'eta_robust':np.array(eta_robusts),
+                       'fap':np.array(faps),
+                       'log10_fap':np.log10(faps),
+                       'cand_template_lcpath':cand_template_lcpaths
+                      })
+    # 0.1% chance. Means some strong periodic variability that the TFA missed.
+    # Seems to be 20-25% of TESS stars typically.
+    throw_out = df['fap'] < max_fap
+    df['throw_out'] = throw_out
+
+    df = df.sort_values(by='log10_fap', ascending=True)
+
+    print('making plots for tfa template check')
+    for cand_template_lcpath, fap, eta_r, throw_out in zip(
+        df['cand_template_lcpath'], df['fap'],
+        df['eta_robust'], df['throw_out']
+    ):
+
+        if fap > 0.01:
+            print('plotting: skip b/c high FAP {}'.
+                  format(cand_template_lcpath))
+            continue
+
+        data, hdr = iu.read_fits(cand_template_lcpath, ext=1)
+        tfa_mag = data['TFA{}'.format(apnum)]
+        tfa_time = data['TMID_BJD']
+
+        rawlcpath = os.path.join(lcdirectory,
+                                 os.path.basename(cand_template_lcpath))
+        rawdata, hdr = iu.read_fits(rawlcpath, ext=1)
+        raw_mag = rawdata['IRM{}'.format(apnum)]
+        raw_time = rawdata['TMID_BJD']
+        bkgd_val = rawdata['BGV']
+
+        savpath = cand_template_lcpath.replace('.fits','_raw_tfa_bkgd.png')
+        if os.path.exists(savpath):
+            continue
+
+        customstr = 'FAP: {:.1e}, ETA: {:.1e}, OMIT? {}'.format(
+            fap, eta_r, throw_out)
+
+        plot_raw_tfa_bkgd(raw_time, raw_mag, tfa_mag, bkgd_val, apnum,
+                          savpath=savpath, customstr=customstr,
+                          tfatime=tfa_time)
+
+    # create a backup of the original template stars, since we're going to
+    # overwrite it.
+    dst = trendlisttfa_path.replace('trendlist','stage1-trendlist')
+    shutil.copyfile(trendlisttfa_path,dst)
+    print('copied {}->{}'.format(trendlisttfa_path,dst))
+
+    # generally should have enough stars.
+    throw_out = df['fap'] < max_fap
+    if not len(df[~throw_out]) > n_min_tfa_templates:
+        raise AssertionError('in selecting tfa template stars, did not '
+                             'find enough')
+
+    if len(df[~throw_out]) > n_desired_tfa_templates:
+
+        # pick template stars randomly from dataframe of stars that are not
+        # variable.
+        outdf = df[~throw_out].sample(n=n_desired_tfa_templates)
+
+    else:
+
+        # same, but default to fewer stars.
+        outdf = df[~throw_out].sample(n=n_min_tfa_templates)
+
+    currentdf = pd.read_csv(trendlisttfa_path, sep=' ',
+                            names=['templatelcpath','x','y'])
+
+    outdf['cand_template_lcpath'] = list(map(
+        lambda x: x.replace('INITIAL_TFA_LCS/ap{}/'.format(apnum),''),
+        outdf['cand_template_lcpath']
+    ))
+
+    outdf = outdf.merge(currentdf, how='left', left_on='cand_template_lcpath',
+                        right_on='templatelcpath', suffixes=('_left','_right'))
+
+    outcols = ['cand_template_lcpath', 'x', 'y']
+    odf = outdf[outcols]
+
+    odf.to_csv(
+        trendlisttfa_path, header=None, index=False, sep=' '
+    )
+    print('rewrote {}'.format(trendlisttfa_path))
+
 
 
 def merge_tfa_lc_worker(task):

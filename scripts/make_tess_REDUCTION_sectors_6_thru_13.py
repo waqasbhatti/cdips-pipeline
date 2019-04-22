@@ -56,10 +56,10 @@ def main():
         templatelines = fhandle.readlines()
 
     # start at projid 1300 for sector 1-5 reduction.
-    projid = 1300
+    projid = 1500
     varyparamdict = {}
 
-    for snum in [2,3,4,5,1]:
+    for snum in [6,7,8,9,10,11,12,13]:
         for cam in range(1,5):
             for ccd in range(1,5):
                 varyparamdict[projid] = {
@@ -72,7 +72,7 @@ def main():
                     'aperturelist':"\"1.0:7.0:6.0,1.5:7.0:6.0,2.25:7.0:6.0\"",
                     'epdsmooth':11,            # not used
                     'epdsigclip':10000,        # ditto
-                    'photdisjointradius':2,
+                    'photdisjointradius':1.5,
                     'anetfluxthreshold':50000,
                     'anettweak':6,
                     'anetradius':30,

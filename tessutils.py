@@ -158,6 +158,7 @@ badtimewindows = [
     (1406.29246, 1409.388295), # sector 3, orbit 14 end
     (1418.53690, 1421.211685), # sector 4 instrument anomaly
     (1465.212615, 1468.269985), # sector 6 PRF time
+    (1477.01998, 1478.11304), # sector 6 downlink
 ]
 
 def mask_dquality_flag_frame(task):
@@ -480,9 +481,10 @@ def are_known_planets_in_field(ra_center, dec_center, outname, use_NEA=False,
             hj_coords, cam_tuple, withgaps=False)
 
     elif use_alerts:
+        # sectors 1-7
         df = pd.read_csv(
             '/home/lbouma/proj/pipe-trex/data/'
-            'hlsp_tess-data-alerts_tess_phot_alert-summary-s01+s02+s03+s04_tess_v9_spoc.csv'
+            'toi-plus-2019-04-18'
         )
         kp_coords = SkyCoord(nparr(df['RA'])*u.deg,
                              nparr(df['Dec'])*u.deg,
@@ -799,7 +801,8 @@ def measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
         raise NotImplementedError
 
     # get the starids that correspond to the HJs on-chip
-    projcat = read_object_reformed_catalog(projcatalogpath, isgaiaid=True)
+    projcat = read_object_reformed_catalog(projcatalogpath, isgaiaid=True,
+                                           gaiafull=False)
 
     proj_ra, proj_dec = projcat['ra']*u.deg, projcat['dec']*u.deg
 
@@ -1487,7 +1490,8 @@ def read_tess_txt_lightcurve(
     return lcdict
 
 
-def read_object_reformed_catalog(reformedcatalogfile, isgaiaid=False):
+def read_object_reformed_catalog(reformedcatalogfile, isgaiaid=False,
+                                 gaiafull=True):
     """
     you often need an objectid, ra, dec, and/or 2mass magnitudes.  get these
     from the "reformed" catalog with a small sub-read.
@@ -1505,14 +1509,19 @@ def read_object_reformed_catalog(reformedcatalogfile, isgaiaid=False):
                                delimiter=' '
                                )
     else:
-        columns='id,ra,dec'
+        if gaiafull:
+            columns='id,ra,dec,xi,eta,G,Rp,Bp,plx,pmra,pmdec,varflag'
+            dtypes='U19,f8,f8,f8,f8,f8,f8,f8,f8,f8,f8,<U16'
+        else:
+            columns='id,ra,dec'
+            dtypes='U19,f8,f8'
         columns = columns.split(',')
 
         catarr = np.genfromtxt(reformedcatalogfile,
                                comments='#',
                                usecols=list(range(len(columns))),
                                names=columns,
-                               dtype='U19,f8,f8',
+                               dtype=dtypes,
                                delimiter=' '
                                )
     return catarr
@@ -1701,7 +1710,7 @@ def parallel_bkgd_subtract(fitslist, method='boxblurmedian', isfull=True, k=32,
     from parse import parse
     res = parse('{}/sector-{}/{}',fitslist[0])
     sectornum = int(res[1])
-    if sectornum in [1,2,4,5]:
+    if sectornum in [1,2,4,5,6,7]:
         orbitgap = 1. # days
     elif sectornum in [3]:
         orbitgap = 0.15 # days
@@ -1881,3 +1890,62 @@ def read_object_catalog(catalogfile):
     # 'eta[deg]']
 
     return df
+
+def merge_object_catalog_vs_cdips(
+    in_reformed_cat_file, out_reformed_cat_file,
+    cdips_cat_file=('/nfs/phtess1/ar1/TESS/PROJ/lbouma/'
+                    'OC_MG_FINAL_GaiaRp_lt_16.csv'),
+    G_Rp_cut=14):
+    """
+    the CDIPS project defines a cluster star sample for which we should make
+    lightcurves no matter what.
+
+    this function:
+
+        * takes a reformed_catalog (created by calling
+        ap.reform_gaia_fov_catalog(catalog_file, reformed_cat_file))
+
+        * applies a secondary magnitude cut (G_Rp < G_Rp_cut), except if the
+        star is a cluster star, in which case it is always included (provided
+        it was within whatever first magnitude cut was used to create the
+        reformed_gaia_fov_catalog).
+
+        * writes to out_reformed_cat_file. if in_reformed_cat_file ==
+        out_reformed_cat_file, will overwrite.
+    """
+
+    catarr = read_object_reformed_catalog(in_reformed_cat_file, isgaiaid=True)
+    field_df = pd.DataFrame(catarr)
+    del catarr
+
+    cdips_df = pd.read_csv(cdips_cat_file, sep=';')
+
+    field_ids = np.array(field_df['id']).astype(str)
+    cdips_ids = np.array(cdips_df['source_id']).astype(str)
+    del cdips_df
+
+    print('{} begin source_id xmatch DR2 to CDIPS...'.
+          format(datetime.utcnow().isoformat()))
+    is_cdips = np.in1d(field_ids, cdips_ids)
+    print('{} completed source_id xmatch DR2 to CDIPS...'.
+          format(datetime.utcnow().isoformat()))
+
+    sel = (field_df['Rp'] < G_Rp_cut) | is_cdips
+
+    outdf = field_df[sel]
+
+    if in_reformed_cat_file == out_reformed_cat_file:
+        print('[WRN!] will overwrite {}'.format(in_reformed_cat_file))
+        print('[WRN!] N_stars for LCs before cut: {}'.format(len(field_df)))
+        print('[WRN!] N_stars for LCs after: {}'.format(len(outdf)))
+
+    outdf.to_csv(out_reformed_cat_file, sep=' ', index=False, header=False,
+                 na_rep='n/a')
+    print('wrote {}'.format(out_reformed_cat_file))
+
+    if np.any(is_cdips):
+        print('[INFO!] got {} CDIPS stars in field, including...'.
+              format(len(is_cdips[is_cdips])))
+        print('{}'.format(repr(field_df[is_cdips].head(n=20))))
+    else:
+        print('[INFO!][WRN!] got 0 CDIPS stars in field')

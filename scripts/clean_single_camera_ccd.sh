@@ -9,10 +9,10 @@
 # clear out astromrefs and photrefs table.
 # clear out calibratedframes table.
 # clear frameinfo cache from past week. 
-camnum=2
-ccdnum=1
-projectid=1320
-sector='s0003'
+camnum=4
+ccdnum=4
+projectid=1315
+sector='s0002'
 tuneparameters=false
 
 ##########
