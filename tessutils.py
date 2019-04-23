@@ -1895,7 +1895,7 @@ def read_object_catalog(catalogfile):
 def merge_object_catalog_vs_cdips(
     in_reformed_cat_file, out_reformed_cat_file,
     cdips_cat_file=('/nfs/phtess1/ar1/TESS/PROJ/lbouma/'
-                    'OC_MG_FINAL_GaiaRp_lt_16_v0.1.csv'),
+                    'OC_MG_FINAL_GaiaRp_lt_16_v0.2.csv'),
     G_Rp_cut=14):
     """
     the CDIPS project defines a cluster star sample for which we should make
