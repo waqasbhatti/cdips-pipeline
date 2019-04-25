@@ -15,6 +15,12 @@ main
         parallel_append_ccd_temperature_to_hdr
     parallel_move_badframes
     get_files_needed_before_image_subtraction
+        parallel_extract_sources
+        parallel_astrometrydotnet
+        make_fov_catalog
+        reform_gaia_fov_catalog
+        merge_object_catalog_vs_cdips
+        parallel_fitsdir_photometry
     run_imagesubtraction
         parallel_frames_to_database
         framelist_make_xtrnsfits
@@ -30,6 +36,8 @@ main
         parallel_lc_statistics
         choose_tfa_template
         make_ascii_files_for_vartools
+        initial_tfa
+        round_two_tfa_selection
         run_tfa
         parallel_merge_tfa_lcs
         plot_stats_file
@@ -165,7 +173,7 @@ def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid):
     if len(clusterjpgs)>1:
 
         clusternames = nparr(
-            [search('CUT-{}_{}sub-{}-{}',c)[0] for c in clusterjpgs]
+            [search('CUT-{}_rsub-{}-{}',c)[0] for c in clusterjpgs]
         )
         uclusternames = np.sort(np.unique(clusternames))
 
@@ -501,7 +509,9 @@ def plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=10,
 
             key = 'AP{}'.format(ap)
 
-            savdir = statsdir
+            savdir = os.path.join(statsdir,'random_lightcurves_and_ACFs')
+            if not os.path.exists(savdir):
+                os.mkdir(savdir)
             savpath = os.path.join(
                 savdir,
                 os.path.basename(acffile).rstrip('.pickle')+
@@ -561,7 +571,11 @@ def plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=20,
             epdap = 'EP{:d}'.format(ap)
             tfaap = 'TFA{:d}'.format(ap)
 
-            savdir = os.path.join(os.path.dirname(tfafile),'stats_files')
+            savdir = os.path.join(os.path.dirname(tfafile),
+                                  'stats_files',
+                                  'random_lightcurve_subsample')
+            if not os.path.exists(savdir):
+                os.mkdir(savdir)
             savpath = os.path.join(
                 savdir,
                 os.path.basename(tfafile).rstrip(ext)+
@@ -1404,6 +1418,11 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
         make_percentiles_plot (bool)
     """
 
+    lcglob = '*_llc.fits'
+    tu.plot_lc_positions(lcdirectory, lcglob, statsdir,
+                         outname='lc_position_scatter_plot.png',
+                         N_desired=20000)
+
     percentilesfiles = glob(os.path.join(statsdir,'percentiles_*png'))
     if not percentilesfiles:
         lcs.percentiles_RMSorMAD_stats_and_plots(
@@ -1425,7 +1444,10 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
         eval_times_hr=[1,2,6,12,24,48,60,96,120,144,192],
         skipepd=skipepd)
 
-    lcs.plot_tfa_templates(tfa_templates_path, statsdir)
+    outdir = os.path.join(statsdir,'tfa_templates')
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+    lcs.plot_tfa_templates(tfa_templates_path, outdir)
 
     # plot some lightcurves and their ACFs
     pickledir = os.path.join(statsdir, 'acf_stats')
@@ -1437,7 +1459,8 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
                                         skipepd=skipepd)
 
     # check if image noise is gaussian
-    is_image_noise_gaussian(fitsdir, projectid, field, camera, ccd)
+    if False:
+        is_image_noise_gaussian(fitsdir, projectid, field, camera, ccd)
 
     # just make some lightcurve plots to look at them
     plot_random_lightcurve_subsample(lcdirectory, n_desired_lcs=10,
