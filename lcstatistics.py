@@ -34,7 +34,7 @@ Stat calculation functions
         compute above statistics for a directory of lightcurves and compile
 
 Plotting functions
-    percentiles_RMSorMAD_stats_and_plots
+    percentiles_RMSorMAD_stats_and_plots:
         make csv files and (optionally) percentiles plots of MAD vs magnitude.
 
     acf_percentiles_stats_and_plots:
@@ -52,14 +52,14 @@ Plotting functions
             * EPD mags vs time (and ACF)
             * TFA mags vs time. (and ACF)
 
-plot_raw_tfa_bkgd:
-    Plot a 3 row, 1 column plot with rows of:
-        * raw mags vs time
-        * TFA mags vs time.
-        * background vs time
+    plot_raw_tfa_bkgd:
+        Plot a 3 row, 1 column plot with rows of:
+            * raw mags vs time
+            * TFA mags vs time.
+            * background vs time
 
-plot_raw_tfa_bkgd_fits
-    Wrapper to above, given a *llc.fits lightcurve.
+    plot_raw_tfa_bkgd_fits:
+        Wrapper to above, given a *llc.fits lightcurve.
 
 TODO:
 move items from aperturephot.py here, and update all respective calls.
@@ -1668,6 +1668,9 @@ def plot_raw_tfa_bkgd_fits(fitspath, savdir, maskbadtimes=True, ap_index=2,
         savdir,
         os.path.basename(fitspath).replace('.fits','_raw_tfa_bkgd.png')
     )
+    if os.path.exists(savpath):
+        print('found {}, return'.format(savpath))
+        return
 
     # load lc
     hdulist = fits.open(fitspath)
@@ -1900,6 +1903,3 @@ def plot_lightcurve_and_ACF(
     fig.tight_layout(h_pad=0., w_pad=0)
     fig.savefig(savpath, dpi=250, bbox_inches='tight')
     print('%sZ: made plot: %s' % (datetime.utcnow().isoformat(), savpath))
-
-
-

@@ -24,6 +24,8 @@ make_ascii_files_for_vartools
 
 initial_tfa
 
+round_two_tfa_selection
+
 run_tfa
 
 parallel_merge_tfa_lcs
