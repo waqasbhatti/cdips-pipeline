@@ -40,6 +40,9 @@ read_object_catalog: read the Gaia .catalog file into a pandas DataFrame
 read_tess_txt_lightcurve: Read grcollect dumped lightcurve file into a
 dictionary (which can then be put into a FITS table, or some other data
 structure better than text).
+
+plot_lc_positions: Given list of lcpaths, plot their on-chip positions.
+
 """
 from __future__ import division, print_function
 
@@ -735,6 +738,11 @@ def make_cluster_cutout_jpgs(sectornum, fitsdir, racenter, deccenter, field,
     ras = np.array(df['ra'])
     decs = np.array(df['dec'])
     angrads = np.array(df['r2'])
+
+    outcalmatches = glob(os.path.join( fitsdir, 'CUT-*_CAL.jpg' ))
+    if len(outcalmatches) > 1000:
+        print('found cutouts were already made, return')
+        return
 
     for name, ct, ns, d, age, ra, dec, r2 in zip(names, ctype, nstar, dist,
                                                  logt, ras, decs, angrads):
@@ -1950,3 +1958,50 @@ def merge_object_catalog_vs_cdips(
         print('{}'.format(repr(field_df[is_cdips].head(n=20))))
     else:
         print('[INFO!][WRN!] got 0 CDIPS stars in field')
+
+
+
+
+
+def plot_lc_positions(lcdir, lcglob, statsdir, outname=None, N_desired=20000):
+    """
+    Given list of lcpaths, plot their on-chip positions.
+
+    args:
+        lcpaths (list): of lightcurve paths.
+
+        outname: outpath is join of statsdir and outname, if given.
+    """
+
+    lcpaths = glob(os.path.join(lcdir, lcglob))
+
+    if len(lcpaths) > N_desired:
+        selpaths = np.random.choice(lcpaths, size=N_desired, replace=False)
+    else:
+        selpaths = lcpaths
+
+    print('beginning plot LC positions on {} LCs'.format(len(selpaths)))
+
+    if not outname:
+        outname = 'lc_position_scatter_plot.png'
+    outpath = os.path.join(statsdir, outname)
+    if os.path.exists(outpath):
+        print('found {}, skip'.format(outpath))
+        return
+
+    xs, ys = [], []
+    for selpath in selpaths:
+        hdul = fits.open(selpath)
+        xs.append(hdul[0].header['XCC'])
+        ys.append(hdul[0].header['YCC'])
+    xs, ys = nparr(xs), nparr(ys)
+
+    f, ax = plt.subplots(figsize=(4,4))
+    ax.scatter(xs, ys, c='k', alpha=0.5, s=0.5, rasterized=True, linewidths=0)
+    ax.set_title(os.path.basename(lcdir))
+
+    ax.set_xlabel('x on photref')
+    ax.set_ylabel('y on photref')
+
+    f.savefig(outpath, bbox_inches='tight', dpi=350)
+    print('made {}'.format(outpath))
