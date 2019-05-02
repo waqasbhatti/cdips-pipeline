@@ -5297,6 +5297,12 @@ def get_lc_statistics(lcfile,
         # TESS filenaming format: {gaiaid}_llc.fits -- so if we want to
         # retrieve the Gaia-ID, must omit "_llc" here.
         lcobj = lcobj.replace('_llc','')
+    if 'hlsp' in lcobj:
+        # typical format:
+        # hlsp_cdips_tess_ffi_gaiatwo0002917938284837069312-0006_tess_v01_llc.fits
+        from parse import search
+        res = search('hlsp_cdips_tess_ffi_gaiatwo{}-{}_tess{}', lcobj)
+        lcobj = res[0].lstrip('0')
 
     return {'lcfile':lcfile,
             'lcobj':lcobj,
