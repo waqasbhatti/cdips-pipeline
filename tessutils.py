@@ -1989,12 +1989,14 @@ def plot_lc_positions(lcdir, lcglob, statsdir, outname=None, N_desired=20000):
         print('found {}, skip'.format(outpath))
         return
 
-    xs, ys = [], []
+    xs, ys, ras, decs = [], [], [], []
     for selpath in selpaths:
         hdul = fits.open(selpath)
         xs.append(hdul[0].header['XCC'])
         ys.append(hdul[0].header['YCC'])
-    xs, ys = nparr(xs), nparr(ys)
+        ras.append(hdul[0].header['RA[deg]'])
+        dec.append(hdul[0].header['Dec[deg]'])
+    xs, ys, ras, decs = nparr(xs), nparr(ys), nparr(ras), nparr(decs)
 
     f, ax = plt.subplots(figsize=(4,4))
     ax.scatter(xs, ys, c='k', alpha=0.5, s=0.5, rasterized=True, linewidths=0)
@@ -2005,3 +2007,7 @@ def plot_lc_positions(lcdir, lcglob, statsdir, outname=None, N_desired=20000):
 
     f.savefig(outpath, bbox_inches='tight', dpi=350)
     print('made {}'.format(outpath))
+
+    outdf = pd.DataFrame({'x':xs,'y':ys,'ra':ras,'dec':decs})
+    outdf.to_csv(outpath.replace('.png', '.csv'), index=False)
+    print('made {}'.format(outpath.replace('.png', '.csv')))
