@@ -179,6 +179,7 @@ except:
 from datetime import datetime
 import shlex, re, json, random
 from hashlib import md5
+from copy import deepcopy
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -1670,6 +1671,9 @@ def combine_frames(framelist,
         return framelist, None
 
 
+def catmag_to_flux(catmag, catmag_0, flux_0):
+    return flux_0 * 10** ( -0.4*(catmag - catmag_0) )
+
 
 def photometry_on_combined_photref(
         photref_frame,
@@ -1875,16 +1879,203 @@ def photometry_on_combined_photref(
 
     returncode = os.system(cmdtorun)
 
-    if returncode == 0:
-        print('%sZ: photometry on photref %s OK -> %s' %
-              (datetime.utcnow().isoformat(), photref_frame, outfile))
-        return photref_frame, outfile
+    if observatory != 'tess':
+        # Current default non-TESS behavior: get reference fluxes by measuring
+        # them from photometric reference frame. This is a bad default in
+        # crowded regions, because the flux of a star in a crowded region
+        # measured from the frame will be overestimated.  The resulting
+        # _relative depth_ of signals is decreased (since the reference
+        # magnitude is overestimated). This lowers detectability. It also
+        # weakens detectability since the COMBINEDREFPHOTCMD above hard-codes
+        # in a disjoint radius of 2 pixels, so you will get NaNs in crowded
+        # regions (which image subtraction can in theory avoid).
+
+        print('WARNING\n'*42)
+        print('Please use a better method to measure reference fluxes.')
+        print('WARNING\n'*42)
+
+        if returncode == 0:
+            print('%sZ: photometry on photref %s OK -> %s' %
+                  (datetime.utcnow().isoformat(), photref_frame, outfile))
+            return photref_frame, outfile
+        else:
+            print('ERR! %sZ: photometry on photref %s failed!' %
+                  (datetime.utcnow().isoformat(), photref_frame))
+            if os.path.exists(outfile):
+                os.remove(outfile)
+            return photref_frame, None
+
+    elif observatory=='tess' and not extractsources:
+
+        # Above, the reference flux values were measured on the reference frame. We
+        # now want to fit these flux values vs catalog magnitudes, and then write
+        # the cmrawphot file with reference fluxes that are predicted from the fit.
+        colnames = ['sourceid', 'x', 'y', 'n_ap', 'catalog_mag', 'catalog_color',
+                    'rad_ap1', 'ann_inner_ap1', 'ann_width_ap1', 'flux_ap1',
+                    'flux_err_ap1', 'qflag_ap1',
+                    'rad_ap2', 'ann_inner_ap2', 'ann_width_ap2', 'flux_ap2',
+                    'flux_err_ap2', 'qflag_ap2',
+                    'rad_ap3', 'ann_inner_ap3', 'ann_width_ap3', 'flux_ap3',
+                    'flux_err_ap3', 'qflag_ap3']
+
+        # raw photometry dataframe. outfile has lines formatted like:
+        #    4623663518281658240        2.904       8.380   3          -
+        #    -  1.00  7.00  6.00     718.634     11.8163 0x007f  1.50  7.00
+        #    6.00     1978.89      19.583 0x007f  2.25  7.00  6.00     4679.89
+        #    30.1105 0x007f
+
+        rpdf = pd.read_csv(outfile, comment='#', delim_whitespace=True,
+                           names=colnames)
+
+        # Now need to read in catalog information. This is catalog and observatory
+        # specific. Below is only implemented for the TESS pipeline, which has the
+        # Gaia DR2 .projcatalog reformated catalog file format, where each line is
+        # formatted like:
+        #
+        #   4623663518281658240 88.6421522981 -78.623013112 -4.0583529625
+        #   -6.9954454144 10.6766643524 10.2180233002 10.9946670532 3.0136
+        #   1.6152298953 26.648822804 NOT_AVAILABLE     2.9039     8.3803
+
+        # projected catalog sourcelist dataframe
+        # cols = ['id,ra,dec,xi,eta,G,Rp,Bp,plx,pmra,pmdec,varflag,x,y']
+        from tessutils import read_object_reformed_catalog
+        _ = read_object_reformed_catalog(photref_sourcelist, isgaiaid=True,
+                                         gaiafull=True)
+        sldf = pd.DataFrame(_)
+        sldf['sourceid'] = sldf['id'].astype(np.int64)
+
+        mdf = rpdf.merge(sldf, on='sourceid', how='left',
+                         suffixes=('_rawphot','_sourcelist'))
+
+        # Stassun+2019, TICv8 paper give conversion from GaiaDR2 photometry to
+        # the TESS bandpass. Scatter is 0.006 mag.
+        mdf['T'] = (mdf['G']
+                    - 0.00522555 * (mdf['Bp'] - mdf['Rp'])**3
+                    + 0.0891337 * (mdf['Bp'] - mdf['Rp'])**2
+                    - 0.633923 * (mdf['Bp'] - mdf['Rp'])
+                    + 0.0324473)
+
+        # For each aperture, fit flux as function of catalog mag.  Only want
+        # stars with 0x0000 flags in each aperture.  Also only want stars with
+        # finite Gaia G, Rp, and Bp mags
+        sel = nparr(mdf['qflag_ap1'] == '0x0000')
+        sel &= nparr(mdf['qflag_ap2'] == '0x0000')
+        sel &= nparr(mdf['qflag_ap3'] == '0x0000')
+
+        sel &= ~nparr(pd.isnull(mdf['G']))
+        sel &= ~nparr(pd.isnull(mdf['Rp']))
+        sel &= ~nparr(pd.isnull(mdf['Bp']))
+
+        # Do the selection.
+        sdf = mdf[sel]
+
+        n_apertures = 3
+        for ap in range(1,n_apertures+1):
+
+            popt, pcov = curve_fit(catmag_to_flux, nparr(sdf['T']),
+                                   nparr(sdf['flux_ap{}'.format(ap)]),
+                                   p0=(10, 1e4))
+
+            # Make a plot that shows the line being fit to log10(flux) vs mag.
+            plt.close('all')
+            f,ax =plt.subplots(figsize=(4,3))
+
+            T_lin = np.arange(min(sdf['T']), max(sdf['T']), 0.1)
+            ax.scatter(sdf['T'], sdf['flux_ap{}'.format(ap)], rasterized=True,
+                       s=0.3, zorder=2, c='C0')
+            ax.plot(T_lin, catmag_to_flux(T_lin, popt[0], popt[1]), zorder=3,
+                    c='C1')
+
+            ax.set_yscale('log')
+            ax.set_xlabel('T mag')
+            ax.set_ylabel('flux in ap{} [ADU]'.format(ap))
+            outpath = os.path.join(
+                os.path.splitext(photref_frame)[0]+
+                '_fluxap{}_vs_Tmag.png'.format(ap)
+            )
+            f.savefig(outpath, bbox_inches='tight')
+
+            mdf['flux_ap{}_predicted'.format(ap)] = (
+                catmag_to_flux(mdf['T'], popt[0], popt[1])
+            )
+
+        # Save `mdf`, so that for future reference we know what the measured vs
+        # the predicted fluxes were.
+        outpath = os.path.join(
+            os.path.splitext(photref_frame)[0]+
+            '_measured_and_predicted_fluxes.csv'
+        )
+        mdf.to_csv(outpath, index=False)
+        print('saved {}'.format(outpath))
+
+        # Ok. Now copy `outfile` (.cmrawphot) to a .rawphot extension.  Then
+        # overwrite .cmrawphot measured fluxes with the predicted reference
+        # fluxes. Do it line by line, since fiphot reads the .cmrawphot file
+        # with very specific formatting.
+        if not outfile.endswith('.cmrawphot'):
+            raise AssertionError('expected outfile to be .cmrawphot')
+
+        shutil.copyfile(outfile, outfile.replace('.cmrawphot','.rawphot'))
+        print('copied {}->{}'.format(
+            outfile, outfile.replace('.cmrawphot','.rawphot')))
+
+        with open(outfile, 'r') as f:
+            lines = f.readlines()
+        outlines = deepcopy(lines)
+
+        for ix, l in enumerate(lines):
+            if l.startswith('#'):
+                continue
+            sourceid = np.int64(l.split(' ')[0])
+
+            sel = mdf['sourceid'] == sourceid
+
+            # replace measured fluxes with predicted fluxes
+            for ap in range(1,n_apertures+1):
+                outlines[ix] = outlines[ix].replace(
+                    str(float(mdf[sel]['flux_ap{}'.format(ap)])),
+                    '{:.6g}'.format(
+                        float(mdf[sel]['flux_ap{}_predicted'.format(ap)])
+                    )
+                )
+
+            # add the catalog mag and catalog color.
+            # these are read by fitsh with `sscanf(cmd[4],"%lg",&ref_mag)`, so
+            # format them as floats. fun trick: python's `.replace` method
+            # has an optional argument for maximum number of occurrences.
+
+            # catalog mag column first
+            outlines[ix] = outlines[ix].replace(
+                '-',
+                '{:.3f}'.format(float(mdf[sel]['T'])),
+                1
+            )
+
+            # then color column
+            outlines[ix] = outlines[ix].replace(
+                '-',
+                '{:.3f}'.format(float(mdf[sel]['Rp']-mdf[sel]['Bp'])),
+                1
+            )
+
+        with open(outfile, 'w') as f:
+            f.writelines(lines)
+        print('overwrote {} with reformatted fluxes, catmags, and colors'.
+              format(outfile))
+
+        if returncode == 0:
+            print('%sZ: photometry on photref %s OK -> %s' %
+                  (datetime.utcnow().isoformat(), photref_frame, outfile))
+            return photref_frame, outfile
+        else:
+            print('ERR! %sZ: photometry on photref %s failed!' %
+                  (datetime.utcnow().isoformat(), photref_frame))
+            if os.path.exists(outfile):
+                os.remove(outfile)
+            return photref_frame, None
+
     else:
-        print('ERR! %sZ: photometry on photref %s failed!' %
-              (datetime.utcnow().isoformat(), photref_frame))
-        if os.path.exists(outfile):
-            os.remove(outfile)
-        return photref_frame, None
+        raise NotImplementedError
 
 
 
