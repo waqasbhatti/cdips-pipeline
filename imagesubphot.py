@@ -2059,7 +2059,7 @@ def photometry_on_combined_photref(
             )
 
         with open(outfile, 'w') as f:
-            f.writelines(lines)
+            f.writelines(outlines)
         print('overwrote {} with reformatted fluxes, catmags, and colors'.
               format(outfile))
 
