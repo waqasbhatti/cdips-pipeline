@@ -2083,13 +2083,22 @@ def photometry_on_combined_photref(
                 # replaced by precursor whitespace.
                 if predicted.endswith('.'):
                     predicted = ' {:s}'.format(predicted.replace('.',''))
+                elif predicted.endswith('.0'):
+                    predicted = predicted[:-2]
                 elif predicted.endswith('0'):
                     predicted = predicted[:-1]
 
                 nspaces_needed = len(measured) - len(predicted)
                 predicted = nspaces_needed*' ' + predicted
 
-                outlines[ix] = outlines[ix].replace(measured, predicted)
+                # the following is more complicated than a .replace()
+                # statement, but for 0-columns .replace would be ambiguous
+                outline = (
+                    outlines[ix][:thisslice.start]
+                    + predicted
+                    + outlines[ix][thisslice.stop:]
+                )
+                outlines[ix] = outline
 
             # add the catalog mag and catalog color.
             # these are read by fitsh with `sscanf(cmd[4],"%lg",&ref_mag)`, so
