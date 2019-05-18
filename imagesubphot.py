@@ -325,7 +325,7 @@ SUBFRAMEPHOTCMD = (
     "--sky-fit mode,iterations=2,sigma=3 "
     "--format IXY-----,BbFfMms "
     "--mag-flux {zeropoint},{exptime} "
-    "--gain {ccdgain} "
+    "--gain {ccdgain} " #"--spline --col-magnitude 5 --col-color 6"
     "--disjoint-radius {disjointradius} "
     "--magfit orders=4:2,niter=3,sigma=3 "
     "--input-kernel {subtractedkernel} "
@@ -2024,39 +2024,91 @@ def photometry_on_combined_photref(
         outlines = deepcopy(lines)
 
         for ix, l in enumerate(lines):
+
             if l.startswith('#'):
                 continue
+
             sourceid = np.int64(l.split(' ')[0])
 
             sel = mdf['sourceid'] == sourceid
 
-            # replace measured fluxes with predicted fluxes
+            # the exact number of characters per string apparently must be
+            # matched.  because the
+            # `sscanf(cmd[6+i*6+3],"%lg",&rfflux[i].flux)` in
+            # fiphot-io.c/read_raw_photometry couldn't work with say...  COMMA
+            # SEPARATED values. it needs to be variable length whitespace, with
+            # fixed max numbers of characters per column (but variable numbers
+            # of characters). LOL! so let's format some strings.
+            #
+            # each line is like:
+            #
+            #   4767791282021775744     1931.906       2.682   3          -
+            #   -  1.00  7.00  6.00     107.937      5.0005 0x007f  1.50  7.00
+            #   6.00     260.402     7.85987 0x007f  2.25  7.00  6.00     390.784
+            #   10.2589 0x007f
+            #
+
+            # replace measured fluxes with predicted fluxes. do it via EXACT
+            # STRING matching, because the %11g C-format with which they're
+            # written seems otherwise mind-numbingly hard to get in python
+            slices_dict = {
+                'ap1':slice(88,100),
+                'ap2':slice(137,149),
+                'ap3':slice(186,198),
+            }
+
             for ap in range(1,n_apertures+1):
-                outlines[ix] = outlines[ix].replace(
-                    str(float(mdf[sel]['flux_ap{}'.format(ap)])),
-                    '{:.6g}'.format(
-                        float(mdf[sel]['flux_ap{}_predicted'.format(ap)])
-                    )
+
+                # " "-padded string with flux in this aperture
+                thisslice = slices_dict['ap{}'.format(ap)]
+                measured = l[thisslice]
+
+                # this minimum is needed... so that at most 7 characters are
+                # written. (ignoring whitespace inserted further on...)
+                n_characters = 7
+
+                predicted = '{:s}'.format(
+                    str('{:.3f}'.format(
+                        float(mdf[sel]['flux_ap{}_predicted'.format(ap)]))
+                    )[:n_characters]
                 )
+
+                if len(predicted)>7:
+                    print('somehow len predicted is above 7')
+                    import IPython; IPython.embed()
+
+                # each column entry has max width 7 characters (but might be
+                # fewer)... and is designated to END at a particular line,
+                # without periods. trailing periods therefore need to be
+                # replaced by precursor whitespace.
+                if predicted.endswith('.'):
+                    predicted = ' {:s}'.format(predicted.replace('.',''))
+                elif predicted.endswith('0'):
+                    predicted = predicted[:-1]
+
+                nspaces_needed = len(measured) - len(predicted)
+                predicted = nspaces_needed*' ' + predicted
+
+                outlines[ix] = outlines[ix].replace(measured, predicted)
 
             # add the catalog mag and catalog color.
             # these are read by fitsh with `sscanf(cmd[4],"%lg",&ref_mag)`, so
             # format them as floats. fun trick: python's `.replace` method
             # has an optional argument for maximum number of occurrences.
 
-            # catalog mag column first
-            outlines[ix] = outlines[ix].replace(
-                '-',
-                '{:.3f}'.format(float(mdf[sel]['T'])),
-                1
-            )
+            # # catalog mag column first
+            # outlines[ix] = outlines[ix].replace(
+            #     '-',
+            #     '{:.3f}'.format(float(mdf[sel]['T'])),
+            #     1
+            # )
 
-            # then color column
-            outlines[ix] = outlines[ix].replace(
-                '-',
-                '{:.3f}'.format(float(mdf[sel]['Rp']-mdf[sel]['Bp'])),
-                1
-            )
+            # # then color column
+            # outlines[ix] = outlines[ix].replace(
+            #     '-',
+            #     '{:.3f}'.format(float(mdf[sel]['Rp']-mdf[sel]['Bp'])),
+            #     1
+            # )
 
         with open(outfile, 'w') as f:
             f.writelines(outlines)
