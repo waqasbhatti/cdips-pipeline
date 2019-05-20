@@ -1379,7 +1379,8 @@ def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
             params = (str(projectid), str(camera), str(ccd))
 
             if DEBUG:
-                print('query: {:s}\nparams: {:s}'.format(query,params))
+                print('query: {:s}\nparams: {:s}'.format(
+                    repr(query),repr(params)))
 
         else:
             raise ValueError('observatory must be tess or hatpi')
@@ -3499,7 +3500,7 @@ def convsubfits_staticphot_worker(task):
 
     (subframe, photreftype, kernelspec,
      lcapertures, disjrad, outdir, refinfo,
-     observatory, fieldinfo, photparams) = task
+     observatory, fieldinfo, photparams, domagfit) = task
 
     try:
 
