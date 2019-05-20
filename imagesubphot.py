@@ -325,10 +325,11 @@ SUBFRAMEPHOTCMD = (
     "--sky-fit mode,iterations=2,sigma=3 "
     "--format IXY-----,BbFfMms "
     "--mag-flux {zeropoint},{exptime} "
-    "--gain {ccdgain} " #"--spline --col-magnitude 5 --col-color 6"
+    "--gain {ccdgain} "
     "--disjoint-radius {disjointradius} "
-    "--magfit orders=4:2,niter=3,sigma=3 "
+    "{magfitstr}"
     "--input-kernel {subtractedkernel} "
+    "--spline "
     "--nan-string 'NaN' --single-background 3 "
     "--comment --output - | "
     "grtrans --col-xy 2,3 "
@@ -2373,12 +2374,17 @@ def subframe_photometry_worker(task):
     task[10] -> observatory
     task[11] -> photparams. if hatpi, None. elif tess, dict with gain, exptime,
                 and zeropoint.
+    task[12] -> domagfit (bool). if true, includes the "magfit" option, which
+                fits instrument magnitdues vs catalog magnitudes and colors.
+                these catalog mags and colors must be specified a priori. (i.e.
+                this functionality has not been implemented in a general way to
+                pipe-trex).
     """
 
     # get the info out of the task
     (subframe, photrefrawphot, disjointrad,
      subframekernel, subframeitrans, subframexysdk, outdir, photrefprefix,
-     kernelspec, lcapertures, observatory, photparams) = task
+     kernelspec, lcapertures, observatory, photparams, domagfit) = task
 
     try:
 
@@ -2465,6 +2471,13 @@ def subframe_photometry_worker(task):
             outfile = os.path.join(os.path.abspath(os.path.dirname(subframe)),
                                    frameiphot)
 
+        if domagfit:
+            magfitstr = (
+                "--magfit orders=4:2,niter=3,sigma=3 "
+                "--col-magnitude 5 --col-color 6 "
+            )
+        else:
+            magfitstr = ""
 
         cmdtorun = SUBFRAMEPHOTCMD.format(
             subtractedframe=subframe,
@@ -2476,6 +2489,7 @@ def subframe_photometry_worker(task):
             subtractedkernel=subframekernel,
             subtracteditrans=subframeitrans,
             subtractedxysdk=subframexysdk,
+            magfitstr=magfitstr,
             outiphot=outfile
             )
 

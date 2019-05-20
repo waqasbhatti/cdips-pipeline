@@ -115,7 +115,7 @@ except:
 ## CONFIG ##
 ############
 
-DEBUG = False
+DEBUG = True
 
 # used to get the station ID, frame number, and CCD number from a FITS filename
 FRAMEREGEX = re.compile(r'(\d{1})\-(\d{6}\w{0,1})_(\d{1})')
@@ -3490,6 +3490,7 @@ def convsubfits_staticphot_worker(task):
     task[7] = observatory
     task[8] = fieldinfo
     task[9] = photparams
+    task[10] = domagfit option
 
     currently produces iphot files.
 
@@ -3589,7 +3590,8 @@ def convsubfits_staticphot_worker(task):
         _, subphot = ism.subframe_photometry_worker(
             (subframe, cphotref_cmrawphot, disjrad,
              kernel, itrans, xysdk, outdir,
-             photreftype, kernelspec, lcapertures, observatory, photparams)
+             photreftype, kernelspec, lcapertures, observatory, photparams,
+             domagfit)
         )
 
         if subphot and os.path.exists(subphot):
@@ -3634,7 +3636,8 @@ def parallel_convsubfits_staticphot(
         observatory='hatpi',
         fieldinfo=None,
         overwrite=False,
-        photparams=None):
+        photparams=None,
+        domagfit=False):
     """
     This does static object photometry on the all subtracted FITS in
     subfitslist.
@@ -3668,7 +3671,7 @@ def parallel_convsubfits_staticphot(
             subfitslist = [fitsdir+sd+'.iphot' for sd in setdiff]
 
     tasks = [(x, photreftype, kernelspec, lcapertures, photdisjointradius,
-              outdir, refinfo, observatory, fieldinfo, photparams)
+              outdir, refinfo, observatory, fieldinfo, photparams, domagfit)
              for x in subfitslist if os.path.exists(x)]
 
     if len(tasks) > 0:
