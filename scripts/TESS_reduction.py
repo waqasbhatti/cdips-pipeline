@@ -1146,7 +1146,8 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
                                       workerntasks=500, rmcols=None,
                                       epcols=None, tfcols=None,
                                       rfcols=None, correctioncoeffs=None,
-                                      sigclip=5.0, fovcathasgaiaids=True)
+                                      sigclip=5.0, fovcathasgaiaids=True,
+                                      istessandmaskedges=True)
     elif skipepd:
         print('skipped EPD because got skipepd flag')
     else:
@@ -1162,7 +1163,8 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
                                   nworkers=nworkers, workerntasks=500,
                                   rmcols=None, epcols=None, tfcols=None,
                                   rfcols=None, correctioncoeffs=None,
-                                  sigclip=5.0, fovcathasgaiaids=True)
+                                  sigclip=5.0, fovcathasgaiaids=True,
+                                  istessandmaskedges=True)
 
     epdmadplot = glob(os.path.join(statsdir, '*median-EP1-vs-mad-*png'))
     if (not epdmadplot and
@@ -1837,7 +1839,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                str(ccd))
     )
     astromrefpath = glob(astromrefglob)
-    if len(astromrefpath) != 1:
+    if len(astromrefpath) < 1:
         raise AssertionError('FATAL ERR! astromrefglob wrong for run assessment')
     astromrefpath = astromrefpath[0]
     tfa_templates_path = os.path.join(statsdir,'trendlist_tfa_ap2.txt')

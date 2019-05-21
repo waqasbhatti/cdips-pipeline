@@ -43,6 +43,7 @@ structure better than text).
 
 plot_lc_positions: Given list of lcpaths, plot their on-chip positions.
 
+mask_orbit_start_and_end: Ignore the times near the edges of orbits.
 """
 from __future__ import division, print_function
 
@@ -2011,3 +2012,41 @@ def plot_lc_positions(lcdir, lcglob, statsdir, outname=None, N_desired=20000):
     outdf = pd.DataFrame({'x':xs,'y':ys,'ra':ras,'dec':decs})
     outdf.to_csv(outpath.replace('.png', '.csv'), index=False)
     print('made {}'.format(outpath.replace('.png', '.csv')))
+
+
+
+def mask_orbit_start_and_end(time, flux, orbitgap=1, expected_norbits=2,
+                             orbitpadding=6/(24), raise_error=True):
+    """
+    Ignore the times near the edges of orbits.
+
+    args:
+        time, flux
+    returns:
+        time, flux: with `orbitpadding` days trimmed out
+    """
+    norbits, groups = lcmath.find_lc_timegroups(time, mingap=orbitgap)
+
+    if norbits != expected_norbits:
+        errmsg = 'got {} orbits, expected {}. groups are {}'.format(
+            norbits, expected_norbits, repr(groups))
+        if raise_error:
+            raise AssertionError(errmsg)
+        else:
+            print(errmsg)
+            print('returning what was passed')
+            return time, flux
+
+    sel = np.zeros_like(time).astype(bool)
+    for group in groups:
+        tg_time = time[group]
+        start_mask = (np.min(tg_time), np.min(tg_time) + orbitpadding)
+        end_mask = (np.max(tg_time) - orbitpadding, np.max(tg_time))
+        sel |= (
+            (time > max(start_mask)) & (time < min(end_mask))
+        )
+
+    return_time = time[sel]
+    return_flux = flux[sel]
+
+    return return_time, return_flux

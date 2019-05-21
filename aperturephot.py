@@ -4699,7 +4699,8 @@ def get_lc_statistics(lcfile,
                       sigclip=4.0,
                       tfalcrequired=False,
                       epdlcrequired=True,
-                      fitslcnottxt=False):
+                      fitslcnottxt=False,
+                      istessandmaskedges=False):
     """
     This calculates the following statistics for the magnitude columns in the
     given lcfile.
@@ -4832,6 +4833,74 @@ def get_lc_statistics(lcfile,
                                                   unpack=True)
                 else:
                     rf1, rf2, rf3 = [], [], []
+
+    #
+    # optionally, if it's TESS data, mask the orbit edges since they are known
+    # to be rampy
+    #
+    if istessandmaskedges:
+
+        time = hdulist[1].data['TMID_BJD']
+
+        from tessutils import mask_orbit_start_and_end
+
+        orbitgap = 1
+        expected_norbits = 2
+        orbitpadding = 6/24
+        raise_error = False
+
+        _, rm1 = mask_orbit_start_and_end(time, rm1, orbitgap=orbitgap,
+                                          expected_norbits=expected_norbits,
+                                          orbitpadding=orbitpadding,
+                                          raise_error=raise_error)
+        _, rm2 = mask_orbit_start_and_end(time, rm2, orbitgap=orbitgap,
+                                          expected_norbits=expected_norbits,
+                                          orbitpadding=orbitpadding,
+                                          raise_error=raise_error)
+        _, rm3 = mask_orbit_start_and_end(time, rm3, orbitgap=orbitgap,
+                                          expected_norbits=expected_norbits,
+                                          orbitpadding=orbitpadding,
+                                          raise_error=raise_error)
+
+        _, ep1 = mask_orbit_start_and_end(time, ep1, orbitgap=orbitgap,
+                                          expected_norbits=expected_norbits,
+                                          orbitpadding=orbitpadding,
+                                          raise_error=raise_error)
+        _, ep2 = mask_orbit_start_and_end(time, ep2, orbitgap=orbitgap,
+                                          expected_norbits=expected_norbits,
+                                          orbitpadding=orbitpadding,
+                                          raise_error=raise_error)
+        _, ep3 = mask_orbit_start_and_end(time, ep3, orbitgap=orbitgap,
+                                          expected_norbits=expected_norbits,
+                                          orbitpadding=orbitpadding,
+                                          raise_error=raise_error)
+
+        _, tf1 = mask_orbit_start_and_end(time, tf1, orbitgap=orbitgap,
+                                          expected_norbits=expected_norbits,
+                                          orbitpadding=orbitpadding,
+                                          raise_error=raise_error)
+        _, tf2 = mask_orbit_start_and_end(time, tf2, orbitgap=orbitgap,
+                                          expected_norbits=expected_norbits,
+                                          orbitpadding=orbitpadding,
+                                          raise_error=raise_error)
+        _, tf3 = mask_orbit_start_and_end(time, tf3, orbitgap=orbitgap,
+                                          expected_norbits=expected_norbits,
+                                          orbitpadding=orbitpadding,
+                                          raise_error=raise_error)
+
+        _, rf1 = mask_orbit_start_and_end(time, rf1, orbitgap=orbitgap,
+                                          expected_norbits=expected_norbits,
+                                          orbitpadding=orbitpadding,
+                                          raise_error=raise_error)
+        _, rf2 = mask_orbit_start_and_end(time, rf2, orbitgap=orbitgap,
+                                          expected_norbits=expected_norbits,
+                                          orbitpadding=orbitpadding,
+                                          raise_error=raise_error)
+        _, rf3 = mask_orbit_start_and_end(time, rf3, orbitgap=orbitgap,
+                                          expected_norbits=expected_norbits,
+                                          orbitpadding=orbitpadding,
+                                          raise_error=raise_error)
+
 
     ##################################
     # get statistics for each column #
@@ -5477,7 +5546,8 @@ def parallel_lc_statistics(lcdir,
                            rfcols=None,
                            correctioncoeffs=None,
                            sigclip=4.0,
-                           epdlcrequired=True):
+                           epdlcrequired=True,
+                           istessandmaskedges=False):
     """
     This calculates statistics on all lc files in lcdir.
 
@@ -5539,7 +5609,8 @@ def parallel_lc_statistics(lcdir,
                   'sigclip':sigclip,
                   'tfalcrequired':tfalcrequired,
                   'fitslcnottxt':fitslcnottxt,
-                  'epdlcrequired':epdlcrequired}] for x in lcfiles]
+                  'epdlcrequired':epdlcrequired,
+                  'istessandmaskedges':istessandmaskedges}] for x in lcfiles]
 
     pool = mp.Pool(nworkers,maxtasksperchild=workerntasks)
     results = pool.map(lc_statistics_worker, tasks)
