@@ -237,7 +237,7 @@ from numpy import array as nparr
 #################
 
 # set this to show extra info
-DEBUG = False
+DEBUG = True
 
 # CCD minimum and maximum X,Y pixel coordinates
 # used to strip things outside FOV from output of make_frame_sourcelist
@@ -1983,7 +1983,7 @@ def photometry_on_combined_photref(
 
             T_lin = np.arange(min(sdf['T']), max(sdf['T']), 0.1)
             ax.scatter(sdf['T'], sdf['flux_ap{}'.format(ap)], rasterized=True,
-                       s=0.3, zorder=2, c='C0')
+                       s=0.15, zorder=2, c='C0')
             ax.plot(T_lin, catmag_to_flux(T_lin, popt[0], popt[1]), zorder=3,
                     c='C1')
 

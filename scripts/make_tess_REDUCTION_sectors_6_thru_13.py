@@ -72,7 +72,7 @@ def main():
                     'aperturelist':"\"1.0:7.0:6.0,1.5:7.0:6.0,2.25:7.0:6.0\"",
                     'epdsmooth':11,            # not used
                     'epdsigclip':10000,        # ditto
-                    'photdisjointradius':1.5,
+                    'photdisjointradius':0.5,
                     'anetfluxthreshold':50000,
                     'anettweak':6,
                     'anetradius':30,

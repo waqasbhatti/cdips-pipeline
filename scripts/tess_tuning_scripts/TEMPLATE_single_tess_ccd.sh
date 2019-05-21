@@ -102,12 +102,12 @@ else
   tunefullstr='FULL'
 fi
 
-LOCAL_IMGBASE="/nfs/phtess1/ar1/TESS/FFI/RED_IMGSUB/"${tunefullstr}
+LOCAL_IMGBASE="/nfs/phtess2/ar0/TESS/FFI/RED_IMGSUB/"${tunefullstr}
 sectordir=$LOCAL_IMGBASE"/"${sector}"/"
 fitsdir=$sectordir"RED_"${camnum}"-"${ccdnum}"-"${projectid}"_ISP/"
 LOCAL_GLOBPATTERN='tess?????????????-'${sector}'-'${camnum}'-'${ccdnum}'-'${scid}'_cal_img_bkgdsub.fits'
 fitsglob=$LOCAL_GLOBPATTERN
-lcbase="/nfs/phtess1/ar1/TESS/FFI/LC/"${tunefullstr}
+lcbase="/nfs/phtess2/ar0/TESS/FFI/LC/"${tunefullstr}
 lcsector=$lcbase"/"${sector}"/"
 lcdir=${lcsector}"ISP_"${camnum}"-"${ccdnum}"-"${projectid}"/"
 

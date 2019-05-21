@@ -1995,7 +1995,7 @@ def plot_lc_positions(lcdir, lcglob, statsdir, outname=None, N_desired=20000):
         xs.append(hdul[0].header['XCC'])
         ys.append(hdul[0].header['YCC'])
         ras.append(hdul[0].header['RA[deg]'])
-        dec.append(hdul[0].header['Dec[deg]'])
+        decs.append(hdul[0].header['Dec[deg]'])
     xs, ys, ras, decs = nparr(xs), nparr(ys), nparr(ras), nparr(decs)
 
     f, ax = plt.subplots(figsize=(4,4))

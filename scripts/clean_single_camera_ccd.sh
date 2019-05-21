@@ -79,6 +79,8 @@ rm -rf `find /nfs/phtess1/ar1/TESS/FFI/BASE/frameinfo-cache/* -mtime -7 -print`
 
 psql -U hpx -h xphtess1 hpx -c \
   "DELETE from calibratedframes where fits like '"${fitsdir}"%';"
+psql -U hpx -h xphtess1 hpx -c \
+  "DELETE from calibratedframes where (fitsheader->'PROJID' ='"${projectid}"');"
 
 # # clean cache
 # echo "removing all reference files"
