@@ -4875,19 +4875,6 @@ def get_lc_statistics(lcfile,
                                           orbitpadding=orbitpadding,
                                           raise_error=raise_error)
 
-        _, tf1 = mask_orbit_start_and_end(time, tf1, orbitgap=orbitgap,
-                                          expected_norbits=expected_norbits,
-                                          orbitpadding=orbitpadding,
-                                          raise_error=raise_error)
-        _, tf2 = mask_orbit_start_and_end(time, tf2, orbitgap=orbitgap,
-                                          expected_norbits=expected_norbits,
-                                          orbitpadding=orbitpadding,
-                                          raise_error=raise_error)
-        _, tf3 = mask_orbit_start_and_end(time, tf3, orbitgap=orbitgap,
-                                          expected_norbits=expected_norbits,
-                                          orbitpadding=orbitpadding,
-                                          raise_error=raise_error)
-
         _, rf1 = mask_orbit_start_and_end(time, rf1, orbitgap=orbitgap,
                                           expected_norbits=expected_norbits,
                                           orbitpadding=orbitpadding,
@@ -4900,6 +4887,22 @@ def get_lc_statistics(lcfile,
                                           expected_norbits=expected_norbits,
                                           orbitpadding=orbitpadding,
                                           raise_error=raise_error)
+
+        if len(tf1) > 0:
+            _, tf1 = mask_orbit_start_and_end(time, tf1, orbitgap=orbitgap,
+                                              expected_norbits=expected_norbits,
+                                              orbitpadding=orbitpadding,
+                                              raise_error=raise_error)
+        if len(tf2) > 0:
+            _, tf2 = mask_orbit_start_and_end(time, tf2, orbitgap=orbitgap,
+                                              expected_norbits=expected_norbits,
+                                              orbitpadding=orbitpadding,
+                                              raise_error=raise_error)
+        if len(tf3) > 0:
+            _, tf3 = mask_orbit_start_and_end(time, tf3, orbitgap=orbitgap,
+                                              expected_norbits=expected_norbits,
+                                              orbitpadding=orbitpadding,
+                                              raise_error=raise_error)
 
 
     ##################################
@@ -5522,8 +5525,8 @@ def lc_statistics_worker(task):
     try:
         return get_lc_statistics(task[0], **task[1])
     except Exception as e:
-        print('SOMETHING WENT WRONG! task was {}, exception was {}'.format(
-            repr(task), repr(e))
+        print('LC STATS SOMETHING WENT WRONG! task was {}, exception was {}'.
+              format( repr(task), repr(e))
         )
         return None
 

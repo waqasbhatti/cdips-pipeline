@@ -1976,7 +1976,7 @@ def photometry_on_combined_photref(
             popt, pcov = curve_fit(catmag_to_flux, nparr(sdf['T']),
                                    nparr(sdf['flux_ap{}'.format(ap)]),
                                    p0=(10, 1e4))
-            if popt == p0:
+            if np.all(popt == (10, 1e4)):
                 errmsg = 'curve_fit optimization failed. fix this!'
                 raise AssertionError(errmsg)
 
