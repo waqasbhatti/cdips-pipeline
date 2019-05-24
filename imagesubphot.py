@@ -1690,7 +1690,8 @@ def photometry_on_combined_photref(
         searchradius=8.0,
         photreffluxthreshold=50000,
         observatory='hatpi',
-        useimagenotfistar=False
+        useimagenotfistar=False,
+        astrometrydownsample=8
         ):
     """
     This does source extraction, WCS, catalog projection, and then runs fiphot
@@ -1813,7 +1814,8 @@ def photometry_on_combined_photref(
             scalelow=1,
             scalehigh=30,
             scaleunits='arcsecperpix',
-            useimagenotfistar=useimagenotfistar
+            useimagenotfistar=useimagenotfistar,
+            downsample=astrometrydownsample
         )
 
     # THIRD: run do_photometry to get a .sourcelist file with HATID,X,Y

@@ -803,7 +803,8 @@ def get_files_needed_before_image_subtraction(
         useastrometrydotnet=True,
         useimagenotfistar=True,
         extractsources=True,
-        do_cdips_merge=True
+        do_cdips_merge=True,
+        astrometrydownsample=8
     ):
     """
     get .fistar, .fiphot, and .wcs files needed before image subtraction
@@ -837,7 +838,7 @@ def get_files_needed_before_image_subtraction(
             nworkers=nworkers, scalelow=10, scalehigh=30,
             scaleunits='arcsecperpix', nobjs=200, xcolname='ximage',
             ycolname='yimage', useimagenotfistar=useimagenotfistar,
-            downsample=4
+            downsample=astrometrydownsample
         )
 
     else:
@@ -979,7 +980,8 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
         apertures=aperturelist, framewidth=None, searchradius=8.0,
         nworkers=nworkers, maxworkertasks=1000, observatory='tess',
         fieldinfo=fieldinfo, photreffluxthreshold=photreffluxthreshold,
-        useimagenotfistar=useimagenotfistar)
+        useimagenotfistar=useimagenotfistar,
+        astrometrydownsample=astrometrydownsample)
 
     # Step ISP7: convolve and subtract all FITS files in the xtrnsfits list from the
     # photometric reference.  With 30 workers, at best process ~few frames per

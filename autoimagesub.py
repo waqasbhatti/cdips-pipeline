@@ -2756,7 +2756,8 @@ def generate_combined_photref(
         fieldinfo=None,
         observatory='hatpi',
         overwrite=False,
-        useimagenotfistar=False):
+        useimagenotfistar=False,
+        astrometrydownsample=8):
     """
     This generates a combined photref from photref target and candidates and
     updates the sqlite or postgres database.
@@ -3025,7 +3026,8 @@ def generate_combined_photref(
         searchradius=searchradius,
         photreffluxthreshold=photreffluxthreshold,
         observatory=observatory,
-        useimagenotfistar=useimagenotfistar
+        useimagenotfistar=useimagenotfistar,
+        astrometrydownsample=astrometrydownsample
     )
 
     if not (cphotref_photometry and
