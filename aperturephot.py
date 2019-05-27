@@ -393,7 +393,10 @@ def astrometrydotnet_solve_frame(srclist,
                                  xcolname='ximage',
                                  ycolname='yimage',
                                  useimagenotfistar=False,
-                                 downsample=4):
+                                 downsample=4,
+                                 pixelerror=1,
+                                 uniformize=10
+                                ):
     """
     This uses astrometry.net to solve frame astrometry. This is the
     free version of anet_solve_frame.
@@ -418,6 +421,10 @@ def astrometrydotnet_solve_frame(srclist,
 
     For astrometry.net to work, you need to install it, and get all the index
     files. See http://astrometry.net/doc/readme.html.
+
+    If you care about your astrometric projection's precision at the < 1 pixel
+    level, you will likely need to tweak downsample, pixelerror, and
+    uniformize. `wcsqualityassurance.py` implements some relevant tests.
     """
 
     if useimagenotfistar:
@@ -427,9 +434,10 @@ def astrometrydotnet_solve_frame(srclist,
             "--scale-low {scalelow} --scale-high {scalehigh} "
             "--scale-units {scaleunits} --tweak-order {tweakorder} "
             "--wcs {wcsout} --downsample {downsample} "
-            "--overwrite --objs {nobjs} --fits-image --no-verify "
+            "--overwrite --fits-image --no-verify "
+            "--pixel-error {pixelerror} "
+            "--uniformize {uniformize} "
             "{srcimage}"
-
         )
 
         astrometrycmd = ASTROMETRYDOTNETCMD.format(
@@ -441,8 +449,9 @@ def astrometrydotnet_solve_frame(srclist,
             scaleunits=scaleunits,
             tweakorder=tweakorder,
             downsample=downsample,
-            nobjs=nobjs,
             wcsout=wcsout,
+            pixelerror=pixelerror,
+            uniformize=uniformize,
             srcimage=srclist.replace('.fistar-fits-xy','.fits')
         )
 
@@ -487,6 +496,12 @@ def astrometrydotnet_solve_frame(srclist,
 
     # get results
     anet_stdout, anet_stderr = anetproc.communicate()
+
+    if DEBUG:
+        for l in anet_stdout.decode('utf-8').split('\n'):
+            print(l)
+        for l in anet_stderr.decode('utf-8').split('\n'):
+            print(l)
 
     # get results if succeeded, log outcome, and return path of outfile
     if (anetproc.returncode == 0 and
@@ -814,7 +829,9 @@ def parallel_astrometrydotnet(
         xcolname='ximage',
         ycolname='yimage',
         useimagenotfistar=False,
-        downsample=4
+        downsample=4,
+        pixelerror=1,
+        uniformize=10
     ):
 
     """
@@ -872,7 +889,9 @@ def parallel_astrometrydotnet(
                    'ypix':ypix,
                    'xcolname':xcolname,
                    'ycolname':ycolname,
-                   'useimagenotfistar':useimagenotfistar
+                   'useimagenotfistar':useimagenotfistar,
+                   'pixelerror':pixelerror,
+                   'uniformize':uniformize
                    }
         ]
         for x in fistarfitsxylist
