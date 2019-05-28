@@ -71,7 +71,7 @@ mpl.use('AGG')
 import numpy as np, pandas as pd, matplotlib.pyplot as plt
 import aperturephot as ap, shared_variables as sv, autoimagesub as ais, \
        imagesubphot as ism, tessutils as tu, lcstatistics as lcs, \
-       imageutils as iu, lcutils as lcu
+       imageutils as iu, lcutils as lcu, wcsqualityassurance as wcsqa
 from glob import glob
 from astropy.io import fits
 from astropy import units as units, constants as constants
@@ -804,17 +804,19 @@ def get_files_needed_before_image_subtraction(
         useimagenotfistar=True,
         extractsources=True,
         do_cdips_merge=True,
-        astrometrydownsample=8
+        astrometrydownsample=2,
+        defaultwcsisspoc=True
     ):
     """
     get .fistar, .fiphot, and .wcs files needed before image subtraction
 
     1. run parallel_extract_sources on all frames with threshold ~ 10000 to get
-    bright stars for astrometry.
-    2. run parallel_anet to get precise WCS headers for all frames.
-    3. run make_fov_catalog to get a FOV source catalog for the field.
-    4. run reform_gaia_fov_catalog to cut this down to the columns needed for
+    bright stars that are optionally used for astrometry. (SPOC WCS is
+    default for TESS).
+    2. run make_fov_catalog to get a FOV source catalog for the field.
+    3. run reform_gaia_fov_catalog to cut this down to the columns needed for
     magfit only.
+    4. run parallel_anet to get precise WCS headers for all frames.
     5. run parallel_fitsdir_photometry for photometry on all frames (via
     fistar)
     """
@@ -826,34 +828,8 @@ def get_files_needed_before_image_subtraction(
                                 tailstr='.fits',
                                 fnamestr=fnamestr)
 
-    if useastrometrydotnet:
-
-        if not useimagenotfistar:
-            ap.fistardir_to_xy(outdir, fistarglob=fistarglob)
-
-        ap.parallel_astrometrydotnet(
-            fitsdir, outdir, ra_nom, dec_nom,
-            fistarfitsxyglob='tess*_bkgdsub.fistar-fits-xy',
-            tweakorder=anettweak, radius=anetradius, xpix=xpix, ypix=ypix,
-            nworkers=nworkers, scalelow=10, scalehigh=30,
-            scaleunits='arcsecperpix', nobjs=200, xcolname='ximage',
-            ycolname='yimage', useimagenotfistar=useimagenotfistar,
-            downsample=astrometrydownsample
-        )
-
-    else:
-        raise AssertionError('we don\'t use anet')
-        ap.parallel_anet(outdir, outdir, ra_nom, dec_nom,
-                         fistarglob=fistarglob,
-                         infofromframe=False, width=width, tweak=anettweak,
-                         radius=anetradius,
-                         xpix=xpix, ypix=ypix,
-                         cols=cols # columns with x,y in fistar file.
-        )
-
-    # This function gets all the sources in the field of view of the frame, given
-    # its central pointing coordinates and plate-scale from 2MASS. This catalog
-    # file is then be used as input to make_source_list below.
+    # This function gets all possible sources in the field of view of the
+    # frame, given its central pointing coordinates and plate-scale from 2MASS.
     _ = ap.make_fov_catalog(ra=catra, dec=catdec, size=catboxsize,
                             brightrmag=brightrmag, faintrmag=faintrmag,
                             fits=None, outfile=None, outdir=outdir,
@@ -869,10 +845,78 @@ def get_files_needed_before_image_subtraction(
         # you could use ap.reform_fov_catalog, but you should be using Gaia.
         raise ValueError
 
-    # reduce number of LCs. merge against CDIPS stars.
+    # Reduce number of LCs. Merge against CDIPS stars.
     if do_cdips_merge:
         tu.merge_object_catalog_vs_cdips(reformed_cat_file, reformed_cat_file,
                                          G_Rp_cut=field_faint_Rp_mag)
+
+
+    # Work with WCS from SPOC headers by default. Require median astrometric
+    # residual below 0.2 pixel, 90th percentile below 0.4 pixel. Std devn below
+    # 1.0 pixel.
+    if useastrometrydotnet:
+
+        if defaultwcsisspoc:
+
+            fitslist = glob(os.path.join(fitsdir,fnamestr))
+            for f in fitslist:
+                wcsqa.write_wcs_from_spoc(f, observatory='tess')
+
+            wcslist = [f.replace('.fits','.wcs') for f in fitslist]
+            fistarlist = [f.replace('.fits','.fistar') for f in fitslist]
+
+            skip = 100 # check every 100th object
+
+            for w,f,s in zip(wcslist[::skip],fitslist[::skip],fistarlist[::skip]):
+
+                if wcsqa.does_wcs_pass_quality_check(
+                    w, f, reformed_cat_file, isspocwcs=True, N_bright=1000,
+                    N_faint=9000, fistarpath=s, matchedoutpath=None,
+                    qualitycondition={'median_px':0.2,
+                                      '90th_px':0.4,
+                                      'std_px': 1.0}
+                ):
+                    pass
+
+                else:
+                    errmsg = (
+                        'WCS fails quality check '+
+                        'wcs, fits, fistar are {}, {}, {}'.format(w,f,s)
+                    )
+                    raise AssertionError(errmsg)
+                    # NOTE : might need to derive the WCS yourself, using a
+                    # parallel_astrometrydotnet call as below...
+
+        else:
+
+            raise DeprecationWarning('TESS reduction uses SPOC WCS as default')
+            raise NotImplementedError
+
+            if not useimagenotfistar:
+                ap.fistardir_to_xy(outdir, fistarglob=fistarglob)
+
+            ap.parallel_astrometrydotnet(
+                fitsdir, outdir, ra_nom, dec_nom,
+                fistarfitsxyglob='tess*_bkgdsub.fistar-fits-xy',
+                tweakorder=anettweak, radius=anetradius, xpix=xpix, ypix=ypix,
+                nworkers=nworkers, scalelow=10, scalehigh=30,
+                scaleunits='arcsecperpix', nobjs=200, xcolname='ximage',
+                ycolname='yimage', useimagenotfistar=useimagenotfistar,
+                downsample=astrometrydownsample,
+                pixelerror=pixelerror,
+                uniformize=uniformize
+            )
+
+    else:
+        raise AssertionError('we don\'t use anet')
+        ap.parallel_anet(outdir, outdir, ra_nom, dec_nom,
+                         fistarglob=fistarglob,
+                         infofromframe=False, width=width, tweak=anettweak,
+                         radius=anetradius,
+                         xpix=xpix, ypix=ypix,
+                         cols=cols # columns with x,y in fistar file.
+        )
+
 
     if extractsources==True:
         fiphot_xycols = '7,8'
@@ -908,7 +952,8 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
                          photdisjointradius=2, colorscheme='bwr',
                          photreffluxthreshold=30000, extractsources=True,
                          translateimages=True, reversesubtract=False,
-                         useimagenotfistar=True):
+                         useimagenotfistar=True,
+                         astrometrydownsample=2, pixelerror=0.3, uniformize=10):
 
     ccdgain = photparams['ccdgain']
     exptime = photparams['ccdexptime']
@@ -981,7 +1026,10 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
         nworkers=nworkers, maxworkertasks=1000, observatory='tess',
         fieldinfo=fieldinfo, photreffluxthreshold=photreffluxthreshold,
         useimagenotfistar=useimagenotfistar,
-        astrometrydownsample=astrometrydownsample)
+        astrometrydownsample=astrometrydownsample,
+        pixelerror=pixelerror,
+        uniformize=uniformize,
+        reformed_cat_file=reformed_cat_file)
 
     # Step ISP7: convolve and subtract all FITS files in the xtrnsfits list from the
     # photometric reference.  With 30 workers, at best process ~few frames per
@@ -1002,6 +1050,11 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
     if len(glob(os.path.join(fitsdir,'*.iphot')))<10:
         subfitslist = glob(os.path.join(fitsdir,'[r|n]sub-????????-'+
                                         fitsglob.replace('.fits','-xtrns.fits')))
+
+        # FIXME FIXME ensure that the projected positions used for forced
+        # aperture photometry are correctedly shifted (and correctly span
+        # 0:2048, instead of like 0:2048-SCIROWS
+
         out = ais.parallel_convsubfits_staticphot(
             subfitslist, fitsdir=fitsdir, fitsglob=fitsglob,
             photreftype=photreftype, kernelspec=kernelspec,

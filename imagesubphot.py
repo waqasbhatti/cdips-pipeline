@@ -1691,7 +1691,11 @@ def photometry_on_combined_photref(
         photreffluxthreshold=50000,
         observatory='hatpi',
         useimagenotfistar=False,
-        astrometrydownsample=8
+        astrometrydownsample=2,
+        pixelerror=0.3,
+        uniformize=10,
+        reformed_cat_file=None,
+        projid=None
         ):
     """
     This does source extraction, WCS, catalog projection, and then runs fiphot
@@ -1803,20 +1807,62 @@ def photometry_on_combined_photref(
                                    radius=searchradius)
     elif observatory=='tess':
 
-        if not useimagenotfistar:
-            fistarfile_to_xy(astromfistar)
-
-        wcsfile = astrometrydotnet_solve_frame(
-            astromfistar.replace(os.path.splitext(astromfistar)[-1],'.fistar-fits-xy'),
-            wcsf,
-            frame_ra,
-            frame_dec,
-            scalelow=1,
-            scalehigh=30,
-            scaleunits='arcsecperpix',
-            useimagenotfistar=useimagenotfistar,
-            downsample=astrometrydownsample
+        #
+        # for TESS, default is to use astrometry from SPOC headers, and then to
+        # check that it satisfies precision requirements. the WCS for the
+        # photref should always be same as that for the astromref.
+        #
+        astromref_wcs = glob(
+            os.path.dirname(photref_frame),
+            'proj{}-*astromref*.wcs'.format(projid)
         )
+        if len(astromref_wcs) != 1:
+            raise AssertionError('exepcted 1 astromref wcs')
+
+        shutil.copy(astromref_wcs, photref_frame.replace('.fits','.wcs'))
+        print('did hard copy of {} -> {}'.format(
+            astromref_wcs, photref_frame.replace('.fits','.wcs')))
+
+        import wcsqualityassurance as wcsqa
+
+        if wcsqa.does_wcs_pass_quality_check(
+            wcsf, photref_frame, reformed_cat_file, isspocwcs=True, N_bright=1000,
+            N_faint=9000, fistarpath=astromfistar, matchedoutpath=None,
+            qualitycondition={'median_px':0.2,
+                              '90th_px':0.4,
+                              'std_px': 1.0}
+        ):
+            pass
+
+        else:
+            errmsg = (
+                'WCS fails quality check '+
+                'wcs, fits, fistar are {}, {}, {}'.format(w,f,s)
+            )
+            raise AssertionError(errmsg)
+
+        import IPython; IPython.embed() #FIXME
+
+        if False:
+            # NOTE: outdated
+            if not useimagenotfistar:
+                fistarfile_to_xy(astromfistar)
+
+            wcsfile = astrometrydotnet_solve_frame(
+                astromfistar.replace(os.path.splitext(astromfistar)[-1],'.fistar-fits-xy'),
+                wcsf,
+                frame_ra,
+                frame_dec,
+                radius=20,
+                scalelow=20,
+                scalehigh=22,
+                scaleunits='arcsecperpix',
+                tweakorder=6,
+                useimagenotfistar=useimagenotfistar,
+                downsample=astrometrydownsample,
+                pixelerror=pixelerror,
+                uniformize=uniformize
+            )
 
     # THIRD: run do_photometry to get a .sourcelist file with HATID,X,Y
     if observatory=='hatpi':

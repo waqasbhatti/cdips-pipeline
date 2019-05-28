@@ -1617,7 +1617,7 @@ def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
                 areftargetfistar = areftargetfits.replace('.fits','.fistar')
                 areftargetfiphot = areftargetfits.replace('.fits','.fiphot')
 
-                # copy the frame, jpeg, and fistar to the reference-frames dir
+                # copy the frame, jpeg, fistar, and wcs to the reference-frames dir
                 shutil.copy(arefinfo['fits'],os.path.join(refdir,
                                                           areftargetfits))
                 shutil.copy(arefinfo['jpg'],os.path.join(refdir,
@@ -1626,6 +1626,10 @@ def dbgen_get_astromref(fieldinfo, observatory='hatpi', makeactive=True,
                             os.path.join(refdir, areftargetfistar))
                 shutil.copy(arefinfo['fiphot'],
                             os.path.join(refdir, areftargetfiphot))
+                shutil.copy(arefinfo['fits'].replace('.fits','.wcs'),
+                            os.path.join(refdir,
+                                         areftargetfits.replace('.fits','.wcs'))
+                           )
 
                 # now, update the astomrefs table in the database
                 if overwrite and (
@@ -2757,7 +2761,10 @@ def generate_combined_photref(
         observatory='hatpi',
         overwrite=False,
         useimagenotfistar=False,
-        astrometrydownsample=8):
+        astrometrydownsample=2,
+        pixelerror=0.3,
+        uniformize=10,
+        reformed_cat_file=None):
     """
     This generates a combined photref from photref target and candidates and
     updates the sqlite or postgres database.
@@ -3027,7 +3034,11 @@ def generate_combined_photref(
         photreffluxthreshold=photreffluxthreshold,
         observatory=observatory,
         useimagenotfistar=useimagenotfistar,
-        astrometrydownsample=astrometrydownsample
+        astrometrydownsample=astrometrydownsample,
+        pixelerror=pixelerror,
+        uniformize=uniformize,
+        reformed_cat_file=reformed_cat_file,
+        projid=masterphotrefinfo['projectid']
     )
 
     if not (cphotref_photometry and
