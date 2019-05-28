@@ -1812,12 +1812,14 @@ def photometry_on_combined_photref(
         # check that it satisfies precision requirements. the WCS for the
         # photref should always be same as that for the astromref.
         #
-        astromref_wcs = glob(
+        astromref_wcs = glob.glob(
+            os.path.join(
             os.path.dirname(photref_frame),
             'proj{}-*astromref*.wcs'.format(projid)
+            )
         )
         if len(astromref_wcs) != 1:
-            raise AssertionError('exepcted 1 astromref wcs')
+            raise AssertionError('expected 1 astromref wcs')
 
         shutil.copy(astromref_wcs, photref_frame.replace('.fits','.wcs'))
         print('did hard copy of {} -> {}'.format(
@@ -1840,8 +1842,6 @@ def photometry_on_combined_photref(
                 'wcs, fits, fistar are {}, {}, {}'.format(w,f,s)
             )
             raise AssertionError(errmsg)
-
-        import IPython; IPython.embed() #FIXME
 
         if False:
             # NOTE: outdated

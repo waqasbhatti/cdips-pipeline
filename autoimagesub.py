@@ -2321,11 +2321,22 @@ def framelist_make_xtrnsfits(fitsfiles,
     wcsfiles = glob.glob(fitsdir+ fitsglob.replace('.fits','.wcs'))
 
     if len(xtrns) != len(wcsfiles):
-        raise AssertionError(
-            'something wrong in astrometric shift.'+
-            '\nN_WCS: {:d}'.format(len(wcsfiles))+
-            '\nN_xtrns: {:d}'.format(len(xtrns))
-        )
+        if len(wcsfiles) - len(xtrns) < 10:
+            # some wonky wcs's
+            shiftok = np.array([os.path.exists(f.replace('.wcs','.fits'))
+                                for f in wcsfiles])
+            for w in np.array(wcsfiles)[~shiftok]:
+                dst = os.path.join(os.path.dirname(w), 'badframes',
+                                   os.path.basename(w))
+                shutil.move(w,dst)
+                print('BAD SHIFT moving {} -> {}'.format(w, dst))
+
+        else:
+            raise AssertionError(
+                'something wrong in astrometric shift.'+
+                '\nN_WCS: {:d}'.format(len(wcsfiles))+
+                '\nN_xtrns: {:d}'.format(len(xtrns))
+            )
 
     return {x:y for (x,y) in results}
 
