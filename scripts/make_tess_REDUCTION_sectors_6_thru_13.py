@@ -73,7 +73,7 @@ def main():
                     'epdsmooth':11,            # not used
                     'epdsigclip':10000,        # ditto
                     'photdisjointradius':0.5,
-                    'anetfluxthreshold':50000,
+                    'anetfluxthreshold':1000,
                     'anettweak':6,
                     'anetradius':30,
                     'initccdextent':"\"0:2048,0:2048\"",
