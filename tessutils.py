@@ -1779,6 +1779,66 @@ def parallel_bkgd_subtract(fitslist, method='boxblurmedian', isfull=True, k=32,
     return 1
 
 
+def plot_apertures_on_frame(fitsframe, photrefprojcat, xlim=None, ylim=None):
+
+    df = pd.read_csv(
+        photrefprojcat,
+        sep=' ',
+        names='id,ra,dec,xi,eta,G,Rp,Bp,plx,pmra,pmdec,varflag,x_proj,y_proj'.split(',')
+    )
+
+    vmin, vmax = 10, int(1e3)
+
+    xstr = '_x_{}t{}'.format(xlim[0],xlim[1]) if isinstance(xlim, list) else ''
+    ystr = '_y_{}t{}'.format(ylim[0],ylim[1]) if isinstance(ylim, list) else ''
+
+    outdir = os.path.dirname(fitsframe)
+    outpath = (
+        os.path.join(
+            outdir,
+            os.path.basename(fitsframe).replace(
+                '.fits','_apertures_on_frame{}{}.png'.format(xstr,ystr))
+        )
+    )
+
+    img, _ = iu.read_fits(fitsframe)
+
+    plt.close('all')
+    plt.rcParams['xtick.direction'] = 'in'
+    plt.rcParams['ytick.direction'] = 'in'
+
+    fig, ax = plt.subplots(figsize=(6,6))
+
+    import matplotlib.colors as colors
+    norm = colors.LogNorm(vmin=vmin, vmax=vmax)
+
+    img[img<0] = 0.01
+
+    cset = ax.imshow(img, cmap='binary_r', vmin=vmin, vmax=vmax, norm=norm)
+
+    # -1 total because image origin
+    ax.scatter(df['x_proj']-.5, df['y_proj']-.5, s=6, facecolors='none',
+               edgecolors='r', linewidths=0.5)
+
+    if isinstance(xlim, list):
+        ax.set_xlim(xlim)
+    if isinstance(ylim, list):
+        ax.set_ylim(ylim)
+
+    ax.get_xaxis().set_tick_params(which='both', direction='in')
+    ax.get_yaxis().set_tick_params(which='both', direction='in')
+
+    cb = fig.colorbar(cset, ax=ax, extend='both', fraction=0.046, pad=0.04)
+    ax.set_xlabel('x [px]')
+    ax.set_ylabel('y [px]')
+
+    fig.tight_layout()
+
+    fig.savefig(outpath, bbox_inches='tight', dpi=450)
+    print('{}: made {}'.format(datetime.utcnow().isoformat(), outpath))
+
+
+
 def plot_median_filter_quad(task):
 
     bkgdfile, calfile, outdir = task

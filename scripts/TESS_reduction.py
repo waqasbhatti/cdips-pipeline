@@ -1031,6 +1031,28 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
         uniformize=uniformize,
         reformed_cat_file=reformed_cat_file)
 
+    # overplot forced aperture locations on subset of photref frame. this is a
+    # sanity check that they are in correct locations.
+    from tessutils import plot_apertures_on_frame
+    photrefframe = _['combinedphotref']['frame']
+    photrefprojcat = photrefframe.replace('.fits','.projcatalog')
+    plot_apertures_on_frame(photrefframe, photrefprojcat,
+                            xlim=[1024-150,1024+150],ylim=[1024-150,1024+150])
+    plot_apertures_on_frame(photrefframe, photrefprojcat,
+                            xlim=[1024-70,1024+70],ylim=[1024-70,1024+70])
+    plot_apertures_on_frame(photrefframe, photrefprojcat,
+                            xlim=[0,300],ylim=[0,300])
+    plot_apertures_on_frame(photrefframe, photrefprojcat,
+                            xlim=[300+80,300+160],ylim=[300+80,300+160])
+    plot_apertures_on_frame(photrefframe, photrefprojcat,
+                            xlim=[1300+80,1300+160],ylim=[1300+80,1300+160])
+    plot_apertures_on_frame(photrefframe, photrefprojcat,
+                            xlim=[2048-300,2048],ylim=[0,300])
+    plot_apertures_on_frame(photrefframe, photrefprojcat,
+                            xlim=[0,300],ylim=[2048-300,2048])
+    plot_apertures_on_frame(photrefframe, photrefprojcat,
+                            xlim=[2048-300,2048],ylim=[2048-300,2048])
+
     # Step ISP7: convolve and subtract all FITS files in the xtrnsfits list from the
     # photometric reference.  With 30 workers, at best process ~few frames per
     # second.
