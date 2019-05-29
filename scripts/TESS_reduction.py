@@ -372,9 +372,27 @@ def examine_astrometric_shifts(fitsdir, astromref, statsdir,
         # get wcs files from this run
         wcsfiles = glob(os.path.join(fitsdir,wcsglob))
         assert len(wcsfiles) > 1
+        xtrnsfits = glob(os.path.join(fitsdir,'*-xtrns.fits'))
+
+        if len(xtrnsfits) != len(wcsfiles):
+            if len(wcsfiles) - len(xtrnsfits) < 10:
+                # some wonky wcs's
+                shiftok = np.array([os.path.exists(f.replace('.wcs','.fits'))
+                                    for f in wcsfiles])
+                for w in np.array(wcsfiles)[~shiftok]:
+                    dst = os.path.join(os.path.dirname(w), 'badframes',
+                                       os.path.basename(w))
+                    shutil.move(w,dst)
+                    print('BAD SHIFT moving {} -> {}'.format(w, dst))
+
+            else:
+                raise AssertionError(
+                    'something wrong in astrometric shift.'+
+                    '\nN_WCS: {:d}'.format(len(wcsfiles))+
+                    '\nN_xtrns: {:d}'.format(len(xtrnsfits))
+                )
 
         # using fits headers, get corresponding timestamps from this run
-        xtrnsfits = [w.replace('.wcs','-xtrns.fits') for w in wcsfiles]
         hdrs = [iu.read_fits_header(f, ext=0) for f in xtrnsfits]
         tstarts = nparr([h['TSTART'] for h in hdrs])
         tstops = nparr([h['TSTOP'] for h in hdrs])
@@ -1558,16 +1576,18 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
     else:
         print('did not find any known HJs on this field')
 
+    DO_DEPRECATED = False
+    if DO_DEPRECATED:
+        # plot and examine size of astrometric shifts
+        if not os.path.exists(os.path.join(
+            statsdir, 'examine_astrometric_shifts.pickle')
+        ):
+            examine_astrometric_shifts(fitsdir, astromrefpath, statsdir)
+
     # make cutouts jpgs of clusters
     tu.make_cluster_cutout_jpgs(sectornum, fitsdir, ra_nom, dec_nom, field,
                                 camera, ccd, statsdir,
                                 clusterdistancecutoff=2000, nworkers=nworkers)
-
-    # plot and examine size of astrometric shifts
-    if not os.path.exists(os.path.join(
-        statsdir, 'examine_astrometric_shifts.pickle')
-    ):
-        examine_astrometric_shifts(fitsdir, astromrefpath, statsdir)
 
     _make_movies(fitsdir, moviedir, field, camera, ccd, projectid)
 

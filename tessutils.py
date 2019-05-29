@@ -646,7 +646,8 @@ def cluster_cutout_jpg_worker(task):
                                   scale_func_params={
                                       'cap':255.0, 'lomult':2.0,
                                       'himult':2.0, 'coeff':1000.0},
-                                  verbose=False
+                                  verbose=False,
+                                  do_spoc_trim_shift=True
                                  )
         iu.frame_radecbox_to_jpeg(subfitsimage, wcsfrom=wcsfile,
                                   radeccenter=radeccenter,
@@ -656,7 +657,9 @@ def cluster_cutout_jpg_worker(task):
                                   forcesquare=True,
                                   overplotscalebar=True,
                                   rescaleimage=True,
-                                  verbose=False)
+                                  verbose=False,
+                                  do_spoc_trim_shift=True
+                                 )
         iu.frame_radecbox_to_jpeg(subfitsimage, wcsfrom=wcsfile,
                                   radeccenter=radeccenter,
                                   out_fname=outsubpath.replace('.jpg','_bwr.jpg'),
@@ -666,7 +669,9 @@ def cluster_cutout_jpg_worker(task):
                                   overplotscalebar=True,
                                   rescaleimage=True,
                                   colorscheme='bwr',
-                                  verbose=False)
+                                  verbose=False,
+                                  do_spoc_trim_shift=True
+                                 )
     except Exception as e:
         print(e)
         print('{}, {}'.format(cname, repr(radeccenter)))
@@ -717,7 +722,24 @@ def make_cluster_cutout_jpgs(sectornum, fitsdir, racenter, deccenter, field,
     subfitsimages = glob(os.path.join(fitsdir,'[r|n]sub-*-tess*-xtrns.fits'))
 
     if not len(wcsfiles)==len(subfitsimages)==len(calfitsimages):
-        raise AssertionError
+        if len(wcsfiles) - len(subfitsimages) < 10:
+            # some wonky wcs's
+            shiftok = np.array([os.path.exists(f.replace('.wcs','.fits'))
+                                for f in wcsfiles])
+            for w in np.array(wcsfiles)[~shiftok]:
+                dst = os.path.join(os.path.dirname(w), 'badframes',
+                                   os.path.basename(w))
+                shutil.move(w,dst)
+                print('BAD SHIFT moving {} -> {}'.format(w, dst))
+
+        else:
+            raise AssertionError(
+                'something wrong in astrometric shift.'+
+                '\nN_WCS: {:d}'.format(len(wcsfiles))+
+                '\nN_subfits: {:d}'.format(len(subfitsimages))+
+                '\nN_calfits: {:d}'.format(len(calfitsimages))
+            )
+
 
     outcsv = os.path.join(
         statsdir, '{:s}_cam{:d}_ccd{:d}_kharchenko13_clusters.csv'.
