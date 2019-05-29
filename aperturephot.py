@@ -1618,7 +1618,8 @@ def make_frameprojected_catalog(fits,
                                 ccdextent=None,
                                 out=None,
                                 removetemp=True,
-                                pixborders=0.0):
+                                pixborders=0.0,
+                                observatory='hatpi'):
 
     """
     This makes the projected catalog for the frame to use with fiphot using the
@@ -1681,35 +1682,92 @@ def make_frameprojected_catalog(fits,
         # get results if succeeded, log outcome, and return path of outfile
         if transformproc.returncode == 0:
 
-            # now we need to take out sources outside the CCD extent
-            sourcelist_x, sourcelist_y = np.loadtxt(temppath,
-                                                    usecols=catalogxycols,
-                                                    unpack=True)
+            if observatory=='hatpi':
 
-            # get the extent of the CCD
-            if not ccdextent:
-                ccdextent = CCDEXTENT
+                # now we need to take out sources outside the CCD extent
+                sourcelist_x, sourcelist_y = np.loadtxt(temppath,
+                                                        usecols=catalogxycols,
+                                                        unpack=True)
 
-            # get indices for the lines to be kept optionally, remove all
-            # sources within pixborders pixels of the edges of the image.
-            keep_ind = np.where(
-                (sourcelist_x > (ccdextent['x'][0] + pixborders)) &
-                (sourcelist_x < (ccdextent['x'][1] - pixborders)) &
-                (sourcelist_y > (ccdextent['y'][0] + pixborders)) &
-                (sourcelist_y < (ccdextent['y'][1] - pixborders))
-            )[0].tolist()
+                # get the extent of the CCD
+                if not ccdextent:
+                    ccdextent = CCDEXTENT
 
-            # output the lines to be kept
-            outf = open(outfile, 'wb')
-            with open(temppath,'rb') as tempf:
+                # get indices for the lines to be kept optionally, remove all
+                # sources within pixborders pixels of the edges of the image.
+                keep_ind = np.where(
+                    (sourcelist_x > (ccdextent['x'][0] + pixborders)) &
+                    (sourcelist_x < (ccdextent['x'][1] - pixborders)) &
+                    (sourcelist_y > (ccdextent['y'][0] + pixborders)) &
+                    (sourcelist_y < (ccdextent['y'][1] - pixborders))
+                )[0].tolist()
 
-                templines = tempf.readlines()
-                templines = [x.decode('utf-8') for x in templines if '#' not in
-                             x.decode('utf-8')]
-                for ind in keep_ind:
-                    outf.write(templines[ind].encode('utf-8'))
+                # output the lines to be kept
+                outf = open(outfile, 'wb')
+                with open(temppath,'rb') as tempf:
 
-            outf.close()
+                    templines = tempf.readlines()
+                    templines = [x.decode('utf-8') for x in templines if '#' not in
+                                 x.decode('utf-8')]
+                    for ind in keep_ind:
+                        outf.write(templines[ind].encode('utf-8'))
+
+                outf.close()
+
+            elif observatory=='tess':
+
+                df = pd.read_csv(
+                    temppath,
+                    delim_whitespace=True,
+                    names='id,ra,dec,xi,eta,G,Rp,Bp,plx,pmra,pmdec,varflag,x_proj,y_proj'.split(',')
+                )
+
+                sourcelist_x, sourcelist_y = (np.array(df['x_proj']),
+                                              np.array(df['y_proj']))
+
+                # get the extent of the CCD
+                if not ccdextent:
+                    ccdextent = CCDEXTENT
+
+               # do a hack for TESS-SPOC WCS. the WCS is derived pre-trim of the
+                # rows and columns. this corrects it.
+                if ('proj' in fitspath and 's0' in fitspath and 'cam' in fitspath
+                    and 'ccd' in fitspath and 'photref' in fitspath):
+
+                    print('WRN! doing hack for TESS/SPOC WCS to fix the trim '+
+                          'x/y CRPIX offset')
+
+                    hdulist = pyfits.open(fitspath)
+                    hdr = hdulist[0].header
+
+                    sourcelist_x -= (hdr['SCCSA']-1)
+                    sourcelist_y -= (hdr['SCIROWS']-1)
+
+                    hdulist.close()
+
+                    # the WCS-project and measured positions differ by this because
+                    # of a coordinate offset problem, somewhere. this is
+                    # CHECKED formally by wcsqualityassurance, and visually by
+                    # inspecting  tessutils.plot_apertures_on_frame
+                    sourcelist_x -= 0.5
+                    sourcelist_y -= 0.5
+
+                df['x_proj'] = sourcelist_x
+                df['y_proj'] = sourcelist_y
+
+                # get indices for the lines to be kept optionally, remove all
+                # sources within pixborders pixels of the edges of the image.
+                keep_ind = np.where(
+                    (sourcelist_x > (ccdextent['x'][0] + pixborders)) &
+                    (sourcelist_x < (ccdextent['x'][1] - pixborders)) &
+                    (sourcelist_y > (ccdextent['y'][0] + pixborders)) &
+                    (sourcelist_y < (ccdextent['y'][1] - pixborders))
+                )[0].tolist()
+
+                outdf = df.iloc[keep_ind]
+                outdf.to_csv(outfile, index=False, header=False, sep=' ')
+                print('TESS wrote {}'.format(outfile))
+                print(outdf.describe())
 
             if removetemp:
                 os.remove(temppath)
@@ -1953,7 +2011,8 @@ def do_photometry(fits,
                                                   ccdextent=ccdextent,
                                                   out=outprojcat,
                                                   removetemp=removesourcetemp,
-                                                  pixborders=pixborders)
+                                                  pixborders=pixborders,
+                                                  observatory=observatory)
     else:
         print('%sZ: %s already exists, skipping making projcatalog.' %
               (datetime.utcnow().isoformat(), outprojcat))

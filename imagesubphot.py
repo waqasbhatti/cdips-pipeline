@@ -1845,7 +1845,7 @@ def photometry_on_combined_photref(
             raise AssertionError(errmsg)
 
         if False:
-            # NOTE: outdated
+            # NOTE: deprecated for TESS
             if not useimagenotfistar:
                 fistarfile_to_xy(astromfistar)
 
@@ -1873,7 +1873,8 @@ def photometry_on_combined_photref(
             outdir=os.path.dirname(os.path.abspath(photref_frame)),
             extractsources=extractsources,
             zeropoint=zeropoint,
-            aperturelist=apertures
+            aperturelist=apertures,
+            observatory='hatpi'
         )
     elif observatory=='tess':
         # nb. fiphot_xycols is adjusted inside `do_photometry` to match
