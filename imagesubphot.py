@@ -1814,12 +1814,13 @@ def photometry_on_combined_photref(
         #
         astromref_wcs = glob.glob(
             os.path.join(
-            os.path.dirname(photref_frame),
-            'proj{}-*astromref*.wcs'.format(projid)
+                os.path.dirname(photref_frame),
+                'proj{}-*astromref*.wcs'.format(projid)
             )
         )
         if len(astromref_wcs) != 1:
             raise AssertionError('expected 1 astromref wcs')
+        astromref_wcs = astromref_wcs[0]
 
         shutil.copy(astromref_wcs, photref_frame.replace('.fits','.wcs'))
         print('did hard copy of {} -> {}'.format(
@@ -2026,6 +2027,9 @@ def photometry_on_combined_photref(
                                    p0=(10, 1e4))
             if np.all(popt == (10, 1e4)):
                 errmsg = 'curve_fit optimization failed. fix this!'
+                raise AssertionError(errmsg)
+            if np.any(pd.isnull(pcov)):
+                errmsg = 'curve_fit covariance optimization failed. fix this!'
                 raise AssertionError(errmsg)
 
             # Make a plot that shows the line being fit to log10(flux) vs mag.
