@@ -29,7 +29,7 @@ def does_wcs_pass_quality_check(
     fistarpath=None,
     matchedoutpath=None,
     make_plots=True,
-    qualitycondition={'median_px':0.2, '90th_px':0.4, 'std_px': 1.0},
+    qualitycondition={'median_px':0.2, '90th_px':0.4, 'std_px': 1.4},
     ccdextent={'x':[0.,2048.],'y':[0.,2048.]},
     pixborders=0.0,
     gain=5.35,
