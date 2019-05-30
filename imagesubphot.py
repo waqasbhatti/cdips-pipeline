@@ -1833,14 +1833,14 @@ def photometry_on_combined_photref(
             N_faint=9000, fistarpath=astromfistar, matchedoutpath=None,
             qualitycondition={'median_px':0.2,
                               '90th_px':0.4,
-                              'std_px': 1.0}
+                              'std_px': 1.7}
         ):
             pass
 
         else:
             errmsg = (
                 'WCS fails quality check '+
-                'wcs, fits, fistar are {}, {}, {}'.format(w,f,s)
+                'wcs, fits are {}, {}'.format(wcsf,photref_frame)
             )
             raise AssertionError(errmsg)
 
