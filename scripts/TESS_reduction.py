@@ -892,7 +892,7 @@ def get_files_needed_before_image_subtraction(
                     N_faint=9000, fistarpath=s, matchedoutpath=None,
                     qualitycondition={'median_px':0.2,
                                       '90th_px':0.4,
-                                      'std_px': 1.0}
+                                      'std_px': 1.7}
                 ):
                     pass
 
