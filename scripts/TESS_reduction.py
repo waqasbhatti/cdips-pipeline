@@ -891,7 +891,7 @@ def get_files_needed_before_image_subtraction(
                     w, f, reformed_cat_file, isspocwcs=True, N_bright=1000,
                     N_faint=9000, fistarpath=s, matchedoutpath=None,
                     qualitycondition={'median_px':0.2,
-                                      '90th_px':0.4,
+                                      '90th_px':0.5,
                                       'std_px': 1.7}
                 ):
                     pass
