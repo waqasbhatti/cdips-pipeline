@@ -1122,7 +1122,7 @@ def make_fov_catalog(ra=None, dec=None, size=None,
 
     else:
 
-        print('%sZ: FOV catalog generation failed for '
+        print('%sZ: FOV catalog %s generation failed for '
               'center RA, DEC = %.5f, %.5f with size = %.5f deg!' %
               (datetime.utcnow().isoformat(),
                os.path.abspath(outfile), catra, catdec, catbox))
