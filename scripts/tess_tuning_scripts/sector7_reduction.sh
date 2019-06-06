@@ -13,7 +13,7 @@
 ( source activate trex_37; source projid_1522.sh; wait ) & wait
 ( source activate trex_37; source projid_1523.sh; wait ) & wait
 ( source activate trex_37; source projid_1524.sh; wait ) & wait
-# ( source activate trex_37; source projid_1525.sh; wait ) & wait
+( source activate trex_37; source projid_1525.sh; wait ) & wait
 ( source activate trex_37; source projid_1526.sh; wait ) & wait
 ( source activate trex_37; source projid_1527.sh; wait ) & wait
 ( source activate trex_37; source projid_1528.sh; wait ) & wait
