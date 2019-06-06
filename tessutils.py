@@ -415,7 +415,12 @@ def from_CAL_to_fitsh_compatible(task):
             fitsname.replace('-s_ffic.fits', '_cal_img.fits')))
     )
 
-    data, hdr = iu.read_fits(fitsname, ext=1)
+    try:
+        data, hdr = iu.read_fits(fitsname, ext=1)
+    except TypeError as e:
+        print(e)
+        print('got read error for {}'.format(fitsname))
+        raise TypeError
 
     # FITS header is 1-based counting, but python is 0-based. To convert
     # from FITS->python from slicing you need to subtract 1.
