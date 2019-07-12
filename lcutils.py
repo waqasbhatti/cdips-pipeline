@@ -34,6 +34,8 @@ parallel_merge_tfa_lcs
 parallel_apply_barycenter_time_correction
     apply_barycenter_time_correction_worker
     astropy_utc_time_to_bjd_tdb
+
+run_pca
 """
 
 import os, sys, shutil
@@ -820,6 +822,7 @@ def _make_dates_tfa(fitsdir, fitsimgglob, statsdir):
     framekeyarr = nparr([os.path.basename(f).rstrip('.fits')
                          for f in imgfiles])
 
+    # in BTJD
     tstartarr = nparr(
         [iu.get_header_keyword(f, 'TSTART', ext=0) for f in imgfiles]
     )
@@ -1730,3 +1733,122 @@ def astropy_utc_time_to_bjd_tdb(tmid_utc, ra, dec, observatory='tess',
         return tmid_bjd_tdb.jd
     else:
         return tmid_bjd_tdb.jd, ltt_bary.value
+
+
+def run_pca(tfalclist_path, trendlisttfa_paths, datestfa_path, lcdirectory,
+            statsdir,
+            nworkers=16, do_bls_ls_killharm=True, npixexclude=10,
+            blsqmin=0.002, blsqmax=0.1, blsminper=0.2, blsmaxper=30.0,
+            blsnfreq=20000, blsnbins=1000, lsminp=0.1, lsmaxp=30.0,
+            lssubsample=0.1, killharmnharm=10, tfafromirm=False,
+            outlcdir_tfa=None):
+
+    pass
+
+
+def get_flux(fitspath, ap='IRM2'):
+
+    with fits.open(fitspath) as hdulist:
+
+        mag = hdulist[1].data[ap]
+
+    return mag
+
+
+def test_pca_optimal_ncomponents():
+    # copy from https://scikit-learn.org/stable/auto_examples/decomposition/plot_pca_vs_fa_model_selection.html#sphx-glr-auto-examples-decomposition-plot-pca-vs-fa-model-selection-py
+
+    #FIXME implement!
+
+
+def test_pca():
+
+    statsdir = '/nfs/phtess2/ar0/TESS/FFI/LC/FULL/s0007/ISP_3-3-1526/stats_files/'
+    outdir = os.path.join(statsdir, 'pca_verification')
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+
+    # path, x, y. space-separated. for all ~30k light curves to do TFA on.
+    tfalclist_path = os.path.join(statsdir,'lc_list_tfa.txt')
+    # path, x ,y. space-separated. for 200 TFA template stars.
+    trendlisttfa = os.path.join(statsdir,'trendlist_tfa_ap2.txt')
+    # key, time
+    datestfa_path = os.path.join(statsdir,'dates_tfa.txt')
+
+    df_template_stars = pd.read_csv(trendlisttfa, sep=' ', header=None,
+                                    names=['path','x','y'])
+
+    df_dates = pd.read_csv(datestfa_path, sep=' ', header=None,
+                           names=['rstfc','btjd'])
+
+
+    # simplest thing
+    from sklearn.decomposition import PCA
+
+    # (1086 x 200), following 7.3.1 of orange book
+    mags = nparr(list(map(get_flux, nparr(df_template_stars['path'])))).T
+    median_mags = np.median(mags, axis=0)
+    X = mags - median_mags[None, :]
+
+    from sklearn.decomposition import PCA
+    reconstruct_orders = [3,5]
+
+    lc_models = np.empty((X.shape[0], len(reconstruct_orders), X.shape[1]),
+                         dtype=float)
+
+    i = 0
+    for n_component in reconstruct_orders:
+
+        pca = PCA(n_components=n_component)
+
+        comp = pca.fit_transform(X)
+
+        lc_models[:, i, :] = pca.inverse_transform(comp) + median_mags[None,:]
+
+        i += 1
+
+    N_selected = 50
+    sel_inds = np.random.choice(np.arange(0, mags.shape[1], 1), replace=False,
+                                size=N_selected)
+
+
+    ind = 0
+    for model_mag, mag in zip(lc_models[:,1,sel_inds].T, mags[:,sel_inds].T):
+
+        plt.close('all')
+
+        time = nparr(df_dates['btjd'])
+
+        f, (a0, a1) = plt.subplots(nrows=2, ncols=1, sharex=True,
+                                   figsize=(7,4), gridspec_kw=
+                                   {'height_ratios':[3, 1.5]})
+
+        a0.scatter(time, mag, c='k', alpha=0.9, label='data',
+                   zorder=2, s=3, rasterized=True, linewidths=0)
+        a0.plot(time, model_mag, c='C1', zorder=1, rasterized=True, lw=1.5,
+                alpha=0.7, label='model')
+
+        a1.scatter(time, mag-model_mag, c='k', alpha=0.9, label='data-model',
+                   zorder=2, s=3, rasterized=True, linewidths=0)
+        a1.plot(time, model_mag-model_mag, c='C1', zorder=1, rasterized=True,
+                lw=1.5, alpha=0.7)
+
+        a1.set_xlabel('BJDTDB [days]')
+        a0.set_ylabel('IRM2 [mag]')
+        a1.set_ylabel('Data-model')
+        for a in [a0, a1]:
+            a.get_yaxis().set_tick_params(which='both', direction='in')
+            a.get_xaxis().set_tick_params(which='both', direction='in')
+
+        N_std = 3
+        a1.set_ylim((np.mean(mag-model_mag) - N_std*np.std(mag-model_mag),
+                     np.mean(mag-model_mag) + N_std*np.std(mag-model_mag)))
+
+        f.tight_layout(h_pad=-.3, w_pad=0)
+        savpath = os.path.join(outdir, 'template_{}.png'.format(ind))
+        f.savefig(savpath, dpi=350, bbox_inches='tight')
+        print('made {}'.format(savpath))
+
+        ind += 1
+
+    import IPython; IPython.embed()
