@@ -1746,12 +1746,9 @@ def run_pca(tfalclist_path, trendlisttfa_paths, datestfa_path, lcdirectory,
     pass
 
 
-def get_flux(fitspath, ap='IRM2'):
-
+def get_mag(fitspath, ap='IRM2'):
     with fits.open(fitspath) as hdulist:
-
         mag = hdulist[1].data[ap]
-
     return mag
 
 
@@ -1759,11 +1756,23 @@ def test_pca_optimal_ncomponents():
     # copy from https://scikit-learn.org/stable/auto_examples/decomposition/plot_pca_vs_fa_model_selection.html#sphx-glr-auto-examples-decomposition-plot-pca-vs-fa-model-selection-py
 
     #FIXME implement!
+    pass
 
 
 def test_pca():
 
-    statsdir = '/nfs/phtess2/ar0/TESS/FFI/LC/FULL/s0007/ISP_3-3-1526/stats_files/'
+    sector = 6
+    cam = 1
+    ccd = 2
+    projid = 1501
+    # sector = 7
+    # cam = 3
+    # ccd = 1
+    # projid = 1524
+
+    lcdir = ('/nfs/phtess2/ar0/TESS/FFI/LC/FULL/s{}/ISP_{}-{}-{}/'.
+             format(str(sector).zfill(4), cam, ccd, projid))
+    statsdir = os.path.join(lcdir, 'stats_files')
     outdir = os.path.join(statsdir, 'pca_verification')
     if not os.path.exists(outdir):
         os.mkdir(outdir)
@@ -1781,74 +1790,148 @@ def test_pca():
     df_dates = pd.read_csv(datestfa_path, sep=' ', header=None,
                            names=['rstfc','btjd'])
 
+    lcpaths = glob(os.path.join(lcdir, '*_llc.fits'))
 
-    # simplest thing
-    from sklearn.decomposition import PCA
+    # TODO: FIXME :  maybe select better template stars. and more of them...
 
-    # (1086 x 200), following 7.3.1 of orange book
-    mags = nparr(list(map(get_flux, nparr(df_template_stars['path'])))).T
-    median_mags = np.median(mags, axis=0)
-    X = mags - median_mags[None, :]
+    # prepare data as a (200 x 1086) matrix. We have N=200 light curves, with
+    # K=1086 measurements in each. Think of these as N vectors in a
+    # K-dimensional space. I.e. the flux at each time point is a "measured
+    # feature". So we have N samples (light curves), and K features (points per
+    # light curve).
+    mags = nparr(list(map(get_mag, nparr(df_template_stars['path']))))
+    mean_mags = np.nanmean(mags, axis=1)
+    X = mags - mean_mags[:, None]
 
-    from sklearn.decomposition import PCA
-    reconstruct_orders = [3,5]
+    from sklearn.decomposition import PCA, FactorAnalysis
+    from sklearn.model_selection import cross_val_score
+    pca = PCA()
+    pca.fit(X)
+    fa = FactorAnalysis()
+    fa.fit(X)
 
-    lc_models = np.empty((X.shape[0], len(reconstruct_orders), X.shape[1]),
-                         dtype=float)
+    eigenvals = pca.explained_variance_ratio_
+    eigenvals_cs = eigenvals.cumsum()
+    eigenvals_cs /= eigenvals_cs[-1]
 
-    i = 0
-    for n_component in reconstruct_orders:
+    # (200 x 1086) eigenvector matrix. these are basis vectors for the original
+    # data.
+    eigenvecs = pca.components_
 
-        pca = PCA(n_components=n_component)
+    # NOTE: warning! this uses factor analysis components instead of PCA
+    # components
+    # eigenvecs = fa.components_
 
-        comp = pca.fit_transform(X)
+    # plot a sequence of reconstructions, for a set of random light curves
+    np.random.seed(42)
+    N_to_make = 15
 
-        lc_models[:, i, :] = pca.inverse_transform(comp) + median_mags[None,:]
+    for i in range(N_to_make):
 
-        i += 1
+        mag = get_mag(np.random.choice(lcpaths, size=1)[0])
+        if np.all(pd.isnull(mag)):
+            while np.all(pd.isnull(mag)):
+                mag = get_mag(np.random.choice(lcpaths, size=1)[0])
+        mean_mag = np.nanmean(mag)
+        mag = mag - mean_mag
+        coeff = eigenvecs @ mag
 
-    N_selected = 50
-    sel_inds = np.random.choice(np.arange(0, mags.shape[1], 1), replace=False,
-                                size=N_selected)
-
-
-    ind = 0
-    for model_mag, mag in zip(lc_models[:,1,sel_inds].T, mags[:,sel_inds].T):
+        component_list = [1, 2, 3, 5, 10, 20]
 
         plt.close('all')
+        f, axs = plt.subplots(nrows=len(component_list), ncols=2, sharex=True,
+                              figsize=(8,7))
 
-        time = nparr(df_dates['btjd'])
+        for n_components, ax, ax_r in zip(component_list, axs[:,0], axs[:,1]):
+            #
+            # modelled off Figure 7.6 of the astroML book. (CITE)
+            #
 
-        f, (a0, a1) = plt.subplots(nrows=2, ncols=1, sharex=True,
-                                   figsize=(7,4), gridspec_kw=
-                                   {'height_ratios':[3, 1.5]})
+            model_mag = (
+                pca.mean_ + (coeff[:n_components] @ eigenvecs[:n_components,:])
+            )
 
-        a0.scatter(time, mag, c='k', alpha=0.9, label='data',
-                   zorder=2, s=3, rasterized=True, linewidths=0)
-        a0.plot(time, model_mag, c='C1', zorder=1, rasterized=True, lw=1.5,
-                alpha=0.7, label='model')
+            time = nparr(df_dates['btjd'])
 
-        a1.scatter(time, mag-model_mag, c='k', alpha=0.9, label='data-model',
-                   zorder=2, s=3, rasterized=True, linewidths=0)
-        a1.plot(time, model_mag-model_mag, c='C1', zorder=1, rasterized=True,
-                lw=1.5, alpha=0.7)
+            ax.scatter(time, mag + mean_mag, c='k', alpha=0.9,
+                       zorder=2, s=1, rasterized=True, linewidths=0)
+            ax.plot(time, model_mag + mean_mag, c='C0', zorder=1,
+                    rasterized=True, lw=0.5, alpha=0.7 )
 
-        a1.set_xlabel('BJDTDB [days]')
-        a0.set_ylabel('IRM2 [mag]')
-        a1.set_ylabel('Data-model')
-        for a in [a0, a1]:
+            txt = '{} components'.format(n_components)
+            txt += ', '
+            txt += r'$\sigma_{{\mathrm{{tot}}}}^2$='
+            txt += '{:.2f}'.format(eigenvals_cs[n_components - 1])
+            ax.text(0.02, 0.02, txt, ha='left', va='bottom', fontsize='medium',
+                    transform=ax.transAxes)
+
+            ax_r.scatter(time, mag-model_mag, c='k', alpha=0.9,
+                         zorder=2, s=1, rasterized=True, linewidths=0)
+            ax_r.plot(time, model_mag-model_mag, c='C0', zorder=1, rasterized=True,
+                      lw=0.5, alpha=0.7)
+
+
+        for a in axs[:,0]:
+            a.set_ylabel('raw mag')
+        for a in axs[:,1]:
+            a.set_ylabel('resid')
+        for a in axs.flatten():
             a.get_yaxis().set_tick_params(which='both', direction='in')
             a.get_xaxis().set_tick_params(which='both', direction='in')
 
-        N_std = 3
-        a1.set_ylim((np.mean(mag-model_mag) - N_std*np.std(mag-model_mag),
-                     np.mean(mag-model_mag) + N_std*np.std(mag-model_mag)))
+        f.text(0.5,-0.01, 'BJDTDB [days]', ha='center')
 
-        f.tight_layout(h_pad=-.3, w_pad=0)
-        savpath = os.path.join(outdir, 'template_{}.png'.format(ind))
+        f.tight_layout(h_pad=0, w_pad=0.5)
+        savpath = os.path.join(outdir, 'test_reconstruction_{}.png'.format(i))
         f.savefig(savpath, dpi=350, bbox_inches='tight')
         print('made {}'.format(savpath))
 
-        ind += 1
 
-    import IPython; IPython.embed()
+    #
+    # make plot to find optimal number of components.
+    # see
+    # https://scikit-learn.org/stable/auto_examples/decomposition/plot_pca_vs_fa_model_selection.html
+    #
+    n_components = np.arange(0,50,1)
+
+    def compute_scores(X):
+        pca = PCA()
+        fa = FactorAnalysis()
+        pca_scores, fa_scores = [], []
+        for n in n_components:
+            pca.n_components = n
+            pca_scores.append(np.mean(cross_val_score(pca, X, cv=5)))
+            fa.n_components = n
+            fa_scores.append(np.mean(cross_val_score(fa, X, cv=5)))
+
+        return pca_scores, fa_scores
+
+    pca_scores, fa_scores = compute_scores(X)
+
+    n_components_pca_cv = n_components[np.argmax(pca_scores)]
+    n_components_fa_cv = n_components[np.argmax(fa_scores)]
+
+    # # in commented code below, MLE component estimation only supported if
+    # # n_samples >= n_features.
+    # pca = PCA(svd_solver='full', n_components='mle')
+    # pca.fit(X)
+    # n_components_pca_mle = pca.n_components_
+    # print('n_components_pca_mle: {}'.format(n_components_pca_mle))
+
+    print('n_components_pca_cv: {}'.format(n_components_pca_cv))
+    print('n_components_fa_cv: {}'.format(n_components_fa_cv))
+
+    plt.close('all')
+    f,ax = plt.subplots(figsize=(4,3))
+
+    ax.plot(n_components, pca_scores, label='PCA CV score')
+    ax.plot(n_components, fa_scores, label='FA CV score')
+
+    ax.legend(loc='best')
+    ax.set_xlabel('N components')
+    ax.set_ylabel('Cross-validation score')
+
+    f.tight_layout(pad=0.2)
+    savpath = os.path.join(outdir, 'test_optimal_n_components.png')
+    f.savefig(savpath, dpi=350, bbox_inches='tight')
+    print('made {}'.format(savpath))
