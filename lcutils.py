@@ -1761,14 +1761,15 @@ def test_pca_optimal_ncomponents():
 
 def test_pca():
 
-    sector = 6
-    cam = 1
-    ccd = 2
-    projid = 1501
-    # sector = 7
-    # cam = 3
-    # ccd = 1
-    # projid = 1524
+    # sector = 6
+    # cam = 1
+    # ccd = 2
+    # projid = 1501
+
+    sector = 7
+    cam = 3
+    ccd = 1
+    projid = 1524
 
     lcdir = ('/nfs/phtess2/ar0/TESS/FFI/LC/FULL/s{}/ISP_{}-{}-{}/'.
              format(str(sector).zfill(4), cam, ccd, projid))
@@ -1794,8 +1795,8 @@ def test_pca():
 
     # TODO: FIXME :  maybe select better template stars. and more of them...
 
-    # prepare data as a (200 x 1086) matrix. We have N=200 light curves, with
-    # K=1086 measurements in each. Think of these as N vectors in a
+    # prepare data as a (200 x N_times) matrix. We have N=200 light curves, with
+    # K=N_times measurements in each. Think of these as N vectors in a
     # K-dimensional space. I.e. the flux at each time point is a "measured
     # feature". So we have N samples (light curves), and K features (points per
     # light curve).
@@ -1804,6 +1805,7 @@ def test_pca():
     X = mags - mean_mags[:, None]
 
     from sklearn.decomposition import PCA, FactorAnalysis
+    from sklearn.linear_model import LinearRegression, BayesianRidge
     from sklearn.model_selection import cross_val_score
     pca = PCA()
     pca.fit(X)
@@ -1814,13 +1816,9 @@ def test_pca():
     eigenvals_cs = eigenvals.cumsum()
     eigenvals_cs /= eigenvals_cs[-1]
 
-    # (200 x 1086) eigenvector matrix. these are basis vectors for the original
+    # (200 x N_times) eigenvector matrix. these are basis vectors for the original
     # data.
     eigenvecs = pca.components_
-
-    # NOTE: warning! this uses factor analysis components instead of PCA
-    # components
-    # eigenvecs = fa.components_
 
     # plot a sequence of reconstructions, for a set of random light curves
     np.random.seed(42)
@@ -1834,22 +1832,36 @@ def test_pca():
                 mag = get_mag(np.random.choice(lcpaths, size=1)[0])
         mean_mag = np.nanmean(mag)
         mag = mag - mean_mag
-        coeff = eigenvecs @ mag
 
-        component_list = [1, 2, 3, 5, 10, 20]
+        component_list = [1, 2, 3, 5, 10, 15, 20]
 
         plt.close('all')
         f, axs = plt.subplots(nrows=len(component_list), ncols=2, sharex=True,
-                              figsize=(8,7))
+                              figsize=(8,9))
 
         for n_components, ax, ax_r in zip(component_list, axs[:,0], axs[:,1]):
             #
             # modelled off Figure 7.6 of the astroML book. (CITE)
             #
 
-            model_mag = (
-                pca.mean_ + (coeff[:n_components] @ eigenvecs[:n_components,:])
-            )
+            # eigenvecs shape: 200 x N_times
+            #
+            # model: 
+            # y(w, x) = w_0 + w_1 x_1 + ... + w_p x_p.
+            #
+            # X is matrix of (n_samples, n_features).
+            #
+
+            # either linear regression or bayesian ridge regression seems fine
+            #reg = LinearRegression(fit_intercept=True)
+            reg = BayesianRidge(fit_intercept=True)
+
+            y = mag
+            _X = eigenvecs[:n_components, :]
+
+            reg.fit(_X.T, y)
+
+            model_mag = reg.intercept_ + (reg.coef_ @ _X)
 
             time = nparr(df_dates['btjd'])
 
@@ -1859,9 +1871,9 @@ def test_pca():
                     rasterized=True, lw=0.5, alpha=0.7 )
 
             txt = '{} components'.format(n_components)
-            txt += ', '
-            txt += r'$\sigma_{{\mathrm{{tot}}}}^2$='
-            txt += '{:.2f}'.format(eigenvals_cs[n_components - 1])
+            # txt += ', '
+            # txt += r'$\sigma_{{\mathrm{{tot}}}}^2$='
+            # txt += '{:.2f}'.format(eigenvals_cs[n_components - 1])
             ax.text(0.02, 0.02, txt, ha='left', va='bottom', fontsize='medium',
                     transform=ax.transAxes)
 
