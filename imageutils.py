@@ -307,6 +307,21 @@ def get_header_keyword(fits_file,
     return val
 
 
+def get_data_keyword(fits_file,
+                     keyword,
+                     ext=1):
+
+    hdulist = pyfits.open(fits_file)
+
+    if keyword in hdulist[ext].data.names:
+        val = hdulist[ext].data[keyword]
+    else:
+        val = None
+
+    hdulist.close()
+    return val
+
+
 def get_header_keyword_list(fits_file,
                             keyword_list,
                             ext=0):
