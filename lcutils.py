@@ -35,7 +35,7 @@ parallel_apply_barycenter_time_correction
     apply_barycenter_time_correction_worker
     astropy_utc_time_to_bjd_tdb
 
-run_pca
+test_pca
 """
 
 import os, sys, shutil
@@ -214,6 +214,7 @@ def _map_key_to_comment(k):
         'dtr_isub': "img subtraction photometry performed",
         'dtr_epd' : "EPD detrending performed",
         'dtr_tfa' : "TFA detrending performed",
+        'dtr_pca' : "PCA detrending performed",
         'projid' :  "PIPE-TREX identifier for software version",
         'btc_ra' : "Right ascen in barycentric time correction",
         'btc_dec' : "Declination in barycentric time correction",
@@ -372,7 +373,9 @@ def convert_grcollect_to_fits_lc_worker(task):
     primary_hdu.header['DTR_ISUB'] = True
     primary_hdu.header['DTR_EPD'] = False
     primary_hdu.header['DTR_TFA'] = False
-    for k in ['xcc','ycc','PROJID','DTR_ISUB','DTR_EPD','DTR_TFA',
+    primary_hdu.header['DTR_PCA'] = False
+    for k in ['xcc','ycc','PROJID',
+              'DTR_ISUB','DTR_EPD','DTR_TFA','DTR_PCA',
               'THETADEG','RDISTPX'
     ]:
         primary_hdu.header.comments[k] = _map_key_to_comment(k.lower())
@@ -1427,7 +1430,7 @@ def merge_tfa_lc_worker(task):
         ):
             # TFA LC has too few frame stamps (for whatever reason -- often
             # because NaNs are treated differently by VARTOOLS TFA, so they are
-            # omitted). The follow code findd entries in the TFA lightcurve
+            # omitted). The following code finds entries in the TFA lightcurve
             # that are missing frameids, and put nans in those cases. It does
             # this by first making an array of NaNs with length equal to the
             # original RAW data. It then puts the TFA values at the appropriate
@@ -1752,24 +1755,17 @@ def get_mag(fitspath, ap='IRM2'):
     return mag
 
 
-def test_pca_optimal_ncomponents():
-    # copy from https://scikit-learn.org/stable/auto_examples/decomposition/plot_pca_vs_fa_model_selection.html#sphx-glr-auto-examples-decomposition-plot-pca-vs-fa-model-selection-py
-
-    #FIXME implement!
-    pass
-
-
 def test_pca():
 
-    # sector = 6
-    # cam = 1
-    # ccd = 2
-    # projid = 1501
+    sector = 6
+    cam = 1
+    ccd = 2
+    projid = 1501
 
-    sector = 7
-    cam = 3
-    ccd = 1
-    projid = 1524
+    # sector = 7
+    # cam = 3
+    # ccd = 1
+    # projid = 1524
 
     lcdir = ('/nfs/phtess2/ar0/TESS/FFI/LC/FULL/s{}/ISP_{}-{}-{}/'.
              format(str(sector).zfill(4), cam, ccd, projid))
@@ -1805,7 +1801,8 @@ def test_pca():
     X = mags - mean_mags[:, None]
 
     from sklearn.decomposition import PCA, FactorAnalysis
-    from sklearn.linear_model import LinearRegression, BayesianRidge
+    from sklearn.linear_model import (LinearRegression, BayesianRidge,
+                                      ARDRegression)
     from sklearn.model_selection import cross_val_score
     pca = PCA()
     pca.fit(X)
@@ -1818,14 +1815,15 @@ def test_pca():
 
     # (200 x N_times) eigenvector matrix. these are basis vectors for the original
     # data.
-    eigenvecs = pca.components_
+    #eigenvecs = pca.components_
+    eigenvecs = fa.components_  #FIXME
 
     # plot a sequence of reconstructions, for a set of random light curves
-    np.random.seed(42)
     N_to_make = 15
 
     for i in range(N_to_make):
 
+        np.random.seed(i)
         mag = get_mag(np.random.choice(lcpaths, size=1)[0])
         if np.all(pd.isnull(mag)):
             while np.all(pd.isnull(mag)):
@@ -1833,7 +1831,7 @@ def test_pca():
         mean_mag = np.nanmean(mag)
         mag = mag - mean_mag
 
-        component_list = [1, 2, 3, 5, 10, 15, 20]
+        component_list = [1, 2, 4, 8, 12, 16, 20]
 
         plt.close('all')
         f, axs = plt.subplots(nrows=len(component_list), ncols=2, sharex=True,
@@ -1844,6 +1842,7 @@ def test_pca():
             # modelled off Figure 7.6 of the astroML book. (CITE)
             #
 
+            #
             # eigenvecs shape: 200 x N_times
             #
             # model: 
@@ -1853,8 +1852,9 @@ def test_pca():
             #
 
             # either linear regression or bayesian ridge regression seems fine
-            #reg = LinearRegression(fit_intercept=True)
-            reg = BayesianRidge(fit_intercept=True)
+            reg = LinearRegression(fit_intercept=True)
+            #reg = BayesianRidge(fit_intercept=True)
+            #reg = ARDRegression(fit_intercept=True)
 
             y = mag
             _X = eigenvecs[:n_components, :]
