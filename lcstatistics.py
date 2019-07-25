@@ -33,6 +33,10 @@ Stat calculation functions
     parallel_compute_lc_statistics:
         compute above statistics for a directory of lightcurves and compile
 
+    compute_lc_statistics_fits:
+        alternative to compute_lc_statistics, but only for FITS LCs. (has extra
+        flexibility in column choice)
+
 Plotting functions
     percentiles_RMSorMAD_stats_and_plots:
         make csv files and (optionally) percentiles plots of MAD vs magnitude.
@@ -1082,6 +1086,154 @@ def compute_lc_statistics(lcfile,
             else:
                 for s in ['median', 'mad', 'mean', 'stdev', 'ndet']:
                     results[s+'_sigclip'+suf] = np.nan
+        else:
+            for s in ['median', 'mad', 'mean', 'stdev', 'ndet']:
+                results[s+suf] = np.nan
+                results[s+'_sigclip'+suf] = np.nan
+    if verbose:
+        print('%sZ: done with statistics for %s' %
+              (datetime.utcnow().isoformat(), lcfile))
+
+    return results
+
+
+def compute_lc_statistics_fits(lcfile,
+                               sigclip=4.0,
+                               num_aps=3,
+                               desired_stages=['IRM','PCA','TFA'],
+                               verbose=True,
+                               istessandmaskedges=False):
+    """
+    Compute mean, median, MAD, stdev magnitudes for a given FITS lightcurve.
+
+    Args:
+        lcfile: A fits LC.
+
+        num_aps (int): Number of apertures. Required for fits LC files.
+
+        desired_stages (list): A list of detrending stages for which you want
+        to assess statistics, e.g., ['IRM','PCA','TFA'], or ['EPD'], or
+        whatever, depending on whatever stages of detrending you have done, and
+        the keys you have used for them in the FITS data extension.
+
+        istessandmaskedges (bool): If you're working with TESS data, dropping
+        the edges near orbit start/end is standard.
+
+    Returns:
+        result (dict): Dictionary containing the following fields
+            'lcfile': full path to lightcurve
+            'lcobj': name of object
+            Stat cols:
+            Raw magnitudes:
+                'median_rm[1-3]', 'mad_rm[1-3]', 'mean_rm[1-3]', 'stdev_rm[1-3]',
+                'ndet_rm[1-3]',
+                'median_sigclip_rm[1-3]', 'mad_sigclip_rm[1-3]', ...
+
+            And similarly for EPD mags (_ep), TFA mags (_tf), raw fluxes (_rf),
+            or PCA mags (_pm).
+    """
+
+    if istessandmaskedges:
+        from tessutils import mask_orbit_start_and_end
+
+    lcext = os.path.splitext(lcfile)[1]
+    # Use dictionary to collect stats for extensibility
+    mags = {}
+
+    stage_to_key_dict = {
+        'IRM':'rm',
+        'TFA':'tf',
+        'IFL':'rf',
+        'PCA':'pm',
+        'EPD':'ep'
+    }
+
+    ######################################
+    # read lc files into mags dictionary #
+    ######################################
+    keys = []
+    if lcext == '.fits':
+        hdulist = fits.open(lcfile)
+
+        for stage in desired_stages:
+
+            if stage not in stage_to_key_dict.keys():
+                raise ValueError('got detrending stage that is not recognized')
+
+            mags[ stage_to_key_dict[stage] ] = []
+
+            for i in range(num_aps):
+                mags[ stage_to_key_dict[stage] ].append(
+                    hdulist[1].data['{}{}'.format(stage, i+1)]
+                )
+
+            keys.append(stage_to_key_dict[stage])
+
+    else:
+        raise ValueError('expected a fits light curve')
+
+    ##################################
+    # get statistics for each column #
+    ##################################
+    # Create results dict
+    results = {'lcfile': lcfile,
+               'lcobj': os.path.splitext(os.path.basename(lcfile))[0]}
+
+    # Now, get statistics for each column
+    statkeys = ['median', 'mad', 'mean', 'stdev', 'ndet']
+    cols = [(x, ap) for x in keys for ap in range(num_aps)]
+
+    for (k, ap) in cols:
+        suf = '_%s%d' % (k, ap+1)
+        if k not in mags:
+            for s in statkeys:
+                results[s+suf] = np.nan
+                results[s+'_sigclip'+suf] = np.nan
+            continue
+
+        mag = mags[k][ap]
+
+        if istessandmaskedges:
+
+            time = hdulist[1].data['TMID_BJD']
+
+            orbitgap = 1
+            expected_norbits = 2
+            orbitpadding = 6/24
+            raise_error = False
+
+            _, mag = mask_orbit_start_and_end(time, mag, orbitgap=orbitgap,
+                                              expected_norbits=expected_norbits,
+                                              orbitpadding=orbitpadding,
+                                              raise_error=raise_error)
+
+        finiteind = np.isfinite(mag)
+        mag = mag[finiteind]
+
+        if len(mag) > 4:
+
+            med = np.median(mag)
+            results['median'+suf] = med
+            results['mad'+suf] = np.median(np.fabs(mag - med))
+            results['mean'+suf] = np.mean(mag)
+            results['stdev'+suf] = np.std(mag)
+            results['ndet'+suf] = len(mag)
+
+            if sigclip:
+                sigclip_mag, lo, hi = stats_sigmaclip(mag,
+                                                      low=sigclip,
+                                                      high=sigclip)
+                med_sigclip = np.median(sigclip_mag)
+                results['median'+'_sigclip'+suf] = med_sigclip
+                results['mad'+'_sigclip'+suf] = np.median(np.fabs(sigclip_mag -
+                                                                  med_sigclip))
+                results['mean'+'_sigclip'+suf] = np.mean(sigclip_mag)
+                results['stdev'+'_sigclip'+suf] = np.std(sigclip_mag)
+                results['ndet'+'_sigclip'+suf] = len(sigclip_mag)
+            else:
+                for s in ['median', 'mad', 'mean', 'stdev', 'ndet']:
+                    results[s+'_sigclip'+suf] = np.nan
+
         else:
             for s in ['median', 'mad', 'mean', 'stdev', 'ndet']:
                 results[s+suf] = np.nan
