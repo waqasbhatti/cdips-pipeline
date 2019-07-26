@@ -72,7 +72,7 @@ from astropy.coordinates import SkyCoord
 from astropy import units as u, constants as const
 from astropy.io import ascii
 
-from lcstatistics import read_tfa_lc, plot_raw_epd_tfa
+from lcstatistics import plot_raw_epd_tfa
 
 from astrobase.periodbase import kbls
 from astrobase.varbase import lcfit
