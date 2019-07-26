@@ -336,6 +336,7 @@ def read_stats_file(statsfile, fovcathasgaiaids=False):
 def compute_acf_statistics_worker(task, n_apertures=3, timename='TMID_BJD',
                                   filterwindow=7, istessffi=True,
                                   isfitslc=True):
+    # dtrtypes is e.g., ['IRM','PCA','TFA']
 
     #NOTE : might want to check a couple smoothing values ("filterwindows")...
 
@@ -346,7 +347,7 @@ def compute_acf_statistics_worker(task, n_apertures=3, timename='TMID_BJD',
             'to generalize this you just need to interpolate, but I am lazy.'
             )
 
-        tfafile, outdir, eval_times_hr, skipepd = task
+        tfafile, outdir, eval_times_hr, dtrtypes = task
 
         if not isfitslc:
             lcdata = read_tfa_lc(tfafile)
@@ -366,35 +367,29 @@ def compute_acf_statistics_worker(task, n_apertures=3, timename='TMID_BJD',
             return 1
 
         d_pkl, outdf = {}, pd.DataFrame({})
+        flux_d = {}
+        acfs = {}
         for ap in range(1,n_apertures+1):
 
-            rawap = 'IRM{:d}'.format(ap)
-            epdap = 'EP{:d}'.format(ap)
-            tfaap = 'TFA{:d}'.format(ap)
-            errap = 'IRE{:d}'.format(ap)
+            for dtrtype in dtrtypes:
 
-            time = lcdata[timename]
-            flux_raw = lcdata[rawap]
-            if not skipepd:
-                flux_epd = lcdata[epdap]
-            flux_tfa = lcdata[tfaap]
-            err = lcdata[errap]
+                apname = dtrtype+'{}'.format(ap)
+                errname = 'IRE{}'.format(ap)
 
-            acf_raw = autocorr_magseries(time, flux_raw, err, maxlags=None,
-                                         fillgaps='noiselevel', sigclip=5,
-                                         magsarefluxes=True,
-                                         filterwindow=filterwindow)
-            if not skipepd:
-                acf_epd = autocorr_magseries(time, flux_epd, err, maxlags=None,
-                                             fillgaps='noiselevel', sigclip=5,
-                                             magsarefluxes=True,
-                                             filterwindow=filterwindow)
-            acf_tfa = autocorr_magseries(time, flux_tfa, err, maxlags=None,
-                                         fillgaps='noiselevel', sigclip=5,
-                                         magsarefluxes=True,
-                                         filterwindow=filterwindow)
+                time = lcdata[timename]
 
-            if not np.isclose(acf_raw['cadence']*24*60, 30, atol=1e-3):
+                flux_d[dtrtype] = lcdata[apname]
+
+                err = lcdata[errname]
+
+                acfs[dtrtype] = autocorr_magseries(time, flux_d[dtrtype], err,
+                                                   maxlags=None,
+                                                   fillgaps='noiselevel',
+                                                   sigclip=5,
+                                                   magsarefluxes=True,
+                                                   filterwindow=filterwindow)
+
+            if not np.isclose(acfs[dtrtype]['cadence']*24*60, 30, atol=1e-3):
                 raise NotImplementedError(
                 'this function assumes an ffi cadence of 30 minutes to evaluate ACFs. '
                 'to generalize this you just need to interpolate, but I am lazy.'
@@ -402,9 +397,11 @@ def compute_acf_statistics_worker(task, n_apertures=3, timename='TMID_BJD',
 
             apstr = 'AP{}'.format(ap)
             d_pkl[apstr] = {}
-            acfs = [acf_raw, acf_epd, acf_tfa] if not skipepd else [acf_raw, acf_tfa]
-            dtrs = ['raw','epd','tfa'] if not skipepd else ['raw','tfa']
-            for acf, dtr in zip(acfs, dtrs):
+
+            for k, v in acfs.items():
+
+                dtr = k.lower()
+                acf = v
 
                 d_pkl[apstr]['acf_{}'.format(dtr)] = acf['acf']
                 d_pkl[apstr]['lag_time_{}'.format(dtr)] = acf['lags']*acf['cadence']
@@ -414,7 +411,7 @@ def compute_acf_statistics_worker(task, n_apertures=3, timename='TMID_BJD',
                 d_pkl[apstr]['cadence'] = acf['cadence']
 
             # assuming FFI cadence of 30 minutes, evalute ACF at desired lags.
-            n_acf_vals = len(acf_tfa['acf'])
+            n_acf_vals = len(acfs[k]['acf'])
 
             # in "TUNE" mode, might want short-timescale ACFs (otherwise,
             # fails)
@@ -426,16 +423,13 @@ def compute_acf_statistics_worker(task, n_apertures=3, timename='TMID_BJD',
             eval_times_hr = nparr(eval_times_hr)
             outdf['LAG_TIME_HR'] = eval_times_hr
 
-            colstrs = (
-                ['RAW{:d}'.format(ap),'EPD{:d}'.format(ap),'TFA{:d}'.format(ap)]
-                if not skipepd else
-                ['RAW{:d}'.format(ap),'TFA{:d}'.format(ap)]
-            )
-            for acf, colstr in zip(acfs, colstrs):
+            colstrs = ['{}{}'.format(dtr, ap) for dtr in dtrtypes]
+
+            for colstr, dtr in zip(colstrs, dtrtypes):
 
                 # wonky indexing scheme. 30 minute cadence -> e.g., 1hr lag is
                 # index number 2.
-                these_acf_vals = acf['acf'][2*eval_times_hr]
+                these_acf_vals = acfs[dtr]['acf'][2*eval_times_hr]
 
                 outdf[colstr+"_ACF"] = these_acf_vals
 
@@ -454,7 +448,9 @@ def compute_acf_statistics_worker(task, n_apertures=3, timename='TMID_BJD',
 
 def parallel_compute_acf_statistics(
     tfafiles, outdir, eval_times_hr=[1,2,6,12,24,48,60,96,120,144,192],
-    nworkers=16, maxworkertasks=1000, skipepd=False):
+    nworkers=16, maxworkertasks=1000,
+    dtrtypes=['IRM','PCA','TFA']
+):
     """
     Given list of TFA lightcurves, calculate autocorrelation functions and
     evaluate them at specific times, e.g., 1hr, 2hr, 6hr, 24hr.
@@ -471,14 +467,17 @@ def parallel_compute_acf_statistics(
 
         eval_times_hr (list of ints): times at which to evaluate the
         autocorrelation functions, in hours.
+
+        dtrtypes (list of strs): stages of detrending for which to evaluate the
+        ACFs.
     """
 
     print('%sZ: %s files to compute ACF statistics for' %
           (datetime.utcnow().isoformat(), len(tfafiles)))
 
-    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+    tasks = [(x, outdir, eval_times_hr, dtrtypes) for x in tfafiles]
 
-    tasks = [(x, outdir, eval_times_hr, skipepd) for x in tfafiles]
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
     # fire up the pool of workers
     results = pool.map(compute_acf_statistics_worker, tasks)
