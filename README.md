@@ -1,9 +1,6 @@
-# `pipe-trex`
+# `cdips-pipeline`
 
-Timeseries photometry pipeline used for HATPI prototype, TESS simulated
-data, and real TESS data.
-
-![pipe-trex](https://github.com/waqasbhatti/pipe-trex/blob/master/graphics/pipetrex_small.png?raw=true)
+Timeseries photometry pipeline used for TESS simulated data, and real TESS data.
 
 
 ## Install
@@ -20,7 +17,7 @@ please submit a PR describing your experience.
 First, clone this repo into a working directory, that we will call $TREX.
 
   ```
-  git clone https://github.com/waqasbhatti/pipe-trex
+  git clone https://github.com/waqasbhatti/cdips-pipeline
   ```
 
 #### 3.X environment
@@ -56,7 +53,7 @@ local directory, for instance `~/local`. We will call the environment trex\_27:
 Make sure your $PATH and $PYTHON\_PATH environmental variables do not have any
 python-related things that will break your venv.
 
-Active the empty python 2.7 environment: 
+Active the empty python 2.7 environment:
 
   ```
   source trex_27/bin/activate
@@ -150,16 +147,7 @@ Most of these are `fitsh` tasks.  The `fitsh` installation instructions are
   ```
 Check to make sure this gives you `ficalib`, `fistar`, `fiphot`, `grmatch`,
 `grtrans`, `ficonv`, `fitrans`, and `ficombine`.
- 
-If you had access to the closed HATpipe svn repo, you could do something like
-this to install them:
-  ```
-  cd ~/local
-  svn checkout --username lbouma https://hat.astro.princeton.edu/svn/HATreduc/HATpipe
-  cd HATpipe
-  svn up -r3186   # we froze dependencies for pipe-trex
-  cd ../ ; cp -r HATpipe HATpipe_R3186
-  ```
+
 
 ### PostgreSQL installation
 
@@ -199,7 +187,7 @@ relations include:
 
   ```
                        List of relations
-   Schema |              Name              |   Type   | Owner 
+   Schema |              Name              |   Type   | Owner
   --------+--------------------------------+----------+-------
    public | ap_photometry                  | table    | hpx
    public | arefshiftedframes              | table    | hpx
@@ -251,7 +239,7 @@ assumed directory structure is as follows.
 
   ```
   .
-  ├── BASE      # 
+  ├── BASE      #
   ├── LC        # lightcurves go here
   ├── PROJ      # project directories for specific users
   ├── RAW       # raw fits images (or fits.fz images) go here
@@ -320,7 +308,7 @@ pipeline to work on a mac.
     brew install gsl  # this is not a default on macs
     ```
 
-  If on a mac, you then must edit all six makefiles, 
+  If on a mac, you then must edit all six makefiles,
   ```
     /Users/luke/local/HATpipe_R3186/source/odoncontrib/anet/Makefile
     /Users/luke/local/HATpipe_R3186/source/odoncontrib/anet/libc*/Makefile
@@ -330,4 +318,3 @@ pipeline to work on a mac.
   though, linking on my mac fails because of architecture problems that I don't
   understand. This is perhaps a waste of time, and you should just develop on
   linux, if you have a very good internet connection, or do not develop.
-
