@@ -1,18 +1,33 @@
 # `cdips-pipeline`
 
-Timeseries photometry pipeline used for TESS simulated data, and real TESS data.
+Time-series photometry pipeline that can reduce images to light curves.
 
+Specifically, this pipeline has been used for the Cluster Difference Imaging
+Photometric Survey (CDIPS) image-subtraction reductions.  This is a project
+that has made and is making light curves for stars in open clusters, moving
+groups, etc. It has [a stand-alone repo](https://github.com/lgbouma/cdips).
 
-## Install
+In theory, if one wished to reproduce the CDIPS reductions, this pipeline would
+be the place to start. More practically, the code-base should provide its
+readers and potential users with an entry-point into a particular set of
+programs that can be used for photometric and time-series analyses.
 
-### Operating system
+It is released in order for general reproducibility and method-sharing reasons.
+(And without the expectation of converting you into a user).
+
+This pipeline is a port of a pipeline originally developed for the [HATPI
+project](http://hatpi.org).
+
+## 1. Install
+
+### 1.1 Operating system
 
 This installation is only tested on linux boxes (Debian/Ubuntu).  Compiling the
 `fitsh` binaries (see below) might be challenging, but if you do it on MacOS,
 please submit a PR describing your experience.
 
 
-### Environment basics
+### 1.2 Environment basics
 
 First, clone this repo into a working directory, that we will call $TREX.
 
@@ -20,7 +35,7 @@ First, clone this repo into a working directory, that we will call $TREX.
   git clone https://github.com/waqasbhatti/cdips-pipeline
   ```
 
-#### 3.X environment
+#### 1.2.1 `python3` environment
 
 Have a working version of [conda](https://conda.io/miniconda.html) on your path
 (the 64-bit linux version, presumably).  Then
@@ -41,7 +56,7 @@ site-packages directory.  See "Making pipe-trex accessible within virtual
 environment" below.
 
 
-#### 2.7 environment
+#### 1.2.2 `python2.7` environment
 
 If you opt instead for a 2.7 environment, make a virtual environment in some
 local directory, for instance `~/local`. We will call the environment trex\_27:
@@ -84,7 +99,7 @@ For transit-fitting, you will want `batman`, `corner`, and `emcee` installed:
   (trex_27) python setup.py install
   ```
 
-## catalog reading dependencies
+### 1.3 catalog reading dependencies
 
 In order to perform photometry, we project known-star catalogs onto images in
 order to know where the stars are. (This is more reliable than source
@@ -114,7 +129,7 @@ The assumption of the last line is that you are doing this on the
 already been performed to download and sort the Gaia DR2 catalog.
 
 
-### anet and astrometry.net dependencies
+### 1.4 anet and astrometry.net dependencies
 
 You must use either `anet` or `astrometry.net`. The latter is strongly
 recommended, since it's free.  To install, follow [this
@@ -122,7 +137,7 @@ page](http://astrometry.net/doc/build.html#build). If you're doing wide-field
 work, be sure to get both the 4100 and 4200 indexes.
 
 
-### fitsh and HATpipe dependencies
+### 1.5 fitsh and HATpipe dependencies
 
 This code inherits from the [`fitsh`](https://fitsh.net/wiki/Main_Page)
 project, developed mostly by Andras Pal. Much of `fitsh` was inherited by
@@ -149,7 +164,7 @@ Check to make sure this gives you `ficalib`, `fistar`, `fiphot`, `grmatch`,
 `grtrans`, `ficonv`, `fitrans`, and `ficombine`.
 
 
-### PostgreSQL installation
+### 1.6 PostgreSQL installation
 
 For bookkeeping, you will also need a [PostgreSQL
 database](https://www.postgresql.org/files/documentation/pdf/10/postgresql-10-US.pdf).
@@ -210,7 +225,7 @@ relations include:
    public | subtractedframes_framekey_seq  | sequence | hpx
   ```
 
-### Making pipe-trex accessible within virtual environment
+### 1.7 Making pipe-trex accessible within virtual environment
 
 For the moment, go into the venv's `usr/lib/python2.7/site-packages` directory
 and create a `.pth` file, e.g.  `pipe-trex.pth` with the location of the local
@@ -227,12 +242,12 @@ will instead be at a path like
 `/home/lbouma/miniconda3/envs/trex_37/lib/python3.7/site-packages`.
 
 
-## Getting Started
+## 2 Getting Started
 
 Some usage examples are given in the `scripts/` directory.
 
 
-### Concepts: Directory structure
+### 2.1 Concepts: Directory structure
 
 Everything must be in its right place for your photometry to Just Work. The
 assumed directory structure is as follows.
@@ -276,15 +291,15 @@ At the second level:
 Maintaining this structure is essential. Commands can be run from anywhere,
 provided that this structure is maintained.
 
-# Authors
+# 3. Authors
 
 Waqas Bhatti, Luke Bouma, Samuel Yee
 
-# License
+# 4. License
 
 MIT
 
-# Notes on mac installation
+# Appendix. Notes on mac installation
 
 **Aside**: compiling the HATpipe source on a mac is not advised, because many
 of the libraries are linux-specific. The entire pipeline is untested on macs,
