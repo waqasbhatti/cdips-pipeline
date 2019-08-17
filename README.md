@@ -1,22 +1,43 @@
 # `cdips-pipeline`
 
-Time-series photometry pipeline that can reduce images to light curves.
+This is a time-series photometry pipeline that reduces images to light curves.
 
-Specifically, this pipeline has been used for the Cluster Difference Imaging
-Photometric Survey (CDIPS) image-subtraction reductions.  This is a project
-that has made and is making light curves for stars in open clusters, moving
-groups, etc. It has [a stand-alone repo](https://github.com/lgbouma/cdips).
+This pipeline has been used for the Cluster Difference Imaging Photometric
+Survey (CDIPS) image-subtraction reductions.  The CDIPS project has made and is
+making light curves for stars in open clusters, moving groups, etc.  It has [a
+stand-alone repo](https://github.com/lgbouma/cdips).  The pipeline is a port of
+a pipeline originally developed for the [HATPI project](http://hatpi.org).
 
 In theory, if one wished to reproduce the CDIPS reductions, this pipeline would
-be the place to start. More practically, the code-base should provide its
-readers and potential users with an entry-point into a particular set of
-programs that can be used for photometric and time-series analyses.
+be the place to start. More practically, the code-base should provide readers
+and users with an entry-point into a particular set of programs that can be
+used for photometric and time-series analyses.
 
-It is released in order for general reproducibility and method-sharing reasons.
-(And without the expectation of converting you into a user).
+We're releasing it for general reproducibility and method-sharing and
+improvement reasons.  (Without the expectation of converting you into a user).
 
-This pipeline is a port of a pipeline originally developed for the [HATPI
-project](http://hatpi.org).
+## 0. How is this structured?
+
+The pipeline is a collection of python functions that can be called from a
+single "driver script" to go through steps described in [the
+paper](https://github.com/lgbouma/cdips/blob/master/paper_I/ms.pdf). For the
+CDIPS-I reduction, the driver script is
+[`scripts/TESS_reduction.py`](https://github.com/waqasbhatti/cdips-pipeline/blob/master/scripts/TESS_reduction.py).
+The idea is that you run this one program (calling the correct options),  and
+you get light curves from images.  This can be done from [a shell
+script](https://github.com/waqasbhatti/cdips-pipeline/blob/master/scripts/tess_tuning_scripts/TEMPLATE_single_tess_ccd.sh).
+State-awareness (i.e., whether previous reduction attempts succeeded or failed)
+is minimal, and based on the pre-existence of files and if-else logic.  A few
+similar driver scripts are also in /scripts/, for example to reduce the ETE6
+images.  Most of the intermediate files in the pipe-trex reduction (e.g.,
+fistar, fiphot, ficonv, etc files) are stored on-disk. A few pieces of metadata
+(e.g., image quality diagnostics) are collected to a PostgreSQL database and
+used for the reference frame selection steps.
+
+The most important collections of sub-scripts are in `aperturephot.py` and
+`imagesubphot.py`, which wrap the `fitsh` tools used to do the aperture
+photometry and image subtraction. `autoimagesub.py` rolls up many of these
+functions to enable pipeline-like functionality.
 
 ## 1. Install
 
