@@ -1,5 +1,7 @@
 # `cdips-pipeline`
 
+[![DOI](https://zenodo.org/badge/202777810.svg)](https://zenodo.org/badge/latestdoi/202777810)
+
 This is a time-series photometry pipeline that reduces images to light curves.
 It is a port of a pipeline originally developed for the [HATPI
 project](http://hatpi.org).
@@ -7,7 +9,7 @@ project](http://hatpi.org).
 This pipeline has been used for the Cluster Difference Imaging Photometric
 Survey (CDIPS) image-subtraction reductions.  The CDIPS project has made and is
 making light curves for stars in open clusters, moving groups, etc.  It has [a
-stand-alone repo](https://github.com/lgbouma/cdips).  
+stand-alone repo](https://github.com/lgbouma/cdips).
 
 In theory, if one wished to reproduce the CDIPS reductions, this pipeline would
 be the place to start. More practically, the code-base should provide readers
