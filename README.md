@@ -313,15 +313,15 @@ At the second level:
 Maintaining this structure is essential. Commands can be run from anywhere,
 provided that this structure is maintained.
 
-# 3. Authors
+## 3. Authors
 
 Waqas Bhatti, Luke Bouma, Samuel Yee
 
-# 4. License
+## 4. License
 
 MIT
 
-# Appendix. Notes on mac installation
+## Appendix. Notes on mac installation
 
 **Aside**: compiling the HATpipe source on a mac is not advised, because many
 of the libraries are linux-specific. The entire pipeline is untested on macs,
