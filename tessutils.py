@@ -308,6 +308,9 @@ def move_badframe(task):
 def parallel_move_badframes(fitslist, flagvalues=[-1,4,32,36], nworkers=16,
                             maxworkertasks=1000):
     '''
+    Move the entire frame to "badframe" subdirectory, if it matches particular
+    quality flags or time windows.
+
     Move frame to badframes dir it matches any of the passed data quality flag
     value.  See e.g., EXP-TESS-ARC-ICD-TM-0014 for a description of the flag
     values.

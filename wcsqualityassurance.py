@@ -365,7 +365,7 @@ def write_wcs_from_spoc(infilename, outfilename=None, observatory='tess',
             fistar_dst = os.path.join(
                 os.path.dirname(fistar_src),
                 'badframes',
-                os.path.basename(fistar_dst)
+                os.path.basename(fistar_src)
             )
 
             if os.path.exists(fistar_src):
