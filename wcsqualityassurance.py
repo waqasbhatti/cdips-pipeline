@@ -104,7 +104,17 @@ def does_wcs_pass_quality_check(
         matchedoutpath = fitsfile.replace('.fits','.matched')
 
     if not os.path.exists(wcsfile):
-        raise AssertionError('did not find wcsfile')
+
+        _wcs = os.path.join(
+            os.path.dirname(wcsfile),
+            'badframes',
+            os.path.basename(wcsfile)
+        )
+
+        if os.path.exists(_wcs):
+            return True
+        else:
+            raise AssertionError('did not find wcsfile')
 
     #
     # given WCS and reformed celestial coordinate catalog, make the frame

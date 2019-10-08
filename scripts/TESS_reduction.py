@@ -881,6 +881,8 @@ def get_files_needed_before_image_subtraction(
                 wcsqa.write_wcs_from_spoc(f, observatory='tess',
                                           assert_ctype_intact=True)
 
+            # in writing the WCSs, some files may have been moved to badframes.
+            fitslist = glob(os.path.join(fitsdir,fnamestr))
             wcslist = [f.replace('.fits','.wcs') for f in fitslist]
             fistarlist = [f.replace('.fits','.fistar') for f in fitslist]
 
