@@ -92,7 +92,10 @@ from psycopg2.extras import Json
 
 from astropy import wcs
 
-from framecalib import make_frame_movie
+try:
+    from framecalib import make_frame_movie
+except ModuleNotFoundError:
+    print('WRN! not importing framecalib; was not found.')
 import aperturephot as ap
 import imagesubphot as ism
 from imageutils import get_header_keyword, get_header_keyword_list, \
