@@ -878,7 +878,8 @@ def get_files_needed_before_image_subtraction(
 
             fitslist = glob(os.path.join(fitsdir,fnamestr))
             for f in fitslist:
-                wcsqa.write_wcs_from_spoc(f, observatory='tess')
+                wcsqa.write_wcs_from_spoc(f, observatory='tess',
+                                          assert_ctype_intact=True)
 
             wcslist = [f.replace('.fits','.wcs') for f in fitslist]
             fistarlist = [f.replace('.fits','.fistar') for f in fitslist]

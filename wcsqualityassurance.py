@@ -7,7 +7,7 @@ size, this is a big no-no).
 import pandas as pd, numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import os
+import os, shutil
 from numpy import array as nparr
 
 from astropy.io import fits
@@ -294,7 +294,8 @@ def impose_wcs_quality_check(
     return quality_check_result
 
 
-def write_wcs_from_spoc(infilename, outfilename=None, observatory='tess'):
+def write_wcs_from_spoc(infilename, outfilename=None, observatory='tess',
+                        assert_ctype_intact=True):
     """
     For TESS, the SPOC CAL FFIs contain a WCS solution that is typically VERY
     good.  (Like, <0.1 pixel median astrometric residual).
@@ -302,6 +303,10 @@ def write_wcs_from_spoc(infilename, outfilename=None, observatory='tess'):
     Given a *.fits `infilename`, with the WCS in the header, this function
     creates a matching *.wcs file with the full header re-written, so that
     almost all WCS-reading utilities can use it.
+
+    If `assert_ctype_intact` is True, it will require that the WCS header has
+    the "CTYPE1" key. If this is found to be false, the frame and wcs are moved
+    to "badframes".
     """
 
     if observatory != 'tess':
@@ -327,6 +332,47 @@ def write_wcs_from_spoc(infilename, outfilename=None, observatory='tess'):
     print('made {} from SPOC header'.format(wcspath))
 
     hdulist.close()
+
+    if assert_ctype_intact:
+
+        hdulist = fits.open(wcspath)
+        hdr = hdulist[0].header
+        hdulist.close()
+
+        if not ('CTYPE1' in hdr):
+
+            fits_src = outfilename
+            fits_dst = os.path.join(
+                os.path.dirname(fits_src),
+                'badframes',
+                os.path.basename(fits_src)
+            )
+
+            wcs_src = wcspath
+            wcs_dst = os.path.join(
+                os.path.dirname(wcs_src),
+                'badframes',
+                os.path.basename(wcs_src)
+            )
+
+            print('WRN: CTYPE1 NOT FOUND IN WCS HEADER. MOVE WCS,IMG,FISTAR\n'
+                  '{} -> {}'.format(fits_src,fits_dst))
+
+            shutil.move(fits_src, fits_dst)
+            shutil.move(wcs_src, wcs_dst)
+
+            fistar_src = wcs_src.replace('.wcs','.fistar')
+            fistar_dst = os.path.join(
+                os.path.dirname(fistar_src),
+                'badframes',
+                os.path.basename(fistar_dst)
+            )
+
+            if os.path.exists(fistar_src):
+                shutil.move(fistar_src, fistar_dst)
+
+        else:
+            pass
 
 
 def sep(x0,y0,x1,y1):
