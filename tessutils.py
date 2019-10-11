@@ -783,6 +783,8 @@ def make_cluster_cutout_jpgs(sectornum, fitsdir, racenter, deccenter, field,
         print('found cutouts were already made, return')
         return
 
+    raise AssertionError('DEBUG FROM HERE TO SOLVE THE CAL MOVIE PROBLEM')
+
     for name, ct, ns, d, age, ra, dec, r2 in zip(names, ctype, nstar, dist,
                                                  logt, ras, decs, angrads):
 
