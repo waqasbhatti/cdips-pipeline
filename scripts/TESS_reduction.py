@@ -897,16 +897,28 @@ def get_files_needed_before_image_subtraction(
                                       '90th_px':0.5,
                                       'std_px': 1.7}
                 ):
-                    pass
+                    print('{} passed WCS quality check'.format(w))
 
                 else:
-                    errmsg = (
-                        'WCS fails quality check '+
-                        'wcs, fits, fistar are {}, {}, {}'.format(w,f,s)
-                    )
-                    raise AssertionError(errmsg)
-                    # NOTE : might need to derive the WCS yourself, using a
-                    # parallel_astrometrydotnet call as below...
+
+                    # weaker check for heavily background contaminated frames.
+                    if wcsqa.does_wcs_pass_bkgd_corrected_quality_check(
+                        w, f, reformed_cat_file, isspocwcs=True, N_bright=1000,
+                        N_faint=9000, fistarpath=s, matchedoutpath=None,
+                        qualitycondition={'median_px':0.2, '90th_px':0.8,
+                                          'std_px': 3}
+                    ):
+
+                        pass
+
+                    else:
+                        errmsg = (
+                            'WCS fails quality check '+
+                            'wcs, fits, fistar are {}, {}, {}'.format(w,f,s)
+                        )
+                        raise AssertionError(errmsg)
+                        # NOTE : might need to derive the WCS yourself, using a
+                        # parallel_astrometrydotnet call as below...
 
         else:
 

@@ -150,10 +150,81 @@ def does_wcs_pass_quality_check(
         N_bright=N_bright,
         N_faint=N_faint,
         make_plots=make_plots,
-        qualitycondition=qualitycondition
+        qualitycondition=qualitycondition,
+        is_bkgd_corrected_check=False
     )
 
     return quality_check_result
+
+
+
+def does_wcs_pass_bkgd_corrected_quality_check(
+    wcsfile,
+    fitsfile,
+    reformedfovcatalog,
+    isspocwcs=True,
+    N_bright=1000,
+    N_faint=9000,
+    fistarpath=None,
+    matchedoutpath=None,
+    make_plots=True,
+    qualitycondition={'median_px':0.2, '90th_px':0.4, 'std_px': 1.7},
+    ccdextent={'x':[0.,2048.],'y':[0.,2048.]},
+    pixborders=0.0,
+    gain=5.35,
+    fluxthreshold=500,
+    zeropoint=11.82,
+    exptime=1800
+):
+    """
+    `does_wcs_pass_quality_check` has failed.
+
+    However, for frames with substantial amounts of scattered light in "the
+    toast", this can be because the centroid measurements are imprecise.
+
+    In this "background-corrected" WCS quality check, throw out the worst
+    stars according to background measurements (not between the 10th to 75th
+    percentiles), then reimpose the same conditions.
+    """
+
+    # verify that everything from earlier exists
+    outprojcat = fitsfile.replace('.fits','.projcat')
+
+    if matchedoutpath is None:
+        matchedoutpath = fitsfile.replace('.fits','.matched')
+
+    if not os.path.exists(wcsfile):
+        raise AssertionError('did not find wcsfile')
+
+    projcatfile = outprojcat
+    if not os.path.exists(projcatfile):
+        raise AssertionError(
+            'expected {} to exist from earlier wcs check'.
+            format(projcatfile)
+        )
+
+    if not os.path.exists(fistarpath):
+        raise AssertionError(
+            'expected {} to exist from earlier wcs check'.
+            format(fistarpath)
+        )
+
+    quality_check_result = impose_wcs_quality_check(
+        fitsfile,
+        fistarpath,
+        matchedoutpath,
+        isspocwcs=isspocwcs,
+        projcatfile=projcatfile,
+        N_bright=N_bright,
+        N_faint=N_faint,
+        make_plots=make_plots,
+        qualitycondition=qualitycondition,
+        is_bkgd_corrected_check=True
+    )
+
+    return quality_check_result
+
+
 
 
 def impose_wcs_quality_check(
@@ -165,7 +236,8 @@ def impose_wcs_quality_check(
     N_bright=1000,
     N_faint=9000,
     make_plots=True,
-    qualitycondition=None
+    qualitycondition=None,
+    is_bkgd_corrected_check=False
 ):
     """
     impose check as described in does_wcs_pass_quality_check docstring
@@ -196,10 +268,55 @@ def impose_wcs_quality_check(
         fistarlines = f.readlines()
 
     fistaroutlines = fistarlines[6+N_bright:6+N_faint] # 6 comment lines
+
+    if is_bkgd_corrected_check:
+
+        # keep the stars between the lower and upper percentiles of the
+        # measured background flux
+        lower_pctile = 10
+        upper_pctile = 75
+
+        # variable length whitespace to singlespace
+        cleanoutlines = [' '.join(l.split()) for l in fistaroutlines]
+        resplitlines = [l.split(' ') for l in cleanoutlines]
+        fistar_df = pd.DataFrame(
+            resplitlines,
+            columns=['Ident','X','Y','Bg','Amp','S','D','K','Flux','S/N']
+        )
+
+        lower_val = np.percentile(fistar_df['Bg'].astype(float), lower_pctile)
+        upper_val = np.percentile(fistar_df['Bg'].astype(float), upper_pctile)
+
+        # now correct the "outlines" to only be the indices between the two
+        # values.
+
+        sel = nparr(
+            (fistar_df['Bg'].astype(float) > lower_val)
+            &
+            (fistar_df['Bg'].astype(float) < upper_val)
+        )
+
+        fistaroutarr = nparr(fistaroutlines)[sel]
+
+        N_before = len(fistaroutlines)
+        N_after = len(fistaroutarr)
+
+        print('WRN! {} requires bkgd>{} and bkgd<{}. before {} *s. after {} *s.'.
+              format(fitsfile, lower_val, upper_val, N_before, N_after))
+
+        fistaroutlines = list(fistaroutarr)
+
     cutfistar = os.path.join(
         os.path.dirname(fistarpath),
         'cut_{}'.format(os.path.basename(fistarpath))
     )
+
+    if is_bkgd_corrected_check:
+
+        cutfistar = os.path.join(
+            os.path.dirname(fistarpath),
+            'cutbkgdcorr_{}'.format(os.path.basename(fistarpath))
+        )
 
     with open(cutfistar, 'w') as f:
         f.writelines(fistaroutlines)
@@ -273,6 +390,8 @@ def impose_wcs_quality_check(
         pre = os.path.splitext(os.path.basename(fistarpath))[0]
         if isspocwcs:
             pre = pre+'_spocwcs'
+        if is_bkgd_corrected_check:
+            pre = pre+'_cutbkgdcorr'
         outpath = os.path.join(os.path.dirname(fistarpath),
                                '{}_sep_hist.png'.format(pre))
         plot_sep_hist(df, outpath)
