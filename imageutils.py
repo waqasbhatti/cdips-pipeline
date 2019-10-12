@@ -14,8 +14,10 @@ fits-reading functions:
     trim_image
     make_superflat
     compressed_fits_ext
-    get_header_keyword: get the value of a header keyword in a fits file
+    get_header_keyword
     get_header_keyword_list
+    get_header_comment_list
+    get_data_keyword_list
 
 image-scaling functions:
     zscale_img
@@ -76,6 +78,8 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 import matplotlib.cm as mplcm
+
+from astrobase import imageutils as iu
 
 # get the ImageFont
 fontpath = os.path.join(os.path.dirname(__file__), 'DejaVuSans.ttf')
@@ -291,74 +295,36 @@ def compressed_fits_ext(fits_file):
 def get_header_keyword(fits_file,
                        keyword,
                        ext=0):
-    '''
-    Get the value of a header keyword in a fits file optionally using an
-    extension.
 
-    '''
-    hdulist = pyfits.open(fits_file)
-
-    if keyword in hdulist[ext].header:
-        val = hdulist[ext].header[keyword]
-    else:
-        val = None
-
-    hdulist.close()
-    return val
+    return iu.get_header_keyword(fits_file, keyword, ext=ext)
 
 
 def get_data_keyword(fits_file,
                      keyword,
                      ext=1):
 
-    hdulist = pyfits.open(fits_file)
-
-    if keyword in hdulist[ext].data.names:
-        val = hdulist[ext].data[keyword]
-    else:
-        val = None
-
-    hdulist.close()
-    return val
+    return iu.get_data_keyword(fits_file, keyword, ext=ext)
 
 
 def get_header_keyword_list(fits_file,
                             keyword_list,
                             ext=0):
 
-    hdulist = pyfits.open(fits_file)
-
-    out_dict = {}
-
-    for keyword in keyword_list:
-
-        if keyword in hdulist[ext].header:
-            out_dict[keyword] = hdulist[ext].header[keyword]
-        else:
-            out_dict[keyword] = None
-
-    hdulist.close()
-    return out_dict
+    return iu.get_header_keyword_list(fits_file, keyword_list, ext=ext)
 
 
 def get_header_comment_list(fits_file,
                             keyword_list,
                             ext=0):
 
-    hdulist = pyfits.open(fits_file)
+    return iu.get_header_comment_list(fits_file, keyword_list, ext=ext)
 
-    out_dict = {}
 
-    for keyword in keyword_list:
+def get_data_keyword_list(fits_file,
+                          keyword_list,
+                          ext=1):
 
-        if keyword in hdulist[ext].header:
-            out_dict[keyword] = hdulist[ext].header.comments[keyword]
-        else:
-            out_dict[keyword] = None
-
-    hdulist.close()
-    return out_dict
-
+    return iu.get_data_keyword_list(fits_file, keyword_list, ext=ext)
 
 
 ## IMAGE SCALING FUNCTIONS ##
