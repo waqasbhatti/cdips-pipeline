@@ -1243,6 +1243,7 @@ def round_two_tfa_selection(cand_template_lcpaths, apnum,
                             lcdirectory,
                             trendlisttfa_path,
                             max_fap=0.001,
+                            period_max=10.5,
                             n_min_tfa_templates=120,
                             n_desired_tfa_templates=200):
     """
@@ -1263,11 +1264,16 @@ def round_two_tfa_selection(cand_template_lcpaths, apnum,
 
         lcdirectory: str used to get the reduced mags and bkgd measurements
         corresponding to each cand_template_lcpath
+
+        period_max (float): maximum period at which LS peaks will be considered
+        against max_fap.
     """
 
     from astrobase.varclass.varfeatures import lightcurve_ptp_measures
     from astropy.stats import LombScargle
     from lcstatistics import plot_raw_tfa_bkgd
+
+    from cdips.lcproc import mask_orbit_edges as moe
 
     eta_normals, eta_robusts, faps = [],[],[]
     print('beginning lomb scargle for ap{}'.format(apnum))
@@ -1289,14 +1295,24 @@ def round_two_tfa_selection(cand_template_lcpaths, apnum,
         d = lightcurve_ptp_measures(tfa_time[sel], tfa_mag[sel],
                                     np.ones_like(tfa_time[sel]))
 
+        #
         # Lomb scargle w/ uniformly weighted points.
-        ls = LombScargle(tfa_time, tfa_mag, tfa_mag*1e-3)
+        #
+        _time, _mag = moe.mask_orbit_start_and_end(tfa_time[sel], tfa_mag[sel])
+        ls = LombScargle(_time, _mag, _mag*1e-3)
         freq, power = ls.autopower()
+        period = 1/freq
+
+        #
         # Say FAP = 0.4%. Then "under the assumption that there is no periodic
         # signal in the data, we will observe a peak this high or higher
         # approximately 0.4% of the time, which gives a strong indication that
         # a periodic signal is present in the data."
-        fap = ls.false_alarm_probability(power.max())
+        #
+        # Lots of power at the TESS orbital period (13.7 days) is bad. So only
+        # consider the FAP of the peak below period_max, which empirically
+        # looks like about 10.5 days.
+        fap = ls.false_alarm_probability(power[period < period_max].max())
 
         eta_normals.append(d['eta_normal'])
         eta_robusts.append(d['eta_robust'])
