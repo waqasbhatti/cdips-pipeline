@@ -167,6 +167,7 @@ badtimewindows = [
     (1503.03803, 1504.69775), # sector 7 downlink, btwn orbits 21->22
     (1529.06510, 1530.25816), # sector 8 downlink, btwn orbits 23->24
     (1531.74288, 1535.00264), # sector 8 instrument anomaly
+    (1543.21648, 1543.75080), # sector 9 camera 1 attitude control issues
     (1555.54148, 1557.00080), # sector 9 downlink, btwn orbits 25->26
     (1581.78453, 1582.76231), # sector 10 downlink, btwn orbits 27->28
     (1609.69425, 1610.77620), # sector 11 downlink, btwn orbits 29->30
