@@ -365,7 +365,7 @@ def plot_lc(lc, aps='all', apnums='all', tcol='rjd', tlim=None, sigclip=5.0,
     Plot a lightcurve.
 
     Args:
-        lc (np.reacarray or pd.DataFrame): Lightcurve
+        lc (np.recarray or pd.DataFrame): Lightcurve
         aps (list or 'all'): List of apertures (e.g. ['rm', 'ep'])
         apnums (list or 'all'): List of apnums (e.g. [1, 2, 3])
         figheight: Height of single lightcurve
@@ -427,7 +427,12 @@ def plot_lc(lc, aps='all', apnums='all', tcol='rjd', tlim=None, sigclip=5.0,
     fig.tight_layout(h_pad=-1.0)
 
     if savefig:
-        plt.savefig(savefig)
+        if savefig.endswith('.png')
+            fig.savefig(savfig, bbox_inches='tight', dpi=250)
+        elif savefig.endswith('.png')
+            fig.savefig(savfig, bbox_inches='tight')
+        else:
+            fig.savefig(savfig, bbox_inches='tight')
         plt.close()
 
     return fig, ax
@@ -762,7 +767,7 @@ def dump_stamps(objs, fits, iphot=None, fitstype='rsub', coord_cols=None,
             outplotfile = os.path.join(outdir, fitsframename + '.png')
             plt.savefig(outplotfile)
             plt.close()
-#             print('Saved figure to %s' % outplotfile)
+            print('Saved figure to %s' % outplotfile)
 
     if computeresiduals and fitstype == 'rsub':
         return fluxresiduals
