@@ -789,7 +789,7 @@ def make_cluster_cutout_jpgs(sectornum, fitsdir, racenter, deccenter, field,
     decs = np.array(df['dec'])
     angrads = np.array(df['r2'])
 
-    outcalmatches = glob(os.path.join( fitsdir, 'CUT-*_CAL.jpg' ))
+    outcalmatches = glob(os.path.join( fitsdir, 'CUT*', 'CUT-*_CAL.jpg' ))
     if len(outcalmatches) > 1000:
         print('found cutouts were already made, return')
         return
@@ -821,9 +821,9 @@ def make_cluster_cutout_jpgs(sectornum, fitsdir, racenter, deccenter, field,
                                          forcesquare=True)
         )
 
-        if xmax - xmin < 10:
+        if not xmax - xmin > 10:
             continue
-        if ymax - ymin < 10:
+        if not ymax - ymin > 10:
             continue
 
         parallel_cluster_cutout_jpgs(bkgdsubfiles,

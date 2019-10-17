@@ -125,6 +125,7 @@ def _get_random_acf_pkls(pkldir, n_desired=10):
 
 
 def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid):
+
     typestr = 'full' if 'FULL' in fitsdir else 'tune'
 
     # subtracted frame movies
@@ -170,30 +171,31 @@ def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid):
     # is:
     # CUT-NGC_2516_rsub-9ab2774b-tess2018232225941-s0001-4-3-0120_cal_img_bkgdsub-xtrns_SUB_grayscale.jpg
     clusterjpgs = glob(os.path.join(
-        fitsdir, 'CUT-*_[r|n]sub-*-tess2*_cal_img_bkgdsub*_SUB_grayscale.jpg'))
+        fitsdir, 'CUT-*', 'CUT-*_[r|n]sub-*-tess2*_cal_img_bkgdsub*_SUBCONV.jpg'))
     if len(clusterjpgs)>1:
 
         clusternames = nparr(
             [search('CUT-{}_rsub-{}-{}',c)[0] for c in clusterjpgs]
         )
         uclusternames = np.sort(np.unique(clusternames))
+        uclusternames = [u.split('/')[0] for u in uclusternames]
 
         # iterate over clusters
         for uclustername in uclusternames:
 
             # iterate over movie formats
             for jpgstr, outstr in zip(
-                ['CUT-{:s}_[r|n]sub-*-tess2*SUB_grayscale.jpg'.
+                ['CUT-{:s}_[r|n]sub-*-tess2*SUBCONV.jpg'.
                  format(uclustername),
-                 'CUT-{:s}_[r|n]sub-*-tess2*SUB_bwr.jpg'.
+                 'CUT-{:s}_[r|n]sub-*-tess2*BKGDSUB.jpg'.
                  format(uclustername),
                  'CUT-{:s}_tess2*CAL.jpg'.
                  format(uclustername)
                 ],
-                ['{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_SUB_grayscale.mp4'.
+                ['{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_SUBCONV.mp4'.
                  format(field, typestr, int(camera), int(ccd), int(projectid),
                         uclustername),
-                '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_SUB_bwr.mp4'.
+                '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_BKGDSUB.mp4'.
                  format(field, typestr, int(camera), int(ccd), int(projectid),
                         uclustername),
                 '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_CAL.mp4'.
@@ -202,7 +204,7 @@ def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid):
                 ]
             ):
 
-                jpgglob = os.path.join(fitsdir, jpgstr)
+                jpgglob = os.path.join(fitsdir, 'CUT-*', jpgstr)
                 outmp4path = os.path.join(moviedir, outstr)
                 if not os.path.exists(outmp4path) and len(glob(jpgglob))>10:
                     iu.make_mp4_from_jpegs(
