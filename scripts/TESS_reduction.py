@@ -69,9 +69,10 @@ import os, time, warnings
 import matplotlib as mpl
 mpl.use('AGG')
 import numpy as np, pandas as pd, matplotlib.pyplot as plt
-import aperturephot as ap, shared_variables as sv, autoimagesub as ais, \
-       imagesubphot as ism, tessutils as tu, lcstatistics as lcs, \
-       imageutils as iu, lcutils as lcu, wcsqualityassurance as wcsqa
+import aperturephot as ap, shared_variables as sv, \
+       autoimagesub as ais, imagesubphot as ism, tessutils as tu, \
+       lcstatistics as lcs, imageutils as iu, \
+       lcutils as lcu, wcsqualityassurance as wcsqa
 from glob import glob
 from astropy.io import fits
 from astropy import units as units, constants as constants
@@ -1585,12 +1586,15 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
 
     # measure S/N of known HJ transits
     kponchippath = os.path.join(statsdir,'knownplanet_onchip.csv')
-    if tu.are_known_planets_in_field(ra_nom, dec_nom, kponchippath):
-        tu.measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
-                                    statsdir, sectornum, nworkers=nworkers,
-                                    skipepd=skipepd)
+    if not os.path.exists(kponchippath):
+        if tu.are_known_planets_in_field(ra_nom, dec_nom, kponchippath):
+            tu.measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
+                                        statsdir, sectornum, nworkers=nworkers,
+                                        skipepd=skipepd)
+        else:
+            print('did not find any known HJs on this field')
     else:
-        print('did not find any known HJs on this field')
+        print('found {}; skipping planet SNR measurement'.format(kponchippath))
 
     DO_DEPRECATED = False
     if DO_DEPRECATED:
