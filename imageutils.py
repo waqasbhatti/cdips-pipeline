@@ -27,6 +27,8 @@ image-scaling functions:
     extract_img_background
 
 image-sectioning and image-writing functions:
+    mplplot_logscale_img_w_colorbar
+    mplplot_diffscale_img_w_colorbar
     img_to_stamps
     stamps_background
     stamps_to_jpeg
@@ -78,6 +80,8 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 import matplotlib.cm as mplcm
+import matplotlib.pyplot as plt
+import matplotlib.colors as colors
 
 from astrobase import imageutils as iu
 
@@ -569,6 +573,93 @@ def extract_img_background(img_array,
 
 
 ## IMAGE SECTION FUNCTIONS ##
+
+def mplplot_logscale_img_w_colorbar(
+    img,
+    outpath,
+    vmin=10, vmax=int(1e3),
+    cmap='binary_r',
+    titlestr=None):
+
+    if os.path.exists(outpath):
+        print('found {}. continue'.format(outpath))
+        return 0
+
+    plt.close('all')
+    plt.rcParams['xtick.direction'] = 'in'
+    plt.rcParams['ytick.direction'] = 'in'
+
+    fig, ax = plt.subplots(figsize=(6,4.5))
+
+    norm = colors.LogNorm(vmin=vmin, vmax=vmax)
+
+    cset1 = ax.imshow(img, cmap=cmap, vmin=vmin, vmax=vmax, norm=norm)
+
+    #ax.set_xticklabels('')
+    #ax.set_yticklabels('')
+    ax.get_xaxis().set_tick_params(which='both', direction='in')
+    ax.get_yaxis().set_tick_params(which='both', direction='in')
+    #ax.xaxis.set_ticks_position('none')
+    #ax.yaxis.set_ticks_position('none')
+
+    cb1 = fig.colorbar(cset1, ax=ax, extend='both')
+    #cb2.set_ticks([-1e3,-1e2,-1e1,0,1e1,1e2,1e3])
+    #cb2.set_ticklabels(['-$10^3$','-$10^2$','-$10^1$','0',
+    #                    '$10^1$','$10^2$','$10^3$'])
+
+    if isinstance(titlestr, str):
+        ax.set_title(titlestr, fontsize='x-small')
+
+    fig.tight_layout(pad=0)
+
+    fig.savefig(outpath, bbox_inches='tight', dpi=300)
+    print('{}: made {}'.format(datetime.utcnow().isoformat(), outpath))
+
+
+def mplplot_diffscale_img_w_colorbar(
+    img,
+    outpath,
+    vmin=-1000, vmax=1000,
+    cmap='RdBu_r',
+    titlestr=None):
+
+    if os.path.exists(outpath):
+        print('found {}. continue'.format(outpath))
+        return 0
+
+    plt.close('all')
+    plt.rcParams['xtick.direction'] = 'in'
+    plt.rcParams['ytick.direction'] = 'in'
+
+    fig, ax = plt.subplots(figsize=(6,4.5))
+
+    diffnorm = colors.SymLogNorm(linthresh=0.03, linscale=0.03, vmin=vmin,
+                                 vmax=vmax)
+
+    cset2 = ax.imshow(img, cmap=cmap, vmin=vmin, vmax=vmax, norm=diffnorm)
+
+    #ax.set_xticklabels('')
+    #ax.set_yticklabels('')
+    ax.get_xaxis().set_tick_params(which='both', direction='in')
+    ax.get_yaxis().set_tick_params(which='both', direction='in')
+    #ax.xaxis.set_ticks_position('none')
+    #ax.yaxis.set_ticks_position('none')
+
+    cb2 = fig.colorbar(cset2, ax=ax, extend='both')
+
+    cb2.set_ticks([-1e3,-1e2,-1e1,0,1e1,1e2,1e3])
+    cb2.set_ticklabels(['-$10^3$','-$10^2$','-$10^1$','0',
+                        '$10^1$','$10^2$','$10^3$'])
+
+    if isinstance(titlestr, str):
+        ax.set_title(titlestr, fontsize='x-small')
+
+    fig.tight_layout(pad=0)
+
+    fig.savefig(outpath, bbox_inches='tight', dpi=300)
+    print('{}: made {}'.format(datetime.utcnow().isoformat(), outpath))
+
+
 
 def img_to_stamps(img,
                   stampsize=256):
