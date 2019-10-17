@@ -612,18 +612,26 @@ def are_clusters_in_field(ra_center, dec_center, outname, dist_cut=2000,
 
 def cluster_cutout_jpg_worker(task):
 
-    (calfitsimage, subfitsimage, wcsfile, fitsdir, cname, ctype, nstar, dist,
-     logt, ra, dec, angrad, clusterdistancecutoff ) = task
+    (bkgdsubfile, subconvfile, calfitsfile, wcsfile, fitsdir,
+     cname, ctype, nstar, dist, logt,
+     xmin, xmax, ymin, ymax, clusterdistancecutoff
+    ) = task
 
+    outdir = os.path.join(fitsdir, 'CUT-'+str(cname))
     outcalpath = os.path.join(
-        fitsdir, 'CUT-{}_{}_CAL.jpg'.
+        outdir, 'CUT-{}_{}_CAL.jpg'.
         format(cname,
-               os.path.basename(calfitsimage.replace('.fits','')))
+               os.path.basename(calfitsfile.replace('.fits','')))
+    )
+    outbkgdsubpath = os.path.join(
+        outdir, 'CUT-{}_{}_BKGDSUB.jpg'.
+        format(cname,
+               os.path.basename(bkgdsubfile.replace('.fits','')))
     )
     outsubpath = os.path.join(
-        fitsdir, 'CUT-{}_{}_SUB.jpg'.
+        outdir, 'CUT-{}_{}_SUBCONV.jpg'.
         format(cname,
-               os.path.basename(subfitsimage.replace('.fits','')))
+               os.path.basename(subconvfile.replace('.fits','')))
     )
 
     if dist > clusterdistancecutoff:
@@ -631,84 +639,71 @@ def cluster_cutout_jpg_worker(task):
               format(cname, clusterdistancecutoff))
         return 1
 
-    if os.path.exists(outcalpath) and os.path.exists(outsubpath):
+    if (os.path.exists(outcalpath) and
+        os.path.exists(outsubpath) and
+        os.path.exists(outbkgdsubpath)
+    ):
         return 1
 
     thisctype, thisnstar, thislogt = str(ctype), int(nstar), float(dist)
-
-    ra, dec = float(ra), float(dec)
-    clusterangradius = (float(angrad)*u.deg).value
-    boxwidth, boxheight = 5*clusterangradius, 5*clusterangradius
-
-    radeccenter = [ra, dec, boxwidth, boxheight]
 
     annotatestr = '{:s}-{:s}, {:s}*, logt={:s}, d={:.1f}'.format(
         cname, ctype, repr(int(nstar)),
         '{:.1f}'.format(logt), dist/1000
     )
 
-    try:
-        iu.frame_radecbox_to_jpeg(calfitsimage, wcsfrom=wcsfile,
-                                  radeccenter=radeccenter,
-                                  out_fname=outcalpath,
-                                  annotatejd=False,
-                                  annotate=annotatestr,
-                                  forcesquare=True,
-                                  overplotscalebar=True,
-                                  rescaleimage=True,
-                                  scale_func=iu.clipped_logscale_img,
-                                  scale_func_params={
-                                      'cap':255.0, 'lomult':2.0,
-                                      'himult':2.0, 'coeff':1000.0},
-                                  verbose=False,
-                                  do_spoc_trim_shift=True
-                                 )
-        iu.frame_radecbox_to_jpeg(subfitsimage, wcsfrom=wcsfile,
-                                  radeccenter=radeccenter,
-                                  out_fname=outsubpath.replace('.jpg','_grayscale.jpg'),
-                                  annotatejd=False,
-                                  annotate=annotatestr,
-                                  forcesquare=True,
-                                  overplotscalebar=True,
-                                  rescaleimage=True,
-                                  verbose=False,
-                                  do_spoc_trim_shift=True
-                                 )
-        iu.frame_radecbox_to_jpeg(subfitsimage, wcsfrom=wcsfile,
-                                  radeccenter=radeccenter,
-                                  out_fname=outsubpath.replace('.jpg','_bwr.jpg'),
-                                  annotatejd=False,
-                                  annotate=annotatestr,
-                                  forcesquare=True,
-                                  overplotscalebar=True,
-                                  rescaleimage=True,
-                                  colorscheme='bwr',
-                                  verbose=False,
-                                  do_spoc_trim_shift=True
-                                 )
-    except Exception as e:
-        print(e)
-        print('{}, {}'.format(cname, repr(radeccenter)))
-        print('failed to cut for {}, {}'.format(outcalpath, outsubpath))
-        return -1
+    # logscale of the CAL image (no background subtraction)
+    img, _ = iu.read_fits(calfitsfile, ext=0)
+    trimmed_img = img[ymin:ymax, xmin:xmax]
+    iu.mplplot_logscale_img_w_colorbar(trimmed_img, outcalpath,
+                                       cmap='binary_r', vmin=10, vmax=1000,
+                                       titlestr=annotatestr)
+
+    # diffscale image of the BKGDSUB image
+    img, _ = iu.read_fits(bkgdsubfile, ext=0)
+    trimmed_img = img[ymin:ymax, xmin:xmax]
+    iu.mplplot_diffscale_img_w_colorbar(trimmed_img, outbkgdsubpath,
+                                        cmap='RdBu_r', vmin=-1000, vmax=1000,
+                                        titlestr=annotatestr)
+
+    # diffscale image of the SUBCONV image
+    img, _ = iu.read_fits(subconvfile, ext=0)
+    trimmed_img = img[ymin:ymax, xmin:xmax]
+    iu.mplplot_diffscale_img_w_colorbar(trimmed_img, outsubpath,
+                                        cmap='RdBu_r', vmin=-1000, vmax=1000,
+                                        titlestr=annotatestr)
 
     return 1
 
 
-def parallel_cluster_cutout_jpgs(calfitsimages, subfitsimages, wcsfiles,
-                                 fitsdir, cname, ctype, nstar, dist, logt,
-                                 ra, dec, angrad, clusterdistancecutoff,
+def parallel_cluster_cutout_jpgs(bkgdsubfiles, subconvfiles, calimgfiles,
+                                 wcsfiles, fitsdir, cname, ctype, nstar, dist,
+                                 logt, xmin, xmax, ymin, ymax, clusterdistancecutoff,
                                  nworkers=16, maxworkertasks=1000):
+    """
+    cutout boxes from the images, to make movies of individual clusters.
+
+    we use a fixed box (xmin,xmax,ymin,ymax) because determining specific boxes
+    on each frame leads to jitter over the movie.
+    """
 
     print('%sZ: %s files to make cluster cutouts for %s' %
           (datetime.utcnow().isoformat(), len(wcsfiles), cname))
 
-    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+    outdir = os.path.join(fitsdir, 'CUT-'+str(cname))
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
 
-    tasks = [(x, y, z, fitsdir, cname, ctype, nstar, dist, logt, ra, dec,
-              angrad, clusterdistancecutoff)
-             for x,y,z in zip(calfitsimages, subfitsimages, wcsfiles)
-            ]
+    tasks = [(
+        x, y, z, w,
+        fitsdir, cname, ctype, nstar, dist, logt,
+        xmin, xmax, ymin, ymax,
+        clusterdistancecutoff
+    )
+        for x,y,z,w in zip(bkgdsubfiles, subconvfiles, calimgfiles, wcsfiles)
+    ]
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
     # fire up the pool of workers
     results = pool.map(cluster_cutout_jpg_worker, tasks)
@@ -726,17 +721,31 @@ def make_cluster_cutout_jpgs(sectornum, fitsdir, racenter, deccenter, field,
                              camera, ccd, statsdir,
                              clusterdistancecutoff=2000, nworkers=16):
     """
+    cluster cutouts from three types of images:
+        CAL images
+        BKGDSUB images (background subtracted)
+        SUBCONV images (difference image -- convolved + subtracted)
+
     (kw)args:
         clusterdistancecutoff (float): distance beyond which you are not making
         cutouts for clusters.
     """
 
-    wcsfiles = glob(os.path.join(fitsdir,'*.wcs'))
-    calfitsimages = [w.replace('.wcs','.fits') for w in wcsfiles]
-    subfitsimages = glob(os.path.join(fitsdir,'[r|n]sub-*-tess*-xtrns.fits'))
+    calimgdir = (
+        '/nfs/phtess2/ar0/TESS/FFI/RED/sector-{:d}/cam{:d}_ccd{:d}/'.
+        format(int(str(field[1:]).lstrip('0')), camera, ccd)
+    )
 
-    if not len(wcsfiles)==len(subfitsimages)==len(calfitsimages):
-        if len(wcsfiles) - len(subfitsimages) < 10:
+    calimgfiles = glob(os.path.join(calimgdir, 'tess*cal_img.fits'))
+    wcsfiles = glob(os.path.join(fitsdir,'*.wcs'))
+    bkgdsubfiles = [w.replace('.wcs','.fits') for w in wcsfiles]
+    subconvfiles = glob(os.path.join(fitsdir,'[r|n]sub-*-tess*-xtrns.fits'))
+
+    if not (
+        len(wcsfiles) == len(subconvfiles) ==
+        len(bkgdsubfiles) == len(calimgfiles)
+    ):
+        if len(wcsfiles) - len(subconvfiles) < 10:
             # some wonky wcs's
             shiftok = np.array([os.path.exists(f.replace('.wcs','.fits'))
                                 for f in wcsfiles])
@@ -750,8 +759,9 @@ def make_cluster_cutout_jpgs(sectornum, fitsdir, racenter, deccenter, field,
             raise AssertionError(
                 'something wrong in astrometric shift.'+
                 '\nN_WCS: {:d}'.format(len(wcsfiles))+
-                '\nN_subfits: {:d}'.format(len(subfitsimages))+
-                '\nN_calfits: {:d}'.format(len(calfitsimages))
+                '\nN_calfits: {:d}'.format(len(calimgfiles))+
+                '\nN_subconvfits: {:d}'.format(len(subconvfiles))+
+                '\nN_bkgdsubfits: {:d}'.format(len(bkgdsubfiles))
             )
 
 
@@ -784,22 +794,45 @@ def make_cluster_cutout_jpgs(sectornum, fitsdir, racenter, deccenter, field,
         print('found cutouts were already made, return')
         return
 
-    raise AssertionError('DEBUG FROM HERE TO SOLVE THE CAL MOVIE PROBLEM')
-
     for name, ct, ns, d, age, ra, dec, r2 in zip(names, ctype, nstar, dist,
                                                  logt, ras, decs, angrads):
 
-        outcalmatches = glob(os.path.join(
-            fitsdir, 'CUT-{}*_CAL.jpg'.format(name) ))
+        outdir = os.path.join(fitsdir, 'CUT-'+str(name))
+        outcalmatches = glob(
+            os.path.join(outdir, 'CUT-{}*_CAL.jpg'.format(name))
+        )
         if len(outcalmatches) > 10:
             print('found cuts for {}, continue'.format(name))
             continue
 
-        parallel_cluster_cutout_jpgs(calfitsimages, subfitsimages, wcsfiles,
-                                     fitsdir, name, ct, ns, d, age, ra, dec,
-                                     r2, clusterdistancecutoff,
-                                     nworkers=nworkers)
+        ra, dec = float(ra), float(dec)
+        clusterangradius = (float(r2)*u.deg).value
+        boxwidth, boxheight = 5*clusterangradius, 5*clusterangradius
 
+        radeccenter = [ra, dec, boxwidth, boxheight]
+
+        middle_index = 200 # used to define the box pixel limits for the movie
+        _img, _hdr = iu.read_fits(calimgfiles[middle_index])
+        xmin,xmax,ymin,ymax = (
+            iu._given_radecbox_get_xybox(wcsfiles[middle_index],
+                                         calimgfiles[middle_index], None,
+                                         radeccenter, _hdr, _img,
+                                         do_spoc_trim_shift=True,
+                                         forcesquare=True)
+        )
+
+        if xmax - xmin < 10:
+            continue
+        if ymax - ymin < 10:
+            continue
+
+        parallel_cluster_cutout_jpgs(bkgdsubfiles,
+                                     subconvfiles,
+                                     calimgfiles,
+                                     wcsfiles,
+                                     fitsdir, name, ct, ns, d, age,
+                                     xmin, xmax, ymin, ymax,
+                                     clusterdistancecutoff, nworkers=nworkers)
 
 
 def measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
