@@ -542,13 +542,13 @@ def plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=10,
             if skipepd:
                 # hacky placeholder to prevent too much code rewrite in
                 # TFA-direct-from-IRM case
-                foo = np.zeros_like(d[key]['lag_time_raw'])
+                foo = np.zeros_like(d[key]['lag_time_irm'])
 
                 lcs.plot_lightcurve_and_ACF(
-                    d[key]['lag_time_raw'], d[key]['acf_raw'],
+                    d[key]['lag_time_irm'], d[key]['acf_irm'],
                     foo, foo,
                     d[key]['lag_time_tfa'], d[key]['acf_tfa'],
-                    d[key]['itimes_raw'], d[key]['ifluxs_raw'],
+                    d[key]['itimes_irm'], d[key]['ifluxs_irm'],
                     foo, foo,
                     d[key]['itimes_tfa'], d[key]['ifluxs_tfa'],
                     ap, savpath=savpath, skipepd=skipepd
@@ -556,10 +556,10 @@ def plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=10,
 
             else:
                 lcs.plot_lightcurve_and_ACF(
-                    d[key]['lag_time_raw'], d[key]['acf_raw'],
+                    d[key]['lag_time_irm'], d[key]['acf_irm'],
                     d[key]['lag_time_epd'], d[key]['acf_epd'],
                     d[key]['lag_time_tfa'], d[key]['acf_tfa'],
-                    d[key]['itimes_raw'], d[key]['ifluxs_raw'],
+                    d[key]['itimes_irm'], d[key]['ifluxs_irm'],
                     d[key]['itimes_epd'], d[key]['ifluxs_epd'],
                     d[key]['itimes_tfa'], d[key]['ifluxs_tfa'],
                     ap, savpath=savpath, skipepd=skipepd
@@ -1553,7 +1553,8 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
         os.mkdir(outdir)
     lcs.parallel_compute_acf_statistics(
         acf_lcs, outdir, nworkers=nworkers,
-        eval_times_hr=[1,2,6,12,24,48,60,96,120,144,192]
+        eval_times_hr=[1,2,6,12,24,48,60,96,120,144,192],
+        dtrtypes=['IRM','TFA']
     )
 
     outdir = os.path.join(statsdir,'tfa_templates')

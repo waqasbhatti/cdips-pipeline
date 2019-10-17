@@ -449,7 +449,7 @@ def compute_acf_statistics_worker(task, n_apertures=3, timename='TMID_BJD',
 def parallel_compute_acf_statistics(
     tfafiles, outdir, eval_times_hr=[1,2,6,12,24,48,60,96,120,144,192],
     nworkers=16, maxworkertasks=1000,
-    dtrtypes=['IRM','PCA','TFA']
+    dtrtypes=['IRM','TFA']
 ):
     """
     Given list of TFA lightcurves, calculate autocorrelation functions and
@@ -1489,10 +1489,10 @@ def acf_percentiles_stats_and_plots(statdir, outprefix, make_plot=True,
 
     # ACF vs time-lag statistics, summarized as percentiles at 2%, 25%, 50%,
     # 75%, and 98% percentiles.
-    apstrlist = (['TFA1','TFA2','TFA3','RAW1','RAW2','RAW3']
+    apstrlist = (['TFA1','TFA2','TFA3','IRM1','IRM2','IRM3']
                  if skipepd else
                  ['TFA1','TFA2','TFA3', 'EPD1','EPD2','EPD3',
-                  'RAW1','RAW2','RAW3'])
+                  'IRM1','IRM2','IRM3'])
 
     for apstr in apstrlist:
         try:
