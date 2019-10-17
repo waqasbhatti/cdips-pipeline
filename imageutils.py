@@ -1573,12 +1573,18 @@ def make_mp4_from_jpegs(jpgglob, outmp4path, ffmpegpath='ffmpeg'):
         raise AssertionError(
             '`ffmpeg` must be installed to use make_mp4_from_jpegs')
 
+    # framerate: obvious.
+    # libx264: encoding
+    # vf: encoding requires even number of pixels. This filter divided original
+    # heigh and width by two, rounds up to nearest pixel, multiplies by two,
+    # and add white padding pixels.
     FFMPEGCMD = (
         "{ffmpegpath} -framerate 24 "
         "-pattern_type "
         "glob -i '{jpgglob}' "
         "-c:v libx264 "
         "-preset fast "
+        "-vf \"pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white\" "
         "{outmp4path}"
     )
 
