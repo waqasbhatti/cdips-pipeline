@@ -998,62 +998,25 @@ def fits_to_full_jpeg(fits_image,
     return out_fname
 
 
-def frame_radecbox_to_jpeg(
-        fits_image,
-        wcsfrom=None,
-        radecbox=None,
-        radeccenter=None,
-        out_fname=None,
-        ext=None,
-        flip=True,
-        annotatejd=True,
-        annotate=True,
-        jdsrc=None,
-        forcesquare=False,
-        overplotscalebar=False,
-        rescaleimage=False,
-        scale_func=clipped_linscale_img,
-        scale_func_params={'cap':255.0,
-                           'lomult':2,
-                           'himult':2.5},
-        colorscheme=None,
-        verbose=True,
-        do_spoc_trim_shift=False):
-    '''This cuts out a box centered at RA/DEC and width from the FITS to JPEG.
+def _given_radecbox_get_xybox(wcsfrom, fits_image, radecbox, radeccenter, hdr,
+                              img, do_spoc_trim_shift=False, forcesquare=True,
+                              verbose=False):
+    """
+    Stand-alone helper to frame_radecbox_to_jpeg. requires a FITS image, its
+    WCS, and the coords of a box,
 
-    wcsfrom indicates that the frame WCS should be taken from the specified file
-    (usually a .wcs in our pipeline).
+        `radeccenter = [ra, dec, boxwidth, boxheight]`.
 
-    if radecbox and not radeccenter:
-        radecbox = [rmin, rmax, dmin, dmax] of box to cut out of FITS
+    This function is relevant for any image box-trimming though.
 
-    elif radeccenter and not radecbox:
-        radeccenter = [rcenter, dcenter, rwidth, dwidth]
+    args:
+        wcsfrom: wcs file
+        fits_image: path to fits image
+        hdr, img: from reading the fits image
 
-    else:
-        do nothing, since we can't have both at the same time
-
-    Other options:
-
-        forcesquare (bool): forces output image to be square.
-
-        overplotscalebar (bool):
-
-        rescaleimage (bool):
-    '''
-    compressed_ext = compressed_fits_ext(fits_image)
-
-    if ext is None and compressed_ext:
-        img, hdr = read_fits(fits_image,
-                             ext=compressed_ext[0])
-    elif (ext is not None):
-        img, hdr = read_fits(fits_image,ext=ext)
-    else:
-        img, hdr = read_fits(fits_image)
-
-    #trimmed_img = trim_image(img, hdr)
-    trimmed_img = img
-    jpegaspect = float(img.shape[1])/float(img.shape[0])
+    returns:
+        xmin,xmax,ymin,ymax to trim the image.
+    """
 
     try:
         # get the WCS header
@@ -1159,6 +1122,75 @@ def frame_radecbox_to_jpeg(
                       int(np.round(ymid + sqdelta/2)))
         xmin, xmax = (int(np.round(xmid - sqdelta/2)),
                       int(np.round(xmid + sqdelta/2)))
+
+    return xmin, xmax, ymin, ymax
+
+
+
+def frame_radecbox_to_jpeg(
+        fits_image,
+        wcsfrom=None,
+        radecbox=None,
+        radeccenter=None,
+        out_fname=None,
+        ext=None,
+        flip=True,
+        annotatejd=True,
+        annotate=True,
+        jdsrc=None,
+        forcesquare=False,
+        overplotscalebar=False,
+        rescaleimage=False,
+        scale_func=clipped_linscale_img,
+        scale_func_params={'cap':255.0,
+                           'lomult':2,
+                           'himult':2.5},
+        colorscheme=None,
+        verbose=True,
+        do_spoc_trim_shift=False):
+    '''This cuts out a box centered at RA/DEC and width from the FITS to JPEG.
+
+    wcsfrom indicates that the frame WCS should be taken from the specified file
+    (usually a .wcs in our pipeline).
+
+    if radecbox and not radeccenter:
+        radecbox = [rmin, rmax, dmin, dmax] of box to cut out of FITS
+
+    elif radeccenter and not radecbox:
+        radeccenter = [rcenter, dcenter, rwidth, dwidth]
+
+    else:
+        do nothing, since we can't have both at the same time
+
+    Other options:
+
+        forcesquare (bool): forces output image to be square.
+
+        overplotscalebar (bool):
+
+        rescaleimage (bool):
+    '''
+    compressed_ext = compressed_fits_ext(fits_image)
+
+    if ext is None and compressed_ext:
+        img, hdr = read_fits(fits_image,
+                             ext=compressed_ext[0])
+    elif (ext is not None):
+        img, hdr = read_fits(fits_image,ext=ext)
+    else:
+        img, hdr = read_fits(fits_image)
+
+    #trimmed_img = trim_image(img, hdr)
+    trimmed_img = img
+    jpegaspect = float(img.shape[1])/float(img.shape[0])
+
+    xmin, xmax, ymin, ymax = _given_radecbox_get_xybox(
+        wcsfrom, fits_image,
+        radecbox, radeccenter,
+        hdr, img,
+        do_spoc_trim_shift=do_spoc_trim_shift, forcesquare=forcesquare,
+        verbose=verbose
+    )
 
     # numpy is y,x so make sure to reverse the order
     trimmed_img = trimmed_img[ymin:ymax, xmin:xmax]
