@@ -1794,10 +1794,12 @@ def parallel_bkgd_subtract(fitslist, method='boxblurmedian', isfull=True, k=32,
     from parse import parse
     res = parse('{}/sector-{}/{}',fitslist[0])
     sectornum = int(res[1])
-    if sectornum in [1,2,4,5,6,7,9]:
+    if sectornum in [1,2,4,5,6,7,9,10,11]:
         orbitgap = 1. # days
     elif sectornum in [3]:
         orbitgap = 0.15 # days
+    elif sectornum in [12,13]:
+        orbitgap = 0.5 # days
     else:
         errmsg = 'need manual orbitgap to be implemented in bkgdsub'
         raise NotImplementedError(errmsg)
