@@ -66,7 +66,7 @@ def main():
                     'camnum':cam,
                     'ccdnum':ccd,
                     'projectid':projid,        # increment this whenever new things go to PSQL database.
-                    'sector':"'s000{}'".format(snum), # match SPOC syntax, zfill to 4.
+                    'sector':"'s{:s}'".format(str(snum).zfill(4)), # match SPOC syntax, zfill to 4.
                     'tuneparameters':'false',
                     'nworkers':32,
                     'aperturelist':"\"1.0:7.0:6.0,1.5:7.0:6.0,2.25:7.0:6.0\"",
