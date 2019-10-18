@@ -1,25 +1,35 @@
 import os
 
-outlines = (
+sectors = [10,11,12,13]
+
+projidtuples = [(1564,1580),
+                (1564+16,1580+16),
+                (1564+32,1580+32),
+                (1564+48,1580+48)
+               ]
+
+for ix, sector in enumerate(sectors):
+
+    outlines = (
 """#!/usr/bin/env bash
 
 ####################################
-# USAGE: ./sector9_reduction.sh & #
+# USAGE: ./sector{}_reduction.sh & #
 ####################################
 
-"""
-)
-
-projidlines = []
-for projid in range(1548,1564):
-    projidlines.append(
-        '( source activate trex_37; source projid_{}.sh; wait ) & wait\n'.
-        format(projid)
+""".format(sector)
     )
 
-outname = 'tess_tuning_scripts/sector9_reduction.sh'
-with open(outname, 'w') as f:
-    f.writelines(outlines)
-    f.writelines(projidlines)
+    projidlines = []
+    for projid in range(projidtuples[ix][0],projidtuples[ix][1]):
+        projidlines.append(
+            '( source activate trex_37; source projid_{}.sh; wait ) & wait\n'.
+            format(projid)
+        )
 
-print('wrote {}'.format(outname))
+    outname = 'tess_tuning_scripts/sector{}_reduction.sh'.format(sector)
+    with open(outname, 'w') as f:
+        f.writelines(outlines)
+        f.writelines(projidlines)
+
+    print('wrote {}'.format(outname))
