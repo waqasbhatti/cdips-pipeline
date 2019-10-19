@@ -506,7 +506,7 @@ def are_known_planets_in_field(ra_center, dec_center, outname, use_NEA=False,
         # sectors 1-7
         df = pd.read_csv(
             '/home/lbouma/proj/pipe-trex/data/'
-            'toi-plus-2019-04-18.csv'
+            'toi-plus-2019-10-19.csv'
         )
         kp_coords = SkyCoord(nparr(df['RA'])*u.deg,
                              nparr(df['Dec'])*u.deg,
