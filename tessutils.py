@@ -1173,7 +1173,18 @@ def _measure_planet_snr(plname, tfalc, statsdir, sectornum,
             intra_inds_list.append( (time[this_window_inds]>transit_start) &
                                     (time[this_window_inds]<transit_end) )
 
-        intra = np.hstack(np.array(intra_inds_list))
+        try:
+            intra = np.hstack(np.array(intra_inds_list))
+        except ValueError:
+            outdf = pd.DataFrame({'plname':plname, 'trapz_snr':np.nan,
+                                  'tfalc':tfalc}, index=[0])
+            outdf.to_csv(snrfit_savfile, index=False)
+            print('WRN! SNR calculation failed, but made {} anyway with nan'.
+                  format(snrfit_savfile))
+            print('{} made {}'.format(
+                datetime.utcnow().isoformat(), snrfit_savfile))
+            return 0
+
         sel_time = np.array(time_list)
         sel_flux = np.array(in_fluxs)
         windowinds = np.bitwise_or.reduce( np.array(windowinds), axis=0 )
