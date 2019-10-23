@@ -9,10 +9,10 @@
 # clear out astromrefs and photrefs table.
 # clear out calibratedframes table.
 # clear frameinfo cache from past week. 
-camnum=4
-ccdnum=4
-projectid=1315
-sector='s0002'
+camnum=1
+ccdnum=1
+projectid=1548
+sector='s0010'
 tuneparameters=false
 
 ##########
@@ -34,12 +34,12 @@ else
 fi
 
 # get paths
-LOCAL_IMGBASE="/nfs/phtess1/ar1/TESS/FFI/RED_IMGSUB/"${tunefullstr}
+LOCAL_IMGBASE="/nfs/phtess2/ar0/TESS/FFI/RED_IMGSUB/"${tunefullstr}
 sectordir=$LOCAL_IMGBASE"/"${sector}"/"
 fitsdir=$sectordir"RED_"${camnum}"-"${ccdnum}"-"${projectid}"_ISP/"
 LOCAL_GLOBPATTERN='tess?????????????-'${sector}'-'${camnum}'-'${ccdnum}'-'${scid}'_cal_img_bkgdsub.fits'
 fitsglob=$LOCAL_GLOBPATTERN
-lcbase="/nfs/phtess1/ar1/TESS/FFI/LC/"${tunefullstr}
+lcbase="/nfs/phtess2/ar0/TESS/FFI/LC/"${tunefullstr}
 lcsector=$lcbase"/"${sector}"/"
 lcdir=${lcsector}"ISP_"${camnum}"-"${ccdnum}"-"${projectid}"/"
 lcdirold=${lcsector}"ISP_"${camnum}"-"${ccdnum}"-"${projectid}"_old/"
@@ -55,24 +55,21 @@ rm ${fitsdir}*ASTOMREF*jpg
 rm ${fitsdir}rsub-*
 rm ${fitsdir}JPEG-SUBTRACTEDCONV*jpg
 
-# remove lightcurves and stats. since this takes a while... first rename, then
-# run!
+# remove lightcurves and stats. this takes a while. first rename, then run!
 echo "moving "${lcdir}" to "${lcdirold}
 mv ${lcdir} ${lcdirold}
 echo "removing lightcurves from "${lcdirold}
 rm -rf ${lcdirold}
 
-#FIXME: old
-# remove specific reference files (otherwise bad old cached files get collected)
 echo "removing all reference files"
+rm /nfs/phtess2/ar0/TESS/FFI/BASE/reference-frames/*proj${projectid}-camera${camnum}-ccd${ccdnum}*
 
-rm /nfs/phtess1/ar1/TESS/FFI/BASE/reference-frames/*proj${projectid}-camera${camnum}-ccd${ccdnum}*
-# 
-# for the frameinfo-cache, the name is tricky. But if you're running this, it's
-# probably safe to remove everything from the past week.
-echo "removing frameinfo cache from past week"
+# remove frameinfo cache directory
+fname=`find /nfs/phtess2/ar0/TESS/FFI/BASE/frameinfo-cache/*/*${sector}-${camnum}-${ccdnum}-${scid}*jpg | head -n1`
+dname=`dirname $fname`
 
-rm -rf `find /nfs/phtess1/ar1/TESS/FFI/BASE/frameinfo-cache/* -mtime -7 -print`
+echo "removing frameinfo cache dir for "${fname}
+rm -rf $dname
 
 # clean calibratedframes. regex reference:
 # https://www.postgresql.org/docs/9.5/static/functions-matching.html
@@ -81,9 +78,3 @@ psql -U hpx -h xphtess1 hpx -c \
   "DELETE from calibratedframes where fits like '"${fitsdir}"%';"
 psql -U hpx -h xphtess1 hpx -c \
   "DELETE from calibratedframes where (fitsheader->'PROJID' ='"${projectid}"');"
-
-# # clean cache
-# echo "removing all reference files"
-# rm /nfs/phtess1/ar1/TESS/FFI/BASE/reference-frames/*cam${camnum}-ccd${ccdnum}*
-# rm /nfs/phtess1/ar1/TESS/FFI/BASE/reference-frames/*camera${camnum}-ccd${ccdnum}*
-# rm -rf /nfs/phtess1/ar1/TESS/FFI/BASE/frameinfo-cache/*
