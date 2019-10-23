@@ -277,7 +277,7 @@ def move_badframe(task):
     fitsname, flagvalues = task
 
     # open the header, check if the quality flag matches the passed value.
-    data, hdr = iu.read_fits(fitsname, ext=0)
+    hdr = iu.read_fits_header(fitsname, ext=0)
 
     isbadtime = False
     if -1 in flagvalues:
@@ -306,7 +306,82 @@ def move_badframe(task):
         return 1
 
 
-def parallel_move_badframes(fitslist, flagvalues=[-1,4,32,36], nworkers=16,
+def verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.15):
+    """
+    max_frac_badframes: if you have more than this fraction of the FFIs that
+    are "badframes", you should be worried!
+    """
+
+    dqualitys = []
+    isbadtimes = []
+
+    for f in fitslist:
+
+        # open the header, check if the quality flag matches the passed value.
+        hdr = iu.read_fits_header(f, ext=0)
+
+        dquality = hdr['DQUALITY']
+        dqualitys.append(dquality)
+
+        isbadtime = False
+        if -1 in flagvalues:
+            # get frame time in TJD. if its within any known bad times for TESS,
+            # then set isbadtime to True, and mask the frame.
+
+            # get frametime in TJD = BTJD - LTT_corr
+            tjd = hdr['TSTART'] - hdr['BARYCORR']
+
+            for window in badtimewindows:
+                if tjd > min(window) and tjd < max(window):
+                    isbadtime = True
+
+        if dquality in flagvalues or isbadtime:
+
+            isbadtimes.append(True)
+
+        else:
+
+            isbadtimes.append(False)
+
+    df = pd.DataFrame()
+
+    df['fitslist'] = fitslist
+    df['isbadtime'] = isbadtimes
+    df['DQUALITY'] =  dqualitys
+
+    df = df.sort_values(by='fitslist')
+    camera = hdr['CAMERA']
+    ccd = hdr['CCD']
+    outstr = 'cam{}_ccd{}'.format(camera, ccd)
+    outpath = os.path.join(os.path.dirname(fitslist[0]),
+                           'verify_badframe_move_{}.csv'.format(outstr))
+    df.to_csv(outpath, index=False)
+    print('made {}'.format(outpath))
+
+    if not len(df[df['isbadtime']])/len(df) < max_frac_badframes:
+        errmsg = (
+            'Got {} badtimes of {} FFIs. Too large fraction!'.
+            format(len(df[df['isbadtime']]), len(df) )
+        )
+        raise AssertionError(errmsg)
+
+
+    plt.close('all')
+    f, axs = plt.subplots(nrows=2, ncols=1, figsize=(6,6))
+    axs[0].scatter(range(len(df)), df['DQUALITY'])
+    axs[0].set_ylabel('dquality')
+    axs[1].scatter(range(len(df)), df['isbadtime'])
+    axs[1].set_ylabel('is_omitted')
+    axs[1].set_xlabel('time index')
+    outpath = os.path.join(os.path.dirname(fitslist[0]),
+                           'verify_badframe_move_{}.png'.format(outstr))
+    f.savefig(outpath, dpi=300, bbox_inches='tight')
+    print('made {}'.format(outpath))
+
+
+def parallel_move_badframes(fitslist,
+                            flagvalues=[-1,4,32,36,2048,2080,2052,2084],
+                            nworkers=16,
                             maxworkertasks=1000):
     '''
     Move the entire frame to "badframe" subdirectory, if it matches particular
@@ -318,16 +393,25 @@ def parallel_move_badframes(fitslist, flagvalues=[-1,4,32,36], nworkers=16,
 
     Kwargs:
         flagvalues (list): list of integers that tells you something about the
-        data quality. E.g., "32" is a "reaction wheel desaturation event", AKA
-        a "momentum dump".  The value "-1" is special because it is the
-        manually-imposed "Manual Exclude" flag from within pipe-trex. These
-        come from a list of known bad times, which are read from the data
-        release notes.
+        data quality.
+
+            "32" is "reaction wheel desaturation event", AKA "momentum dump".
+
+            "4" is that the spacecraft is in corase point mode.
+
+            "2048" is scattered light. empirically, it's _bad_ scattered light.
+
+            "-1" is special because it is the manually-imposed "Manual Exclude"
+            flag from within pipe-trex. These come from a list of known bad
+            times, which are read from the data release notes.
     '''
 
     print('%sZ: %s files to check for DQUALITY=%s in (BADFRAME MOVE)' %
           (datetime.utcnow().isoformat(), len(fitslist), repr(flagvalues)))
 
+    verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.15)
+
+    # omit the frames.
     pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
 
     tasks = [(x, flagvalues) for x in fitslist]

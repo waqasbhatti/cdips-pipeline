@@ -1649,7 +1649,8 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
          extractsources=True, binlightcurves=False, get_masks=1,
          tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0, translateimages=True,
          reversesubtract=False, skipepd=True, useimagenotfistar=True,
-         fixedtfatemplate=None, flagvalues=[-1,4,32,36], do_cdips_merge=True
+         fixedtfatemplate=None, flagvalues=[-1,4,32,36,2048,2080,2052,2084],
+         do_cdips_merge=True
          ):
     """
     args:
