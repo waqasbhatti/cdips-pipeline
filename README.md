@@ -25,13 +25,13 @@ The pipeline is a collection of python functions that can be called from a
 single "driver script" to go through steps described in [the
 paper](https://github.com/lgbouma/cdips/blob/master/paper_I/ms.pdf). For the
 CDIPS-I reduction, the driver script is
-[`scripts/TESS_reduction.py`](https://github.com/waqasbhatti/cdips-pipeline/blob/master/scripts/TESS_reduction.py).
+[`drivers/TESS_reduction.py`](https://github.com/waqasbhatti/cdips-pipeline/blob/master/drivers/TESS_reduction.py).
 The idea is that you run this one program (calling the correct options),  and
 you get light curves from images.  This can be done from [a shell
-script](https://github.com/waqasbhatti/cdips-pipeline/blob/master/scripts/tess_tuning_scripts/TEMPLATE_single_tess_ccd.sh).
+script](https://github.com/waqasbhatti/cdips-pipeline/blob/master/drivers/tess_tuning_drivers/TEMPLATE_single_tess_ccd.sh).
 State-awareness (i.e., whether previous reduction attempts succeeded or failed)
 is minimal, and based on the pre-existence of files and if-else logic.  A few
-similar driver scripts are also in /scripts/, for example to reduce the ETE6
+similar driver scripts are also in /drivers/, for example to reduce the ETE6
 images.  Most of the intermediate files in the pipe-trex reduction (e.g.,
 fistar, fiphot, ficonv, etc files) are stored on-disk. A few pieces of metadata
 (e.g., image quality diagnostics) are collected to a PostgreSQL database and
@@ -268,7 +268,7 @@ will instead be at a path like
 
 ## 2 Getting Started
 
-Some usage examples are given in the `scripts/` directory.
+Some usage examples are given in the `drivers/` directory.
 
 
 ### 2.1 Concepts: Directory structure
