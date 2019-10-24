@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-functions for reducing TESS data.  contents are as follows, where "sub-tasks"
-in a conceptual sense are listed below the main task:
-------------------------------------------
+tessutils.py - Luke Bouma (bouma.luke@gmail.com) - May 2019
 
+Miscellaneous utilities used for the TESS reductions.
+
+====================
 parallel_bkgd_subtract: estimate sky background (with a median filter)
 
 parallel_plot_median_filter_quad: plot sky bkgd.
@@ -20,16 +21,16 @@ parallel_mask_dquality_flag_frames: mask entire frames based on DQUALITY flag
     mask_dquality_flag_frame
 
 parallel_trim_get_single_extension: get single extension image, trim to remove
-virtual columns, append "PROJID" header keywork
+    virtual columns, append "PROJID" header keywork
 
     from_CAL_to_fitsh_compatible
     (deprecated) from_ete6_to_fitsh_compatible
 
 are_known_planets_in_field: precursor to measuring known planet properties is
-knowing if there are any
+    knowing if there are any
 
 measure_known_planet_SNR: if there are known planets in this frame, estimate
-their SNR through a max-likelihood trapezoidal transit model
+    their SNR through a max-likelihood trapezoidal transit model
 
     _measure_planet_snr
 
@@ -38,8 +39,7 @@ read_object_reformed_catalog: get objectid, ra, dec from reformed catalog
 read_object_catalog: read the Gaia .catalog file into a pandas DataFrame
 
 read_tess_txt_lightcurve: Read grcollect dumped lightcurve file into a
-dictionary (which can then be put into a FITS table, or some other data
-structure better than text).
+    dictionary (which can then be put into a FITS table).
 
 plot_lc_positions: Given list of lcpaths, plot their on-chip positions.
 
@@ -94,67 +94,6 @@ SATURATIONMASKCMD = ('fiign {fitsfile} -o {outfitsfile} '
 DQUALITYMASKCMD = ('fiign {fitsfile} -o {outfitsfile} '
                    '-s {minimumreadout:.10f} --ignore-nonpositive')
 
-def mask_saturated_stars_worker(task):
-    """
-    Mask the saturated stars using the calibrated images. Overwrites image with
-    fitsh-aware mask in the header. Note the mask is not actually applied to
-    the pixel values until we need to visualize; the mask is metadata.
-
-    At first thought, it would be better to do this with raw images because
-    once the flat-field is applied, saturated stars do not have a constant
-    value.  However inspection of the raw images shows that the saturated stars
-    do not have constant values there either. So it's easier to first trim, and
-    then apply this.
-    """
-
-    fitsname, saturationlevel = task
-
-    cmdtorun = SATURATIONMASKCMD.format(fitsfile=fitsname, outfitsfile=fitsname,
-                                        saturationlevel=saturationlevel)
-
-    returncode = os.system(cmdtorun)
-
-    if DEBUG:
-        print(cmdtorun)
-
-    if returncode == 0:
-        print('%sZ: appended saturated stars mask %s' %
-              (datetime.utcnow().isoformat(), fitsname))
-        return fitsname
-    else:
-        print('ERR! %sZ: saturated star mask construction failed for %s' %
-              (datetime.utcnow().isoformat(), fitsname))
-        return None
-
-
-def parallel_mask_saturated_stars(fitslist, saturationlevel=65535, nworkers=16,
-                                  maxworkertasks=1000):
-    '''
-    Append mask of saturated stars to fits header using the calibrated TESS
-    images, by applying a constant saturation level.
-
-    Kwargs:
-        saturationlevel (int): 2**16 - 1 = 65535 is a common choice. This is
-        the number that is used to mask out cores of saturated stars.
-    '''
-
-    print('%sZ: %s files to mask saturated stars in' %
-          (datetime.utcnow().isoformat(), len(fitslist)))
-
-    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
-
-    tasks = [(x, saturationlevel) for x in fitslist]
-
-    # fire up the pool of workers
-    results = pool.map(mask_saturated_stars_worker, tasks)
-
-    # wait for the processes to complete work
-    pool.close()
-    pool.join()
-
-    return {result for result in results}
-
-
 # bad times quoted in data release notes are all in TJD (no barycentric
 # correction applied). this is b/c they're from POC, not SPOC.
 badtimewindows = [
@@ -174,6 +113,7 @@ badtimewindows = [
     (1638.99562, 1640.03312), # sector 12 downlink, btwn orbits 31->32
     (1667.69004, 1668.61921), # sector 13 downlink, btwn orbits 33->34
 ]
+
 
 def mask_dquality_flag_frame(task):
     """
@@ -428,6 +368,66 @@ def parallel_move_badframes(fitslist,
 
     return {result for result in results}
 
+
+def mask_saturated_stars_worker(task):
+    """
+    Mask the saturated stars using the calibrated images. Overwrites image with
+    fitsh-aware mask in the header. Note the mask is not actually applied to
+    the pixel values until we need to visualize; the mask is metadata.
+
+    At first thought, it would be better to do this with raw images because
+    once the flat-field is applied, saturated stars do not have a constant
+    value.  However inspection of the raw images shows that the saturated stars
+    do not have constant values there either. So it's easier to first trim, and
+    then apply this.
+    """
+
+    fitsname, saturationlevel = task
+
+    cmdtorun = SATURATIONMASKCMD.format(fitsfile=fitsname, outfitsfile=fitsname,
+                                        saturationlevel=saturationlevel)
+
+    returncode = os.system(cmdtorun)
+
+    if DEBUG:
+        print(cmdtorun)
+
+    if returncode == 0:
+        print('%sZ: appended saturated stars mask %s' %
+              (datetime.utcnow().isoformat(), fitsname))
+        return fitsname
+    else:
+        print('ERR! %sZ: saturated star mask construction failed for %s' %
+              (datetime.utcnow().isoformat(), fitsname))
+        return None
+
+
+def parallel_mask_saturated_stars(fitslist, saturationlevel=65535, nworkers=16,
+                                  maxworkertasks=1000):
+    '''
+    Append mask of saturated stars to fits header using the calibrated TESS
+    images, by applying a constant saturation level.
+
+    Kwargs:
+        saturationlevel (int): 2**16 - 1 = 65535 is a common choice. This is
+        the number that is used to mask out cores of saturated stars.
+    '''
+
+    print('%sZ: %s files to mask saturated stars in' %
+          (datetime.utcnow().isoformat(), len(fitslist)))
+
+    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+
+    tasks = [(x, saturationlevel) for x in fitslist]
+
+    # fire up the pool of workers
+    results = pool.map(mask_saturated_stars_worker, tasks)
+
+    # wait for the processes to complete work
+    pool.close()
+    pool.join()
+
+    return {result for result in results}
 
 
 def parallel_trim_get_single_extension(fitslist, outdir, projid, nworkers=16,
@@ -799,11 +799,9 @@ def parallel_cluster_cutout_jpgs(bkgdsubfiles, subconvfiles, calimgfiles,
     return {result for result in results}
 
 
-
-
 def make_cluster_cutout_jpgs(sectornum, fitsdir, racenter, deccenter, field,
-                             camera, ccd, statsdir,
-                             clusterdistancecutoff=2000, nworkers=16):
+                             camera, ccd, statsdir, clusterdistancecutoff=2000,
+                             nworkers=16):
     """
     cluster cutouts from three types of images:
         CAL images
@@ -1095,6 +1093,7 @@ def measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
         _measure_planet_snr(plname, tfalc, statsdir, sectornum,
                             nworkers=nworkers, use_NEA=use_NEA,
                             use_alerts=use_alerts, skipepd=skipepd)
+
 
 def _write_nan_df(plname, tfalc, snrfit_savfile):
     outdf = pd.DataFrame({'plname':plname,
@@ -1407,7 +1406,6 @@ def explore_ccd_temperature_timeseries():
           format(s01_first, s01_second))
 
 
-
 def append_ccd_temperature_to_hdr_worker(task):
 
     fitsname, d = task
@@ -1506,7 +1504,6 @@ def parallel_append_ccd_temperature_to_hdr(fitslist, temperaturepklpath,
     print('{}: made {}'.format(datetime.utcnow().isoformat(), outpath))
 
     return {result for result in results}
-
 
 
 def make_ccd_temperature_timeseries_pickle(sectornum):
@@ -1705,6 +1702,7 @@ def read_object_reformed_catalog(reformedcatalogfile, isgaiaid=False,
                                )
     return catarr
 
+
 def median_filter_frame(task):
 
     imgfile, outbkgdpath, outbkgdsubpath, n_sigma, k, k_sigma = task
@@ -1796,7 +1794,6 @@ def none_filter_frame(task):
                   format(datetime.utcnow().isoformat(), outfile))
 
     hdulist_bkgd.close()
-
 
 
 def parallel_bkgd_subtract(fitslist, method='boxblurmedian', isfull=True, k=32,
@@ -2006,7 +2003,6 @@ def plot_apertures_on_frame(fitsframe, photrefprojcat, xlim=None, ylim=None):
     print('{}: made {}'.format(datetime.utcnow().isoformat(), outpath))
 
 
-
 def plot_median_filter_quad(task):
 
     bkgdfile, calfile, outdir = task
@@ -2095,6 +2091,7 @@ def parallel_plot_median_filter_quad(fitsdir, nworkers=16, maxworkertasks=1000):
 
     return 1
 
+
 def read_object_catalog(catalogfile):
     """
     read the Gaia .catalog file into a pandas DataFrame
@@ -2131,6 +2128,7 @@ def read_object_catalog(catalogfile):
     # 'eta[deg]']
 
     return df
+
 
 def merge_object_catalog_vs_cdips(
     in_reformed_cat_file, out_reformed_cat_file,
@@ -2192,9 +2190,6 @@ def merge_object_catalog_vs_cdips(
         print('[INFO!][WRN!] got 0 CDIPS stars in field')
 
 
-
-
-
 def plot_lc_positions(lcdir, lcglob, statsdir, outname=None, N_desired=20000):
     """
     Given list of lcpaths, plot their on-chip positions.
@@ -2243,7 +2238,6 @@ def plot_lc_positions(lcdir, lcglob, statsdir, outname=None, N_desired=20000):
     outdf = pd.DataFrame({'x':xs,'y':ys,'ra':ras,'dec':decs})
     outdf.to_csv(outpath.replace('.png', '.csv'), index=False)
     print('made {}'.format(outpath.replace('.png', '.csv')))
-
 
 
 def mask_orbit_start_and_end(time, flux, orbitgap=1, expected_norbits=2,
