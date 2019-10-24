@@ -1586,6 +1586,8 @@ def make_mp4_from_jpegs(jpgglob, outmp4path, ffmpegpath='ffmpeg', verbose=True):
     # vf: encoding requires even number of pixels. This filter divided original
     # heigh and width by two, rounds up to nearest pixel, multiplies by two,
     # and add white padding pixels.
+    # outputting to /dev/null because otherwise ffmpeg overfills the bash pipe
+    # memory buffer.
     FFMPEGCMD = (
         "{ffmpegpath} -framerate 24 "
         "-pattern_type "
@@ -1593,7 +1595,7 @@ def make_mp4_from_jpegs(jpgglob, outmp4path, ffmpegpath='ffmpeg', verbose=True):
         "-c:v libx264 "
         "-preset fast "
         "-vf \"pad=ceil(iw/2)*2:ceil(ih/2)*2:color=white\" "
-        "{outmp4path}"
+        "{outmp4path} > /dev/null 2>&1 < /dev/null"
     )
 
     cmdtorun = FFMPEGCMD.format(jpgglob=jpgglob,
@@ -1602,6 +1604,7 @@ def make_mp4_from_jpegs(jpgglob, outmp4path, ffmpegpath='ffmpeg', verbose=True):
 
     if verbose:
         print(cmdtorun)
+
     returncode = os.system(cmdtorun)
 
     if returncode == 0:
@@ -1642,7 +1645,7 @@ def make_mov_from_jpegs(jpgglob, outmovpath, ffmpegpath='ffmpeg'):
         "-c:v libx264 "
         "-pix_fmt yuv420p "
         "-preset fast "
-        "{outmovpath}"
+        "{outmovpath} > /dev/null 2>&1 < /dev/null"
     )
 
     cmdtorun = FFMPEGCMD.format(
