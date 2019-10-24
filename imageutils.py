@@ -1563,7 +1563,7 @@ def check_frame_warping(frame,
         return True, warpinfo
 
 
-def make_mp4_from_jpegs(jpgglob, outmp4path, ffmpegpath='ffmpeg'):
+def make_mp4_from_jpegs(jpgglob, outmp4path, ffmpegpath='ffmpeg', verbose=True):
     """
     Make mp4 movie from jpg images. (Codec/preset configured to work with
     ffmpeg v3.4. Fails for v4.X).
@@ -1600,6 +1600,8 @@ def make_mp4_from_jpegs(jpgglob, outmp4path, ffmpegpath='ffmpeg'):
                                 outmp4path=outmp4path,
                                 ffmpegpath=ffmpegpath)
 
+    if verbose:
+        print(cmdtorun)
     returncode = os.system(cmdtorun)
 
     if returncode == 0:
@@ -1681,23 +1683,26 @@ def plot_stages_of_img_proc_sector_cam_ccd(
         format(str(sector).zfill(4), cam, ccd, projid)
     )
 
-    bkgdfiles = glob(os.path.join(
+    bkgdfiles = np.sort(glob(os.path.join(
         datadir,
         'tess20*-s{}-{}-{}-*_cal_img_bkgd.fits'.
         format(str(sector).zfill(4), cam, ccd))
-    )
-    calfiles = glob(os.path.join(
+    ))
+    calfiles = np.sort(glob(os.path.join(
         datadir,
         'tess20*-s{}-{}-{}-*_cal_img.fits'.
         format(str(sector).zfill(4), cam, ccd))
-    )
-    difffiles = glob(os.path.join(
-        diffdir,
-        'rsub-*-*-s{}-{}-{}-*_cal_img_bkgdsub-xtrns.fits'.
-        format(str(sector).zfill(4), cam, ccd))
-    )
+    ))
 
-    for b,c,d in zip(bkgdfiles, calfiles, difffiles):
+    if not len(calfiles) == len(bkgdfiles):
+        raise AssertionError
+
+    btimes = [b.split('/')[-1].split('-')[0] for b in bkgdfiles]
+    ctimes = [c.split('/')[-1].split('-')[0] for c in calfiles]
+
+    np.testing.assert_array_equal(btimes, ctimes)
+
+    for b,c in zip(bkgdfiles, calfiles):
 
         outpath = os.path.join(
             outdir,
@@ -1709,19 +1714,30 @@ def plot_stages_of_img_proc_sector_cam_ccd(
             print('found {} and not overwrite; continue'.format(outpath))
             continue
         else:
-            plot_stages_of_img_proc(b, c, d, outpath, slicebounds=slicebounds)
+            plot_stages_of_img_proc(b, c, outpath, diffdir,
+                                    slicebounds=slicebounds)
 
 
 def plot_stages_of_img_proc(
-    bkgdfile, calfile, difffile, outpath,
+    bkgdfile, calfile, outpath, diffdir,
     slicebounds=[slice(300,812), slice(300,812)]
     ):
 
-    vmin, vmax = 10, int(1e3)
-
     bkgd_img, _ = read_fits(bkgdfile)
     cal_img, _ = read_fits(calfile)
-    diff_img, _ = read_fits(difffile)
+
+    thistime = bkgdfile.split('/')[-1].split('-')[0]
+    diffglob = os.path.join(
+        diffdir, 'rsub-*-{}-*_bkgdsub-xtrns.fits'.format(thistime)
+    )
+    difffile = glob(diffglob)
+    if len(difffile) == 1:
+        diff_img, _ = read_fits(difffile[0])
+    else:
+        print('WRN! did not find {}. using blank image.'.format(diffglob))
+        diff_img = np.zeros_like(cal_img)
+
+    vmin, vmax = 10, int(1e3)
 
     plt.close('all')
     plt.rcParams['xtick.direction'] = 'in'
