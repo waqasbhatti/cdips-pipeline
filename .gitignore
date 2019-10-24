@@ -30,4 +30,7 @@ examples/logs/
 scripts/log*
 scripts/tess_tuning_scripts/projid_????.sh
 scripts/mv*py
+drivers/tess_tuning_scripts/projid_????.sh
+drivers/log*
+drivers/mv*py
 *nohup*
