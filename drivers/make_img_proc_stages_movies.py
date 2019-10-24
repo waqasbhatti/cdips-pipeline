@@ -1,3 +1,6 @@
+"""
+Usage: python -u make_img_proc_stages_movies.py &> logs/s6_movies.log &
+"""
 import os
 import imageutils as iu
 
@@ -38,7 +41,7 @@ def get_identifiers_slicebounds(sector):
     return identifiers, slicebounds
 
 
-def main(sector=6):
+def make_img_proc_stages_movies(sector=6, overwrite=0):
 
     identifiers, slicebounds = get_identifiers_slicebounds(sector)
 
@@ -46,6 +49,15 @@ def main(sector=6):
     moviedir = '/nfs/phtess2/ar0/TESS/FFI/MOVIES'
 
     for i,s in zip(identifiers, slicebounds):
+
+        outmp4path = os.path.join(
+            moviedir, 'img_proc_stages_sector{}_cam{}_ccd{}_projid{}.mp4'.format(
+                i[0], i[1], i[2], i[3]
+            )
+        )
+        if os.path.exists(outmp4path):
+            print('found {}; skip this sector'.format(outmp4path))
+            continue
 
         outdir = os.path.join(
             basedir, 'sector{}_cam{}_ccd{}_projid{}'.format(
@@ -56,28 +68,20 @@ def main(sector=6):
             print('made {}'.format(outdir))
             os.mkdir(outdir)
 
-        iu.plot_stages_of_img_proc_sector_cam_ccd(sector=i[0], cam=i[1], ccd=i[2],
-                                                  projid=i[3], overwrite=0,
+        iu.plot_stages_of_img_proc_sector_cam_ccd(sector=i[0], cam=i[1],
+                                                  ccd=i[2], projid=i[3],
+                                                  overwrite=overwrite,
                                                   outdir=outdir, slicebounds=s)
 
         imgglob = os.path.join(outdir, 'tess2*_img_proc_stages.png')
 
-        outmp4path = os.path.join(
-            moviedir, 'img_proc_stages_sector{}_cam{}_ccd{}_projid{}.mp4'.format(
-                i[0], i[1], i[2], i[3]
-            )
-        )
-        if not os.path.exists(outmp4path):
-            iu.make_mp4_from_jpegs(imgglob, outmp4path,
-                                   ffmpegpath='/home/lbouma/bin/ffmpeg',
-                                   verbose=True)
-
-        else:
-            print('found {} and skipped'.format(outmp4path))
+        iu.make_mp4_from_jpegs(imgglob, outmp4path,
+                               ffmpegpath='/home/lbouma/bin/ffmpeg',
+                               verbose=True)
 
 
 if __name__ == "__main__":
 
     sector = 6
 
-    main(sector=sector)
+    make_img_proc_stages_movies(sector=sector)
