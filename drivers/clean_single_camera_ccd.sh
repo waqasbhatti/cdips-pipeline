@@ -13,10 +13,10 @@
 #
 
 removeall=true # if true, removes all "REDUCED" files. else, only post-presubtraction files
-camnum=1
-ccdnum=1
-projectid=1548
-sector='s0009'
+camnum=2
+ccdnum=3
+projectid=1570
+sector='s0010'
 tuneparameters=false
 
 ##########################################
@@ -61,8 +61,10 @@ mv ${lcdir} ${lcdirold}
 echo "removing lightcurves from "${lcdirold}
 rm -rf ${lcdirold}
 
+# note: both globs below are needed...
 echo "removing all reference files"
 rm /nfs/phtess2/ar0/TESS/FFI/BASE/reference-frames/*proj${projectid}-camera${camnum}-ccd${ccdnum}*
+rm /nfs/phtess2/ar0/TESS/FFI/BASE/reference-frames/*proj${projectid}-${sector}-cam${camnum}-ccd${ccdnum}*
 
 # remove frameinfo cache directory
 fname=`find /nfs/phtess2/ar0/TESS/FFI/BASE/frameinfo-cache/*/*${sector}-${camnum}-${ccdnum}-${scid}*jpg | head -n1`
