@@ -42,6 +42,9 @@ image-sectioning and image-writing functions:
 movie-making functions:
     make_mp4_from_jpegs
     make_mov_from_jpegs
+
+image-processing diagnostic plots:
+
 ====================
 '''
 
@@ -79,9 +82,14 @@ from astropy import wcs
 from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
+
 import matplotlib.cm as mplcm
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import matplotlib.patches as patches
+import matplotlib.patheffects as path_effects
 
 from astrobase import imageutils as iu
 
@@ -1652,3 +1660,187 @@ def make_mov_from_jpegs(jpgglob, outmovpath, ffmpegpath='ffmpeg'):
               (datetime.utcnow().isoformat(), outmovpath))
         print('ERR! command was %s' % cmdtorun)
         return 256
+
+
+def plot_stages_of_img_proc_sector_cam_ccd(
+    sector=6, cam=1, ccd=2, projid=1501, overwrite=0, outdir=None,
+    slicebounds=[slice(300,812), slice(300,812)]
+    ):
+
+    if not isinstance(outdir, str):
+        raise NotImplementedError
+    if not os.path.exists(outdir):
+        raise ValueError('did not find {}'.format(outdir))
+
+    datadir = (
+        '/nfs/phtess2/ar0/TESS/FFI/RED/sector-{}/cam{}_ccd{}/'.
+        format(sector, cam, ccd)
+    )
+    diffdir = (
+        '/nfs/phtess2/ar0/TESS/FFI/RED_IMGSUB/FULL/s{}/RED_{}-{}-{}_ISP'.
+        format(str(sector).zfill(4), cam, ccd, projid)
+    )
+
+    bkgdfiles = glob(os.path.join(
+        datadir,
+        'tess20*-s{}-{}-{}-*_cal_img_bkgd.fits'.
+        format(str(sector).zfill(4), cam, ccd))
+    )
+    calfiles = glob(os.path.join(
+        datadir,
+        'tess20*-s{}-{}-{}-*_cal_img.fits'.
+        format(str(sector).zfill(4), cam, ccd))
+    )
+    difffiles = glob(os.path.join(
+        diffdir,
+        'rsub-*-*-s{}-{}-{}-*_cal_img_bkgdsub-xtrns.fits'.
+        format(str(sector).zfill(4), cam, ccd))
+    )
+
+    for b,c,d in zip(bkgdfiles, calfiles, difffiles):
+
+        outpath = os.path.join(
+            outdir,
+            os.path.basename(c).replace('_cal_img.fits',
+                                        '_img_proc_stages.png')
+        )
+
+        if os.path.exists(outpath) and not overwrite:
+            print('found {} and not overwrite; continue'.format(outpath))
+            continue
+        else:
+            plot_stages_of_img_proc(b, c, d, outpath, slicebounds=slicebounds)
+
+
+def plot_stages_of_img_proc(
+    bkgdfile, calfile, difffile, outpath,
+    slicebounds=[slice(300,812), slice(300,812)]
+    ):
+
+    vmin, vmax = 10, int(1e3)
+
+    bkgd_img, _ = read_fits(bkgdfile)
+    cal_img, _ = read_fits(calfile)
+    diff_img, _ = read_fits(difffile)
+
+    plt.close('all')
+    plt.rcParams['xtick.direction'] = 'in'
+    plt.rcParams['ytick.direction'] = 'in'
+
+    fig, axs = plt.subplots(ncols=2, nrows=3)
+
+    # top right: log of calibrated image
+    lognorm = colors.LogNorm(vmin=vmin, vmax=vmax)
+
+    cset1 = axs[0,1].imshow(cal_img, cmap='binary_r', vmin=vmin, vmax=vmax,
+                            norm=lognorm)
+    #txt = axs[0,1].text(0.02, 0.96, 'image', ha='left', va='top',
+    #                    fontsize='small', transform=axs[0,1].transAxes,
+    #                    color='black')
+    #txt.set_path_effects([path_effects.Stroke(linewidth=1, foreground='white'),
+    #                      path_effects.Normal()])
+
+
+    diff_vmin, diff_vmax = -1000, 1000
+
+    diffnorm = colors.SymLogNorm(linthresh=0.03, linscale=0.03, vmin=diff_vmin,
+                                 vmax=diff_vmax)
+
+    # top left: background map
+    axs[0,0].imshow(bkgd_img - np.median(cal_img), cmap='RdBu_r',
+                    vmin=diff_vmin, vmax=diff_vmax, norm=diffnorm)
+    #txt = axs[0,0].text(0.02, 0.96, 'background', ha='left', va='top',
+    #                    fontsize='small', transform=axs[0,0].transAxes,
+    #                    color='black')
+    #txt.set_path_effects([path_effects.Stroke(linewidth=1, foreground='white'),
+    #                      path_effects.Normal()])
+
+    # middle left: calibrated - background
+    cset2 = axs[1,0].imshow(cal_img - bkgd_img, cmap='RdBu_r', vmin=diff_vmin,
+                            vmax=diff_vmax, norm=diffnorm)
+    #txt = axs[1,0].text(0.02, 0.96, 'image - background', ha='left', va='top',
+    #                    fontsize='small', transform=axs[1,0].transAxes,
+    #                    color='black')
+    #txt.set_path_effects([path_effects.Stroke(linewidth=1, foreground='white'),
+    #                      path_effects.Normal()])
+
+    # middle right: calibrated - median
+    axs[1,1].imshow(cal_img - np.median(cal_img), cmap='RdBu_r',
+                    vmin=diff_vmin, vmax=diff_vmax, norm=diffnorm)
+    #txt = axs[1,1].text(0.02, 0.96, 'image - median(image)', ha='left', va='top',
+    #                    fontsize='small', transform=axs[1,1].transAxes,
+    #                    color='black')
+    #txt.set_path_effects([path_effects.Stroke(linewidth=1, foreground='white'),
+    #                      path_effects.Normal()])
+
+
+    # lower left:  difference image (full)
+    toplen = 57
+    top = mplcm.get_cmap('Oranges_r', toplen)
+    bottom = mplcm.get_cmap('Blues', toplen)
+    newcolors = np.vstack((top(np.linspace(0, 1, toplen)),
+                           np.zeros(((256-2*toplen),4)),
+                           bottom(np.linspace(0, 1, toplen))))
+    newcmp = ListedColormap(newcolors, name='lgb_cmap')
+
+    cset3 = axs[2,0].imshow(diff_img, cmap='RdBu_r', vmin=diff_vmin,
+                            vmax=diff_vmax, norm=diffnorm)
+    #txt = axs[2,0].text(0.02, 0.96, 'difference', ha='left', va='top',
+    #                    fontsize='small', transform=axs[2,0].transAxes,
+    #                    color='black')
+    #txt.set_path_effects([path_effects.Stroke(linewidth=1, foreground='white'),
+    #                      path_effects.Normal()])
+
+    xmin, xmax, ymin, ymax = (slicebounds[0].start, slicebounds[0].stop,
+                              slicebounds[1].start, slicebounds[1].stop)
+    width = ymax - ymin
+    height = xmax - xmin
+
+    rect = patches.Rectangle((ymin, xmin), width, height, linewidth=0.6,
+                             edgecolor='black', facecolor='none',
+                             linestyle='--')
+    axs[2,0].add_patch(rect)
+
+
+
+    # lower right: difference image (zoom)
+    sel = slicebounds
+    axs[2,1].imshow(diff_img[sel], cmap='RdBu_r',
+                    vmin=diff_vmin, vmax=diff_vmax, norm=diffnorm)
+    #txt = axs[2,1].text(0.02, 0.96, 'difference (zoom)', ha='left', va='top',
+    #                    fontsize='small', transform=axs[2,1].transAxes,
+    #                    color='black')
+    #txt.set_path_effects([path_effects.Stroke(linewidth=1, foreground='white'),
+    #                      path_effects.Normal()])
+
+    for ax in axs.flatten():
+        ax.set_xticklabels('')
+        ax.set_yticklabels('')
+        ax.get_xaxis().set_tick_params(which='both', direction='in')
+        ax.get_yaxis().set_tick_params(which='both', direction='in')
+        ax.xaxis.set_ticks_position('none')
+        ax.yaxis.set_ticks_position('none')
+
+    divider0 = make_axes_locatable(axs[0,1])
+    divider1 = make_axes_locatable(axs[1,1])
+    divider2 = make_axes_locatable(axs[2,1])
+
+    cax0 = divider0.append_axes('right', size='5%', pad=0.05)
+    cax1 = divider1.append_axes('right', size='5%', pad=0.05)
+    cax2 = divider2.append_axes('right', size='5%', pad=0.05)
+
+    cb1 = fig.colorbar(cset1, ax=axs[0,1], cax=cax0, extend='both')
+    cb2 = fig.colorbar(cset2, ax=axs[1,1], cax=cax1, extend='both')
+    cb3 = fig.colorbar(cset3, ax=axs[2,1], cax=cax2, extend='both')
+
+    cb2.set_ticks([-1e3,-1e2,-1e1,0,1e1,1e2,1e3])
+    cb2.set_ticklabels(['-$10^3$','-$10^2$','-$10^1$','0',
+                        '$10^1$','$10^2$','$10^3$'])
+    cb3.set_ticks([-1e3,-1e2,-1e1,0,1e1,1e2,1e3])
+    cb3.set_ticklabels(['-$10^3$','-$10^2$','-$10^1$','0',
+                        '$10^1$','$10^2$','$10^3$'])
+
+    fig.tight_layout(h_pad=0, w_pad=-14, pad=0)
+
+    fig.savefig(outpath, bbox_inches='tight', dpi=400)
+    print('{}: made {}'.format(datetime.utcnow().isoformat(), outpath))
