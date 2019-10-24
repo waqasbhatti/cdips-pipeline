@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+#
 # PURPOSE: USE WITH CAUTION.
 #
 # remove post-presubtraction files:
@@ -9,22 +10,16 @@
 # clear out astromrefs and photrefs table.
 # clear out calibratedframes table.
 # clear frameinfo cache from past week. 
+#
+
+removeall=true # if true, removes all "REDUCED" files. else, only post-presubtraction files
 camnum=1
 ccdnum=1
 projectid=1548
-sector='s0010'
+sector='s0009'
 tuneparameters=false
 
-##########
-
-psql -U hpx -h xphtess1 hpx -c \
-  "delete from astromrefs where projectid = "${projectid}" and camera = "${camnum}" and ccd = "${ccdnum}";"
-
-psql -U hpx -h xphtess1 hpx -c \
-  "delete from photrefs where projectid = "${projectid}" and camera = "${camnum}" and ccd = "${ccdnum}";"
-
-##########
-
+##########################################
 # define paths to remove
 
 if [ "$tuneparameters" = true ] ; then
@@ -44,16 +39,21 @@ lcsector=$lcbase"/"${sector}"/"
 lcdir=${lcsector}"ISP_"${camnum}"-"${ccdnum}"-"${projectid}"/"
 lcdirold=${lcsector}"ISP_"${camnum}"-"${ccdnum}"-"${projectid}"_old/"
 
-echo "removing post-presubtraction files from "${fitsdir}
 
 # from imagesubphot
-rm ${fitsdir}*XTRNS*jpg
-rm ${fitsdir}*xtrns.fits
-rm ${fitsdir}*.itrans
-rm ${fitsdir}*.xysdk
-rm ${fitsdir}*ASTOMREF*jpg
-rm ${fitsdir}rsub-*
-rm ${fitsdir}JPEG-SUBTRACTEDCONV*jpg
+if [ "$removeall" = true ] ; then
+  echo "WRN! removing "${fitsdir}
+  rm -rf ${fitsdir};
+else
+  echo "removing post-presubtraction files from "${fitsdir};
+  rm ${fitsdir}*XTRNS*jpg;
+  rm ${fitsdir}*xtrns.fits;
+  rm ${fitsdir}*.itrans;
+  rm ${fitsdir}*.xysdk;
+  rm ${fitsdir}*ASTOMREF*jpg;
+  rm ${fitsdir}rsub-*;
+  rm ${fitsdir}JPEG-SUBTRACTEDCONV*jpg;
+fi
 
 # remove lightcurves and stats. this takes a while. first rename, then run!
 echo "moving "${lcdir}" to "${lcdirold}
@@ -71,10 +71,20 @@ dname=`dirname $fname`
 echo "removing frameinfo cache dir for "${fname}
 rm -rf $dname
 
-# clean calibratedframes. regex reference:
+##########################################
+# clean postgres db. regex reference:
 # https://www.postgresql.org/docs/9.5/static/functions-matching.html
 
 psql -U hpx -h xphtess1 hpx -c \
+  "delete from astromrefs where projectid = "${projectid}" and camera = "${camnum}" and ccd = "${ccdnum}";"
+
+psql -U hpx -h xphtess1 hpx -c \
+  "delete from photrefs where projectid = "${projectid}" and camera = "${camnum}" and ccd = "${ccdnum}";"
+
+psql -U hpx -h xphtess1 hpx -c \
   "DELETE from calibratedframes where fits like '"${fitsdir}"%';"
+
 psql -U hpx -h xphtess1 hpx -c \
   "DELETE from calibratedframes where (fitsheader->'PROJID' ='"${projectid}"');"
+
+
