@@ -51,6 +51,7 @@ from numpy import array as nparr, all as npall, isfinite as npisfinite
 np.seterr(all='ignore')
 
 import multiprocessing as mp
+from functools import partial
 
 import tessutils as tu, imageutils as iu, imagesubphot as ism
 
@@ -224,7 +225,7 @@ def _map_key_to_comment(k):
     return kcd[k]
 
 
-def convert_grcollect_to_fits_lc_worker(task):
+def convert_grcollect_to_fits_lc_worker(task, **kwargs):
     """
     Given grcollect lightcurve, make a FITS binary table with the lightcurve
     data. Sort the lightcurve in time order. Collect header information from
@@ -232,14 +233,19 @@ def convert_grcollect_to_fits_lc_worker(task):
     temperature timeseries.
     """
 
-    (grclcpath, outpath, catdf, temperaturedf,
-     observatory, lcdir, fitsdir, projectid) = task
+    (grclcpath, outpath) = task
+    observatory = kwargs.get('observatory')
+    lcdir = kwargs.get('lcdir')
+    fitsdir = kwargs.get('fitsdir')
+    projectid = kwargs.get('projectid')
+    temperaturedf = kwargs.get('temperaturedf')
 
     if observatory != 'tess':
         # if not TESS, you may need to modify the header reads, and the overall
         # lightcurve format 
         raise NotImplementedError
 
+    # use the "catdf" GAIADR2-*.catalog DataFrame from global memory.
     lcd = tu.read_tess_txt_lightcurve(grclcpath, catdf)
 
     # sort the lightcurve, and the X, Y, temperature, etc timeseries, time.
@@ -415,14 +421,16 @@ def parallel_convert_grcollect_to_fits_lc(lcdirectory,
         /nfs/phtess1/ar1/TESS/FFI/ENGINEERING/s0002-3-3-0121_key_temperature_count.csv
     """
 
-    # load the catalog file.
+    # Load the catalog file as a GLOBAL to prevent copying it (~few Gb) when
+    # spawning processes below. nb. multiprocessing.Pool also has an
+    # "initializer" arg that can work for this, but this is such an easy
+    # implementation that it's what I'm going for. NB. it is deleted at the end
+    # of this function.
     if observatory=='tess':
+        global catdf
         catdf = tu.read_object_catalog(catfile)
-        # since it's the same temperature information across each CCD, no need
-        # to repeat the read operation.
         temperaturedf = pd.read_csv(temperaturedfpath)
     else:
-        temperaturedf = None
         raise NotImplementedError
 
     ilclist = glob(os.path.join(lcdirectory, ilcglob))
@@ -450,17 +458,27 @@ def parallel_convert_grcollect_to_fits_lc(lcdirectory,
 
     else:
 
-        tasks = [(x, y, catdf, temperaturedf, observatory, lcdirectory,
-                  fitsdir, projectid) for x,y in zip(ilclist, outlist)]
+        tasks = [(x, y) for x,y in zip(ilclist, outlist)]
+        kwargs = {}
+        kwargs['observatory'] = observatory
+        kwargs['lcdirectory'] = lcdirectory
+        kwargs['fitsdir'] = fitsdir
+        kwargs['projectid'] = projectid
+        kwargs['temperaturedf'] = temperaturedf
 
-        pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
-        results = pool.map(convert_grcollect_to_fits_lc_worker, tasks)
+        pool = mp.Pool(nworkers, maxtasksperchild=maxworkertasks)
+        results = pool.map(
+            partial(convert_grcollect_to_fits_lc_worker, **kwargs), tasks
+        )
 
         # wait for the processes to complete work
         pool.close()
         pool.join()
 
+        del catdf
         return 1
+
+
 
 ##################
 # EPD DETRENDING #
