@@ -330,7 +330,7 @@ def is_imagesubtraction_complete(fitsdir, fitsglob, lcdir):
     N_iphotlist = len(glob(
         fitsdir+'[r|n]sub-????????-'+fitsglob.replace('.fits','.iphot')))
     N_itranslist = len(glob(
-        fitsdir+'[r|n]sub-????????-'+fitsglob.replace('.fits','.itrans')))
+        fitsdir+fitsglob.replace('.fits','.itrans')))
     N_kernellist = len(glob(
         fitsdir+'[r|n]sub-????????-'+
         fitsglob.replace('.fits','-xtrns.fits-kernel')))
@@ -353,8 +353,12 @@ def is_imagesubtraction_complete(fitsdir, fitsglob, lcdir):
         return True
 
     elif np.any( np.diff(N_files) ) or np.any( np.array(full_N_files)==0 ):
-        print('did not find completed image-subtracted photometry products '
-              'including photometry, images, and lightcurves.')
+        msg = (
+            'did not find completed image-subtracted photometry products '
+            'including photometry, images, and lightcurves. found N_files = '
+            '{}, full_N_files = {}'.format(repr(N_files), repr(full_N_files))
+        )
+        print(msg)
         return False
 
     else:
