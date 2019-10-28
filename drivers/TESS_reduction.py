@@ -124,7 +124,8 @@ def _get_random_acf_pkls(pkldir, n_desired=10):
     return sel_files
 
 
-def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid):
+def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid,
+                 DO_DEPRECATED=False):
 
     typestr = 'full' if 'FULL' in fitsdir else 'tune'
 
@@ -166,56 +167,57 @@ def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid):
     else:
         print('found (or skipped) {}'.format(outmp4path))
 
-    # cluster cut movies: (subtracted & grayscale), (subtracted & bwr), (CAL &
-    # grayscale). first, get unique cluster names.  the pattern we're matching
-    # is:
-    # CUT-NGC_2516_rsub-9ab2774b-tess2018232225941-s0001-4-3-0120_cal_img_bkgdsub-xtrns_SUB_grayscale.jpg
-    clusterjpgs = glob(os.path.join(
-        fitsdir, 'CUT-*', 'CUT-*_[r|n]sub-*-tess2*_cal_img_bkgdsub*_SUBCONV.jpg'))
-    if len(clusterjpgs)>1:
+    if DO_DEPRECATED:
+        # cluster cut movies: (subtracted & grayscale), (subtracted & bwr), (CAL &
+        # grayscale). first, get unique cluster names.  the pattern we're matching
+        # is:
+        # CUT-NGC_2516_rsub-9ab2774b-tess2018232225941-s0001-4-3-0120_cal_img_bkgdsub-xtrns_SUB_grayscale.jpg
+        clusterjpgs = glob(os.path.join(
+            fitsdir, 'CUT-*', 'CUT-*_[r|n]sub-*-tess2*_cal_img_bkgdsub*_SUBCONV.jpg'))
+        if len(clusterjpgs)>1:
 
-        clusternames = nparr(
-            [search('CUT-{}_rsub-{}-{}',c)[0] for c in clusterjpgs]
-        )
-        uclusternames = np.sort(np.unique(clusternames))
-        uclusternames = [u.split('/')[0] for u in uclusternames]
+            clusternames = nparr(
+                [search('CUT-{}_rsub-{}-{}',c)[0] for c in clusterjpgs]
+            )
+            uclusternames = np.sort(np.unique(clusternames))
+            uclusternames = [u.split('/')[0] for u in uclusternames]
 
-        # iterate over clusters
-        for uclustername in uclusternames:
+            # iterate over clusters
+            for uclustername in uclusternames:
 
-            # iterate over movie formats
-            for jpgstr, outstr in zip(
-                ['CUT-{:s}_[r|n]sub-*-tess2*SUBCONV.jpg'.
-                 format(uclustername),
-                 'CUT-{:s}_[r|n]sub-*-tess2*BKGDSUB.jpg'.
-                 format(uclustername),
-                 'CUT-{:s}_tess2*CAL.jpg'.
-                 format(uclustername)
-                ],
-                ['{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_SUBCONV.mp4'.
-                 format(field, typestr, int(camera), int(ccd), int(projectid),
-                        uclustername),
-                '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_BKGDSUB.mp4'.
-                 format(field, typestr, int(camera), int(ccd), int(projectid),
-                        uclustername),
-                '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_CAL.mp4'.
-                 format(field, typestr, int(camera), int(ccd), int(projectid),
-                        uclustername)
-                ]
-            ):
+                # iterate over movie formats
+                for jpgstr, outstr in zip(
+                    ['CUT-{:s}_[r|n]sub-*-tess2*SUBCONV.jpg'.
+                     format(uclustername),
+                     'CUT-{:s}_[r|n]sub-*-tess2*BKGDSUB.jpg'.
+                     format(uclustername),
+                     'CUT-{:s}_tess2*CAL.jpg'.
+                     format(uclustername)
+                    ],
+                    ['{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_SUBCONV.mp4'.
+                     format(field, typestr, int(camera), int(ccd), int(projectid),
+                            uclustername),
+                    '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_BKGDSUB.mp4'.
+                     format(field, typestr, int(camera), int(ccd), int(projectid),
+                            uclustername),
+                    '{:s}_{:s}_cam{:d}_ccd{:d}_projid{:d}_{:s}_CAL.mp4'.
+                     format(field, typestr, int(camera), int(ccd), int(projectid),
+                            uclustername)
+                    ]
+                ):
 
-                jpgglob = os.path.join(fitsdir, 'CUT-*', jpgstr)
-                outmp4path = os.path.join(moviedir, outstr)
-                if not os.path.exists(outmp4path) and len(glob(jpgglob))>10:
-                    iu.make_mp4_from_jpegs(
-                        jpgglob, outmp4path,
-                        ffmpegpath='/home/lbouma/bin/ffmpeg'
-                    )
-                else:
-                    print('found (or skipped) {}'.format(outmp4path))
+                    jpgglob = os.path.join(fitsdir, 'CUT-*', jpgstr)
+                    outmp4path = os.path.join(moviedir, outstr)
+                    if not os.path.exists(outmp4path) and len(glob(jpgglob))>10:
+                        iu.make_mp4_from_jpegs(
+                            jpgglob, outmp4path,
+                            ffmpegpath='/home/lbouma/bin/ffmpeg'
+                        )
+                    else:
+                        print('found (or skipped) {}'.format(outmp4path))
 
-    else:
-        print('WRN! did not make CUT movies, because did not find jpg matches')
+        else:
+            print('WRN! did not make CUT movies, because did not find jpg matches')
 
 
 def make_fake_xtrnsfits(fitsdir, fitsglob, fieldinfo):
@@ -1610,10 +1612,11 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
         ):
             examine_astrometric_shifts(fitsdir, astromrefpath, statsdir)
 
-    # make cutouts jpgs of clusters
-    tu.make_cluster_cutout_jpgs(sectornum, fitsdir, ra_nom, dec_nom, field,
-                                camera, ccd, statsdir,
-                                clusterdistancecutoff=2000, nworkers=nworkers)
+        # make cutouts jpgs of clusters
+        tu.make_cluster_cutout_jpgs(sectornum, fitsdir, ra_nom, dec_nom, field,
+                                    camera, ccd, statsdir,
+                                    clusterdistancecutoff=2000,
+                                    nworkers=nworkers)
 
     _make_movies(fitsdir, moviedir, field, camera, ccd, projectid)
 
