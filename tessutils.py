@@ -247,7 +247,7 @@ def move_badframe(task):
         return 1
 
 
-def verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.15):
+def verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.25):
     """
     max_frac_badframes: if you have more than this fraction of the FFIs that
     are "badframes", you should be worried!
@@ -350,7 +350,7 @@ def parallel_move_badframes(fitslist,
     print('%sZ: %s files to check for DQUALITY=%s in (BADFRAME MOVE)' %
           (datetime.utcnow().isoformat(), len(fitslist), repr(flagvalues)))
 
-    verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.15)
+    verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.25)
 
     # omit the frames.
     pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
