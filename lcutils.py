@@ -1317,10 +1317,10 @@ def round_two_tfa_selection(cand_template_lcpaths, apnum,
         # Lomb scargle w/ uniformly weighted points.
         #
         try:
-            _time, _mag = moe.mask_orbit_start_and_end(tfa_time[sel], tfa_mag[sel],
-                                                       orbitgap=1,
-                                                       expected_norbits=2,
-                                                       orbitpadding=6/(24))
+            _time, _mag = moe.mask_orbit_start_and_end(
+                tfa_time[sel], tfa_mag[sel], orbitgap=1, expected_norbits=2,
+                orbitpadding=6/(24), raise_expectation_error=False
+            )
             ls = LombScargle(_time, _mag, _mag*1e-3)
             freq, power = ls.autopower()
             period = 1/freq
@@ -1343,7 +1343,8 @@ def round_two_tfa_selection(cand_template_lcpaths, apnum,
         except AssertionError as e:
             # trimming failed because of bad gaps. assign a FAP to ensure this
             # isn't selected as a template star. then continue.
-            print(e)
+            print('AssertionError: failed to mask orbit for {}'.
+                  format(cand_template_lcpath))
             eta_normals.append(-1)
             eta_robusts.append(-1)
             faps.append(0)
