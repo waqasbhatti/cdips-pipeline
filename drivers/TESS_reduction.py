@@ -816,6 +816,7 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
 ##################################################
 
 def get_files_needed_before_image_subtraction(
+        sectornum, camera, ccd,
         fitsdir, fitsglob, outdir, initccdextent, ccdgain, zeropoint, exptime,
         ra_nom, dec_nom,
         catra, catdec, catboxsize,
@@ -897,14 +898,22 @@ def get_files_needed_before_image_subtraction(
 
             skip = 100 # check every 100th object
 
+            qualitycondition = {'median_px':0.2,
+                                '90th_px':0.5,
+                                'std_px': 1.7}
+
+            if (int(sectornum), camera, ccd) == (10, 3, 1):
+                # hack to allow worse std-devn b/c of galactic plane field
+                qualitycondition = {'median_px':0.2,
+                                    '90th_px':0.6,
+                                    'std_px':2.2 }
+
             for w,f,s in zip(wcslist[::skip],fitslist[::skip],fistarlist[::skip]):
 
                 if wcsqa.does_wcs_pass_quality_check(
                     w, f, reformed_cat_file, isspocwcs=True, N_bright=1000,
                     N_faint=9000, fistarpath=s, matchedoutpath=None,
-                    qualitycondition={'median_px':0.2,
-                                      '90th_px':0.5,
-                                      'std_px': 1.7}
+                    qualitycondition=qualitycondition
                 ):
                     print('{} passed WCS quality check'.format(w))
 
@@ -1871,6 +1880,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     if not is_presubtraction_complete(outdir, fitsglob, lcdirectory, outdir,
                                       extractsources=extractsources):
         get_files_needed_before_image_subtraction(
+            sectornum, camera, ccd,
             fitsdir, fitsglob, outdir, initccdextent, ccdgain, zeropoint, exptime,
             ra_nom, dec_nom, catra, catdec, catboxsize, catalog, catalog_file,
             reformed_cat_file, field_faint_Rp_mag, fnamestr=fitsglob,
