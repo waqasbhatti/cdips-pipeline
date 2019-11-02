@@ -105,8 +105,7 @@ badtimewindows = [
     (1477.01998, 1478.11304), # sector 6 downlink, btwn orbits 19->20
     (1503.03803, 1504.69775), # sector 7 downlink, btwn orbits 21->22
     (1517.34150, 1517.39566), # sector 8 orbit 23 camera 1 attitude control
-    (1529.06510, 1530.44705), # sector 8 btwn orbits + attitude control 23->24
-    (1531.74288, 1535.00264), # sector 8 instrument anomaly
+    (1529.06510, 1535.00264), # sector 8 gap + attitude + instr anomaly 23->24
     (1543.21648, 1543.75080), # sector 9 camera 1 attitude control issues
     (1555.54148, 1557.00080), # sector 9 downlink, btwn orbits 25->26
     (1569.43176, 1570.87620), # sector 10 orbit 27 "strong scattered light"
@@ -256,6 +255,7 @@ def verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.25):
 
     dqualitys = []
     isbadtimes = []
+    tjds = []
 
     for f in fitslist:
 
@@ -265,14 +265,14 @@ def verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.25):
         dquality = hdr['DQUALITY']
         dqualitys.append(dquality)
 
+        # get frametime in TJD = BTJD - LTT_corr.
+        # if its within any known bad times for TESS, then set isbadtime to
+        # True, and mask the frame.
+        tjd = hdr['TSTART'] - hdr['BARYCORR']
+        tjds.append(tjd)
+
         isbadtime = False
         if -1 in flagvalues:
-            # get frame time in TJD. if its within any known bad times for TESS,
-            # then set isbadtime to True, and mask the frame.
-
-            # get frametime in TJD = BTJD - LTT_corr
-            tjd = hdr['TSTART'] - hdr['BARYCORR']
-
             for window in badtimewindows:
                 if tjd > min(window) and tjd < max(window):
                     isbadtime = True
@@ -290,6 +290,7 @@ def verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.25):
     df['fitslist'] = fitslist
     df['isbadtime'] = isbadtimes
     df['DQUALITY'] =  dqualitys
+    df['tjd'] = tjds
 
     df = df.sort_values(by='fitslist')
     camera = hdr['CAMERA']
@@ -305,16 +306,25 @@ def verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.25):
             'Got {} badtimes of {} FFIs. Too large fraction!'.
             format(len(df[df['isbadtime']]), len(df) )
         )
-        raise AssertionError(errmsg)
 
+        badsectors = ['s0008']
+
+        raise_error = True
+        for badsector in badsectors:
+            if badsector in f:
+                print('WRN! {}'.format(errmsg))
+                raise_error = False
+
+        if raise_error:
+            raise AssertionError(errmsg)
 
     plt.close('all')
     f, axs = plt.subplots(nrows=2, ncols=1, figsize=(6,6))
-    axs[0].scatter(range(len(df)), df['DQUALITY'])
+    axs[0].scatter(df['tjd'], df['DQUALITY'])
     axs[0].set_ylabel('dquality')
-    axs[1].scatter(range(len(df)), df['isbadtime'])
+    axs[1].scatter(df['tjd'], df['isbadtime'])
     axs[1].set_ylabel('is_omitted')
-    axs[1].set_xlabel('time index')
+    axs[1].set_xlabel('tjd = BJTD - barycorr')
     outpath = os.path.join(os.path.dirname(fitslist[0]),
                            'verify_badframe_move_{}.png'.format(outstr))
     f.savefig(outpath, dpi=300, bbox_inches='tight')
@@ -1903,7 +1913,7 @@ def parallel_bkgd_subtract(fitslist, method='boxblurmedian', isfull=True, k=32,
     elif not isfull:
         expected_norbits = 1
     elif sectornum in [8]:
-        expected_norbits = 3
+        expected_norbits = 2 # jk, 2 after ignoring the wonky first day.
     else:
         expected_norbits = 2
 
