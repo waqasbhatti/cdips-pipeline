@@ -898,15 +898,23 @@ def get_files_needed_before_image_subtraction(
 
             skip = 100 # check every 100th object
 
-            qualitycondition = {'median_px':0.2,
-                                '90th_px':0.5,
-                                'std_px': 1.7}
+            framecoord = SkyCoord(
+                ra=ra_nom, dec=dec_nom, unit=(units.degree, units.degree),
+                frame='icrs'
+            )
 
-            if (int(sectornum), camera, ccd) == (10, 3, 1):
-                # hack to allow worse std-devn b/c of galactic plane field
+            frame_galacticlatitude = framecoord.galactic.b.value
+
+            if abs(frame_galacticlatitude) < 10:
+                # allow worse wcs outliers if frame center within 10 deg of
+                # galactic plane
                 qualitycondition = {'median_px':0.2,
-                                    '90th_px':0.6,
-                                    'std_px':2.2 }
+                                    '90th_px':0.7,
+                                    'std_px':2.3 }
+            else:
+                qualitycondition = {'median_px':0.2,
+                                    '90th_px':0.5,
+                                    'std_px': 1.7}
 
             for w,f,s in zip(wcslist[::skip],fitslist[::skip],fistarlist[::skip]):
 
