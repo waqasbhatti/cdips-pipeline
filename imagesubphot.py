@@ -1831,6 +1831,7 @@ def photometry_on_combined_photref(
             astromref_wcs, photref_frame.replace('.fits','.wcs')))
 
         import wcsqualityassurance as wcsqa
+        from astropy.coordinates import SkyCoord
 
         # allow worse wcs outliers if frame center within 10 deg of
         # galactic plane
