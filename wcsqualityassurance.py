@@ -329,14 +329,19 @@ def impose_wcs_quality_check(
     matchcmd = (
         'grmatch --match-points -i {cutfistar} --col-inp 2,3 '
         '-r {cutprojcat} --col-ref 13,14 --output {matched}'.
-        format(cutfistar=cutfistar, cutprojcat=cutprojcat, matched=matchedoutpath)
+        format(cutfistar=cutfistar,
+               cutprojcat=cutprojcat,
+               matched=matchedoutpath)
     )
 
     rc = os.system(matchcmd)
     print(matchcmd)
 
     if rc != 0:
-      raise RuntimeError('grmatch failed somehow')
+        raise RuntimeError(
+            'grmatch failed when running the command:\n{}'.
+            format(matchcmd)
+        )
 
     df = pd.read_csv(
         matchedoutpath,

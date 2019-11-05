@@ -2751,6 +2751,8 @@ def generate_combined_photref(
         photrefinfo,
         photreftype,
         dbtype,
+        ra_nom,
+        dec_nom,
         photref_reformedfovcat=None,
         makeactive=True,
         field=None,
@@ -3037,6 +3039,8 @@ def generate_combined_photref(
     cphotref_photometry = ism.photometry_on_combined_photref(
         combinedphotref,
         photref_reformedfovcatpath,
+        ra_nom,
+        dec_nom,
         masterphotrefinfo['ccd'],
         ccdgain=ccdgain,
         zeropoint=zeropoint,

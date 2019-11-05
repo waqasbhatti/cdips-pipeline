@@ -201,6 +201,8 @@ from scipy.linalg import lstsq
 from scipy.stats import sigmaclip as stats_sigmaclip
 from scipy.optimize import curve_fit
 
+from astropy import units as units
+
 import scipy.stats
 
 import matplotlib
@@ -1680,6 +1682,8 @@ def photometry_on_combined_photref(
         photref_frame,
         fovcatalog,
         ccdnumber,
+        ra_nom,
+        dec_nom,
         ccdgain=None,
         zeropoint=None,
         ccdexptime=None,
@@ -1828,12 +1832,26 @@ def photometry_on_combined_photref(
 
         import wcsqualityassurance as wcsqa
 
+        # allow worse wcs outliers if frame center within 10 deg of
+        # galactic plane
+        framecoord = SkyCoord(
+            ra=ra_nom, dec=dec_nom, unit=(units.degree, units.degree),
+            frame='icrs'
+        )
+        frame_galacticlatitude = framecoord.galactic.b.value
+        if abs(frame_galacticlatitude) < 10:
+            qualitycondition = {'median_px':0.2,
+                                '90th_px':0.7,
+                                'std_px':2.3 }
+        else:
+            qualitycondition = {'median_px':0.2,
+                                '90th_px':0.5,
+                                'std_px': 1.7}
+
         if wcsqa.does_wcs_pass_quality_check(
             wcsf, photref_frame, reformed_cat_file, isspocwcs=True, N_bright=1000,
             N_faint=9000, fistarpath=astromfistar, matchedoutpath=None,
-            qualitycondition={'median_px':0.2,
-                              '90th_px':0.5,
-                              'std_px': 2.0}
+            qualitycondition=qualitycondition
         ):
             pass
 
