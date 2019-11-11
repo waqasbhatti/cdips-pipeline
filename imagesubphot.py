@@ -1840,7 +1840,7 @@ def photometry_on_combined_photref(
             frame='icrs'
         )
         frame_galacticlatitude = framecoord.galactic.b.value
-        if abs(frame_galacticlatitude) < 10:
+        if abs(frame_galacticlatitude) < 20:
             qualitycondition = {'median_px':0.2,
                                 '90th_px':0.7,
                                 'std_px':2.3 }
@@ -1859,7 +1859,8 @@ def photometry_on_combined_photref(
         else:
             errmsg = (
                 'PHOTREF WCS fails quality check '+
-                'wcs, fits are {}, {}'.format(wcsf,photref_frame)
+                'wcs, fits are {}, {}. frame glat is {} deg'.
+                format(wcsf, photref_frame, frame_galacticlatitude)
             )
             raise AssertionError(errmsg)
 
