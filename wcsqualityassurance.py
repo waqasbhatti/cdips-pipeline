@@ -126,7 +126,8 @@ def does_wcs_pass_quality_check(
                                               out=outprojcat,
                                               wcs=wcsfile,
                                               removetemp=True,
-                                              pixborders=pixborders)
+                                              pixborders=pixborders,
+                                              observatory='tess')
     #
     # if source extraction not done, then do it
     #
@@ -660,7 +661,8 @@ def debug(
                                                   out=outprojcat,
                                                   wcs=wcsfile,
                                                   removetemp=True,
-                                                  pixborders=pixborders)
+                                                  pixborders=pixborders,
+                                                  observatory='tess')
     # do source extraction...
     if not os.path.exists(fistarpath):
         extract_frame_sources(fitsfile,
