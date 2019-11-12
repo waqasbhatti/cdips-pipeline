@@ -1913,7 +1913,7 @@ def parallel_bkgd_subtract(fitslist, method='boxblurmedian', isfull=True, k=32,
     elif not isfull:
         expected_norbits = 1
     elif sectornum in [8]:
-        expected_norbits = 2 # jk, 2 after ignoring the wonky first day.
+        expected_norbits = 3 # (quality cuts down to 2 afterwards)
     else:
         expected_norbits = 2
 

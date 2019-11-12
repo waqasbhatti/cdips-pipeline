@@ -1288,6 +1288,7 @@ def round_two_tfa_selection(cand_template_lcpaths, apnum,
     """
 
     from astrobase.varclass.varfeatures import lightcurve_ptp_measures
+    from astrobase.lcmath import sigclip_magseries
     from astropy.stats import LombScargle
     from lcstatistics import plot_raw_tfa_bkgd
 
@@ -1321,6 +1322,13 @@ def round_two_tfa_selection(cand_template_lcpaths, apnum,
                 tfa_time[sel], tfa_mag[sel], orbitgap=1, expected_norbits=2,
                 orbitpadding=6/(24), raise_expectation_error=False
             )
+
+            _time, _mag = sigclip_magseries(_time, _mag, _mag*1e-3,
+                                            sigclip=[3,3], iterative=False,
+                                            niterations=None,
+                                            meanormedian='median',
+                                            magsarefluxes=False)
+
             ls = LombScargle(_time, _mag, _mag*1e-3)
             freq, power = ls.autopower()
             period = 1/freq
@@ -1404,8 +1412,12 @@ def round_two_tfa_selection(cand_template_lcpaths, apnum,
     # generally should have enough stars.
     throw_out = df['fap'] < max_fap
     if not len(df[~throw_out]) > n_min_tfa_templates:
-        raise AssertionError('in selecting tfa template stars, did not '
-                             'find enough')
+        errmsg = (
+            'lcutils.round_two_tfa_selection: in selecting tfa template stars,'
+            'found {} templates, but need at least {}'.
+            format(len(df[~throw_out]), n_min_tfa_templates)
+        )
+        raise AssertionError(errmsg)
 
     if len(df[~throw_out]) > n_desired_tfa_templates:
 
