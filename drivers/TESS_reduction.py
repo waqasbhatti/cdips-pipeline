@@ -1754,6 +1754,8 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
         '/nfs/phtess2/ar0/TESS/FFI/RED/sector-{:d}/cam{}_ccd{}'.
         format(sectornum, camnum, ccdnum)
     )
+    if not os.path.exists(os.path.dirname(RED_dir)):
+        os.mkdir(os.path.dirname(RED_dir))
     if not os.path.exists(RED_dir):
         os.mkdir(RED_dir)
     fits_list = np.sort(glob(os.path.join(RED_dir, fitsglob)))
