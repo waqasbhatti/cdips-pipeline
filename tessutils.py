@@ -1559,7 +1559,12 @@ def make_ccd_temperature_timeseries_pickle(sectornum):
 
     for temperature_hdr_name in temperature_hdr_names:
         this_time = hdulist[temperature_hdr_name].data['TIME']
-        this_temperature = hdulist[temperature_hdr_name].data['COOKED']
+        try:
+            this_temperature = hdulist[temperature_hdr_name].data['COOKED']
+        except KeyError:
+            # in sectors >=13, the engineering data changed the key from
+            # "COOKED" to "VALUE".
+            this_temperature = hdulist[temperature_hdr_name].data['VALUE']
         d[temperature_hdr_name] = {}
         d[temperature_hdr_name]['time'] = this_time
         d[temperature_hdr_name]['temperature'] = this_temperature
