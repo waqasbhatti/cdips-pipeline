@@ -1323,11 +1323,11 @@ def round_two_tfa_selection(cand_template_lcpaths, apnum,
                 orbitpadding=6/(24), raise_expectation_error=False
             )
 
-            _time, _mag = sigclip_magseries(_time, _mag, _mag*1e-3,
-                                            sigclip=[3,3], iterative=False,
-                                            niterations=None,
-                                            meanormedian='median',
-                                            magsarefluxes=False)
+            _time, _mag, _ = sigclip_magseries(_time, _mag, _mag*1e-3,
+                                               sigclip=[3,3], iterative=False,
+                                               niterations=None,
+                                               meanormedian='median',
+                                               magsarefluxes=False)
 
             ls = LombScargle(_time, _mag, _mag*1e-3)
             freq, power = ls.autopower()

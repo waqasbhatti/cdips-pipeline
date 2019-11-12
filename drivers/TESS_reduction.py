@@ -1291,7 +1291,10 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
     else:
         print('already made EPD LC stats file')
 
-    if skipepd and not os.path.exists(tfastatfile):
+    if (skipepd
+        and not os.path.exists(tfastatfile)
+        and not os.path.exists(epdstatfile)
+       ):
         # do the hack of getting "EPD" statistics that are actually IRM
         # statistics, duplicated into all the EPD fields.
         ap.parallel_lc_statistics(lcdirectory, epdlcglob, reformed_cat_file,
