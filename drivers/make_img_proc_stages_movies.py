@@ -41,7 +41,10 @@ def get_identifiers_slicebounds(sector):
     return identifiers, slicebounds
 
 
-def make_img_proc_stages_movies(sector=6, overwrite=0):
+def make_img_proc_stages_movies(sector=None, overwrite=None):
+
+    assert isinstance(sector, int)
+    assert isinstance(overwrite, int)
 
     identifiers, slicebounds = get_identifiers_slicebounds(sector)
 
@@ -82,6 +85,7 @@ def make_img_proc_stages_movies(sector=6, overwrite=0):
 
 if __name__ == "__main__":
 
-    sector = 6
+    sector = 10
+    overwrite = 0
 
-    make_img_proc_stages_movies(sector=sector)
+    make_img_proc_stages_movies(sector=sector, overwrite=overwrite)
