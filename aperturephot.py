@@ -197,10 +197,11 @@ TRANSFORMCMD = ("{transformer} -w {framewcsfile} "
                 "-o {outputfile} "
                 "-c 2,3 "
                 "{catalogsourcelist} ")
+WCSRD2XYCMD = ( "wcs-rd2xy -w {framewcsfile} -o {outputfile} "
+               "-i {rdlsfile} -R 'ra' -D 'dec' " )
 
 # fiphot command string to run fiphot. requires a sourcelist obtained from
 # running TRANSFORMCMD and removing objects outside the CCD. the parameters are:
-# FIXME: WTF is single-background and why is it 3?
 
 # {fits}:         name of input FITS frame
 # {sourcelist}:   name of the source list file
@@ -215,6 +216,15 @@ TRANSFORMCMD = ("{transformer} -w {framewcsfile} "
 #                 (used for later collection of fiphot files into an LC)
 # {outfile}:      name of the output .phot file (binary format)
 # {format}:       for text output, e.g.,'ISXY,BbMms', see fiphot manpage
+#
+# single-background: a fiphot I/O parameter for which the number sets different
+# aspects of the output formatting for the .fiphot file that is produced. It
+# is a HATpipebin-specific dependency; the public `fitsh` downloadable from
+# Andras' webpage does not have this parameter. See `fiphot-io.c` and
+# `fiphot.c` in the HATpipebin source. The corresponding `singlebg` parameter
+# is a switch used in `write_comment`, `write_photometry_text`,
+# `output_phot_columns`, and similar formatting functions.
+#
 FIPHOTCMD = ("fiphot --input {fits} --input-list {sourcelist} "
              "--col-id 1 --col-xy {xycols} --gain {ccdgain:f} "
              "--mag-flux {zeropoint:f},{ccdexptime:f} "
