@@ -257,6 +257,11 @@ def verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.25):
     isbadtimes = []
     tjds = []
 
+    astromkeys = ['CRVAL1', 'CRVAL2', 'A_DMAX', 'B_DMAX']
+    astromdict = {}
+    for k in astromkeys:
+        astromdict[k] = []
+
     for f in fitslist:
 
         # open the header, check if the quality flag matches the passed value.
@@ -264,6 +269,9 @@ def verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.25):
 
         dquality = hdr['DQUALITY']
         dqualitys.append(dquality)
+
+        for k in astromkeys:
+            astromdict[k].append(hdr[k])
 
         # get frametime in TJD = BTJD - LTT_corr.
         # if its within any known bad times for TESS, then set isbadtime to
@@ -291,6 +299,8 @@ def verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.25):
     df['isbadtime'] = isbadtimes
     df['DQUALITY'] =  dqualitys
     df['tjd'] = tjds
+    for k in astromkeys:
+        df[k] = astromdict[k]
 
     df = df.sort_values(by='fitslist')
     camera = hdr['CAMERA']
@@ -318,6 +328,9 @@ def verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.25):
         if raise_error:
             raise AssertionError(errmsg)
 
+    #
+    # plot DQUALITY vs TIME
+    #
     plt.close('all')
     f, axs = plt.subplots(nrows=2, ncols=1, figsize=(6,6))
     axs[0].scatter(df['tjd'], df['DQUALITY'])
@@ -329,6 +342,25 @@ def verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.25):
                            'verify_badframe_move_{}.png'.format(outstr))
     f.savefig(outpath, dpi=300, bbox_inches='tight')
     print('made {}'.format(outpath))
+
+    #
+    # plot ASTROMETRY QUANTITIES vs TIME
+    # astromkeys = ['CRVAL1', 'CRVAL2', 'A_DMAX', 'B_DMAX']
+    #
+    plt.close('all')
+    f, axs = plt.subplots(nrows=4, ncols=1, figsize=(6,9))
+
+    for ix, k in enumerate(astromkeys):
+        axs[ix].scatter(df['tjd'], df[k])
+        axs[ix].set_ylabel(k)
+
+    axs[-1].set_xlabel('tjd = BJTD - barycorr')
+    outpath = os.path.join(os.path.dirname(fitslist[0]),
+                           'verify_frame_astrometric_quantities_{}.png'.
+                           format(outstr))
+    f.savefig(outpath, dpi=300, bbox_inches='tight')
+    print('made {}'.format(outpath))
+
 
 
 def parallel_move_badframes(fitslist,
