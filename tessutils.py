@@ -317,7 +317,7 @@ def verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.25):
             format(len(df[df['isbadtime']]), len(df) )
         )
 
-        badsectors = ['s0008']
+        badsectors = ['s0003', 's0008']
 
         raise_error = True
         for badsector in badsectors:
