@@ -55,25 +55,25 @@ def main():
     with open(fname,'r') as fhandle:
         templatelines = fhandle.readlines()
 
-    # start at projid 1300 for sector 1-5 reduction.
-    projid = 1300
+    # start at projid 1650 for sector 1-5 reduction.
+    projid = 1650
     varyparamdict = {}
 
-    for snum in [2,3,4,5,1]:
+    for snum in [1,2,3,4,5]:
         for cam in range(1,5):
             for ccd in range(1,5):
                 varyparamdict[projid] = {
                     'camnum':cam,
                     'ccdnum':ccd,
                     'projectid':projid,        # increment this whenever new things go to PSQL database.
-                    'sector':"'s000{}'".format(snum), # match SPOC syntax, zfill to 4.
+                    'sector':"'s{:s}'".format(str(snum).zfill(4)), # match SPOC syntax, zfill to 4.
                     'tuneparameters':'false',
                     'nworkers':32,
                     'aperturelist':"\"1.0:7.0:6.0,1.5:7.0:6.0,2.25:7.0:6.0\"",
                     'epdsmooth':11,            # not used
                     'epdsigclip':10000,        # ditto
-                    'photdisjointradius':2,
-                    'anetfluxthreshold':50000,
+                    'photdisjointradius':0.5,
+                    'anetfluxthreshold':1000,
                     'anettweak':6,
                     'anetradius':30,
                     'initccdextent':"\"0:2048,0:2048\"",
