@@ -1949,11 +1949,11 @@ def parallel_bkgd_subtract(fitslist, method='boxblurmedian', isfull=True, k=32,
         errmsg = 'need manual orbitgap to be implemented in bkgdsub'
         raise NotImplementedError(errmsg)
 
-    if isfull and sectornum in [1,2,4,5,6,7,9,10,11,12,13,17]:
+    if isfull and sectornum in [1,2,5,6,7,9,10,11,12,13,17]:
         expected_norbits = 2
     elif not isfull:
         expected_norbits = 1
-    elif sectornum in [8]:
+    elif sectornum in [4,8]:
         expected_norbits = 3 # (quality cuts down to 2 afterwards)
     else:
         expected_norbits = 2
