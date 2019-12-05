@@ -271,7 +271,10 @@ def verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.25):
         dqualitys.append(dquality)
 
         for k in astromkeys:
-            astromdict[k].append(hdr[k])
+            try:
+                astromdict[k].append(hdr[k])
+            except KeyError:
+                astromdict[k].append(0)
 
         # get frametime in TJD = BTJD - LTT_corr.
         # if its within any known bad times for TESS, then set isbadtime to
@@ -1935,7 +1938,7 @@ def parallel_bkgd_subtract(fitslist, method='boxblurmedian', isfull=True, k=32,
     from parse import parse
     res = parse('{}/sector-{}/{}',fitslist[0])
     sectornum = int(res[1])
-    if sectornum in [1,2,4,5,6,7,8,9,10,11]:
+    if sectornum in [1,2,4,5,6,7,8,9,10,11,17]:
         orbitgap = 1. # days
     elif sectornum in [3]:
         orbitgap = 0.15 # days
@@ -1945,7 +1948,7 @@ def parallel_bkgd_subtract(fitslist, method='boxblurmedian', isfull=True, k=32,
         errmsg = 'need manual orbitgap to be implemented in bkgdsub'
         raise NotImplementedError(errmsg)
 
-    if isfull and sectornum in [1,2,4,5,6,7,9,10,11,12,13]:
+    if isfull and sectornum in [1,2,4,5,6,7,9,10,11,12,13,17]:
         expected_norbits = 2
     elif not isfull:
         expected_norbits = 1
