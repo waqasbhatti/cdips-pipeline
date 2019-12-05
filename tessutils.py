@@ -634,13 +634,14 @@ def are_known_planets_in_field(ra_center, dec_center, outname, use_NEA=False,
             hj_coords, cam_tuple, withgaps=False)
 
     elif use_alerts:
-        # sectors 1-7
+        # latest version available
         df = pd.read_csv(
             '/home/lbouma/proj/cdips-pipeline/data/'
-            'toi-plus-2019-10-19.csv'
+            'csv-file-toi-plus-catalog-2019-12-05.csv',
+            comment='#'
         )
-        kp_coords = SkyCoord(nparr(df['RA'])*u.deg,
-                             nparr(df['Dec'])*u.deg,
+        kp_coords = SkyCoord(nparr(df['TIC Right Ascension'])*u.deg,
+                             nparr(df['TIC Declination'])*u.deg,
                              frame='icrs')
 
         pl_onchip = gts.given_one_camera_get_stars_on_silicon(
