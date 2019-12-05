@@ -1,12 +1,10 @@
 import os
 
-sectors = [10,11,12,13]
+sectors = list(range(14,27)) # [10,11,12,13]
 
-projidtuples = [(1564,1580),
-                (1564+16,1580+16),
-                (1564+32,1580+32),
-                (1564+48,1580+48)
-               ]
+startid = 1750
+projidtuples = [ (startid+ix*16, startid+(ix+1)*16)  for ix in
+                 range(0,len(sectors))  ]
 
 for ix, sector in enumerate(sectors):
 
