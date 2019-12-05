@@ -79,6 +79,10 @@ elif [ "$sector" = 's0014' ] ; then
   scid=0150
 elif [ "$sector" = 's0015' ] ; then
   scid=0151
+elif [ "$sector" = 's0016' ] ; then
+  scid=0152
+elif [ "$sector" = 's0017' ] ; then
+  scid=0161
 else
   echo 'error: need to hard-code in scid for sector s000X'
   exit 42
