@@ -320,7 +320,10 @@ def verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.25):
             format(len(df[df['isbadtime']]), len(df) )
         )
 
-        badsectors = ['s0003', 's0008']
+        # sector 3 has reaction wheel testing.
+        # sector 8 has an instrument failure.
+        # sector 12, camera 1 has extended scattered light (see Kruse's videos)
+        badsectors = ['s0003', 's0008', 's0012']
 
         raise_error = True
         for badsector in badsectors:
