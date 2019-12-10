@@ -1012,8 +1012,8 @@ def measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
         tab = tab[is_wanted]
     elif use_alerts:
         tab = pd.read_csv(kponchippath)
-        tab['pl_name'] = tab['toi_id']
-        tab['pl_hostname'] = tab['tic_id']
+        tab['pl_name'] = tab['Full TOI ID']
+        tab['pl_hostname'] = tab['TIC']
     else:
         raise NotImplementedError
 
@@ -1027,8 +1027,8 @@ def measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
     if use_NEA:
         kp_coords = tab['sky_coord']
     elif use_alerts:
-        kp_coords = SkyCoord(nparr(tab['RA'])*u.deg,
-                             nparr(tab['Dec'])*u.deg,
+        kp_coords = SkyCoord(nparr(tab['TIC Right Ascension'])*u.deg,
+                             nparr(tab['TIC Declination'])*u.deg,
                              frame='icrs')
 
     for colname in [
