@@ -1699,7 +1699,8 @@ def photometry_on_combined_photref(
         pixelerror=0.3,
         uniformize=10,
         reformed_cat_file=None,
-        projid=None
+        projid=None,
+        raise_wcs_error=False
         ):
     """
     This does source extraction, WCS, catalog projection, and then runs fiphot
@@ -1862,7 +1863,9 @@ def photometry_on_combined_photref(
                 'wcs, fits are {}, {}. frame glat is {} deg'.
                 format(wcsf, photref_frame, frame_galacticlatitude)
             )
-            raise AssertionError(errmsg)
+            print(errmsg)
+            if raise_wcs_error:
+                raise AssertionError(errmsg)
 
         if False:
             # NOTE: deprecated for TESS

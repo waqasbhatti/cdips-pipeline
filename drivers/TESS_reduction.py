@@ -833,7 +833,8 @@ def get_files_needed_before_image_subtraction(
         extractsources=True,
         do_cdips_merge=True,
         astrometrydownsample=2,
-        defaultwcsisspoc=True
+        defaultwcsisspoc=True,
+        raise_wcs_error=False
     ):
     """
     get .fistar, .fiphot, and .wcs files needed before image subtraction
@@ -939,12 +940,14 @@ def get_files_needed_before_image_subtraction(
 
                     else:
                         errmsg = (
-                            'WCS fails quality check '+
+                            'ERR! WCS fails quality check '+
                             'wcs, fits, fistar are {}, {}, {}'.format(w,f,s)
                         )
-                        raise AssertionError(errmsg)
-                        # NOTE : might need to derive the WCS yourself, using a
-                        # parallel_astrometrydotnet call as below...
+                        print(errmsg)
+                        if raise_wcs_error:
+                            # NOTE : might need to derive the WCS yourself, using a
+                            # parallel_astrometrydotnet call as below...
+                            raise AssertionError(errmsg)
 
         else:
 
