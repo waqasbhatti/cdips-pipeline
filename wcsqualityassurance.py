@@ -338,10 +338,12 @@ def impose_wcs_quality_check(
     print(matchcmd)
 
     if rc != 0:
-        raise RuntimeError(
-            'grmatch failed when running the command:\n{}'.
+        print(
+            'ERR! RunTimeError: grmatch failed when running the command:\n{}'.
             format(matchcmd)
         )
+        quality_check_result = False
+        return quality_check_result
 
     df = pd.read_csv(
         matchedoutpath,
