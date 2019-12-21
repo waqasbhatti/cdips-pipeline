@@ -34,3 +34,4 @@ drivers/tess_tuning_scripts/projid_????.sh
 drivers/log*
 drivers/mv*py
 *nohup*
+drivers/verification*
