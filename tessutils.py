@@ -75,7 +75,7 @@ from astropy.io import ascii
 from lcstatistics import plot_raw_epd_tfa
 
 from astrobase.periodbase import kbls
-from astrobase.varbase import lcfit
+from astrobase import lcfit
 from astrobase.varbase.transits import get_transit_times
 from astrobase import lcmath
 from astrobase.lcfit.utils import make_fit_plot
