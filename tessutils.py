@@ -579,10 +579,16 @@ def from_CAL_to_fitsh_compatible(task):
 
     assert trim.shape == (2048, 2048)
 
-    fits.writeto(outname, trim, header=hdr)
+    if not os.path.exists(outname):
+        fits.writeto(outname, trim, header=hdr)
+        print('{:s} Wrote {:s} to {:s}'.format(
+            datetime.utcnow().isoformat(), fitsname, outname)
+        )
+    else:
+        print('{:s} ERR! Found {:s} already exists'.format(
+            datetime.utcnow().isoformat(), outname)
+        )
 
-    print('{:s} Wrote {:s} to {:s}'.format(
-        datetime.utcnow().isoformat(), fitsname, outname))
 
 
 def from_ete6_to_fitsh_compatible(fitslist, outdir, projid=42):
