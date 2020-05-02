@@ -98,9 +98,13 @@ DQUALITYMASKCMD = ('fiign {fitsfile} -o {outfitsfile} '
 # correction applied). this is b/c they're from POC, not SPOC.
 badtimewindows = [
     (1347, 1349.5), # sector 1, coarse pointing
+    (1338.52153, 1339.65310), # sector 1 downlink, btwn orbits 9->10
+    (1367.15347, 1368.59406), # sector 2 downlink, btwn orbits 11->12
     (1382.03986, 1385.896635), # sector 3, orbit 13 start
+    (1395.47997, 1396.60497), # sector 3 downlink, btwn orbits 13->14
     (1406.29246, 1409.388295), # sector 3, orbit 14 end
     (1418.53690, 1421.211685), # sector 4 instrument anomaly
+    (1421.21000, 1424.54897), # sector 4 empirically "bad" time, + dl orbits 15->16
     (1465.212615, 1468.269985), # sector 6 PRF time
     (1477.01998, 1478.11304), # sector 6 downlink, btwn orbits 19->20
     (1503.03803, 1504.69775), # sector 7 downlink, btwn orbits 21->22
