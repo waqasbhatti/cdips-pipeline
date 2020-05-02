@@ -102,6 +102,7 @@ badtimewindows = [
     (1367.15347, 1368.59406), # sector 2 downlink, btwn orbits 11->12
     (1382.03986, 1385.896635), # sector 3, orbit 13 start
     (1395.47997, 1396.60497), # sector 3 downlink, btwn orbits 13->14
+    (1394.00000, 1396.60497), # sector 3 empirically bad scattered light
     (1406.29246, 1409.388295), # sector 3, orbit 14 end
     (1418.53690, 1421.211685), # sector 4 instrument anomaly
     (1421.21000, 1424.54897), # sector 4 empirically "bad" time, + dl orbits 15->16
