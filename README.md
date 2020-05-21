@@ -273,43 +273,47 @@ Some usage examples are given in the `drivers/` directory.
 
 ### 2.1 Concepts: Directory structure
 
-Everything must be in its right place for your photometry to Just Work. The
-assumed directory structure is as follows.
+Everything must be in its right place for your photometry to Just Work. 
+During an initial installation, you will need to make a directory structure as
+follows, where "." refers to a base directory of your chosing.  (The pipeline
+assumes this directory structure has been made).
 
   ```
   .
-  ├── BASE      #
-  ├── LC        # lightcurves go here
-  ├── PROJ      # project directories for specific users
-  ├── RAW       # raw fits images (or fits.fz images) go here
-  ├── RED       # calibrated fits images go here
-  └── REDTEMP   # temporary space for reduced files
+  ├── CAL            # You must download calibrated fits images from MAST into here
+  ├──                # e.g., ./CAL/sector-4/tess2018307055940-s0004-1-2-0124-s_ffic.fits
+  ├── ENGINEERING    # You must download engineering files from MAST into here
+  ├──                # e.g., ./ENGINEERING/tess2018344132117_sector04-eng.fits
+  ├──                # 
+  ├──                # The following are automatically populated:
+  ├── BASE           # Reference frames will go here
+  ├── RED            # Trimmed and calibrated frames will go here
+  ├── LC             # Lightcurves will go here
+  ├── PROJ           # Files used to document different reductions will go here
+  ├── MOVIES         # Movies will get made and will be put here
+  └── REDTEMP        # Temporary space for reduced files
   ```
 
 At the second level:
 
   ```
   .
+  ├── CAL
+  │   ├── sector-3          # e.g., ./CAL/sector-4/tess2018307055940-s0004-1-2-0124-s_ffic.fits
+  │   └── sector-4          # As above.
+  ├── ENGINEERING           # As in the level-1 example.
   ├── BASE
-  │   ├── CAL                 # calibration frames (bias, flat, dark) go here
-  │   ├── CAT                 # FOV source catalogs for your field go here
-  │   └── reference-frames    # astrometric reference frames; sqlite3 databases
+  │   ├── frameinfo-cache   # Once created, these two subdirectories are...
+  │   └── reference-frames  # ...automatically populated
   ├── LC
-  │   ├── projid12-G577       # lightcurves specific to particular projectids
-  │   ├── stats_files         # for lightcurve statistics
-  │   └── projid8-9-10-11-12
-  ├── PROJ
-  │   ├── lbouma
-  │   └── wbhatti
-  ├── RAW
-  │   ├── 1-20161109          # ??? each night gets its own directory under RAW
-  │   ├── 1-20161110
-  │   ├── 1-20161111
-  │   ├── 1-20161130
-  │   └── tmp
-  ├── RED
-  │   ├── projid12            # each project gets its own subdirectory under RED
-  │   └── wbhatti-red-frames
+  │   ├── FULL              # For LCs from a full sector
+  │   └── TUNE              # For short LCs from a subset of a sector
+  ├── BASE                  # These directories have subdirectories that get made automatically.
+  ├── RED                   # These directories have subdirectories that get made automatically.
+  ├── LC                    # These directories have subdirectories that get made automatically.
+  ├── PROJ                  # These directories have subdirectories that get made automatically.
+  ├── MOVIES                # These directories have subdirectories that get made automatically.
+  └── REDTEMP               # These directories have subdirectories that get made automatically.
   ```
 
 Maintaining this structure is essential. Commands can be run from anywhere,
