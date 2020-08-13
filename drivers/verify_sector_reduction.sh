@@ -6,7 +6,7 @@
 ##########
 # config #
 ##########
-snum=0005
+snum=0001
 
 ##########
 # script #
@@ -30,5 +30,7 @@ for cam in {1..4}; do
     dst=$verificationdir/cam${cam}_ccd${ccd}_projid${projid}_stats_files
     ln -s $src $dst
     echo 'symlinked' $src 'to' $dst
+    rm $dst/*stats_files
   done
 done
+

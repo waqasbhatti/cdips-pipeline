@@ -12,11 +12,11 @@
 # clear frameinfo cache from past week. 
 #
 
-removeall=true # if true, removes all "REDUCED" files. else, only post-presubtraction files
-camnum=2
-ccdnum=3
-projectid=1570
-sector='s0010'
+removeall=false # true # if true, removes all "REDUCED" files. else, only post-presubtraction files
+camnum=4
+ccdnum=1
+projectid=1678
+sector='s0002'
 tuneparameters=false
 
 ##########################################
