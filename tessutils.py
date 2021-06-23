@@ -118,6 +118,7 @@ badtimewindows = [
     (1609.69425, 1610.77620), # sector 11 downlink, btwn orbits 29->30
     (1638.99562, 1640.03312), # sector 12 downlink, btwn orbits 31->32
     (1667.69004, 1668.61921), # sector 13 downlink, btwn orbits 33->34
+    (1696.38865, 1697.33865), # sector 14 downlink, btwn orbits 35->36
 ]
 
 
@@ -328,7 +329,8 @@ def verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.25):
         # sector 3 has reaction wheel testing.
         # sector 8 has an instrument failure.
         # sector 12, camera 1 has extended scattered light (see Kruse's videos)
-        badsectors = ['s0003', 's0008', 's0012']
+        # sector 14, camera 1 also has extended scattered light
+        badsectors = ['s0003', 's0008', 's0012', 's0014']
 
         raise_error = True
         for badsector in badsectors:
@@ -1953,7 +1955,7 @@ def parallel_bkgd_subtract(fitslist, method='boxblurmedian', isfull=True, k=32,
     from parse import parse
     res = parse('{}/sector-{}/{}',fitslist[0])
     sectornum = int(res[1])
-    if sectornum in [1,2,4,5,6,7,8,9,10,11,17]:
+    if sectornum in [1,2,4,5,6,7,8,9,10,11,14,17]:
         orbitgap = 1. # days
     elif sectornum in [3]:
         orbitgap = 0.15 # days
@@ -1963,7 +1965,7 @@ def parallel_bkgd_subtract(fitslist, method='boxblurmedian', isfull=True, k=32,
         errmsg = 'need manual orbitgap to be implemented in bkgdsub'
         raise NotImplementedError(errmsg)
 
-    if isfull and sectornum in [1,2,5,6,7,9,10,11,12,13,17]:
+    if isfull and sectornum in [1,2,5,6,7,9,10,11,12,13,14,17]:
         expected_norbits = 2
     elif not isfull:
         expected_norbits = 1
