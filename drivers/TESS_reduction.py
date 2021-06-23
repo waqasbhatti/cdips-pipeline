@@ -1875,7 +1875,14 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     catboxsize = 24
 
     # get gain, ccdextent, zeropoint, exposure time from header.
-    rand_fits = fits_list[np.random.randint(0, high=len(fits_list))]
+    ntry_rand_fits=0
+    while True:
+        rand_fits = fits_list[np.random.randint(0, high=len(fits_list))]
+        if os.path.exists(rand_fits):
+            break
+        if ntry_rand_fits >= 10000:
+            raise AssertionError('Cannot find a random fits to extract header info after moving the badframes')
+
     hdu_list = fits.open(rand_fits)
     hdr = hdu_list[0].header
 
