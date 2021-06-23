@@ -2234,7 +2234,7 @@ def merge_object_catalog_vs_cdips(
     field_df = pd.DataFrame(catarr)
     del catarr
 
-    cdips_df = pd.read_csv(cdips_cat_file, sep=';')
+    cdips_df = pd.read_csv(cdips_cat_file, sep=',')
 
     field_ids = np.array(field_df['id']).astype(str)
     cdips_ids = np.array(cdips_df['source_id']).astype(str)
