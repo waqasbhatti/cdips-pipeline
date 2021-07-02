@@ -118,6 +118,7 @@ badtimewindows = [
     (1609.69425, 1610.77620), # sector 11 downlink, btwn orbits 29->30
     (1638.99562, 1640.03312), # sector 12 downlink, btwn orbits 31->32
     (1667.69004, 1668.61921), # sector 13 downlink, btwn orbits 33->34
+    (1696.38865, 1697.33865), # sector 14 downlink, btwn orbits 35->36
 ]
 
 
@@ -328,7 +329,8 @@ def verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.25):
         # sector 3 has reaction wheel testing.
         # sector 8 has an instrument failure.
         # sector 12, camera 1 has extended scattered light (see Kruse's videos)
-        badsectors = ['s0003', 's0008', 's0012']
+        # sector 14, camera 1 also has extended scattered light
+        badsectors = ['s0003', 's0008', 's0012', 's0014']
 
         raise_error = True
         for badsector in badsectors:
@@ -608,7 +610,7 @@ def from_ete6_to_fitsh_compatible(fitslist, outdir, projid=42):
 
 
 def are_known_planets_in_field(ra_center, dec_center, outname, use_NEA=False,
-                               use_alerts=True):
+                               use_alerts=False, use_tev=True):
     """
     Given a field center, find which known planets are on chip.
     Dependencies: tessmaps, astroquery
@@ -626,9 +628,15 @@ def are_known_planets_in_field(ra_center, dec_center, outname, use_NEA=False,
         https://archive.stsci.edu/prepds/tess-data-alerts/index.html, to get
         candidate planet host (TOI) properties.
 
+        use_tev (bool): whether to use the TEV TOI list from MIT (i.e.,
+        download it directly).  Assumes you are connected to the internet.
+
     Returns:
         True if any HJs on chip, else False.
     """
+
+    # at most one data getting location should be used
+    assert np.sum([use_NEA, use_alerts, use_tev]) == 1
 
     from tessmaps import get_time_on_silicon as gts
 
@@ -661,6 +669,18 @@ def are_known_planets_in_field(ra_center, dec_center, outname, use_NEA=False,
         pl_onchip = gts.given_one_camera_get_stars_on_silicon(
             kp_coords, cam_tuple, withgaps=False)
 
+    elif use_tev:
+        # download latest TOI list to local memory; use that instead.
+        df = pd.read_csv(
+            'https://tev.mit.edu/data/collection/193/csv/6/',
+            sep=',', comment='#'
+        )
+        kp_coords = SkyCoord(nparr(df['TIC Right Ascension'])*u.deg,
+                             nparr(df['TIC Declination'])*u.deg,
+                             frame='icrs')
+        pl_onchip = gts.given_one_camera_get_stars_on_silicon(
+            kp_coords, cam_tuple, withgaps=False)
+
     else:
         raise NotImplementedError('use_alerts or use_NEA must be true.')
 
@@ -678,7 +698,7 @@ def are_known_planets_in_field(ra_center, dec_center, outname, use_NEA=False,
 
         return True
 
-    elif np.any(pl_onchip) and use_alerts:
+    elif np.any(pl_onchip) and (use_alerts or use_tev):
 
         outdf = df[pl_onchip.astype(bool)]
         outdf.to_csv(outname, index=False)
@@ -981,7 +1001,8 @@ def make_cluster_cutout_jpgs(sectornum, fitsdir, racenter, deccenter, field,
 
 def measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
                              statsdir, sectornum, minxmatchsep=3, nworkers=20,
-                             use_NEA=False, use_alerts=True, skipepd=False):
+                             use_NEA=False, use_alerts=False, use_tev=True,
+                             skipepd=False):
     """
     Args:
 
@@ -998,6 +1019,9 @@ def measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
         crossmatching of hot Jupiter exoarchive catalog positions to 2mass
         projected plate positions.
     """
+
+    # at most one data getting location should be used
+    assert np.sum([use_NEA, use_alerts, use_tev]) == 1
 
     minxmatchsep = minxmatchsep*u.arcsec
 
@@ -1021,7 +1045,7 @@ def measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
         is_wanted = nparr(is_wanted)
 
         tab = tab[is_wanted]
-    elif use_alerts:
+    elif use_alerts or use_tev:
         tab = pd.read_csv(kponchippath)
         tab['pl_name'] = tab['Full TOI ID']
         tab['pl_hostname'] = tab['TIC']
@@ -1037,7 +1061,7 @@ def measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
     proj_coords = SkyCoord(proj_ra, proj_dec, frame='icrs')
     if use_NEA:
         kp_coords = tab['sky_coord']
-    elif use_alerts:
+    elif use_alerts or use_tev:
         kp_coords = SkyCoord(nparr(tab['TIC Right Ascension'])*u.deg,
                              nparr(tab['TIC Declination'])*u.deg,
                              frame='icrs')
@@ -1953,7 +1977,7 @@ def parallel_bkgd_subtract(fitslist, method='boxblurmedian', isfull=True, k=32,
     from parse import parse
     res = parse('{}/sector-{}/{}',fitslist[0])
     sectornum = int(res[1])
-    if sectornum in [1,2,4,5,6,7,8,9,10,11,17]:
+    if sectornum in [1,2,4,5,6,7,8,9,10,11,14,17]:
         orbitgap = 1. # days
     elif sectornum in [3]:
         orbitgap = 0.15 # days
@@ -1963,7 +1987,7 @@ def parallel_bkgd_subtract(fitslist, method='boxblurmedian', isfull=True, k=32,
         errmsg = 'need manual orbitgap to be implemented in bkgdsub'
         raise NotImplementedError(errmsg)
 
-    if isfull and sectornum in [1,2,5,6,7,9,10,11,12,13,17]:
+    if isfull and sectornum in [1,2,5,6,7,9,10,11,12,13,14,17]:
         expected_norbits = 2
     elif not isfull:
         expected_norbits = 1
@@ -2208,7 +2232,7 @@ def read_object_catalog(catalogfile):
 def merge_object_catalog_vs_cdips(
     in_reformed_cat_file, out_reformed_cat_file,
     cdips_cat_file=('/nfs/phtess1/ar1/TESS/PROJ/lbouma/'
-                    'OC_MG_FINAL_GaiaRp_lt_16_v0.4.csv'),
+                    'cdips_targets_v0.6_gaiasources_Rplt16_orclose.csv'),
     G_Rp_cut=14):
     """
     the CDIPS project defines a cluster star sample for which we should make
@@ -2232,7 +2256,7 @@ def merge_object_catalog_vs_cdips(
     field_df = pd.DataFrame(catarr)
     del catarr
 
-    cdips_df = pd.read_csv(cdips_cat_file, sep=';')
+    cdips_df = pd.read_csv(cdips_cat_file, sep=',')
 
     field_ids = np.array(field_df['id']).astype(str)
     cdips_ids = np.array(cdips_df['source_id']).astype(str)
