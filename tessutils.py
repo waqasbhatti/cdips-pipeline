@@ -610,7 +610,7 @@ def from_ete6_to_fitsh_compatible(fitslist, outdir, projid=42):
 
 
 def are_known_planets_in_field(ra_center, dec_center, outname, use_NEA=False,
-                               use_alerts=True):
+                               use_alerts=False, use_tev=True):
     """
     Given a field center, find which known planets are on chip.
     Dependencies: tessmaps, astroquery
@@ -628,9 +628,15 @@ def are_known_planets_in_field(ra_center, dec_center, outname, use_NEA=False,
         https://archive.stsci.edu/prepds/tess-data-alerts/index.html, to get
         candidate planet host (TOI) properties.
 
+        use_tev (bool): whether to use the TEV TOI list from MIT (i.e.,
+        download it directly).  Assumes you are connected to the internet.
+
     Returns:
         True if any HJs on chip, else False.
     """
+
+    # at most one data getting location should be used
+    assert np.sum([use_NEA, use_alerts, use_tev]) == 1
 
     from tessmaps import get_time_on_silicon as gts
 
@@ -663,6 +669,18 @@ def are_known_planets_in_field(ra_center, dec_center, outname, use_NEA=False,
         pl_onchip = gts.given_one_camera_get_stars_on_silicon(
             kp_coords, cam_tuple, withgaps=False)
 
+    elif use_tev:
+        # download latest TOI list to local memory; use that instead.
+        df = pd.read_csv(
+            'https://tev.mit.edu/data/collection/193/csv/6/',
+            sep=',', comment='#'
+        )
+        kp_coords = SkyCoord(nparr(df['TIC Right Ascension'])*u.deg,
+                             nparr(df['TIC Declination'])*u.deg,
+                             frame='icrs')
+        pl_onchip = gts.given_one_camera_get_stars_on_silicon(
+            kp_coords, cam_tuple, withgaps=False)
+
     else:
         raise NotImplementedError('use_alerts or use_NEA must be true.')
 
@@ -680,7 +698,7 @@ def are_known_planets_in_field(ra_center, dec_center, outname, use_NEA=False,
 
         return True
 
-    elif np.any(pl_onchip) and use_alerts:
+    elif np.any(pl_onchip) and (use_alerts or use_tev):
 
         outdf = df[pl_onchip.astype(bool)]
         outdf.to_csv(outname, index=False)
@@ -983,7 +1001,8 @@ def make_cluster_cutout_jpgs(sectornum, fitsdir, racenter, deccenter, field,
 
 def measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
                              statsdir, sectornum, minxmatchsep=3, nworkers=20,
-                             use_NEA=False, use_alerts=True, skipepd=False):
+                             use_NEA=False, use_alerts=False, use_tev=True,
+                             skipepd=False):
     """
     Args:
 
@@ -1000,6 +1019,9 @@ def measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
         crossmatching of hot Jupiter exoarchive catalog positions to 2mass
         projected plate positions.
     """
+
+    # at most one data getting location should be used
+    assert np.sum([use_NEA, use_alerts, use_tev]) == 1
 
     minxmatchsep = minxmatchsep*u.arcsec
 
@@ -1023,7 +1045,7 @@ def measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
         is_wanted = nparr(is_wanted)
 
         tab = tab[is_wanted]
-    elif use_alerts:
+    elif use_alerts or use_tev:
         tab = pd.read_csv(kponchippath)
         tab['pl_name'] = tab['Full TOI ID']
         tab['pl_hostname'] = tab['TIC']
@@ -1039,7 +1061,7 @@ def measure_known_planet_SNR(kponchippath, projcatalogpath, lcdirectory,
     proj_coords = SkyCoord(proj_ra, proj_dec, frame='icrs')
     if use_NEA:
         kp_coords = tab['sky_coord']
-    elif use_alerts:
+    elif use_alerts or use_tev:
         kp_coords = SkyCoord(nparr(tab['TIC Right Ascension'])*u.deg,
                              nparr(tab['TIC Declination'])*u.deg,
                              frame='icrs')

@@ -93,7 +93,7 @@ import scipy.stats
 import numpy.random as nprand
 
 import matplotlib
-matplotlib.use('AGG', warn=False)
+matplotlib.use('AGG')
 import matplotlib.pyplot as plt
 
 import astropy.io.fits as pyfits
