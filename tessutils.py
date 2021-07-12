@@ -122,6 +122,9 @@ badtimewindows = [
     (1696.38865, 1697.33865), # sector 14 downlink, btwn orbits 35->36
 ]
 # and we can append to this automatically using the orbit times from:
+# https://archive.stsci.edu/missions/tess/doc/tess_drn/
+# (downloaded on the date noted below... I'll reach out to Scott Fleming to
+# see whether it'll be updated past S29)
 from paths import DATADIR
 badtime_df = pd.read_csv(
     os.path.join(DATADIR, '20210712_tess_orbit_times_by_sector.csv'),
