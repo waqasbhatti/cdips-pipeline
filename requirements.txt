@@ -48,7 +48,7 @@ Jinja2==2.11.3
 jplephem==2.7
 keyring==12.2.1
 lockfile==0.12.2
-lxml==4.6.3
+lxml==4.6.5
 Mako==1.0.7
 Markdown==2.6.11
 MarkupSafe==1.0
