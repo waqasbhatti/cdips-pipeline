@@ -25,7 +25,7 @@ docutils==0.14
 entrypoints==0.2.3
 enum==0.4.6
 Flask==1.0
-Flask-Admin==1.4.1
+Flask-Admin==1.5.3
 Flask-Cache==0.13.1
 Flask-Login==0.2.11
 flask-swagger==0.2.13
