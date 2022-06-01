@@ -93,7 +93,7 @@ import scipy.stats
 import numpy.random as nprand
 
 import matplotlib
-matplotlib.use('AGG')
+matplotlib.use('AGG', warn=False)
 import matplotlib.pyplot as plt
 
 import astropy.io.fits as pyfits
@@ -1665,11 +1665,42 @@ def make_frameprojected_catalog(fits,
         outpath = outpath + '.projcatalog'
         outfile = outpath
 
+    # if your transformer is wcs-rd2xy, you need to make an intermediate FITS
+    # bintable readable by it
+    if transformer == 'wcs-rd2xy':
+
+        if not catalog.endswith('.reformed_catalog'):
+            errmsg = f'Expected .reformed_catalog, got {catalog}'
+            raise AssertionError(errmsg)
+        colnames = 'id,ra,dec,xi,eta,G,Rp,Bp,plx,pmra,pmdec,varflag'
+        df = pd.read_csv(catalog, names=colnames.split(','), sep=' ')
+
+        rdpath = framewcsfile.replace('.wcs', '.rdfitsbin')
+        xypath = framewcsfile.replace('.wcs', '.xyfitsbin')
+
+        col1 = pyfits.Column(name='ra', format='D', array=np.array(df['ra']))
+        col2 = pyfits.Column(name='dec', format='D', array=np.array(df['dec']))
+        coldefs = pyfits.ColDefs([col1, col2])
+        hdu = pyfits.BinTableHDU.from_columns(coldefs)
+
+        outfname = rdpath
+        if os.path.exists(rdpath):
+            pass
+        else:
+            hdu.writeto(outfname, overwrite=True)
+            print(f'made {outfname}')
+
     # format the transformer shell command
-    transformcmd = TRANSFORMCMD.format(transformer=transformer,
-                                       framewcsfile=framewcsfile,
-                                       catalogsourcelist=catalog,
-                                       outputfile=temppath)
+    if transformer == 'wcs-rd2xy':
+        transformcmd = WCSRD2XYCMD.format(framewcsfile=framewcsfile,
+                                          outputfile=xypath,
+                                          rdlsfile=rdpath)
+
+    elif transformer == 'anrd2xy':
+        transformcmd = TRANSFORMCMD.format(transformer=transformer,
+                                           framewcsfile=framewcsfile,
+                                           catalogsourcelist=catalog,
+                                           outputfile=temppath)
 
     if DEBUG:
         print(transformcmd)
@@ -1726,14 +1757,25 @@ def make_frameprojected_catalog(fits,
 
             elif observatory=='tess':
 
-                df = pd.read_csv(
-                    temppath,
-                    delim_whitespace=True,
-                    names='id,ra,dec,xi,eta,G,Rp,Bp,plx,pmra,pmdec,varflag,x_proj,y_proj'.split(',')
-                )
+                if transformer == 'anrd2xy':
+                    df = pd.read_csv(
+                        temppath,
+                        delim_whitespace=True,
+                        names='id,ra,dec,xi,eta,G,Rp,Bp,plx,pmra,pmdec,varflag,x_proj,y_proj'.split(',')
+                    )
 
-                sourcelist_x, sourcelist_y = (np.array(df['x_proj']),
-                                              np.array(df['y_proj']))
+                    sourcelist_x, sourcelist_y = (np.array(df['x_proj']),
+                                                  np.array(df['y_proj']))
+
+                elif transformer == 'wcs-rd2xy':
+                    hdul = pyfits.open(xypath)
+                    sourcelist_x, sourcelist_y = (np.array(hdul[1].data['X']),
+                                                  np.array(hdul[1].data['Y']))
+                    hdul.close()
+
+                    # still create df, in order to write it below
+                    colnames = 'id,ra,dec,xi,eta,G,Rp,Bp,plx,pmra,pmdec,varflag'
+                    df = pd.read_csv(catalog, names=colnames.split(','), sep=' ')
 
                 # get the extent of the CCD
                 if not ccdextent:
@@ -1780,7 +1822,8 @@ def make_frameprojected_catalog(fits,
                 print(outdf.describe())
 
             if removetemp:
-                os.remove(temppath)
+                if os.path.exists(temppath):
+                    os.remove(temppath)
 
             print('%sZ: frame source list generation OK for %s' %
                   (datetime.utcnow().isoformat(),
