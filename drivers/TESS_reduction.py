@@ -220,6 +220,26 @@ def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid,
             print('WRN! did not make CUT movies, because did not find jpg matches')
 
 
+def given_fits_list_get_gain_exptime_ra_dec(fits_list):
+    ntry_rand_fits=0
+    while True:
+        rand_fits = fits_list[np.random.randint(0, high=len(fits_list))]
+        if os.path.exists(rand_fits):
+            break
+        if ntry_rand_fits >= 10000:
+            raise AssertionError('Cannot find a random fits to extract header info after moving the badframes')
+
+    hdu_list = fits.open(rand_fits)
+    hdr = hdu_list[0].header
+
+    ccdgain = hdr['GAINA'] # electrons/count, from CCD output A. (there are four!)
+    exptime = int(np.round(hdr['TELAPSE']*24*60*60)) # in seconds, 1800
+    ra_nom = hdr['CRVAL1']  # RA at CRPIX1, CRPIX2. Roughly "camera boresight".
+    dec_nom = hdr['CRVAL2'] # DEC at CRPIX1, CRPIX2
+
+    return ccdgain, exptime, ra_nom, dec_nom
+
+
 def make_fake_xtrnsfits(fitsdir, fitsglob, fieldinfo):
 
     wcsfiles = glob(os.path.join(
@@ -1137,10 +1157,6 @@ def run_imagesubtraction(fitsdir, fitsglob, fieldinfo, photparams, fits_list,
         subfitslist = glob(os.path.join(fitsdir,'[r|n]sub-????????-'+
                                         fitsglob.replace('.fits','-xtrns.fits')))
 
-        # FIXME FIXME ensure that the projected positions used for forced
-        # aperture photometry are correctedly shifted (and correctly span
-        # 0:2048, instead of like 0:2048-SCIROWS
-
         out = ais.parallel_convsubfits_staticphot(
             subfitslist, fitsdir=fitsdir, fitsglob=fitsglob,
             photreftype=photreftype, kernelspec=kernelspec,
@@ -1875,21 +1891,9 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     catboxsize = 24
 
     # get gain, ccdextent, zeropoint, exposure time from header.
-    ntry_rand_fits=0
-    while True:
-        rand_fits = fits_list[np.random.randint(0, high=len(fits_list))]
-        if os.path.exists(rand_fits):
-            break
-        if ntry_rand_fits >= 10000:
-            raise AssertionError('Cannot find a random fits to extract header info after moving the badframes')
-
-    hdu_list = fits.open(rand_fits)
-    hdr = hdu_list[0].header
-
-    ccdgain = hdr['GAINA'] # electrons/count, from CCD output A. (there are four!)
-    exptime = int(np.round(hdr['TELAPSE']*24*60*60)) # in seconds, 1800
-    ra_nom = hdr['CRVAL1']  # RA at CRPIX1, CRPIX2. Roughly "camera boresight".
-    dec_nom = hdr['CRVAL2'] # DEC at CRPIX1, CRPIX2
+    ccdgain, exptime, ra_nom, dec_nom = (
+        given_fits_list_get_gain_exptime_ra_dec(fits_list)
+    )
 
     catalog, catra, catdec, catbox = 'GAIADR2', ra_nom, dec_nom, catboxsize
     catalog_file = (
