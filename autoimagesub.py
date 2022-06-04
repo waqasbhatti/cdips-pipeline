@@ -3527,6 +3527,7 @@ def convsubfits_staticphot_worker(task):
     task[8] = fieldinfo
     task[9] = photparams
     task[10] = domagfit option
+    tasks[11] = dorereduce option
 
     currently produces iphot files.
 
@@ -3535,7 +3536,7 @@ def convsubfits_staticphot_worker(task):
 
     (subframe, photreftype, kernelspec,
      lcapertures, disjrad, outdir, refinfo,
-     observatory, fieldinfo, photparams, domagfit) = task
+     observatory, fieldinfo, photparams, domagfit, dorereduce) = task
 
     try:
 
@@ -3573,6 +3574,13 @@ def convsubfits_staticphot_worker(task):
         cphotref_frame = cphotref['framepath']
         cphotref_reg = cphotref['convolveregpath']
         cphotref_cmrawphot = cphotref['cmrawphotpath']
+
+        if dorereduce:
+            cphotref_cmrawphot = cphotref_cmrawphot.replace(
+                'reference-frames', 'rereduce-reference-frames'
+            )
+            assert os.path.exists(cphotref_cmrawphot)
+            print(f'INFO: Updating cmrawphot path to {cphotref_cmrawphot}')
 
         # find matching kernel, itrans, and xysdk files for each subtracted
         # frame
@@ -3673,7 +3681,8 @@ def parallel_convsubfits_staticphot(
         fieldinfo=None,
         overwrite=False,
         photparams=None,
-        domagfit=False):
+        domagfit=False,
+        dorereduce=False):
     """
     This does static object photometry on the all subtracted FITS in
     subfitslist.
@@ -3708,7 +3717,8 @@ def parallel_convsubfits_staticphot(
             subfitslist = [fitsdir+sd+'.iphot' for sd in setdiff]
 
     tasks = [(x, photreftype, kernelspec, lcapertures, photdisjointradius,
-              outdir, refinfo, observatory, fieldinfo, photparams, domagfit)
+              outdir, refinfo, observatory, fieldinfo, photparams, domagfit,
+              dorereduce)
              for x in subfitslist if os.path.exists(x)]
 
     if len(tasks) > 0:
