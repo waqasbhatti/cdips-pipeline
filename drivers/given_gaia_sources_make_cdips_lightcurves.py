@@ -10,12 +10,16 @@ for which we want to use the same machinery to get light curves from the
 # imports #
 ###########
 import os
+from glob import glob
 import pandas as pd, numpy as np
 from numpy import array as nparr
 from copy import deepcopy
 
 # non-standard: https://github.com/christopherburke/tess-point
 from tess_stars2px import tess_stars2px_function_entry
+
+import aperturephot as ap, autoimagesub as ais
+from TESS_reduction import main
 
 ######################
 # variable arguments #
@@ -67,10 +71,10 @@ if not ( ('ra' in targetdf) and ('dec' in targetdf)):
     targetdf = targetdf.rename({
         '#Gaia-ID[1]':'dr2_source_id',
         'RA[deg][2]':'ra',
-        'Dec[deg][3]':'dec'
-        'phot_g_mean_mag[20]','phot_g_mean_mag',
-        'phot_bp_mean_mag[25]','phot_bp_mean_mag',
-        'phot_rp_mean_mag[30]','phot_rp_mean_mag',
+        'Dec[deg][3]':'dec',
+        'phot_g_mean_mag[20]':'phot_g_mean_mag',
+        'phot_bp_mean_mag[25]':'phot_bp_mean_mag',
+        'phot_rp_mean_mag[30]':'phot_rp_mean_mag',
     }, axis='columns')
 
 #
@@ -150,11 +154,196 @@ if not os.path.exists(availpath):
 
     df.to_csv(availpath, index=False)
 
+df = pd.read_csv(availpath)
+
+#
+# re-calculate reduction/project identifier numbers
+#
+from cdips.utils.collect_cdips_lightcurves import (
+    given_sector_cam_ccd_get_projid
+)
+df['projid'] = [
+    given_sector_cam_ccd_get_projid(sec,cam,ccd)
+    for sec,cam,ccd in zip(
+        df.sector, df.cam, df.ccd
+    )
+]
+
 #
 # these are the stars that do not already have light curves, but need them.
 #
-df = pd.read_csv(availpath)
 sel = ~df.hasmatch.astype(bool)
 sdf = df[sel]
 
-import IPython; IPython.embed()
+#
+# iterate over projids (i.e., sector/camera/ccd combinations)
+#
+uprojids = np.unique(sdf.projid)
+
+for projid in uprojids:
+
+    # these are the stars we need light curves for on this sec/cam/ccd
+    _sel = (sdf.projid == projid)
+    _sdf = sdf[_sel]
+
+    sector = np.unique(_sdf.sector)
+    assert len(sector) == 1
+    sector = int(sector)
+    cam = int(np.unique(_sdf.cam))
+    ccd = int(np.unique(_sdf.ccd))
+
+    ################
+    # define paths #
+    ################
+    LOCAL_IMGBASE = "/nfs/phtess2/ar0/TESS/FFI/RED_IMGSUB/FULL"
+
+    sectordir = LOCAL_IMGBASE + f"/s{str(sector).zfill(4)}/"
+    fitsdir = sectordir + f"RED_{cam}-{ccd}-{projid}_ISP/"
+    LOCAL_GLOBPATTERN = f'tess?????????????-s{str(sector).zfill(4)}-{cam}-{ccd}-*_cal_img_bkgdsub.fits'
+    fitsglob = LOCAL_GLOBPATTERN
+    lcbase = "/nfs/phtess2/ar0/TESS/FFI/LC/FULL"
+    lcsector =  lcbase + f"/s{str(sector).zfill(4)}/"
+    lcdir = lcsector + f"ISP_{cam}-{ccd}-{projid}/"
+
+    #################################
+    # reduction-specific parameters #
+    #################################
+    tuneparameters = False
+    nworkers = 32
+    aperturelist = "1.0:7.0:6.0,1.5:7.0:6.0,2.25:7.0:6.0"
+    epdsmooth = 11
+    epdsigclip = 10000
+    photdisjointradius = 0.5
+    anetfluxthreshold = 1000
+    anettweak = 6
+    anetradius = 30
+    initccdextent = "0:2048,0:2048"
+    kernelspec="i/2;d=3/2"
+    cluster_faint_Rp_mag = 17.5
+    field_faint_Rp_mag = 13
+    fiphotfluxthreshold = 300
+    photreffluxthreshold = 300
+    extractsources = 0
+    binlightcurves = 0
+    translateimages = 1
+    reversesubtract = 1
+    skipepd = 1
+    zeropoint = 11.82
+
+    np.random.seed(42)
+
+    from TESS_reduction import given_fits_list_get_gain_exptime_ra_dec
+    fits_list = np.sort(glob(os.path.join(fitsdir, fitsglob)))
+    assert len(fits_list) > 0
+    ccdgain, exptime, ra_nom, dec_nom = (
+        given_fits_list_get_gain_exptime_ra_dec(fits_list)
+    )
+
+    # TODO: actual steps you need to update are
+    # make_fov_catalog
+    # reform_gaia_fov_catalog
+    # parallel_convsubfits_staticphot
+    # dump_lightcurves_with_grcollect
+    # run_detrending : the full wrapper
+
+    #
+    # make_fov_catalog
+    #
+    outdir = f"/nfs/phtess2/ar0/TESS/REREDUC/{reduc_id}"
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+        print(f"Made {outdir}")
+
+    catalog_file = os.path.join(
+        outdir, f"{reduc_id}-s{str(sector).zfill(4)}-{cam}-{ccd}.catalog"
+    )
+    if not os.path.exists(catalog_file):
+        gaia2readcmd = (
+            f"gaia2read --header --extra --xieta-coords {ra_nom},{dec_nom} "
+            f"--idfile {srcpath} --out {catalog_file}"
+        )
+        print(f'Beginning {gaia2readcmd}')
+        returncode = os.system(gaia2readcmd)
+        if returncode != 0: raise AssertionError('gaia2read cmd failed!!')
+        print(f'Ran {gaia2readcmd}')
+    else:
+        print(f'Found {catalog_file}')
+
+    #
+    # reform_gaia_fov_catalog
+    #
+    reformed_cat_file = catalog_file.replace('.catalog', '.reformed_catalog')
+    ap.reform_gaia_fov_catalog(catalog_file, reformed_cat_file)
+
+    #
+    # parallel_convsubfits_staticphot
+    # do photometry on your subtracted frames to produce .iphot files.
+    #
+
+    # first get metadata.  then run the convsubfits forced aperture photometry.
+    photreftype = 'onenight'
+    fieldinfo = {}
+    fieldinfo['camera'] = cam
+    fieldinfo['ccd'] = ccd
+    fieldinfo['projectid'] = int(projid)
+    fieldinfo['field'] = 's'+str(sector).zfill(4)
+
+    photparams = {
+        'ccdgain': ccdgain, 'ccdexptime': exptime, 'zeropoint': zeropoint
+    }
+
+    if len(glob(os.path.join(outdir, '*.iphot'))) < 10:
+
+        subfitslist = glob(os.path.join(
+            fitsdir, '[r|n]sub-????????-'+
+            fitsglob.replace('.fits','-xtrns.fits'))
+        )
+
+        out = ais.parallel_convsubfits_staticphot(
+            subfitslist, fitsdir=fitsdir, fitsglob=fitsglob,
+            photreftype=photreftype, kernelspec=kernelspec,
+            lcapertures=aperturelist, photdisjointradius=photdisjointradius,
+            outdir=outdir, fieldinfo=fieldinfo, observatory='tess',
+            nworkers=nworkers, maxworkertasks=1000, photparams=photparams)
+
+        if out==42:
+            raise AssertionError('fatal error in convsubfits_staticphot')
+
+    else:
+        print('found .iphot files. skipping their production.')
+
+    import IPython; IPython.embed()
+    assert 0
+
+    # dump_lightcurves_with_grcollect
+    # run_detrending : the full wrapper
+
+
+
+    main(fitsdir, fitsglob, projectid, sector, camnum, ccdnum, outdir=fitsdir,
+         lcdirectory=lcdir, nworkers=nworkers, aperturelist=aperturelist,
+         kernelspec=kernelspec, convert_to_fitsh_compatible=True,
+         anetfluxthreshold=anetfluxthreshold, anettweak=anettweak,
+         initccdextent=initccdextent, anetradius=anetradius, zeropoint=11.82,
+         epdsmooth=epdsmooth, epdsigclip=epdsigclip,
+         photdisjointradius=photdisjointradius, tuneparameters=tuneparameters,
+         is_ete6=False, cluster_faint_Rp_mag=cluster_faint_Rp_mag,
+         field_faint_Rp_mag=field_faint_Rp_mag,
+         fiphotfluxthreshold=fiphotfluxthreshold,
+         photreffluxthreshold=photreffluxthreshold,
+         extractsources=extractsources, binlightcurves=binlightcurves,
+         get_masks=1, tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0,
+         translateimages=translateimages, reversesubtract=reversesubtract,
+         skipepd=skipepd, useimagenotfistar=True, fixedtfatemplate=None,
+         flagvalues=[-1,4,32,36,2048,2080,2052,2084], do_cdips_merge=True)
+
+
+    # Step ISP9 + 10 : dump lightcurves.
+    if len(glob(os.path.join(lcdirectory,'*.grcollectilc'))) < 10:
+        ism.dump_lightcurves_with_grcollect(
+            iphotpattern, lcdirectory, '4g', lcextension='grcollectilc',
+            objectidcol=3, observatory='tess')
+    else:
+        print('found grcollectilc files. skipping lc dump.')
+
+
