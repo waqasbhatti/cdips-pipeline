@@ -1789,7 +1789,8 @@ def photometry_on_combined_photref(
           (datetime.utcnow().isoformat(), photref_frame))
     astromfistarf = os.path.abspath(re.sub(sv.FITS_TAIL, '.fistar-astrometry',
                                            photref_frame))
-    print(zeropoint, ccdgain, ccdexptime)
+    if DEBUG:
+        print(zeropoint, ccdgain, ccdexptime)
     astromfistar = extract_frame_sources(
         photref_frame,
         astromfistarf,
@@ -2772,7 +2773,8 @@ def get_lc_for_object(lcobject,
 def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
                                     objectidcol=3,
                                     lcextension='grcollectilc',
-                                    observatory='tess'):
+                                    observatory='tess',
+                                    fitsdir=None):
     """
     Given a list of photometry files (text files at various times output by
     fiphot with rows that are objects), make lightcurve files (text files for
@@ -2785,7 +2787,8 @@ def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
     optimization (dumps ~1 photometry file per second).
 
     An important intermediate step, implemented here, is prepending times and
-    filenames to *.iphot lightcurve files, to make *.iphottemp files.
+    filenames to *.iphot lightcurve files, to make *.iphottemp files.  This
+    involves paths to the FITS files, hence the optional fitsdir call.
 
     *.iphot photometry files look like:
 
@@ -2827,6 +2830,8 @@ def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
 
     if not os.path.exists(lcdir):
         os.mkdir(lcdir)
+    if not lcdir.endswith("/"):
+        lcdir += '/'
 
     starttime = time.time()
 
@@ -2852,8 +2857,15 @@ def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
                 raise AssertionError(
                     'expected only one photframe, got {:s}'.
                     format(repr(framekey)))
-            originalframe = os.path.join(os.path.dirname(photpath),
-                                         framekey[0]+'.fits')
+            if fitsdir is None:
+                originalframe = os.path.join(
+                    os.path.dirname(photpath), framekey[0]+'.fits'
+                )
+            else:
+                originalframe = os.path.join(
+                    fitsdir, framekey[0]+'.fits'
+                )
+
         elif observatory=='hatpi':
             framekey = re.findall('(.-.{7}_.)\.iphot', photpath)
             assert len(framekey) == 1, 'HATPI specific regex!'
@@ -2935,6 +2947,10 @@ def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
                 shutil.copyfileobj(output, tempphotfile)
 
             output.close()
+
+        else:
+            raise ValueError(f'Failed to find {originalframe}')
+
 
     grcollectglob = photfileglob.replace('.iphot', '.iphottemp')
     cmdtorun = GRCOLLECTCMD.format(fiphotfileglob=grcollectglob,
