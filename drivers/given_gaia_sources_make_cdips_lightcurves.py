@@ -9,16 +9,17 @@ for which we want to use the same machinery to get light curves from the
 ###########
 # imports #
 ###########
-import os
+import os, shutil
 from glob import glob
 import pandas as pd, numpy as np
 from numpy import array as nparr
 from copy import deepcopy
+from astropy.io import fits
 
 # non-standard: https://github.com/christopherburke/tess-point
 from tess_stars2px import tess_stars2px_function_entry
 
-import aperturephot as ap, autoimagesub as ais
+import aperturephot as ap, autoimagesub as ais, imagesubphot as ism
 from TESS_reduction import main
 
 ######################
@@ -229,6 +230,7 @@ for projid in uprojids:
     reversesubtract = 1
     skipepd = 1
     zeropoint = 11.82
+    useimagenotfistar = True
 
     np.random.seed(42)
 
@@ -250,9 +252,11 @@ for projid in uprojids:
     # make_fov_catalog
     #
     outdir = f"/nfs/phtess2/ar0/TESS/REREDUC/{reduc_id}"
-    if not os.path.exists(outdir):
-        os.mkdir(outdir)
-        print(f"Made {outdir}")
+    outlcdir = f"/nfs/phtess2/ar0/TESS/REREDUC/{reduc_id}_LC"
+    for d in [outdir, outlcdir]:
+        if not os.path.exists(d):
+            os.mkdir(d)
+            print(f"Made {d}")
 
     catalog_file = os.path.join(
         outdir, f"{reduc_id}-s{str(sector).zfill(4)}-{cam}-{ccd}.catalog"
@@ -281,18 +285,101 @@ for projid in uprojids:
     #
 
     # first get metadata.  then run the convsubfits forced aperture photometry.
+    field = 's'+str(sector).zfill(4)
     photreftype = 'onenight'
     fieldinfo = {}
     fieldinfo['camera'] = cam
     fieldinfo['ccd'] = ccd
     fieldinfo['projectid'] = int(projid)
-    fieldinfo['field'] = 's'+str(sector).zfill(4)
+    fieldinfo['field'] = field
 
     photparams = {
         'ccdgain': ccdgain, 'ccdexptime': exptime, 'zeropoint': zeropoint
     }
 
     if len(glob(os.path.join(outdir, '*.iphot'))) < 10:
+
+        # run photometry on the combinedphotref and generate a cmrawphot file. this
+        # produces the base photometry values that we'll be diffing from those
+        # found in the difference images to get difference magnitudes.
+        # if extractsources==False, a placeholder fistar file with SDK values is
+        # nonetheless generated, to be used for photometric reference frame
+        # statistical bookkeeping.
+
+        # the output combinedphotref path (previously made!)
+        photreffname = ('proj{projid}-{field}-cam{cam}-ccd{ccd}'
+                        '-combinedphotref-{photreftype}.{fileext}')
+        photreffglob = (f'*proj{projid}-{field}-cam{cam}-ccd{ccd}'
+                        f'-combinedphotref-{photreftype}*')
+        astromreffglob = (f'*proj{projid}-camera{cam}-ccd{ccd}'
+                          '-astromref*')
+
+        refdir = f'/nfs/phtess2/ar0/TESS/FFI/BASE/rereduce-reference-frames/{reduc_id}'
+        oldrefdir = '/nfs/phtess2/ar0/TESS/FFI/BASE/reference-frames'
+        if not os.path.exists(refdir): os.mkdir(refdir)
+
+        combinedphotrefpath = os.path.join(
+            refdir,
+            photreffname.format(
+                projid=projid,
+                field=field,
+                cam=cam,
+                ccd=ccd,
+                photreftype=photreftype,
+                fileext='fits'
+            )
+        )
+
+        photreffiles = glob(os.path.join(oldrefdir, photreffglob))
+        astromreffiles = glob(os.path.join(oldrefdir, astromreffglob))
+        filelist = photreffiles + astromreffiles
+
+        for _file in filelist:
+            src = _file
+            dst = os.path.join(refdir, os.path.basename(_file))
+            if not os.path.exists(dst):
+                shutil.copy(src, dst)
+                print(f'Copy {src} -> {dst}')
+            else:
+                print(f'Found {dst}')
+
+        photref_reformedfovcatpath = reformed_cat_file
+
+        hdu_list = fits.open(combinedphotrefpath)
+        hdr = hdu_list[0].header
+
+        ccdgain = hdr['GAINA'] # electrons/count, from CCD output A. (there are four!)
+        ccdexptime = int(np.round(hdr['TELAPSE']*24*60*60)) # in seconds, 1800
+        ra_nom = hdr['CRVAL1']  # RA at CRPIX1, CRPIX2. Roughly "camera boresight".
+        dec_nom = hdr['CRVAL2'] # DEC at CRPIX1, CRPIX2
+        hdu_list.close()
+
+        astrometrydownsample = 2
+        pixelerror = 0.3
+        uniformize = 10
+
+        cphotref_photometry = ism.photometry_on_combined_photref(
+            combinedphotrefpath,
+            photref_reformedfovcatpath,
+            ra_nom,
+            dec_nom,
+            ccd,
+            ccdgain=ccdgain,
+            zeropoint=zeropoint,
+            ccdexptime=ccdexptime,
+            extractsources=extractsources,
+            apertures=aperturelist,
+            framewidth=None,
+            searchradius=8.0,
+            photreffluxthreshold=photreffluxthreshold,
+            observatory='tess',
+            useimagenotfistar=useimagenotfistar,
+            astrometrydownsample=astrometrydownsample,
+            pixelerror=pixelerror,
+            uniformize=uniformize,
+            reformed_cat_file=reformed_cat_file,
+            projid=projid
+        )
 
         subfitslist = glob(os.path.join(
             fitsdir, '[r|n]sub-????????-'+
@@ -312,11 +399,26 @@ for projid in uprojids:
     else:
         print('found .iphot files. skipping their production.')
 
+    #
+    # dump_lightcurves_with_grcollect
+    #
+    iphotpattern = os.path.join(
+        outdir, 'rsub-????????-'+fitsglob.replace('.fits','.iphot')
+    )
+    if len(glob(os.path.join(outlcdir, '*.grcollectilc'))) < 10:
+        ism.dump_lightcurves_with_grcollect(
+            iphotpattern, outlcdir, '4g', lcextension='grcollectilc',
+            objectidcol=3, observatory='tess', fitsdir=fitsdir)
+    else:
+        print('found grcollectilc files. skipping lc dump.')
+
+    #
+    # run_detrending : the full wrapper
+    #
+
     import IPython; IPython.embed()
     assert 0
 
-    # dump_lightcurves_with_grcollect
-    # run_detrending : the full wrapper
 
 
 
@@ -334,7 +436,7 @@ for projid in uprojids:
          extractsources=extractsources, binlightcurves=binlightcurves,
          get_masks=1, tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0,
          translateimages=translateimages, reversesubtract=reversesubtract,
-         skipepd=skipepd, useimagenotfistar=True, fixedtfatemplate=None,
+         skipepd=skipepd, fixedtfatemplate=None,
          flagvalues=[-1,4,32,36,2048,2080,2052,2084], do_cdips_merge=True)
 
 
