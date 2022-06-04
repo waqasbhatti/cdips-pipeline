@@ -3295,6 +3295,10 @@ def get_combined_photref(projectid,
 
     try:
 
+        if DEBUG:
+            print('Executing the following postgres query:')
+            print(query)
+
         cur.execute(query, params)
         rows = cur.fetchone()
 
@@ -3679,7 +3683,7 @@ def parallel_convsubfits_staticphot(
     # and overwrite == False, then do not re-run photometry.
 
     existingiphot = glob.glob(os.path.join(
-        fitsdir,'[r|n]sub-????????-'+ fitsglob.replace('.fits','.iphot')))
+        outdir,'[r|n]sub-????????-'+ fitsglob.replace('.fits','.iphot')))
 
     if len(existingiphot) > 0 and not overwrite:
 
@@ -3697,6 +3701,7 @@ def parallel_convsubfits_staticphot(
         if len(setdiff) == 0:
             print('WRN! %sZ: photometry already done on requested frames.' %
                   (datetime.utcnow().isoformat(),))
+            print('Escaping parallel_convsubfits_staticphot.')
             return
 
         else:
