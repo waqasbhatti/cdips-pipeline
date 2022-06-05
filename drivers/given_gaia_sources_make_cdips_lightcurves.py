@@ -20,6 +20,7 @@ from astropy.io import fits
 # non-standard: https://github.com/christopherburke/tess-point
 from tess_stars2px import tess_stars2px_function_entry
 
+# non-standard: cdips-pipeline imports
 import aperturephot as ap
 import autoimagesub as ais
 import imagesubphot as ism
@@ -193,9 +194,10 @@ for ix, projid in enumerate(uprojids):
     _sdf = sdf[_sel]
 
     starttime = datetime.utcnow().isoformat()
+    print(10*'-')
     print(f'{starttime}: {ix}/{len(uprojids)}: Begin projid {projid} with {len(_sdf)} stars.')
-    import IPython; IPython.embed()
-    #FIXME WHAT STARS ARE BEING CALLED?  SOMETHING IS UP WITH THE FLOW LOGIC.
+    print(_sdf)
+    print(10*'-')
 
     sector = np.unique(_sdf.sector)
     assert len(sector) == 1
@@ -274,9 +276,17 @@ for ix, projid in enumerate(uprojids):
         outdir, f"{reduc_id}-s{str(sector).zfill(4)}-{cam}-{ccd}.catalog"
     )
     if not os.path.exists(catalog_file):
+
+        missedsrcpath = os.path.join(
+            'targetlists', f'{reduc_id}_missed_sources_only.csv'
+        )
+        sdf['dr2_source_id'].to_csv(
+            missedsrcpath, index=False, header=False
+        )
+
         gaia2readcmd = (
             f"gaia2read --header --extra --xieta-coords {ra_nom},{dec_nom} "
-            f"--idfile {srcpath} --out {catalog_file}"
+            f"--idfile {missedsrcpath} --out {catalog_file}"
         )
         print(f'Beginning {gaia2readcmd}')
         returncode = os.system(gaia2readcmd)
