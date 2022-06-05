@@ -1757,11 +1757,11 @@ def read_tess_txt_lightcurve(
     objectid = os.path.basename(lcfile).rstrip(os.path.splitext(lcfile)[-1])
 
     # look up this object in the catalog
-    objind = catalogdf['Gaia-ID'] == int(objectid)
+    sel = catalogdf['Gaia-ID'] == np.int64(objectid)
 
-    if objind.size > 0:
+    if np.any(sel):
 
-        objectinfo = catalogdf[infokeys].ix[objind]
+        objectinfo = catalogdf.loc[sel][infokeys]
         objectinfo = objectinfo.to_dict('records')[0]
 
     else:
