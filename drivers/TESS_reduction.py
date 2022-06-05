@@ -1239,7 +1239,8 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
                    fitsglob, camera, ccd, projectid,
                    epdsmooth=11, epdsigclip=10, nworkers=10,
                    binlightcurves=False, tfa_template_sigclip=5.0,
-                   tfa_epdlc_sigclip=5.0, skipepd=True, fixedtfatemplate=None):
+                   tfa_epdlc_sigclip=5.0, skipepd=True, fixedtfatemplate=None,
+                   nmax_flow_logic=10, escapeafterbarycenter=False):
     """
     Step ISP11: do EPD on all the LCs, and collect stats on the results.
     for ISP LCs, use lcmagcols=([27,28,29],[30,],[30,],[30,])
@@ -1252,12 +1253,14 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
     catfile = reformed_cat_file.replace('.reformed_catalog', '.catalog')
     tfaboolstatusfile = os.path.join(statsdir,'are_tfa_plots_done.txt')
 
-    if len(glob(os.path.join(lcdirectory,'*_llc.fits')))<10:
+    if len(glob(os.path.join(lcdirectory,'*_llc.fits'))) < nmax_flow_logic:
 
         engdir = '/nfs/phtess2/ar0/TESS/FFI/ENGINEERING/'
         # e.g., s0002-3-3-0121_key_temperature_count.csv
-        temperatureglob = ('{}-{}-{}-????_key_temperature_count.csv'.
-                    format(field, camera, ccd))
+        temperatureglob = (
+            '{}-{}-{}-????_key_temperature_count.csv'.
+            format(field, camera, ccd)
+        )
         temperaturedfpath = glob(os.path.join(engdir, temperatureglob))
         if len(temperaturedfpath) != 1:
             raise AssertionError('expected a single temperature csv file')
@@ -1273,7 +1276,11 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
             lcdirectory, nworkers=nworkers
         )
     else:
-        print('found >10 fits LCs from grcollect. skip grcollect convert.')
+        print(f'Found >{nmax_flow_logic} fits LCs from grcollect. '
+              f'skip grcollect convert.')
+
+    if escapeafterbarycenter:
+        return 1
 
     if not os.path.exists(epdstatfile) and not skipepd:
 
@@ -1339,9 +1346,8 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
         print('skipped making EPD LC plots')
 
     # choose the TFA template stars
-    if not os.path.exists(os.path.join(
-        statsdir,'tfa-stage1-input-aperture-1.txt')
-    ):
+    tfastage1path = os.path.join(statsdir,'tfa-stage1-input-aperture-1.txt')
+    if not os.path.exists(tfastage1path):
         if 'TUNE' in statsdir:
             target_nstars, max_nstars = 40, 42
         elif 'FULL' in statsdir:
@@ -1363,18 +1369,24 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
 
 
     if not os.path.exists(vartoolstfastatfile):
-        templatefiles = glob(os.path.join(
-            statsdir, 'tfa-stage1-input-aperture-?.txt'))
-        lcfiles = glob(os.path.join(lcdirectory,'*_llc.fits'))
+
+        templatefiles = glob(
+            os.path.join(statsdir, 'tfa-stage1-input-aperture-?.txt')
+        )
+
+        lcfiles = glob(
+            os.path.join(lcdirectory,'*_llc.fits')
+        )
 
         lcfiles = _get_ok_lightcurve_files(lcfiles)
 
         # create ascii files needed for vartools:
         # lc_list_tfa, trendlist_tfa and dates_tfa
         (tfalclist_path, trendlisttfa_paths, datestfa_path) = (
-        lcu.make_ascii_files_for_vartools(lcfiles, templatefiles, statsdir,
-                                          fitsdir, fitsglob,
-                                          fixedtfatemplate=fixedtfatemplate)
+            lcu.make_ascii_files_for_vartools(
+                lcfiles, templatefiles, statsdir, fitsdir, fitsglob,
+                fixedtfatemplate=fixedtfatemplate
+            )
         )
 
         #
