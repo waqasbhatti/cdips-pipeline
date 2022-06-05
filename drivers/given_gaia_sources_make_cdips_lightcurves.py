@@ -10,6 +10,7 @@ for which we want to use the same machinery to get light curves from the
 # imports #
 ###########
 import os, shutil
+from datetime import datetime
 from glob import glob
 import pandas as pd, numpy as np
 from numpy import array as nparr
@@ -19,8 +20,11 @@ from astropy.io import fits
 # non-standard: https://github.com/christopherburke/tess-point
 from tess_stars2px import tess_stars2px_function_entry
 
-import aperturephot as ap, autoimagesub as ais, imagesubphot as ism
-from TESS_reduction import main
+import aperturephot as ap
+import autoimagesub as ais
+import imagesubphot as ism
+import lcutils as lcu
+from TESS_reduction import main, run_detrending
 
 ######################
 # variable arguments #
@@ -175,17 +179,23 @@ df['projid'] = [
 #
 sel = ~df.hasmatch.astype(bool)
 sdf = df[sel]
+N_needed = len(sdf)
 
 #
 # iterate over projids (i.e., sector/camera/ccd combinations)
 #
 uprojids = np.unique(sdf.projid)
 
-for projid in uprojids:
+for ix, projid in enumerate(uprojids):
 
     # these are the stars we need light curves for on this sec/cam/ccd
     _sel = (sdf.projid == projid)
     _sdf = sdf[_sel]
+
+    starttime = datetime.utcnow().isoformat()
+    print(f'{starttime}: {ix}/{len(uprojids)}: Begin projid {projid} with {len(_sdf)} stars.')
+    import IPython; IPython.embed()
+    #FIXME WHAT STARS ARE BEING CALLED?  SOMETHING IS UP WITH THE FLOW LOGIC.
 
     sector = np.unique(_sdf.sector)
     assert len(sector) == 1
@@ -241,12 +251,14 @@ for projid in uprojids:
         given_fits_list_get_gain_exptime_ra_dec(fits_list)
     )
 
-    # TODO: actual steps you need to update are
+    #
+    # ACTUAL STEPS IN THIS SUB-PIPELINE:
     # make_fov_catalog
     # reform_gaia_fov_catalog
     # parallel_convsubfits_staticphot
     # dump_lightcurves_with_grcollect
     # run_detrending : the full wrapper
+    #
 
     #
     # make_fov_catalog
@@ -297,7 +309,7 @@ for projid in uprojids:
         'ccdgain': ccdgain, 'ccdexptime': exptime, 'zeropoint': zeropoint
     }
 
-    if len(glob(os.path.join(outdir, '*.iphot'))) < 10:
+    if len(glob(os.path.join(outdir, '*.iphot'))) < int(1e9):
 
         # run photometry on the combinedphotref and generate a cmrawphot file. this
         # produces the base photometry values that we'll be diffing from those
@@ -405,7 +417,7 @@ for projid in uprojids:
     iphotpattern = os.path.join(
         outdir, 'rsub-????????-'+fitsglob.replace('.fits','.iphot')
     )
-    if len(glob(os.path.join(outlcdir, '*.grcollectilc'))) < 10:
+    if len(glob(os.path.join(outlcdir, '*.grcollectilc'))) < int(1e9):
         ism.dump_lightcurves_with_grcollect(
             iphotpattern, outlcdir, '4g', lcextension='grcollectilc',
             objectidcol=3, observatory='tess', fitsdir=fitsdir)
@@ -413,39 +425,54 @@ for projid in uprojids:
         print('found grcollectilc files. skipping lc dump.')
 
     #
-    # run_detrending : the full wrapper
+    # run_detrending : the full wrapper.  kind of obnoxious, because most of
+    # the steps are for TFA, which I don't care about.  nonetheless, we are
+    # bound by format homogeneity.
     #
+    epdlcglob, tfalcglob = '*_llc.fits', '*_llc.fits'
+    statsdir = os.path.dirname(lcdir) + '/stats_files/'
+    for dirname in [lcdir, statsdir]:
+        assert os.path.exists(dirname)
+    epdstatfile = statsdir + 'camera' + str(cam) + '_ccd' + str(ccd) + '.epdstats'
+    tfastatfile = statsdir + 'camera' + str(cam) + '_ccd' + str(ccd) + '.tfastats'
+    vartoolstfastatfile = os.path.join(statsdir, 'vartools_tfa_stats.txt')
 
-    import IPython; IPython.embed()
-    assert 0
+    #
+    # hacky call to:
+    # parallel_convert_grcollect_to_fits_lc
+    # parallel_apply_barycenter_time_correction
+    #
+    run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, outlcdir,
+                   epdlcglob, reformed_cat_file, statsdir, field, fitsdir,
+                   fitsglob, cam, ccd, projid, epdsmooth=epdsmooth,
+                   epdsigclip=epdsigclip, nworkers=nworkers,
+                   binlightcurves=binlightcurves,
+                   tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0,
+                   skipepd=skipepd, fixedtfatemplate=None,
+                   nmax_flow_logic=N_needed, escapeafterbarycenter=1)
 
+    #
+    # call TFA runner here, instead of in run_detrending, since all the work
+    # has already been done
+    #
+    lcfiles = glob(os.path.join(outlcdir, '*_llc.fits'))
+    tfalclist_path = lcu._make_tfa_lc_list(lcfiles, outlcdir)
+    trendlisttfa_paths = glob(os.path.join(statsdir, 'trendlist_tfa_ap?.txt'))
+    assert len(trendlisttfa_paths) == 3
+    datestfa_path = os.path.join(statsdir, 'dates_tfa.txt')
+    assert os.path.exists(datestfa_path)
 
+    npixexclude = 20
+    tfafromirm = skipepd
 
+    lcu.run_tfa(tfalclist_path, trendlisttfa_paths, datestfa_path,
+                outlcdir, statsdir, nworkers=nworkers,
+                do_bls_ls_killharm=False, npixexclude=npixexclude,
+                tfafromirm=tfafromirm)
 
-    main(fitsdir, fitsglob, projectid, sector, camnum, ccdnum, outdir=fitsdir,
-         lcdirectory=lcdir, nworkers=nworkers, aperturelist=aperturelist,
-         kernelspec=kernelspec, convert_to_fitsh_compatible=True,
-         anetfluxthreshold=anetfluxthreshold, anettweak=anettweak,
-         initccdextent=initccdextent, anetradius=anetradius, zeropoint=11.82,
-         epdsmooth=epdsmooth, epdsigclip=epdsigclip,
-         photdisjointradius=photdisjointradius, tuneparameters=tuneparameters,
-         is_ete6=False, cluster_faint_Rp_mag=cluster_faint_Rp_mag,
-         field_faint_Rp_mag=field_faint_Rp_mag,
-         fiphotfluxthreshold=fiphotfluxthreshold,
-         photreffluxthreshold=photreffluxthreshold,
-         extractsources=extractsources, binlightcurves=binlightcurves,
-         get_masks=1, tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0,
-         translateimages=translateimages, reversesubtract=reversesubtract,
-         skipepd=skipepd, fixedtfatemplate=None,
-         flagvalues=[-1,4,32,36,2048,2080,2052,2084], do_cdips_merge=True)
+    lcu.parallel_merge_tfa_lcs(outlcdir, nworkers=nworkers)
 
-
-    # Step ISP9 + 10 : dump lightcurves.
-    if len(glob(os.path.join(lcdirectory,'*.grcollectilc'))) < 10:
-        ism.dump_lightcurves_with_grcollect(
-            iphotpattern, lcdirectory, '4g', lcextension='grcollectilc',
-            objectidcol=3, observatory='tess')
-    else:
-        print('found grcollectilc files. skipping lc dump.')
-
-
+    # HYPE!
+    endtime = datetime.utcnow().isoformat()
+    print(f'{endtime}: {ix}/{len(uprojids)}: '
+          f'Finished projid {projid} with {len(_sdf)} stars.')
