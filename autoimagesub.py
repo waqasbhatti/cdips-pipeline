@@ -3527,7 +3527,7 @@ def convsubfits_staticphot_worker(task):
     task[8] = fieldinfo
     task[9] = photparams
     task[10] = domagfit option
-    tasks[11] = dorereduce option
+    tasks[11] = dorereduce option  (str of reduc_id if true)
 
     currently produces iphot files.
 
@@ -3577,10 +3577,10 @@ def convsubfits_staticphot_worker(task):
 
         if dorereduce:
             cphotref_cmrawphot = cphotref_cmrawphot.replace(
-                'reference-frames', 'rereduce-reference-frames'
+                'reference-frames', f'rereduce-reference-frames/{dorereduce}'
             )
+            print(f'INFO: Trying to update cmrawphot path to {cphotref_cmrawphot}')
             assert os.path.exists(cphotref_cmrawphot)
-            print(f'INFO: Updating cmrawphot path to {cphotref_cmrawphot}')
 
         # find matching kernel, itrans, and xysdk files for each subtracted
         # frame
