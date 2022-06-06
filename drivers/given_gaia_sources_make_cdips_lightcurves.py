@@ -265,12 +265,20 @@ for ix, projid in enumerate(uprojids):
     #
     # make_fov_catalog
     #
-    outdir = f"/nfs/phtess2/ar0/TESS/REREDUC/{reduc_id}"
-    outlcdir = f"/nfs/phtess2/ar0/TESS/REREDUC/{reduc_id}_LC"
-    for d in [outdir, outlcdir]:
+    outdirbase = f"/nfs/phtess2/ar0/TESS/REREDUC/{reduc_id}"
+    outdir = f"/nfs/phtess2/ar0/TESS/REREDUC/{reduc_id}/s{str(sector).zfill(4)}-{cam}-{ccd}-{projid}/"
+    outlcdirbase = f"/nfs/phtess2/ar0/TESS/REREDUC/{reduc_id}_LC"
+    outlcdir = f"/nfs/phtess2/ar0/TESS/REREDUC/{reduc_id}_LC/s{str(sector).zfill(4)}-{cam}-{ccd}-{projid}/"
+    for d in [outdirbase, outdir, outlcdirbase, outlcdir]:
         if not os.path.exists(d):
             os.mkdir(d)
             print(f"Made {d}")
+
+    _lcnames = [os.path.join(outlcdir, f'{s}_llc.fits') for s in _sdf.dr2_source_id]
+    newlcexists = [os.path.exists(f) for f in _lcnames]
+    if np.all(newlcexists):
+        print(f'Found LCs {_lcnames}, continue.')
+        continue
 
     catalog_file = os.path.join(
         outdir, f"{reduc_id}-s{str(sector).zfill(4)}-{cam}-{ccd}.catalog"
@@ -352,6 +360,10 @@ for ix, projid in enumerate(uprojids):
             )
         )
 
+        # copy all the old photometric and astrometric reference files into our
+        # new "rereduce-reference-frames" directory. back up the .cmrawphot and
+        # .rawphot files from the original reduction to be doubly-redundant
+        # (and because they will be used to concatenate).
         photreffiles = glob(os.path.join(oldrefdir, photreffglob))
         astromreffiles = glob(os.path.join(oldrefdir, astromreffglob))
         filelist = photreffiles + astromreffiles
@@ -359,11 +371,23 @@ for ix, projid in enumerate(uprojids):
         for _file in filelist:
             src = _file
             dst = os.path.join(refdir, os.path.basename(_file))
-            if not os.path.exists(dst):
-                shutil.copy(src, dst)
-                print(f'Copy {src} -> {dst}')
-            else:
-                print(f'Found {dst}')
+            if os.path.exists(dst):
+                os.remove(dst)
+                print(f'Cleaning out {dst}')
+            shutil.copy(src, dst)
+            print(f'Copy {src} -> {dst}')
+
+        photpaths = glob( os.path.join(
+            refdir, f'*proj{projid}-{field}-cam{cam}-ccd{ccd}*.*phot'
+        ))
+        assert len(photpaths) == 3
+        for photpath in photpaths:
+            src = photpath
+            ext = os.path.basename(photpath).split('.')[-1]
+            dst = photpath.replace(ext,ext+'-backup')
+            assert os.path.exists(src)
+            os.rename(src, dst)
+            print(f'Rename {src}->{dst}')
 
         photref_reformedfovcatpath = reformed_cat_file
 
@@ -413,7 +437,8 @@ for ix, projid in enumerate(uprojids):
             photreftype=photreftype, kernelspec=kernelspec,
             lcapertures=aperturelist, photdisjointradius=photdisjointradius,
             outdir=outdir, fieldinfo=fieldinfo, observatory='tess',
-            nworkers=nworkers, maxworkertasks=1000, photparams=photparams)
+            nworkers=nworkers, maxworkertasks=1000, photparams=photparams,
+            dorereduce=reduc_id)
 
         if out==42:
             raise AssertionError('fatal error in convsubfits_staticphot')
