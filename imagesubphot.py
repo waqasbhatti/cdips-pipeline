@@ -1999,8 +1999,21 @@ def photometry_on_combined_photref(
         #    6.00     1978.89      19.583 0x007f  2.25  7.00  6.00     4679.89
         #    30.1105 0x007f
 
-        rpdf = pd.read_csv(outfile, comment='#', delim_whitespace=True,
-                           names=colnames)
+        if 'rereduce' in photref_sourcelist:
+            # concatenate the "re-reduction" and original reduction cmrawphot files.
+            cmrawphotfiles = [
+                outfile, outfile.replace(".cmrawphot", ".cmrawphot-backup")
+            ]
+            rpdf = pd.concat(
+                (pd.read_csv(f, comment='#', delim_whitespace=True,
+                             names=colnames)
+                    for f in cmrawphotfiles
+                )
+            ).reset_index()
+
+        else:
+            rpdf = pd.read_csv(outfile, comment='#', delim_whitespace=True,
+                               names=colnames)
 
         # Now need to read in catalog information. This is catalog and observatory
         # specific. Below is only implemented for the TESS pipeline, which has the
@@ -2014,13 +2027,35 @@ def photometry_on_combined_photref(
         # projected catalog sourcelist dataframe
         # cols = ['id,ra,dec,xi,eta,G,Rp,Bp,plx,pmra,pmdec,varflag,x,y']
         from tessutils import read_object_reformed_catalog
-        _ = read_object_reformed_catalog(photref_sourcelist, isgaiaid=True,
-                                         gaiafull=True)
-        sldf = pd.DataFrame(_)
+
+        if 'rereduce' in photref_sourcelist:
+            # concatenate the "re-reduction" and original reduction sourcelist
+            # files.  (hacky!)
+            foo = read_object_reformed_catalog(
+                photref_sourcelist, isgaiaid=True, gaiafull=True
+            )
+            sldf1 = pd.DataFrame(foo, [0])
+            origpath = os.path.join(
+                '/nfs/phtess2/ar0/TESS/FFI/BASE/reference-frames',
+                os.path.basename(photref_sourcelist)
+            )
+            bar = read_object_reformed_catalog(
+                origpath, isgaiaid=True, gaiafull=True
+            )
+            sldf2 = pd.DataFrame(bar)
+            sldf = pd.concat((sldf1, sldf2)).reset_index()
+
+        else:
+            _ = read_object_reformed_catalog(photref_sourcelist, isgaiaid=True,
+                                             gaiafull=True)
+            sldf = pd.DataFrame(_)
+
         sldf['sourceid'] = sldf['id'].astype(np.int64)
 
         mdf = rpdf.merge(sldf, on='sourceid', how='left',
                          suffixes=('_rawphot','_sourcelist'))
+        if 'rereduce' in photref_sourcelist:
+            mdf = mdf.drop_duplicates(subset=['sourceid','ra','dec'])
 
         # Stassun+2019, TICv8 paper give conversion from GaiaDR2 photometry to
         # the TESS bandpass. Scatter is 0.006 mag.
