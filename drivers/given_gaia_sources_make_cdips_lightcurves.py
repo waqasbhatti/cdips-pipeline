@@ -32,15 +32,16 @@ from TESS_reduction import main, run_detrending
 ######################
 
 # unique string identifying the reduction, to be used in directories, projid
-# strings, etc.
+# strings, etc.  lives at /cdips-pipeline/drivers/targetlists/{reduc_id}.csv
+# needs at minimum the key "dr2_source_id".  optionally "ra" and "dec".
 reduc_id = 'Meingast_2021_allstars'
-
-# how far to search for stars on silicon.
-MAX_SECTOR = 26
 
 ######################
 # validate arguments #
 ######################
+
+# how far to search for stars on silicon.
+MAX_SECTOR = 26
 
 # comma-separated CSV file contanining at minimum a column named dr2_source_id,
 # with the Gaia DR2 source identifiers.  If 'ra' and 'dec' columns are present,
