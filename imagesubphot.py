@@ -2034,7 +2034,13 @@ def photometry_on_combined_photref(
             foo = read_object_reformed_catalog(
                 photref_sourcelist, isgaiaid=True, gaiafull=True
             )
-            sldf1 = pd.DataFrame(foo, [0])
+            if foo.size==1:
+                sldf1 = pd.DataFrame(foo, index=[0])
+            elif foo.size>1:
+                sldf1 = pd.DataFrame(foo, index=list(range(len(foo))))
+            else:
+                import IPython; IPython.embed()
+                raise NotImplementedError
             origpath = os.path.join(
                 '/nfs/phtess2/ar0/TESS/FFI/BASE/reference-frames',
                 os.path.basename(photref_sourcelist)

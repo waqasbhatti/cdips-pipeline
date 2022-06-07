@@ -288,7 +288,7 @@ for ix, projid in enumerate(uprojids):
         missedsrcpath = os.path.join(
             'targetlists', f'{reduc_id}_missed_sources_only.csv'
         )
-        sdf['dr2_source_id'].to_csv(
+        _sdf['dr2_source_id'].to_csv(
             missedsrcpath, index=False, header=False
         )
 

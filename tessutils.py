@@ -86,7 +86,7 @@ from copy import deepcopy
 
 ##########################################
 
-DEBUG = False
+DEBUG = True
 
 SATURATIONMASKCMD = ('fiign {fitsfile} -o {outfitsfile} '
                      '-s {saturationlevel} --an')
@@ -1783,6 +1783,9 @@ def read_object_reformed_catalog(reformedcatalogfile, isgaiaid=False,
     you often need an objectid, ra, dec, and/or 2mass magnitudes.  get these
     from the "reformed" catalog with a small sub-read.
     """
+
+    if DEBUG:
+        print(f"Reading {reformedcatalogfile}")
 
     if not isgaiaid:
         columns='id,ra,dec,xi,eta,2massJ,2massK,2massqlt,2massI,2massr,2massi,2massz'
