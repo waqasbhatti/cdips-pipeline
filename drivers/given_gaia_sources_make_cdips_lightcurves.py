@@ -187,15 +187,19 @@ N_needed = len(sdf)
 #
 uprojids = np.unique(sdf.projid)
 
+returncodes = {}
+
 for ix, projid in enumerate(uprojids):
 
     # these are the stars we need light curves for on this sec/cam/ccd
     _sel = (sdf.projid == projid)
     _sdf = sdf[_sel]
+    N_desired = len(_sdf)
 
     starttime = datetime.utcnow().isoformat()
     print(10*'-')
-    print(f'{starttime}: {ix}/{len(uprojids)}: Begin projid {projid} with {len(_sdf)} stars.')
+    print(f'{starttime}: {ix}/{len(uprojids)}: Begin projid {projid} with '
+          f'{N_desired} stars.')
     print(_sdf)
     print(10*'-')
 
@@ -427,6 +431,13 @@ for ix, projid in enumerate(uprojids):
             projid=projid
         )
 
+        if cphotref_photometry is None:
+            # means: the only star(s) in this projid were not found to be on
+            # silicon
+            returncode = 1
+            returncodes[projid] = (returncode, N_desired)
+            continue
+
         subfitslist = glob(os.path.join(
             fitsdir, '[r|n]sub-????????-'+
             fitsglob.replace('.fits','-xtrns.fits'))
@@ -511,3 +522,12 @@ for ix, projid in enumerate(uprojids):
     endtime = datetime.utcnow().isoformat()
     print(f'{endtime}: {ix}/{len(uprojids)}: '
           f'Finished projid {projid} with {len(_sdf)} stars.')
+
+    returncode = 0
+    returncodes[projid] = (returncode, N_desired)
+
+print('finished {reduc_id}!')
+outdf = pd.DataFrame(returncodes, index=['returncode','n_desired'])
+outpath = os.path.join(outdirbase, 'reduc_status.log')
+outdf.to_csv(outpath, index=True)
+print(f'wrote final status to {outpath}')
