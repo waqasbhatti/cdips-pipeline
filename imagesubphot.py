@@ -2039,8 +2039,11 @@ def photometry_on_combined_photref(
             elif foo.size>1:
                 sldf1 = pd.DataFrame(foo, index=list(range(len(foo))))
             else:
-                import IPython; IPython.embed()
-                raise NotImplementedError
+                print(f'ERR! Fatal error. Did not get any stars on silicon. '
+                      f'Photref frame was {photref_frame}, fovcatalog was '
+                      f'{fovcatalog}')
+                return None
+
             origpath = os.path.join(
                 '/nfs/phtess2/ar0/TESS/FFI/BASE/reference-frames',
                 os.path.basename(photref_sourcelist)
