@@ -1649,7 +1649,8 @@ def parallel_merge_tfa_lcs(lcdirectory, nworkers=32, maxworkertasks=1000):
 # TIME UTILITIES #
 ##################
 def parallel_apply_barycenter_time_correction(lcdirectory, nworkers=16,
-                                              maxworkertasks=1000):
+                                              maxworkertasks=1000,
+                                              runparallel=True):
 
     fitsilcfiles = glob(os.path.join(lcdirectory,'*_llc.fits'))
 
@@ -1658,13 +1659,17 @@ def parallel_apply_barycenter_time_correction(lcdirectory, nworkers=16,
 
     tasks = [(x) for x in fitsilcfiles]
 
-    pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
-    results = pool.map(apply_barycenter_time_correction_worker, tasks)
+    if runparallel:
+        pool = mp.Pool(nworkers,maxtasksperchild=maxworkertasks)
+        results = pool.map(apply_barycenter_time_correction_worker, tasks)
 
-    pool.close()
-    pool.join()
-
-    return {result for result in results}
+        pool.close()
+        pool.join()
+        return {result for result in results}
+    else:
+        for task in tasks:
+            apply_barycenter_time_correction_worker(task)
+        return 1
 
 
 def apply_barycenter_time_correction_worker(task):
@@ -1672,7 +1677,6 @@ def apply_barycenter_time_correction_worker(task):
     fitsilcfile = task
     result = apply_barycenter_time_correction(fitsilcfile)
     return result
-
 
 
 def apply_barycenter_time_correction(fitsilcfile):
@@ -1705,6 +1709,7 @@ def apply_barycenter_time_correction(fitsilcfile):
 
     new_columns = inhdulist[1].columns + timehdu.columns
     new_timeseries_hdu = fits.BinTableHDU.from_columns(new_columns)
+
 
     # update primary HDU time meta-data
     primary_hdu.header['TIMESYS'] = 'TDB'
