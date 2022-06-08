@@ -20,6 +20,8 @@ from astropy.io import fits
 # non-standard: https://github.com/christopherburke/tess-point
 from tess_stars2px import tess_stars2px_function_entry
 
+from cdips.utils.gaiaqueries import gaia2read_given_df
+
 # non-standard: cdips-pipeline imports
 import aperturephot as ap
 import autoimagesub as ais
@@ -290,6 +292,12 @@ if not os.path.exists(outcsvpath):
             returncode = 0
             returncodes[projid] = (returncode, N_desired)
             continue
+        if np.any(newlcexists):
+            print(f'Found {np.sum(newlcexists)}/{len(newlcexists)} of the '
+                  f'LCs for {projid}:\n{_lcnames}, continue.')
+            returncode = 2
+            returncodes[projid] = (returncode, N_desired)
+            continue
 
         catalog_file = os.path.join(
             outdir, f"{reduc_id}-s{str(sector).zfill(4)}-{cam}-{ccd}.catalog"
@@ -502,7 +510,8 @@ if not os.path.exists(outcsvpath):
                        binlightcurves=binlightcurves,
                        tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0,
                        skipepd=skipepd, fixedtfatemplate=None,
-                       nmax_flow_logic=N_needed, escapeafterbarycenter=1)
+                       nmax_flow_logic=N_needed, escapeafterbarycenter=1,
+                       barycenterparallel=False)
 
         #
         # call TFA runner here, instead of in run_detrending, since all the work
@@ -568,36 +577,6 @@ for ix, r in sdf.iterrows():
 odf = deepcopy(sdf)
 odf['lcpath'] = newlcpaths
 odf['hasmatch'] = hasmatches
-
-def gaia2read_given_df(df, cachedir):
-
-    idstr = str(uuid.uuid4())
-    srcpath = os.path.join(cachedir, f'{idstr}_sources_only.csv')
-    dstpath = os.path.join(cachedir, f'{idstr}_gaia2read.csv')
-
-    assert 'dr2_source_id' in df
-    df['dr2_source_id'].to_csv(srcpath, index=False, header=False)
-
-    if not os.path.exists(dstpath):
-        gaia2readcmd = f"gaia2read --header --extra --idfile {srcpath} --out {dstpath}"
-        print(f'Beginning {gaia2readcmd}')
-        returncode = os.system(gaia2readcmd)
-        if returncode != 0: raise AssertionError('gaia2read cmd failed!!')
-        print(f'Ran {gaia2readcmd}')
-    else:
-        print(f'Found {dstpath}')
-
-    gdf = pd.read_csv(dstpath, delim_whitespace=True)
-    gdf = gdf.rename({
-        '#Gaia-ID[1]':'dr2_source_id',
-        'RA[deg][2]':'ra',
-        'Dec[deg][3]':'dec',
-        'phot_g_mean_mag[20]':'phot_g_mean_mag',
-        'phot_bp_mean_mag[25]':'phot_bp_mean_mag',
-        'phot_rp_mean_mag[30]':'phot_rp_mean_mag',
-    }, axis='columns')
-
-    return gdf
 
 gdf = gaia2read_given_df(odf, outdirbase)
 

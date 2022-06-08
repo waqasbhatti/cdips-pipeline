@@ -1242,7 +1242,8 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
                    epdsmooth=11, epdsigclip=10, nworkers=10,
                    binlightcurves=False, tfa_template_sigclip=5.0,
                    tfa_epdlc_sigclip=5.0, skipepd=True, fixedtfatemplate=None,
-                   nmax_flow_logic=10, escapeafterbarycenter=False):
+                   nmax_flow_logic=10, escapeafterbarycenter=False,
+                   barycenterparallel=True):
     """
     Step ISP11: do EPD on all the LCs, and collect stats on the results.
     for ISP LCs, use lcmagcols=([27,28,29],[30,],[30,],[30,])
@@ -1275,7 +1276,7 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
         )
 
         lcu.parallel_apply_barycenter_time_correction(
-            lcdirectory, nworkers=nworkers
+            lcdirectory, nworkers=nworkers, runparallel=barycenterparallel
         )
     else:
         print(f'Found >{nmax_flow_logic} fits LCs from grcollect. '
