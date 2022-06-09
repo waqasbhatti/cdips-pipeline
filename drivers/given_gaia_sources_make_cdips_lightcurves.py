@@ -5,6 +5,8 @@ The default mode (in TESS_reduction.py) is to go down to G_RP<16 for the
 cluster list, and G_RP<13 for field stars.  Often though, we have extra stars
 for which we want to use the same machinery to get light curves from the
 **already existing** difference images.
+
+phtess2 environment for entire thing: py37
 """
 ###########
 # imports #
@@ -21,6 +23,11 @@ from astropy.io import fits
 from tess_stars2px import tess_stars2px_function_entry
 
 from cdips.utils.gaiaqueries import gaia2read_given_df
+from cdips.lcproc import trex_lc_to_mast_lc as tlml
+from cdips.lcproc import detrend as dtr
+from cdips.lcproc import reformat_lcs_for_mast as rlm
+from cdips.utils import collect_cdips_lightcurves as ccl
+from astrobase import imageutils as iu
 
 # non-standard: cdips-pipeline imports
 import aperturephot as ap
@@ -36,6 +43,7 @@ from TESS_reduction import main, run_detrending
 # unique string identifying the reduction, to be used in directories, projid
 # strings, etc.  lives at /cdips-pipeline/drivers/targetlists/{reduc_id}.csv
 # needs at minimum the key "dr2_source_id".  optionally "ra" and "dec".
+#reduc_id = 'Meingast_2021_n100'
 reduc_id = 'Meingast_2021_allstars'
 
 ######################
@@ -44,6 +52,8 @@ reduc_id = 'Meingast_2021_allstars'
 
 # how far to search for stars on silicon.
 MAX_SECTOR = 26
+OC_MG_CAT_ver = 0.6
+cdipsvnum = 1
 
 # comma-separated CSV file contanining at minimum a column named dr2_source_id,
 # with the Gaia DR2 source identifiers.  If 'ra' and 'dec' columns are present,
@@ -542,10 +552,10 @@ if not os.path.exists(outcsvpath):
         returncode = 0
         returncodes[projid] = (returncode, N_desired)
 
-    print(f'finished {reduc_id}!')
+    print(f'Finished {reduc_id} RAW and TFA light curves!')
     outdf = pd.DataFrame(returncodes, index=['returncode','n_desired'])
     outdf.to_csv(outcsvpath, index=False)
-    print(f'wrote final status to {outcsvpath}')
+    print(f'Wrote status to {outcsvpath}')
 
 #
 # assess whether the light curves were actually made
@@ -575,8 +585,8 @@ for ix, r in sdf.iterrows():
         hasmatches.append(0)
 
 odf = deepcopy(sdf)
-odf['lcpath'] = newlcpaths
-odf['hasmatch'] = hasmatches
+odf['internallcpath'] = newlcpaths
+odf['hasinternalmatch'] = hasmatches
 
 gdf = gaia2read_given_df(odf, outdirbase)
 
@@ -588,4 +598,181 @@ odf['phot_g_mean_mag'] = gdf['phot_g_mean_mag']
 finalcsvpath = os.path.join(outdirbase, 'reduc_status_newlcs.log')
 odf = odf.drop('index', axis='columns')
 odf.to_csv(finalcsvpath, index=False)
+print(42*'#')
+print(f'Wrote {finalcsvpath} after initial reduction.')
+print(42*'#')
+
+#
+# run PCA and HLSP reformatting
+#
+
+outdir = f'/nfs/phtess3/ar0/TESS/PROJ/lbouma/REREDUC/{reduc_id}_HLSP'
+outdirnew = f'/nfs/phtess3/ar0/TESS/PROJ/lbouma/REREDUC/{reduc_id}_HLSP/new'
+outdirall = f'/nfs/phtess3/ar0/TESS/PROJ/lbouma/REREDUC/{reduc_id}_HLSP/all'
+symlinkdir = f'/nfs/phtess1/ar1/TESS/PROJ/lbouma/REREDUC_SYMLINKS/{reduc_id}'
+for _d in [outdir, outdirnew, outdirall, symlinkdir]:
+    if not os.path.exists(_d): os.mkdir(_d)
+
+for ix, projid in enumerate(uprojids):
+
+    # these are the stars we need light curves for on this sec/cam/ccd
+    _sel = (sdf.projid == projid)
+    _sdf = sdf[_sel]
+    N_desired = len(_sdf)
+
+    starttime = datetime.utcnow().isoformat()
+    print(10*'-')
+    print(f'{starttime}: {ix}/{len(uprojids)}: Start PCA projid {projid} with '
+          f'{N_desired} stars.')
+    print(_sdf)
+    print(10*'-')
+
+    sector = np.unique(_sdf.sector)
+    assert len(sector) == 1
+    sector = int(sector)
+    cam = int(np.unique(_sdf.cam))
+    ccd = int(np.unique(_sdf.ccd))
+
+    overwrite = 0
+    nworkers = 32
+
+    lcpaths = glob(os.path.join(
+        outdirnew, f'sector-{sector}', f'cam{cam}_ccd{ccd}', 'hlsp*.fits'
+    ))
+
+    # turn cdips-pipeline light curves to HLSP light curves
+    sectors,cams,ccds = [sector], [cam], [ccd]
+    if len(lcpaths) == 0 or overwrite:
+        # as in trex_lc_to_mast_lc, but with tweaked pahts
+
+        #
+        # make_symlinks
+        #
+        ccl.make_local_lc_directories(
+            sectors=sectors, cams=cams, ccds=ccds,
+            cdipssymlinkdir=symlinkdir
+        )
+        cdips_sourceids = ccl.get_cdips_sourceids(ver=OC_MG_CAT_ver)
+        dr2_source_id = np.array(_sdf.dr2_source_id.astype(str))
+        ccl.symlink_cdips_lcs(
+            dr2_source_id, sectors=sectors, cams=cams, ccds=ccds,
+            basedir=lcdir, cdipssymlinkdir=symlinkdir, isrereduc=True
+        )
+
+        sectordir = os.path.join(outdirnew, f'sector-{sector}')
+        if not os.path.exists(sectordir): os.mkdir(sectordir)
+
+        camccddir = os.path.join(sectordir, f'cam{cam}_ccd{ccd}')
+        if not os.path.exists(camccddir): os.mkdir(camccddir)
+
+        lcpaths = glob(os.path.join(
+            symlinkdir,
+            f'sector-{sector}', f'cam{cam}_ccd{ccd}', '*_llc.fits'
+        ))
+
+        if len(lcpaths) > 0:
+
+            projid = iu.get_header_keyword(lcpaths[0], 'PROJID')
+
+            eigveclist, n_comp_df = dtr.prepare_pca(
+                cam, ccd, sector, projid
+            )
+
+            rlm.reformat_headers(lcpaths, camccddir, sector,
+                                 cdipsvnum, OC_MG_CAT_ver,
+                                 eigveclist=eigveclist,
+                                 n_comp_df=n_comp_df)
+
+        else:
+            print(f'WRN! No light curves made for '
+                  f'sector{sector} (cam{cam} ccd{ccd}).')
+
+    else:
+        print(f'found {len(lcpaths)} HLSP LCs; wont reformat')
+
+print(42*'#')
+print(f'finished PCA + HLSP formatting for {reduc_id}!')
+print(42*'#')
+
+#
+# get paths to all the new light curves.
+#
+
+hlsplcpaths = []
+hasmatches = []
+for ix, r in sdf.iterrows():
+    source_id = str(r['dr2_source_id'])
+    sector = int(r['sector'])
+    cam = int((r['cam']))
+    ccd = int((r['ccd']))
+    projid = int((r['projid']))
+
+    lcdir = f"/nfs/phtess2/ar0/TESS/REREDUC/{reduc_id}_HLSP/new"
+
+    trylcglob = os.path.join(
+        lcdir,
+        f'sector-{sector}',
+        f'cam{cam}_ccd{ccd}',
+        f"hlsp_cdips_*{source_id}*_llc.fits"
+    )
+    trylcpath = glob(trylcglob)
+
+    if len(trylcpath) == 1:
+        trylcpath = trylcpath[0]
+        hlsplcpaths.append(trylcpath)
+        hasmatches.append(1)
+    else:
+        hlsplcpaths.append(-1)
+        hasmatches.append(0)
+
+odf['hlsplcpath'] = hlsplcpaths
+odf['hashlspmatch'] = hasmatches
+
+finalcsvpath = os.path.join(outdirbase, 'reduc_status_newlcs.log')
+odf.to_csv(finalcsvpath, index=False)
+print(42*'#')
 print(f'Wrote {finalcsvpath}')
+print(42*'#')
+
+#
+# symlink everything into its own directory, `outdirall`.
+# outdirall = f'/nfs/phtess3/ar0/TESS/PROJ/lbouma/REREDUC/{reduc_id}_HLSP/all'
+#
+
+mdf = df.merge(odf[['dr2_source_id', 'hlsplcpath', 'hashlspmatch', 'projid',
+                    'phot_g_mean_mag']],
+               how='left', on=['dr2_source_id', 'projid'])
+
+mdf.loc[pd.isnull(mdf.hashlspmatch), 'hashlspmatch'] = 0
+mdf['hashlspmatch'] = mdf.hashlspmatch.astype(int)
+mdf.loc[pd.isnull(mdf.hlsplcpath), 'hlsplcpath'] = -1
+
+mdf['hasanymatch'] = (
+    (mdf['hasmatch'].astype(bool)) # original reduction
+    |
+    (mdf['hashlspmatch'].astype(bool)) # re-reduction
+)
+
+mdf['srcpath'] = mdf.lcpath
+sel = (mdf.srcpath == '-1') & (mdf.hlsplcpath != '-1')
+mdf.loc[sel, 'srcpath'] = mdf.loc[sel, 'hlsplcpath']
+
+for ix, r in mdf.iterrows():
+    dr2_source_id = r['dr2_source_id']
+    srcpath = r['srcpath']
+
+    if srcpath == '-1' or srcpath == -1:
+        print(f'Did not find LC for\n{r}')
+        continue
+
+    else:
+        dst = os.path.join(outdirall, os.path.basename(srcpath))
+        if not os.path.exists(dst):
+            os.symlink(srcpath, dst)
+            print(f'\tsymlink {srcpath} -> {dst}')
+        else:
+            print(f'\t found {dst}')
+
+print(42*'#')
+print(f'Finished {reduc_id}! 🎉🎉🎉')
+print(42*'#')
