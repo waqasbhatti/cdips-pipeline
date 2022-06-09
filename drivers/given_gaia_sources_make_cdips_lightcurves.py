@@ -773,6 +773,11 @@ for ix, r in mdf.iterrows():
         else:
             print(f'\t found {dst}')
 
+finalcsvpath = os.path.join(outdirall, f'{reduc_id}_metadata.csv')
+mdf.to_csv(finalcsvpath, index=False)
+print(42*'#')
+print(f'Wrote {finalcsvpath}')
+
 print(42*'#')
 print(f'Finished {reduc_id}! 🎉🎉🎉')
 print(42*'#')
