@@ -7,6 +7,11 @@ for which we want to use the same machinery to get light curves from the
 **already existing** difference images.
 
 phtess2 environment for entire thing: py37
+
+Instructions:
+    * update `reduc_id` string below
+    * ensure the corresponding target list exists
+    * python -u given_gaia_sources_make_cdips_lightcurves.py &> logs/NAME.log
 """
 ###########
 # imports #
@@ -44,7 +49,8 @@ from TESS_reduction import main, run_detrending
 # strings, etc.  lives at /cdips-pipeline/drivers/targetlists/{reduc_id}.csv
 # needs at minimum the key "dr2_source_id".  optionally "ra" and "dec".
 #reduc_id = 'Meingast_2021_n100'
-reduc_id = 'Meingast_2021_allstars'
+#reduc_id = 'Meingast_2021_allstars'
+reduc_id = 'Meingast_2021_allstars_20220620'
 
 ######################
 # validate arguments #
@@ -182,7 +188,7 @@ from cdips.utils.collect_cdips_lightcurves import (
     given_sector_cam_ccd_get_projid
 )
 df['projid'] = [
-    given_sector_cam_ccd_get_projid(sec,cam,ccd)
+    given_sector_cam_ccd_get_projid(sec, cam, ccd)
     for sec,cam,ccd in zip(
         df.sector, df.cam, df.ccd
     )
@@ -314,6 +320,7 @@ if not os.path.exists(outcsvpath):
         )
         if not os.path.exists(catalog_file):
 
+            # NOTE: this CSV file is iteratively rewritten across sectors
             missedsrcpath = os.path.join(
                 'targetlists', f'{reduc_id}_missed_sources_only.csv'
             )
@@ -772,6 +779,39 @@ for ix, r in mdf.iterrows():
             print(f'\tsymlink {srcpath} -> {dst}')
         else:
             print(f'\t found {dst}')
+
+dstpath = os.path.join(outdirall, f'{reduc_id}_sourceids_gaia2read.csv')
+if not os.path.exists(dstpath):
+
+    srcpath = os.path.join(outdirall, f'{reduc_id}_sourceids.csv')
+    mdf['dr2_source_id'].to_csv(srcpath, index=False, header=False)
+
+    if not os.path.exists(dstpath):
+        gaia2readcmd = f"gaia2read --header --extra --idfile {srcpath} --out {dstpath}"
+        print(f'Beginning {gaia2readcmd}')
+        returncode = os.system(gaia2readcmd)
+        if returncode != 0: raise AssertionError('gaia2read cmd failed!!')
+        print(f'Ran {gaia2readcmd}')
+    else:
+        print(f'Found {dstpath}')
+
+_df = pd.read_csv(dstpath, delim_whitespace=True)
+_df = _df.rename({
+    '#Gaia-ID[1]':'dr2_source_id',
+    'RA[deg][2]':'ra',
+    'Dec[deg][3]':'dec',
+    'phot_g_mean_mag[20]':'phot_g_mean_mag',
+    'phot_bp_mean_mag[25]':'phot_bp_mean_mag',
+    'phot_rp_mean_mag[30]':'phot_rp_mean_mag',
+}, axis='columns')
+
+assert len(_df) == len(mdf)
+mdf = mdf.reset_index()
+_df = _df.reset_index()
+
+mdf['phot_g_mean_mag'] = _df['phot_g_mean_mag']
+mdf['phot_rp_mean_mag'] = _df['phot_rp_mean_mag']
+mdf['phot_bp_mean_mag'] = _df['phot_bp_mean_mag']
 
 finalcsvpath = os.path.join(outdirall, f'{reduc_id}_metadata.csv')
 mdf.to_csv(finalcsvpath, index=False)
