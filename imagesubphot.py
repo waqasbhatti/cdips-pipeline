@@ -2064,7 +2064,7 @@ def photometry_on_combined_photref(
         mdf = rpdf.merge(sldf, on='sourceid', how='left',
                          suffixes=('_rawphot','_sourcelist'))
         if 'rereduce' in photref_sourcelist:
-            mdf = mdf.drop_duplicates(subset=['sourceid','ra','dec'])
+            mdf = mdf.drop_duplicates(subset=['sourceid'])
 
         # Stassun+2019, TICv8 paper give conversion from GaiaDR2 photometry to
         # the TESS bandpass. Scatter is 0.006 mag.
@@ -2156,6 +2156,7 @@ def photometry_on_combined_photref(
             sourceid = np.int64(l.split(' ')[0])
 
             sel = mdf['sourceid'] == sourceid
+            assert len(mdf[sel]) == 1
 
             # the exact number of characters per string apparently must be
             # matched.  because the
