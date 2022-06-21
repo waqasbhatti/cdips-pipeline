@@ -35,3 +35,4 @@ drivers/log*
 drivers/mv*py
 *nohup*
 drivers/verification*
+drivers/targetlists/
