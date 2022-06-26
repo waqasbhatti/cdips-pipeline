@@ -1514,15 +1514,15 @@ def explore_ccd_temperature_timeseries():
 
 def append_ccd_temperature_to_hdr_worker(task):
 
-    fitsname, d = task
+    fitspath, d = task
 
-    framekey = os.path.splitext(os.path.basename(fitsname))[0]
+    framekey = os.path.splitext(os.path.basename(fitspath))[0]
 
     # get the temperature time series appropriate for this CAM/CCD pair using
     # the file name.  match: tess2018206192942-s0001-4-3-0120_cal_img.fits
-    sr = search('{}/tess2{}-{}-{}-{}-{}_cal_img_bkgdsub.fits', fitsname)
-    cam = sr[3]
-    ccd = sr[4]
+    basenamesplit = os.path.basename(fitspath).split("-")
+    cam = basenamesplit[2]
+    ccd = basenamesplit[3]
 
     thiskey = 'S_CAM{:d}_ALCU_sensor_CCD{:d}'.format(int(cam), int(ccd))
 
@@ -1531,7 +1531,7 @@ def append_ccd_temperature_to_hdr_worker(task):
 
     # take the mean of the temperature values within this time window. append
     # it to the header.
-    data, hdr = iu.read_fits(fitsname, ext=0)
+    data, hdr = iu.read_fits(fitspath, ext=0)
     tstart = hdr['TSTART'] # start as BTJD = BJD-2457000.
     tstop = hdr['TSTOP'] # stop in BTJD, ditto.
 
@@ -1555,16 +1555,14 @@ def append_ccd_temperature_to_hdr_worker(task):
         'number of temperatures avgd for CCDTEMP'
     )
 
-    fits.writeto(fitsname, data, header=hdr, output_verify='silentfix+ignore',
+    fits.writeto(fitspath, data, header=hdr, output_verify='silentfix+ignore',
                  overwrite=True)
 
     if n_temps>=1:
-        print('{} Wrote CCDTEMP to {:s}'.format(
-            datetime.utcnow().isoformat(), fitsname))
+        print(f'{datetime.utcnow().isoformat()} Wrote CCDTEMP to {fitspath}')
         return framekey, mean_temp, n_temps
     else:
-        print('{} WRN! Wrote NAN CCDTEMP to {:s}'.format(
-            datetime.utcnow().isoformat(), fitsname))
+        print(f'{datetime.utcnow().isoformat()} WRN! Wrote NAN CCDTEMP to {fitspath}')
         return framekey, np.nan, 0
 
 
