@@ -315,7 +315,14 @@ def convert_grcollect_to_fits_lc_worker(task, **kwargs):
         # b.argsort()[a.argsort()] # array([3, 1, 0, 2])
         #
         # where we're matching b to the array a.
-        matchsortinds = tdfframekeys.argsort()[lcd['rstfc'].argsort()]
+        try:
+            matchsortinds = tdfframekeys.argsort()[lcd['rstfc'].argsort()]
+        except IndexError as e:
+            print(f'ERROR! {e}')
+            print(f'Task was {task}')
+            print(f'lcdir {lcdir}, fitsdir {fitsdir}, projectid {projectid}')
+            return 0
+
         tdfframekeys = tdfframekeys[matchsortinds]
         ccdtemp = ccdtemp[matchsortinds]
         ntemps = ntemps[matchsortinds]
