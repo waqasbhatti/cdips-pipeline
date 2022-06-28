@@ -64,6 +64,7 @@ import numpy.random as npr
 import scipy.misc
 import scipy.ndimage
 import scipy
+import imageio
 
 from scipy.optimize import leastsq
 USE_LEASTSQ = 1
@@ -848,7 +849,7 @@ def stamps_to_jpeg(image_stamps,
                             np.array([255.0]*(midrow_xsize*3 + sepwidth*2)),
                             bottomrow_stamp))
 
-    scipy.misc.imsave(out_fname,full_stamp)
+    imageio.imwrite(out_fname,full_stamp)
     return full_stamp
 
 
@@ -944,7 +945,7 @@ def fits_to_full_jpeg(fits_image,
             hdr['OBJECT'] if 'OBJECT' in hdr else 'objectunknown'
             )
 
-    scipy.misc.imsave(out_fname,resized_img)
+    imageio.imwrite(out_fname,resized_img)
 
     # recolor the saved image if told to do so
     if colorscheme:
@@ -1236,7 +1237,7 @@ def frame_radecbox_to_jpeg(
     if flip:
         scaled_img = np.flipud(scaled_img)
 
-    scipy.misc.imsave(out_fname, scaled_img)
+    imageio.imwrite(out_fname, scaled_img)
 
     if colorscheme:
         cm = mplcm.get_cmap(colorscheme)
@@ -1433,7 +1434,7 @@ def fitscoords_to_jpeg(fits_image,
     if flip:
         scaled_img = np.flipud(scaled_img)
 
-    scipy.misc.imsave(out_fname, scaled_img)
+    imageio.imwrite(out_fname, scaled_img)
 
     # annotate the image if told to do so
     if annotatejd and jdsrc and os.path.exists(jdsrc):
@@ -1475,7 +1476,7 @@ def nparr_to_full_jpeg(nparr,
                                       (outsizex,outsizey))
     if out_fname is None:
         out_fname = fits_image + '.jpeg'
-    scipy.misc.imsave(out_fname,resized_img)
+    imageio.imwrite(out_fname,resized_img)
 
 
 
