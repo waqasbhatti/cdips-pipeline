@@ -16,7 +16,7 @@ main
     parallel_move_badframes
     get_files_needed_before_image_subtraction
         parallel_extract_sources
-        parallel_astrometrydotnet
+        write_wcs_from_spoc
         make_fov_catalog
         reform_gaia_fov_catalog
         merge_object_catalog_vs_cdips
@@ -221,13 +221,19 @@ def _make_movies(fitsdir, moviedir, field, camera, ccd, projectid,
 
 
 def given_fits_list_get_gain_exptime_ra_dec(fits_list):
+
     ntry_rand_fits=0
+
+    np.random.seed(42)
     while True:
-        rand_fits = fits_list[np.random.randint(0, high=len(fits_list))]
+        rand_fits = np.random.choice(fits_list)
         if os.path.exists(rand_fits):
             break
+        else:
+            print(f"Iter {ntry_rand_fits}. Did not find {rand_fits}. Trying again.")
         if ntry_rand_fits >= 10000:
             raise AssertionError('Cannot find a random fits to extract header info after moving the badframes')
+        ntry_rand_fits += 1
 
     hdu_list = fits.open(rand_fits)
     hdr = hdu_list[0].header
