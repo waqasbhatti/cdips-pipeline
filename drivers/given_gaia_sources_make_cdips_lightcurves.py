@@ -50,7 +50,10 @@ from TESS_reduction import main, run_detrending
 # needs at minimum the key "dr2_source_id".  optionally "ra" and "dec".
 #reduc_id = 'Meingast_2021_n100'
 #reduc_id = 'Meingast_2021_allstars'
-reduc_id = 'Meingast_2021_allstars_20220620'
+#reduc_id = 'Meingast_2021_allstars_20220620'
+#reduc_id = '20220311_Kerr_CepHer_x_DR2_boyle'
+#reduc_id = 'alpha_per_cands_2022068'
+reduc_id = 'heyl_sample_20220728'
 
 ######################
 # validate arguments #
@@ -277,6 +280,7 @@ if not os.path.exists(outcsvpath):
 
         from TESS_reduction import given_fits_list_get_gain_exptime_ra_dec
         fits_list = np.sort(glob(os.path.join(fitsdir, fitsglob)))
+
         assert len(fits_list) > 0
         ccdgain, exptime, ra_nom, dec_nom = (
             given_fits_list_get_gain_exptime_ra_dec(fits_list)
@@ -474,6 +478,11 @@ if not os.path.exists(outcsvpath):
                 fitsdir, '[r|n]sub-????????-'+
                 fitsglob.replace('.fits','-xtrns.fits'))
             )
+
+            # these should already exist unless someone deleted them.
+            # in the latter case, make them.  (by rerunning TESS_reduction /
+            # the projid_XXXX.sh shell scripts)
+            assert len(subfitslist) > 0
 
             out = ais.parallel_convsubfits_staticphot(
                 subfitslist, fitsdir=fitsdir, fitsglob=fitsglob,
