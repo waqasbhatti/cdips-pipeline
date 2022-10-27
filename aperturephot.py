@@ -1817,7 +1817,8 @@ def make_frameprojected_catalog(fits,
                 )[0].tolist()
 
                 outdf = df.iloc[keep_ind]
-                outdf.to_csv(outfile, index=False, header=False, sep=' ')
+                outdf.to_csv(outfile, index=False, header=False, sep=' ',
+                             na_rep='NaN')
                 print('TESS wrote {}'.format(outfile))
                 print(outdf.describe())
 
