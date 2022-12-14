@@ -710,7 +710,7 @@ def _plot_normalized_subtractedimg_histogram(
 
 def is_image_noise_gaussian(
     fitsdir, projectid, field, camera, ccd,
-    photrefdir='/nfs/phtess2/ar0/TESS/FFI/BASE/reference-frames/',
+    photrefdir=os.path.join(sv.LOCAL_IMGBASE, 'BASE', 'reference-frames'),
     n_histograms_to_make=40):
     """
     The noise in the differenced image should be gaussian.  Oelkers & Stassun
@@ -828,7 +828,8 @@ def record_reduction_parameters(fitsdir, fitsglob, projectid, field, camnum,
     }
 
     outpicklename = "projid_{:s}.pickle".format(repr(projectid))
-    outpickledir = '/nfs/phtess2/ar0/TESS/FFI/PROJ/REDUCTION_PARAM_PICKLES/'
+    outpickledir = os.path.join(sv.LOCAL_IMGBASE, "PROJ", "REDUCTION_PARAM_PICKLES")
+    if not os.path.exists(outpickledir): os.mkdir(outpickledir)
     outpath = os.path.join(outpickledir, outpicklename)
 
     with open(outpath, 'wb') as f:
@@ -1264,7 +1265,8 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
 
     if len(glob(os.path.join(lcdirectory,'*_llc.fits'))) < nmax_flow_logic:
 
-        engdir = '/nfs/phtess2/ar0/TESS/FFI/ENGINEERING/'
+        engdir = os.path.join(sv.LOCAL_IMGBASE, 'ENGINEERING/')
+
         # e.g., s0002-3-3-0121_key_temperature_count.csv
         temperatureglob = (
             '{}-{}-{}-????_key_temperature_count.csv'.
@@ -1582,7 +1584,7 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
                projcatalogpath, astromrefpath, sectornum, tfa_templates_path,
                binned=False, make_percentiles_plot=True,
                percentiles_xlim=[4,17], percentiles_ylim=[1e-5,1e-1],
-               nworkers=16, moviedir='/nfs/phtess2/ar0/TESS/FFI/MOVIES/',
+               nworkers=16, moviedir=os.path.join(sv.LOCAL_IMGBASE, 'MOVIES/'),
                skipepd=False):
     """
     write files with summary statistics of run. also, make movies.
@@ -1776,12 +1778,15 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     sectornum = int(field[1:])
 
     if is_ete6:
+        raise DeprecationWarning
         CAL_dir = '/nfs/phtess2/ar0/TESS/SIMFFI/ARCHIVAL/'
         mast_calibrated_ffi_list = np.sort(
             glob(CAL_dir+fitsglob.replace('_cal_img.fits','-s_ffic.fits'))
         )
     else:
-        CAL_dir = '/nfs/phtess2/ar0/TESS/FFI/CAL/sector-{:d}'.format(sectornum)
+        CAL_dir = os.path.join(
+            sv.LOCAL_IMGBASE, 'CAL', 'sector-{:d}'.format(sectornum)
+        )
         mast_calibrated_ffi_list = np.sort(
             glob(os.path.join(
                 CAL_dir,fitsglob.replace('_cal_img_bkgdsub.fits','-s_ffic.fits')))
@@ -1793,8 +1798,9 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     else:
         pass
 
-    RED_dir = (
-        '/nfs/phtess2/ar0/TESS/FFI/RED/sector-{:d}/cam{}_ccd{}'.
+    RED_dir = os.path.join(
+        sv.LOCAL_IMGBASE,
+        'RED', 'sector-{:d}/cam{}_ccd{}'.
         format(sectornum, camnum, ccdnum)
     )
     if not os.path.exists(os.path.dirname(RED_dir)):
@@ -1840,7 +1846,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
 
         tu.parallel_plot_median_filter_quad(RED_dir, nworkers=nworkers)
 
-        moviedir='/nfs/phtess2/ar0/TESS/FFI/MOVIES/'
+        moviedir= os.path.join(sv.LOCAL_IMGBASE, 'MOVIES')
         outmp4path = os.path.join(
             moviedir, 'sector{}_cam{}_ccd{}_quad_bkgd.mp4'.
             format(sectornum, camnum, ccdnum)
@@ -1862,7 +1868,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                                          nworkers=nworkers)
 
         # append CCD temperature information to headers
-        engdatadir = '/nfs/phtess2/ar0/TESS/FFI/ENGINEERING/'
+        engdatadir = os.path.join(LOCAL_IMGBASE, 'ENGINEERING')
         temperaturepklpath = os.path.join(
             engdatadir,
             'sector{:s}_ccd_temperature_timeseries.pickle'.
