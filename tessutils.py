@@ -123,17 +123,20 @@ badtimewindows = [
 ]
 # and we can append to this automatically using the orbit times from:
 # https://archive.stsci.edu/missions/tess/doc/tess_drn/
-# (downloaded on the date noted below... I'll reach out to Scott Fleming to
-# see whether it'll be updated past S29)
+# (downloaded on the date noted below... I've reached out to Roland to see
+# whether we can get an updated version that goes past Sector 42)
 from paths import DATADIR
 badtime_df = pd.read_csv(
-    os.path.join(DATADIR, '20210712_tess_orbit_times_by_sector.csv'),
+    os.path.join(DATADIR, '20221214_tess_orbit_times_by_sector.csv'),
     comment='#'
 )
-for ix in range(37, 65, 2):
+#FIXME: double-check whether sector 42, 43, 44, 45, 46 will need special logic
+#since they are on the ecliptic.  i do not think they will, because it was still
+#two orbits per field during that time.
+for orbit_ix in range(37, 91, 2):
     thistuple = (
-        float(badtime_df[badtime_df.Orbit == ix]['End TJD']),
-        float(badtime_df[badtime_df.Orbit == ix+1]['Start TJD'])
+        float(badtime_df[badtime_df.Orbit == orbit_ix]['End TJD']),
+        float(badtime_df[badtime_df.Orbit == orbit_ix+1]['Start TJD'])
     )
     badtimewindows.append(thistuple)
 # append the mid-sector downlink gaps between orbits 37->38, 39->40, 41->42,
@@ -2005,8 +2008,7 @@ def parallel_bkgd_subtract(fitslist, method='boxblurmedian', isfull=True, k=32,
     elif sectornum in [12,13]:
         orbitgap = 0.5 # days
     else:
-        errmsg = 'need manual orbitgap to be implemented in bkgdsub'
-        raise NotImplementedError(errmsg)
+        orbitgap = 0.5
 
     if isfull and sectornum in [1,2,5,6,7,9,10,11,12,13,14,17]:
         expected_norbits = 2
@@ -2024,9 +2026,11 @@ def parallel_bkgd_subtract(fitslist, method='boxblurmedian', isfull=True, k=32,
             'bkgd estimation assumes given two orbits. {} orbits. Time {}'.
             format(norbits, repr(times))
         )
-        raise AssertionError(outmsg)
+        print(outmsg)
 
     # Do background subtraction for each orbit separately.
+    # NOTE: in a future world, this would include some form of time continuity.
+    # In this case, there's no real need to do it by time-groups.
     for group_ix, group in enumerate(groups):
 
         groupind = np.zeros_like(times)
