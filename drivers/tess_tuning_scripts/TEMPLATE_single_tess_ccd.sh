@@ -48,45 +48,6 @@ skipepd=1
 #########################
 # interpret the options #
 #########################
-# spacecraft configuration map used to produce CAL images.
-if [ "$sector" = 's0001' ] ; then
-  scid=0120
-elif [ "$sector" = 's0002' ] ; then
-  scid=0121
-elif [ "$sector" = 's0003' ] ; then
-  scid=0123
-elif [ "$sector" = 's0004' ] ; then
-  scid=0124
-elif [ "$sector" = 's0005' ] ; then
-  scid=0125
-elif [ "$sector" = 's0006' ] ; then
-  scid=0126
-elif [ "$sector" = 's0007' ] ; then
-  scid=0131
-elif [ "$sector" = 's0008' ] ; then
-  scid=0136
-elif [ "$sector" = 's0009' ] ; then
-  scid=0139
-elif [ "$sector" = 's0010' ] ; then
-  scid=0140
-elif [ "$sector" = 's0011' ] ; then
-  scid=0143
-elif [ "$sector" = 's0012' ] ; then
-  scid=0144
-elif [ "$sector" = 's0013' ] ; then
-  scid=0146
-elif [ "$sector" = 's0014' ] ; then
-  scid=0150
-elif [ "$sector" = 's0015' ] ; then
-  scid=0151
-elif [ "$sector" = 's0016' ] ; then
-  scid=0152
-elif [ "$sector" = 's0017' ] ; then
-  scid=0161
-else
-  echo 'error: need to hard-code in scid for sector s000X'
-  exit 42
-fi
 
 if [ "$binlightcurves" = 1 ] ; then
   binlcoption=binlightcurves
@@ -122,12 +83,12 @@ else
   tunefullstr='FULL'
 fi
 
-LOCAL_IMGBASE="/nfs/phtess2/ar0/TESS/FFI/RED_IMGSUB/"${tunefullstr}
+LOCAL_IMGBASE="/ar1/TESS/FFI/RED_IMGSUB/"${tunefullstr}
 sectordir=$LOCAL_IMGBASE"/"${sector}"/"
 fitsdir=$sectordir"RED_"${camnum}"-"${ccdnum}"-"${projectid}"_ISP/"
-LOCAL_GLOBPATTERN='tess?????????????-'${sector}'-'${camnum}'-'${ccdnum}'-'${scid}'_cal_img_bkgdsub.fits'
+LOCAL_GLOBPATTERN='tess?????????????-'${sector}'-'${camnum}'-'${ccdnum}'-????_cal_img_bkgdsub.fits'
 fitsglob=$LOCAL_GLOBPATTERN
-lcbase="/nfs/phtess2/ar0/TESS/FFI/LC/"${tunefullstr}
+lcbase="/ar1/TESS/FFI/LC/"${tunefullstr}
 lcsector=$lcbase"/"${sector}"/"
 lcdir=${lcsector}"ISP_"${camnum}"-"${ccdnum}"-"${projectid}"/"
 
