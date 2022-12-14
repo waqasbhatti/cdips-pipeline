@@ -1,8 +1,9 @@
 import os
 
-sectors = list(range(14,27)) # [10,11,12,13]
+# cycle 4
+sectors = list(range(40, 56))
 
-startid = 1750
+startid = 4000
 projidtuples = [ (startid+ix*16, startid+(ix+1)*16)  for ix in
                  range(0,len(sectors))  ]
 
@@ -25,9 +26,9 @@ for ix, sector in enumerate(sectors):
             format(projid)
         )
 
-    outname = 'tess_tuning_scripts/sector{}_reduction.sh'.format(sector)
+    outname = f'tess_tuning_scripts/sector{sector}_reduction.sh'
     with open(outname, 'w') as f:
         f.writelines(outlines)
         f.writelines(projidlines)
 
-    print('wrote {}'.format(outname))
+    print(f'wrote {outname}')
