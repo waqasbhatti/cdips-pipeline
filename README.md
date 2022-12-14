@@ -160,6 +160,12 @@ recommended, since it's free.  To install, follow [this
 page](http://astrometry.net/doc/build.html#build). If you're doing wide-field
 work, be sure to get both the 4100 and 4200 indexes.
 
+Note that on debian this requires
+```
+sudo apt-get install libcairo2-dev libnetpbm10-dev netpbm \
+                       libpng-dev libjpeg-dev zlib1g-dev \
+                       libbz2-dev swig libcfitsio-dev
+```
 
 ### 1.5 fitsh and HATpipe dependencies
 
@@ -201,11 +207,16 @@ For linux boxes, see
 by modifying your `/etc/sysctl.conf` file to include things discussed in the
 READMEs from the above links.)
 
-Once you've done this:
+Assuming you are the administrator, you will need to initialize the database
+and server, by logging in as the `postgres` user and running `initdb -D
+<datadir>`, and then `pg_ctl -D <datadir> -l logfile start` or an analogous
+command sequence.
+Once you've done this, create the relevant users and databases while under the
+postgres user:
 ```
 $ psql -U postgres      # login as master user
-postgres=# create user hpx with password 'pwgoeshere' createdb;
-$ createdb -U hpx hpx
+$ postgres=# create user hpx with password 'pwgoeshere';
+$ postgres=# create database hpx owner=hpx;
 ```
 and add the appropriate password and info to your `~/.pgpass` file.
 
