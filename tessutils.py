@@ -411,7 +411,7 @@ def verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.25):
 
 
 def parallel_move_badframes(fitslist,
-                            flagvalues=[-1,4,32,36,2048,2080,2052,2084],
+                            flagvalues=[-1,4,32,36,2052,2080,2084],
                             nworkers=16,
                             maxworkertasks=1000):
     '''
