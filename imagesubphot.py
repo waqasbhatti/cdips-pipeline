@@ -1825,7 +1825,8 @@ def photometry_on_combined_photref(
             )
         )
         if len(astromref_wcs) != 1:
-            raise AssertionError('expected 1 astromref wcs')
+            errmsg = f'expected 1 astromref wcs. got {astromref_wcs}'
+            raise AssertionError(errmsg)
         astromref_wcs = astromref_wcs[0]
 
         shutil.copy(astromref_wcs, photref_frame.replace('.fits','.wcs'))

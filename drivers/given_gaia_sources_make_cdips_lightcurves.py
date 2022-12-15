@@ -53,7 +53,8 @@ from TESS_reduction import main, run_detrending
 #reduc_id = 'Meingast_2021_allstars_20220620'
 #reduc_id = '20220311_Kerr_CepHer_x_DR2_boyle'
 #reduc_id = 'alpha_per_cands_2022068'
-reduc_id = 'heyl_sample_20220728'
+#reduc_id = 'heyl_sample_20220728'
+reduc_id = '200pc_sample_Glt13'
 
 ######################
 # validate arguments #
