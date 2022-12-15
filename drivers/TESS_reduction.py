@@ -236,7 +236,14 @@ def given_fits_list_get_gain_exptime_ra_dec(fits_list):
         ntry_rand_fits += 1
 
     hdu_list = fits.open(rand_fits)
-    hdr = hdu_list[0].header
+    if "GAINA" in hdu_list[0].header:
+        hdr_ix = 0
+    elif "GAINA" in hdu_list[1].header:
+        hdr_ix = 1
+    else:
+        print(f"{rand_fits}: tried to find GAINA and failed.")
+        raise KeyError
+    hdr = hdu_list[hdr_ix].header
 
     ccdgain = hdr['GAINA'] # electrons/count, from CCD output A. (there are four!)
     exptime = int(np.round(hdr['TELAPSE']*24*60*60)) # in seconds, 1800
