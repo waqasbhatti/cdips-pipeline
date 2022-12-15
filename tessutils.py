@@ -2164,8 +2164,7 @@ def plot_median_filter_quad(task):
 
     norm = colors.LogNorm(vmin=vmin, vmax=vmax)
 
-    cset1 = axs[0,1].imshow(cal_img, cmap='binary_r', vmin=vmin, vmax=vmax,
-                            norm=norm)
+    cset1 = axs[0,1].imshow(cal_img, cmap='binary_r', norm=norm)
 
     diff_vmin, diff_vmax = -1000, 1000
 
@@ -2173,13 +2172,11 @@ def plot_median_filter_quad(task):
                                  vmax=diff_vmax)
 
     axs[0,0].imshow(bkgd_img - np.median(cal_img), cmap='RdBu_r',
-                    vmin=diff_vmin, vmax=diff_vmax, norm=diffnorm)
+                    norm=diffnorm)
 
-    cset2 = axs[1,0].imshow(cal_img - bkgd_img, cmap='RdBu_r', vmin=diff_vmin,
-                            vmax=diff_vmax, norm=diffnorm)
+    cset2 = axs[1,0].imshow(cal_img - bkgd_img, cmap='RdBu_r', norm=diffnorm)
 
-    axs[1,1].imshow(cal_img - np.median(cal_img), cmap='RdBu_r',
-                    vmin=diff_vmin, vmax=diff_vmax, norm=diffnorm)
+    axs[1,1].imshow(cal_img - np.median(cal_img), cmap='RdBu_r', norm=diffnorm)
 
     for ax in axs.flatten():
         ax.set_xticklabels('')
