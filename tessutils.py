@@ -121,18 +121,29 @@ badtimewindows = [
     (1667.69004, 1668.61921), # sector 13 downlink, btwn orbits 33->34
     (1696.38865, 1697.33865), # sector 14 downlink, btwn orbits 35->36
 ]
-# and we can append to this automatically using the orbit times from:
-# https://archive.stsci.edu/missions/tess/doc/tess_drn/
-# (downloaded on the date noted below... I've reached out to Roland to see
-# whether we can get an updated version that goes past Sector 42)
+# append to this automatically using the known orbit times (downloaded on the
+# date noted below.  Ask Roland if going beyond).
 from paths import DATADIR
 badtime_df = pd.read_csv(
-    os.path.join(DATADIR, '20221214_tess_orbit_times_by_sector.csv'),
+    os.path.join(DATADIR, '20221215_tess_orbit_times_by_sector.csv'),
     comment='#'
 )
-#FIXME: double-check whether sector 42, 43, 44, 45, 46 will need special logic
-#since they are on the ecliptic.  i do not think they will, because it was still
-#two orbits per field during that time.
+
+if "Start TJD" not in badtime_df:
+    # Convert from UTC times available at
+    # https://tess.mit.edu/public/files/orbit_times.csv to TESS julian date
+    # (TJD).  This conversion is good to <0.5 seconds, based on a comparison
+    # against https://archive.stsci.edu/missions/tess/doc/tess_drn/
+    from astroy.time import Time
+    _t0 = np.array(df['Start of Orbit'])
+    _t1 = np.array(df['End of Orbit'])
+    t0 = Time(_t0.astype(str), format='iso', scale='utc')
+    t1 = Time(_t1.astype(str), format='iso', scale='utc')
+    t0_tjd = t0.jd -  2457000 + (69.1817 / (24*60*60))
+    t1_tjd = t1.jd -  2457000 + (69.1817 / (24*60*60))
+    df['Start TJD'] = t0_tjd
+    df['End TJD'] = t1_tjd
+
 for orbit_ix in range(37, 91, 2):
     thistuple = (
         float(badtime_df[badtime_df.Orbit == orbit_ix]['End TJD']),
