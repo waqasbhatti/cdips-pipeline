@@ -1868,7 +1868,7 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
                                          nworkers=nworkers)
 
         # append CCD temperature information to headers
-        engdatadir = os.path.join(LOCAL_IMGBASE, 'ENGINEERING')
+        engdatadir = os.path.join(sv.LOCAL_IMGBASE, 'ENGINEERING')
         temperaturepklpath = os.path.join(
             engdatadir,
             'sector{:s}_ccd_temperature_timeseries.pickle'.

@@ -1737,7 +1737,8 @@ def apply_barycenter_time_correction(fitsilcfile):
             print('{}Z: ERR! got {} in TMID_BJD write to {}. mv -> graveyard.'.
                   format(datetime.utcnow().isoformat(), repr(e), fitsilcfile)
             )
-            graveyarddir = "/nfs/phtess1/ar1/TESS/FFI/GRAVEYARD"
+            graveyarddir = os.path.join(sv.LOCAL_IMGBASE, "GRAVEYARD")
+            if not os.path.exists(graveyarddir): os.mkdir(graveyarddir)
             shutil.move(fitsilcfile,
                         os.path.join(graveyarddir,
                                      os.path.basename(fitsilcfile)))

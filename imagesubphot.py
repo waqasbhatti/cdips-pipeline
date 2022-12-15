@@ -2045,7 +2045,7 @@ def photometry_on_combined_photref(
                 return None
 
             origpath = os.path.join(
-                '/nfs/phtess2/ar0/TESS/FFI/BASE/reference-frames',
+                sv.LOCAL_IMGBASE, 'BASE', 'reference-frames',
                 os.path.basename(photref_sourcelist)
             )
             bar = read_object_reformed_catalog(

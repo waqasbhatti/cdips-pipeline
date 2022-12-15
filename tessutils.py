@@ -134,15 +134,15 @@ if "Start TJD" not in badtime_df:
     # https://tess.mit.edu/public/files/orbit_times.csv to TESS julian date
     # (TJD).  This conversion is good to <0.5 seconds, based on a comparison
     # against https://archive.stsci.edu/missions/tess/doc/tess_drn/
-    from astroy.time import Time
-    _t0 = np.array(df['Start of Orbit'])
-    _t1 = np.array(df['End of Orbit'])
+    from astropy.time import Time
+    _t0 = np.array(badtime_df['Start of Orbit'])
+    _t1 = np.array(badtime_df['End of Orbit'])
     t0 = Time(_t0.astype(str), format='iso', scale='utc')
     t1 = Time(_t1.astype(str), format='iso', scale='utc')
     t0_tjd = t0.jd -  2457000 + (69.1817 / (24*60*60))
     t1_tjd = t1.jd -  2457000 + (69.1817 / (24*60*60))
-    df['Start TJD'] = t0_tjd
-    df['End TJD'] = t1_tjd
+    badtime_df['Start TJD'] = t0_tjd
+    badtime_df['End TJD'] = t1_tjd
 
 for orbit_ix in range(37, 91, 2):
     thistuple = (
@@ -930,8 +930,8 @@ def make_cluster_cutout_jpgs(sectornum, fitsdir, racenter, deccenter, field,
     """
 
     calimgdir = (
-        '/nfs/phtess2/ar0/TESS/FFI/RED/sector-{:d}/cam{:d}_ccd{:d}/'.
-        format(int(str(field[1:]).lstrip('0')), camera, ccd)
+        os.path.join(sv.LOCAL_IMGBASE, 'RED', 'sector-{:d}/cam{:d}_ccd{:d}/'.
+        format(int(str(field[1:]).lstrip('0')), camera, ccd))
     )
 
     calimgfiles = glob(os.path.join(calimgdir, 'tess*cal_img.fits'))
@@ -1450,7 +1450,7 @@ def explore_ccd_temperature_timeseries():
         Instrument Handbook, Appendix A.5 Engineering Data).
     """
 
-    engdatadir = '/nfs/phtess1/ar1/TESS/FFI/ENGINEERING/'
+    engdatadir = os.path.join(sv.LOCAL_IMGBASE, 'ENGINEERING')
     s01_first = 'tess2018331094053_sector01-eng.fits'
     s01_second = 'tess2018323111417_sector01-eng.fits'
     s02 = 'tess2018330083923_sector02-eng.fits'
@@ -1636,7 +1636,7 @@ def make_ccd_temperature_timeseries_pickle(sectornum):
         each of which contains a dictionary of time and temperature.
     """
 
-    engdatadir = '/nfs/phtess1/ar1/TESS/FFI/ENGINEERING/'
+    engdatadir = os.path.join(sv.LOCAL_IMGBASE, 'ENGINEERING')
     if sectornum==1:
         # identical to the other one on mast. LGB tested this in
         # explore_ccd_temperature_timeseries
@@ -2264,8 +2264,9 @@ def read_object_catalog(catalogfile):
 
 def merge_object_catalog_vs_cdips(
     in_reformed_cat_file, out_reformed_cat_file,
-    cdips_cat_file=('/nfs/phtess1/ar1/TESS/PROJ/lbouma/'
-                    'cdips_targets_v0.6_gaiasources_Rplt16_orclose.csv'),
+    cdips_cat_file=(os.path.join(
+        sv.CATPATH, 'cdips_targets_v0.6_gaiasources_Rplt16_orclose.csv')
+    ),
     G_Rp_cut=14):
     """
     the CDIPS project defines a cluster star sample for which we should make

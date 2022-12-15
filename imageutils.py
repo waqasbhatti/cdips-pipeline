@@ -1678,12 +1678,12 @@ def plot_stages_of_img_proc_sector_cam_ccd(
     if not os.path.exists(outdir):
         raise ValueError('did not find {}'.format(outdir))
 
-    datadir = (
-        '/nfs/phtess2/ar0/TESS/FFI/RED/sector-{}/cam{}_ccd{}/'.
-        format(sector, cam, ccd)
+    datadir = os.path.join(
+       sv.LOCAL_IMGBASE, 'RED',
+       'sector-{}/cam{}_ccd{}/'.format(sector, cam, ccd)
     )
-    diffdir = (
-        '/nfs/phtess2/ar0/TESS/FFI/RED_IMGSUB/FULL/s{}/RED_{}-{}-{}_ISP'.
+    diffdir = os.path.join(
+        sv.LOCAL_IMGBASE, 'RED_IMGSUB/FULL/s{}/RED_{}-{}-{}_ISP'.
         format(str(sector).zfill(4), cam, ccd, projid)
     )
 
