@@ -2948,12 +2948,18 @@ def dump_lightcurves_with_grcollect(photfileglob, lcdir, maxmemory,
                 # available timestamps (and the sign convention for how the
                 # correction is applied -- is it added, or subtracted? -- has
                 # been confirmed via private comm. with Jon Jenkins)
+                ext = 0
+                _test = get_header_keyword(
+                    originalframe, 'DATE-OBS', ext=ext)
+                if _test is None:
+                    ext = 1
+
                 tstart_bjd_utc_str = get_header_keyword(
-                    originalframe, 'DATE-OBS')
+                    originalframe, 'DATE-OBS', ext=ext)
                 tstop_bjd_utc_str = get_header_keyword(
-                    originalframe, 'DATE-END')
+                    originalframe, 'DATE-END', ext=ext)
                 ltt_barycenter_spoc = get_header_keyword(
-                    originalframe, 'BARYCORR')
+                    originalframe, 'BARYCORR', ext=ext)
 
                 # record the midtime in JD_UTC with grcollect. barycentric
                 # correction comes later. (once ra/dec are accessible).
