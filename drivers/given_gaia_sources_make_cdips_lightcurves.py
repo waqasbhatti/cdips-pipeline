@@ -691,13 +691,14 @@ for ix, projid in enumerate(uprojids):
 
             projid = iu.get_header_keyword(lcpaths[0], 'PROJID')
 
-            eigveclist, n_comp_df = dtr.prepare_pca(
+            eigveclist, smooth_eigveclist, n_comp_df = dtr.prepare_pca(
                 cam, ccd, sector, projid
             )
 
             rlm.reformat_headers(lcpaths, camccddir, sector,
                                  cdipsvnum, OC_MG_CAT_ver,
                                  eigveclist=eigveclist,
+                                 smooth_eigveclist=smooth_eigveclist,
                                  n_comp_df=n_comp_df)
 
         else:
