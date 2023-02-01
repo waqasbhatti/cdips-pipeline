@@ -2114,7 +2114,7 @@ def plot_apertures_on_frame(fitsframe, photrefprojcat, xlim=None, ylim=None):
 
     img[img<0] = 0.01
 
-    cset = ax.imshow(img, cmap='binary_r', vmin=vmin, vmax=vmax, norm=norm)
+    cset = ax.imshow(img, cmap='binary_r', norm=norm)
 
     # -1 total because image origin
     ax.scatter(df['x_proj']-.5, df['y_proj']-.5, s=6, facecolors='none',
