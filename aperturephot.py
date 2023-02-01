@@ -1983,7 +1983,7 @@ def run_fiphot(fits,
         print('%sZ: fiphot failed for %s: error was %s' %
               (datetime.utcnow().isoformat(),
                fits,
-               fitphot_stderr))
+               fiphot_stderr))
         return None
 
 

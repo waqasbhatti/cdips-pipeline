@@ -229,7 +229,7 @@ To create the tables, run the following:
   ```
   psql$  \i photometry.sql
   psql$  \i xtrnsconvsub.sql
-  psql$  \i imagesub-refino.sql
+  psql$  \i ismphot-database.sql
   ```
 
 Beware that these also remove any information you already had in them. The
