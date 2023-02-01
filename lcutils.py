@@ -935,7 +935,7 @@ def make_ascii_files_for_vartools(lcfiles, templatefiles, statsdir, fitsdir,
 
 # should work with public vartools version
 tfablslskillharmcmd = (
-    '/home/jhartman/SVN/HATpipe/bin/vartools -l {lc_list_tfa} -matchstringid '
+    'vartools -l {lc_list_tfa} -matchstringid '
     ' -inputlcformat BGE:BGE:double,BGV:BGV:double,FDV:FDV:double,'
     'FKV:FKV:double,FSV:FSV:double,IFE1:IFE1:double,IFE2:IFE2:double,'
     'IFE3:IFE3:double,IFL1:IFL1:double,IFL2:IFL2:double,IFL3:IFL3:double,'
@@ -999,7 +999,7 @@ tfablslskillharmcmd = (
 
 
 tfaonlycmd = (
-    '/home/jhartman/SVN/HATpipe/bin/vartools -l {lc_list_tfa} -matchstringid '
+    'vartools -l {lc_list_tfa} -matchstringid '
     ' -inputlcformat BGE:BGE:double,BGV:BGV:double,FDV:FDV:double,'
     'FKV:FKV:double,FSV:FSV:double,IFE1:IFE1:double,IFE2:IFE2:double,'
     'IFE3:IFE3:double,IFL1:IFL1:double,IFL2:IFL2:double,IFL3:IFL3:double,'
@@ -1031,7 +1031,7 @@ tfaonlycmd = (
 
 
 tfafromirmcmd = (
-    '/home/jhartman/SVN/HATpipe/bin/vartools -l {lc_list_tfa} -matchstringid '
+    'vartools -l {lc_list_tfa} -matchstringid '
     ' -inputlcformat BGE:BGE:double,BGV:BGV:double,FDV:FDV:double,'
     'FKV:FKV:double,FSV:FSV:double,IFE1:IFE1:double,IFE2:IFE2:double,'
     'IFE3:IFE3:double,IFL1:IFL1:double,IFL2:IFL2:double,IFL3:IFL3:double,'
@@ -1061,7 +1061,7 @@ tfafromirmcmd = (
 )
 
 inittfafromirmcmd = (
-    '/home/jhartman/SVN/HATpipe/bin/vartools -l {init_lc_list_tfa} -matchstringid '
+    'vartools -l {init_lc_list_tfa} -matchstringid '
     ' -inputlcformat BGE:BGE:double,BGV:BGV:double,FDV:FDV:double,'
     'FKV:FKV:double,FSV:FSV:double,IFE1:IFE1:double,IFE2:IFE2:double,'
     'IFE3:IFE3:double,IFL1:IFL1:double,IFL2:IFL2:double,IFL3:IFL3:double,'
