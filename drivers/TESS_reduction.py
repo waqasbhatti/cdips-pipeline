@@ -338,6 +338,7 @@ def is_presubtraction_complete(outdir, fitsglob, lcdir, RED_dir,
 
     statsdir = lcdir+'stats_files'
     N_statsfiles_products = len(glob(statsdir+"*"))
+
     if N_statsfiles_products > 1:
         print('found stats_files product. skipping to detrending.')
         return True
@@ -921,67 +922,88 @@ def get_files_needed_before_image_subtraction(
 
         if defaultwcsisspoc:
 
-            fitslist = glob(os.path.join(fitsdir,fnamestr))
-            for f in fitslist:
-                wcsqa.write_wcs_from_spoc(f, observatory='tess',
-                                          assert_ctype_intact=True)
+            # check if WCS processing already done.  if so, skip.
+            N_fitsfiles = len(glob(os.path.join(outdir,fitsglob)))
+            N_fistarfiles = len(glob(outdir+fitsglob.replace('.fits','.fistar')))
+            N_wcsfiles = len(glob(outdir+fitsglob.replace('.fits','.wcs')))
+            N_projcatalog = len(glob(outdir+fitsglob.replace('.fits','.projcatalog')))
+            N_files = [N_fitsfiles, N_fistarfiles, N_wcsfiles, N_projcatalog]
 
-            # in writing the WCSs, some files may have been moved to badframes.
-            fitslist = glob(os.path.join(fitsdir,fnamestr))
-            wcslist = [f.replace('.fits','.wcs') for f in fitslist]
-            fistarlist = [f.replace('.fits','.fistar') for f in fitslist]
+            pct_required = 1
 
-            skip = 100 # check every 100th object
-
-            framecoord = SkyCoord(
-                ra=ra_nom, dec=dec_nom, unit=(units.degree, units.degree),
-                frame='icrs'
+            is_wcs_complete = np.all(
+                100 * (np.abs(np.diff(N_files)) / N_files[0]) < pct_required
             )
 
-            frame_galacticlatitude = framecoord.galactic.b.value
+            if not is_wcs_complete:
 
-            if abs(frame_galacticlatitude) < 10:
-                # allow worse wcs outliers if frame center within 10 deg of
-                # galactic plane
-                qualitycondition = {'median_px':0.2,
-                                    '90th_px':0.7,
-                                    'std_px':2.3 }
-            else:
-                qualitycondition = {'median_px':0.2,
-                                    '90th_px':0.5,
-                                    'std_px': 1.7}
+                fitslist = glob(os.path.join(fitsdir,fnamestr))
+                for f in fitslist:
+                    wcsqa.write_wcs_from_spoc(f, observatory='tess',
+                                              assert_ctype_intact=True)
 
-            for w,f,s in zip(wcslist[::skip],fitslist[::skip],fistarlist[::skip]):
+                # in writing the WCSs, some files may have been moved to badframes.
+                fitslist = glob(os.path.join(fitsdir,fnamestr))
+                wcslist = [f.replace('.fits','.wcs') for f in fitslist]
+                fistarlist = [f.replace('.fits','.fistar') for f in fitslist]
 
-                if wcsqa.does_wcs_pass_quality_check(
-                    w, f, reformed_cat_file, isspocwcs=True, N_bright=1000,
-                    N_faint=9000, fistarpath=s, matchedoutpath=None,
-                    qualitycondition=qualitycondition
-                ):
-                    print('{} passed WCS quality check'.format(w))
+                skip = 100 # check every 100th object
 
+                framecoord = SkyCoord(
+                    ra=ra_nom, dec=dec_nom, unit=(units.degree, units.degree),
+                    frame='icrs'
+                )
+
+                frame_galacticlatitude = framecoord.galactic.b.value
+
+                if abs(frame_galacticlatitude) < 10:
+                    # allow worse wcs outliers if frame center within 10 deg of
+                    # galactic plane
+                    qualitycondition = {'median_px':0.2,
+                                        '90th_px':0.7,
+                                        'std_px':2.3 }
                 else:
+                    qualitycondition = {'median_px':0.2,
+                                        '90th_px':0.5,
+                                        'std_px': 1.7}
 
-                    # weaker check for heavily background contaminated frames.
-                    if wcsqa.does_wcs_pass_bkgd_corrected_quality_check(
+                for w,f,s in zip(wcslist[::skip],fitslist[::skip],fistarlist[::skip]):
+
+                    if wcsqa.does_wcs_pass_quality_check(
                         w, f, reformed_cat_file, isspocwcs=True, N_bright=1000,
                         N_faint=9000, fistarpath=s, matchedoutpath=None,
-                        qualitycondition={'median_px':0.2, '90th_px':0.8,
-                                          'std_px': 3}
+                        qualitycondition=qualitycondition
                     ):
-
-                        pass
+                        print('{} passed WCS quality check'.format(w))
 
                     else:
-                        errmsg = (
-                            'ERR! WCS fails quality check '+
-                            'wcs, fits, fistar are {}, {}, {}'.format(w,f,s)
-                        )
-                        print(errmsg)
-                        if raise_wcs_error:
-                            # NOTE : might need to derive the WCS yourself, using a
-                            # parallel_astrometrydotnet call as below...
-                            raise AssertionError(errmsg)
+
+                        # weaker check for heavily background contaminated frames.
+                        if wcsqa.does_wcs_pass_bkgd_corrected_quality_check(
+                            w, f, reformed_cat_file, isspocwcs=True, N_bright=1000,
+                            N_faint=9000, fistarpath=s, matchedoutpath=None,
+                            qualitycondition={'median_px':0.2, '90th_px':0.8,
+                                              'std_px': 3}
+                        ):
+
+                            pass
+
+                        else:
+                            errmsg = (
+                                'ERR! WCS fails quality check '+
+                                'wcs, fits, fistar are {}, {}, {}'.format(w,f,s)
+                            )
+                            print(errmsg)
+                            if raise_wcs_error:
+                                # NOTE : might need to derive the WCS yourself, using a
+                                # parallel_astrometrydotnet call as below...
+                                raise AssertionError(errmsg)
+
+            else:
+                print(42*'-')
+                print("Found WCS had previously been run and completed. "
+                      "Skipping.")
+                print(42*'-')
 
         else:
 
@@ -1957,6 +1979,10 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
     else:
         print('found fistar, fiphot, and wcs files. proceeding to image '
               'subtraction.')
+
+    assert is_presubtraction_complete(
+        outdir, fitsglob, lcdirectory, outdir, extractsources=extractsources
+    )
 
     if not initial_wcs_worked_well_enough(outdir, fitsglob):
         raise AssertionError('if initial wcs failed on majority of frames, '
