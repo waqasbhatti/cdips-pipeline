@@ -2,7 +2,6 @@
 
 #
 # PURPOSE: USE WITH CAUTION.
-# NOTE: PATHS HERE ARE CALIBRATED ON THE PHTESS SYSTEMS
 #
 # remove post-presubtraction files:
 #   (XTRNS, .itrans, .xysdk, astromref, rsub*, subtractedconv)
@@ -14,10 +13,10 @@
 #
 
 removeall=false # true # if true, removes all "REDUCED" files. else, only post-presubtraction files
-camnum=4
+camnum=1
 ccdnum=1
-projectid=1678
-sector='s0002'
+projectid=4000
+sector='s0040'
 tuneparameters=false
 
 ##########################################
@@ -30,12 +29,12 @@ else
 fi
 
 # get paths
-LOCAL_IMGBASE="/nfs/phtess2/ar0/TESS/FFI/RED_IMGSUB/"${tunefullstr}
+LOCAL_IMGBASE="/ar1/TESS/FFI/RED_IMGSUB/"${tunefullstr}
 sectordir=$LOCAL_IMGBASE"/"${sector}"/"
 fitsdir=$sectordir"RED_"${camnum}"-"${ccdnum}"-"${projectid}"_ISP/"
 LOCAL_GLOBPATTERN='tess?????????????-'${sector}'-'${camnum}'-'${ccdnum}'-'${scid}'_cal_img_bkgdsub.fits'
 fitsglob=$LOCAL_GLOBPATTERN
-lcbase="/nfs/phtess2/ar0/TESS/FFI/LC/"${tunefullstr}
+lcbase="/ar1/TESS/FFI/LC/"${tunefullstr}
 lcsector=$lcbase"/"${sector}"/"
 lcdir=${lcsector}"ISP_"${camnum}"-"${ccdnum}"-"${projectid}"/"
 lcdirold=${lcsector}"ISP_"${camnum}"-"${ccdnum}"-"${projectid}"_old/"
@@ -64,11 +63,11 @@ rm -rf ${lcdirold}
 
 # note: both globs below are needed...
 echo "removing all reference files"
-rm /nfs/phtess2/ar0/TESS/FFI/BASE/reference-frames/*proj${projectid}-camera${camnum}-ccd${ccdnum}*
-rm /nfs/phtess2/ar0/TESS/FFI/BASE/reference-frames/*proj${projectid}-${sector}-cam${camnum}-ccd${ccdnum}*
+rm /ar1/TESS/FFI/BASE/reference-frames/*proj${projectid}-camera${camnum}-ccd${ccdnum}*
+rm /ar1/TESS/FFI/BASE/reference-frames/*proj${projectid}-${sector}-cam${camnum}-ccd${ccdnum}*
 
 # remove frameinfo cache directory
-fname=`find /nfs/phtess2/ar0/TESS/FFI/BASE/frameinfo-cache/*/*${sector}-${camnum}-${ccdnum}-${scid}*jpg | head -n1`
+fname=`find /ar1/TESS/FFI/BASE/frameinfo-cache/*/*${sector}-${camnum}-${ccdnum}-${scid}*jpg | head -n1`
 dname=`dirname $fname`
 
 echo "removing frameinfo cache dir for "${fname}
@@ -78,16 +77,16 @@ rm -rf $dname
 # clean postgres db. regex reference:
 # https://www.postgresql.org/docs/9.5/static/functions-matching.html
 
-psql -U hpx -h xphtess1 hpx -c \
+psql -U hpx hpx -c \
   "delete from astromrefs where projectid = "${projectid}" and camera = "${camnum}" and ccd = "${ccdnum}";"
 
-psql -U hpx -h xphtess1 hpx -c \
+psql -U hpx hpx -c \
   "delete from photrefs where projectid = "${projectid}" and camera = "${camnum}" and ccd = "${ccdnum}";"
 
-psql -U hpx -h xphtess1 hpx -c \
+psql -U hpx hpx -c \
   "DELETE from calibratedframes where fits like '"${fitsdir}"%';"
 
-psql -U hpx -h xphtess1 hpx -c \
+psql -U hpx hpx -c \
   "DELETE from calibratedframes where (fitsheader->'PROJID' ='"${projectid}"');"
 
 
