@@ -1665,13 +1665,15 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
     lcs.plot_tfa_templates(tfa_templates_path, outdir)
 
     # plot some lightcurves and their ACFs
-    pickledir = os.path.join(statsdir, 'acf_stats')
-    plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=10,
-                                     skipepd=skipepd)
+    plot_ACFS = False
+    if plot_ACFS:
+        pickledir = os.path.join(statsdir, 'acf_stats')
+        plot_random_lightcurves_and_ACFs(statsdir, pickledir, n_desired=10,
+                                         skipepd=skipepd)
 
-    lcs.acf_percentiles_stats_and_plots(statsdir, outprefix, make_plot=True,
-                                        percentiles=[25,50,75],
-                                        skipepd=skipepd)
+        lcs.acf_percentiles_stats_and_plots(statsdir, outprefix, make_plot=True,
+                                            percentiles=[25,50,75],
+                                            skipepd=skipepd)
 
     # check if image noise is gaussian
     if False:
@@ -1732,6 +1734,8 @@ def assess_run(statsdir, lcdirectory, starttime, outprefix, fitsdir, projectid,
     summarypath = os.path.join(statsdir,'run_summary.csv')
     summarydf.to_csv(summarypath, index=False)
     print('wrote {}'.format(summarypath))
+
+    print(f'🎉 finished projid-{projectid} {field} cam-{camera} ccd-{ccd}')
 
 
 def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,

@@ -37,3 +37,4 @@ drivers/mv*py
 drivers/verification*
 drivers/targetlists/
 tests/logs*
+*secret*
