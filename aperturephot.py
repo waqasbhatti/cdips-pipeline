@@ -7449,18 +7449,18 @@ def plot_stats_file(statsfile, outdir, outprefix,
                 plt.scatter(xcol, ycol,
                             s=1,
                             marker='.')
-                plt.yscale('log',basey=10.0)
+                plt.yscale('log')
             elif logx:
                 plt.scatter(xcol, ycol,
                             s=1,
                             marker='.')
-                plt.xscale('log',basex=10.0)
+                plt.xscale('log')
             elif logx and logy:
                 plt.scatter(xcol, ycol,
                             s=1,
                             marker='.')
-                plt.xscale('log',basex=10.0)
-                plt.yscale('log',basey=10.0)
+                plt.xscale('log')
+                plt.yscale('log')
             else:
                 plt.scatter(xcol, ycol,
                             s=1,
