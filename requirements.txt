@@ -102,7 +102,7 @@ Unidecode==1.0.22
 urllib3==1.26.5
 wcwidth==0.1.7
 webencodings==0.5.1
-Werkzeug==0.15.5
+Werkzeug==2.2.3
 WTForms==2.2
 zope.deprecation==4.3.0
 
