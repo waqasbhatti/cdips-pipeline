@@ -601,10 +601,10 @@ def from_CAL_to_fitsh_compatible(task):
 
     try:
         data, hdr = iu.read_fits(fitsname, ext=1)
-    except TypeError as e:
+    except (TypeError, OSError) as e:
         print(e)
         print('got read error for {}'.format(fitsname))
-        raise TypeError
+        raise Exception
 
     # FITS header is 1-based counting, but python is 0-based. To convert
     # from FITS->python from slicing you need to subtract 1.
