@@ -54,7 +54,10 @@ from TESS_reduction import main, run_detrending
 #reduc_id = '20220311_Kerr_CepHer_x_DR2_boyle'
 #reduc_id = 'alpha_per_cands_2022068'
 #reduc_id = 'heyl_sample_20220728'
-reduc_id = '200pc_sample_Glt13'
+#reduc_id = '200pc_sample_Glt13'
+#reduc_id = 'lizhou_blanco1_controlsample'
+#reduc_id = 'lizhou_blanco1_controlsample_20230324'
+reduc_id = 'lizhou_20230406_gaia_control_sample_selected_parallax_limited_pm_excluded'
 
 ######################
 # validate arguments #
@@ -418,10 +421,11 @@ if not os.path.exists(outcsvpath):
                 shutil.copy(src, dst)
                 print(f'Copy {src} -> {dst}')
 
+            # should have cmrawphot, fiphot, and rawphot on the combinedphotref
             photpaths = glob( os.path.join(
                 refdir, f'*proj{projid}-{field}-cam{cam}-ccd{ccd}*.*phot'
             ))
-            assert len(photpaths) == 3
+            assert len(photpaths) == 3, f"Got {len(photpaths)} photpaths..."
             for photpath in photpaths:
                 src = photpath
                 ext = os.path.basename(photpath).split('.')[-1]
@@ -581,7 +585,14 @@ print(f'Found {outcsvpath}')
 
 newlcpaths = []
 hasmatches = []
+N_iters = len(sdf)
+
 for ix, r in sdf.iterrows():
+
+    if ix % 1000 == 0:
+        _t = datetime.utcnow().isoformat()
+        print(f"{_t}: lcpath existence check {ix}/{N_iters}...")
+
     source_id = str(r['dr2_source_id'])
     sector = int(r['sector'])
     cam = int((r['cam']))
@@ -605,7 +616,7 @@ odf = deepcopy(sdf)
 odf['internallcpath'] = newlcpaths
 odf['hasinternalmatch'] = hasmatches
 
-gdf = gaia2read_given_df(odf, outdirbase)
+gdf = gaia2read_given_df(odf, outdirbase, cache_id=reduc_id)
 
 assert len(odf) == len(gdf)
 
@@ -699,7 +710,7 @@ for ix, projid in enumerate(uprojids):
                                  cdipsvnum, OC_MG_CAT_ver,
                                  eigveclist=eigveclist,
                                  smooth_eigveclist=smooth_eigveclist,
-                                 n_comp_df=n_comp_df)
+                                 n_comp_df=n_comp_df, skiptfa=True)
 
         else:
             print(f'WRN! No light curves made for '
