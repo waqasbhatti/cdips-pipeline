@@ -306,31 +306,52 @@ def convert_grcollect_to_fits_lc_worker(task, **kwargs):
         ccdtemp = nparr(temperaturedf['ccdtemp'])[inds]
         ntemps = nparr(temperaturedf['ntemps'])[inds]
 
-        # Sort the temperature timeseries to be in the same order as
-        # the lightcurve, using the framekeys. Requires a double argsort, for
-        # example:
-        #
-        # a = array([4, 2, 5, 6])
-        # b = array([5, 2, 6, 4])
-        # b.argsort()[a.argsort()] # array([3, 1, 0, 2])
-        #
-        # where we're matching b to the array a.
-        try:
-            matchsortinds = tdfframekeys.argsort()[lcd['rstfc'].argsort()]
-        except IndexError as e:
-            print(f'ERROR! {e}')
-            print(f'Task was {task}')
-            print(f'lcdir {lcdir}, fitsdir {fitsdir}, projectid {projectid}')
-            return 0
+        if len(ntemps) < len(lcd['rstfc']):
+            # One possible reason for this scenario (the number of temperatures
+            # is less than the needed number of RSTFC identifiers) is that if
+            # you are using the "updated" SPOC bulk FFIs, then their file names
+            # may not match the engineering file names.  (See email threads
+            # between LGB and MAST folks ~April2023).  In this case, skip
+            # temperature bookkeeping but raise a warning.
+            print('WARNING!  Engineering temperature RSTFC file names do not '
+                  'match FFI file names.  This is because the SPOC '
+                  'rereduced the FFIs and assigned new timestamps, changing '
+                  'the RSTFC keys.  You need to remove and regenerate the '
+                  'relevant CSV files from files analogous to e.g. '
+                  '/nfs/phtess1/ar1/TESS/FFI/ENGINEERING/s0002-3-3-0121_key_temperature_count.csv'
+            )
+            ccdtemp = np.zeros(len(lcd['rstfc']))
+            ntemps = np.zeros(len(lcd['rstfc']))
 
-        tdfframekeys = tdfframekeys[matchsortinds]
-        ccdtemp = ccdtemp[matchsortinds]
-        ntemps = ntemps[matchsortinds]
+        else:
+            # Sort the temperature timeseries to be in the same order as
+            # the lightcurve, using the framekeys. Requires a double argsort, for
+            # example:
+            #
+            # a = array([4, 2, 5, 6])
+            # b = array([5, 2, 6, 4])
+            # b.argsort()[a.argsort()] # array([3, 1, 0, 2])
+            #
+            # where we're matching b to the array a.
+            try:
+                matchsortinds = tdfframekeys.argsort()[lcd['rstfc'].argsort()]
+            except IndexError as e:
 
-        np.testing.assert_array_equal(
-            tdfframekeys, lcd['rstfc'],
-            err_msg='got tdfframekeys != lcd keys. bad temperature sort?'
-        )
+                print(f'ERROR! {e}')
+                print(f'Task was {task}')
+                print(f'lcdir {lcdir}, fitsdir {fitsdir}, projectid {projectid}')
+
+
+                return 0
+
+            tdfframekeys = tdfframekeys[matchsortinds]
+            ccdtemp = ccdtemp[matchsortinds]
+            ntemps = ntemps[matchsortinds]
+
+            np.testing.assert_array_equal(
+                tdfframekeys, lcd['rstfc'],
+                err_msg='got tdfframekeys != lcd keys. bad temperature sort?'
+            )
 
         fitscollist.append(
             fits.Column(name='CCDTEMP', format='D', array=ccdtemp)
