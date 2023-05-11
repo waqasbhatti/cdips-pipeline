@@ -1290,7 +1290,7 @@ def round_two_tfa_selection(cand_template_lcpaths, apnum,
                             trendlisttfa_path,
                             max_fap=0.001,
                             period_max=10.5,
-                            n_min_tfa_templates=120,
+                            n_min_tfa_templates=20,
                             n_desired_tfa_templates=200):
     """
     given a list of candidate TFA template star LC paths, with initial TFA
@@ -1298,7 +1298,7 @@ def round_two_tfa_selection(cand_template_lcpaths, apnum,
     eta-normal indices, and their LS FAPs.
 
     sort it. make raw/dtr/bkgd plots to verify the sort is sensible. then cut
-    the lists down to ~200 template stars.
+    the lists down to n_min_tfa_templates template stars.
 
     args:
 

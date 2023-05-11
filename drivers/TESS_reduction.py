@@ -1473,7 +1473,7 @@ def run_detrending(epdstatfile, tfastatfile, vartoolstfastatfile, lcdirectory,
                                         apnum,
                                         lcdirectory,
                                         trendlisttfa_paths[ix],
-                                        n_min_tfa_templates=120,
+                                        n_min_tfa_templates=20,
                                         n_desired_tfa_templates=200)
 
         lcu.run_tfa(tfalclist_path, trendlisttfa_paths, datestfa_path,
