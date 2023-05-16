@@ -464,7 +464,7 @@ def write_wcs_from_spoc(infilename, outfilename=None, observatory='tess',
     # Use header to create a new PrimaryHDU and write it to a file.
     hdu = fits.PrimaryHDU(header=header)
 
-    hdu.writeto(wcspath)
+    hdu.writeto(wcspath, output_verify='silentfix+ignore')
     print('made {} from SPOC header'.format(wcspath))
 
     hdulist.close()
