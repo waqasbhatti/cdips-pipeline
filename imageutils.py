@@ -849,7 +849,7 @@ def stamps_to_jpeg(image_stamps,
                             np.array([255.0]*(midrow_xsize*3 + sepwidth*2)),
                             bottomrow_stamp))
 
-    imageio.imwrite(out_fname,full_stamp)
+    imageio.imwrite(out_fname,full_stamp.astype(np.uint8))
     return full_stamp
 
 
@@ -945,7 +945,7 @@ def fits_to_full_jpeg(fits_image,
             hdr['OBJECT'] if 'OBJECT' in hdr else 'objectunknown'
             )
 
-    imageio.imwrite(out_fname,resized_img)
+    imageio.imwrite(out_fname,resized_img.astype(np.uint8))
 
     # recolor the saved image if told to do so
     if colorscheme:
@@ -1237,7 +1237,7 @@ def frame_radecbox_to_jpeg(
     if flip:
         scaled_img = np.flipud(scaled_img)
 
-    imageio.imwrite(out_fname, scaled_img)
+    imageio.imwrite(out_fname, scaled_img.astype(np.uint8))
 
     if colorscheme:
         cm = mplcm.get_cmap(colorscheme)
@@ -1434,7 +1434,7 @@ def fitscoords_to_jpeg(fits_image,
     if flip:
         scaled_img = np.flipud(scaled_img)
 
-    imageio.imwrite(out_fname, scaled_img)
+    imageio.imwrite(out_fname, scaled_img.astype(np.uint8))
 
     # annotate the image if told to do so
     if annotatejd and jdsrc and os.path.exists(jdsrc):
@@ -1476,7 +1476,7 @@ def nparr_to_full_jpeg(nparr,
                                       (outsizex,outsizey))
     if out_fname is None:
         out_fname = fits_image + '.jpeg'
-    imageio.imwrite(out_fname,resized_img)
+    imageio.imwrite(out_fname,resized_img.astype(np.uint8))
 
 
 
