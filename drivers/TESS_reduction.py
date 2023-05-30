@@ -235,6 +235,7 @@ def given_fits_list_get_gain_exptime_ra_dec(fits_list):
             raise AssertionError('Cannot find a random fits to extract header info after moving the badframes')
         ntry_rand_fits += 1
 
+    print(f"Getting gain and CRVALs from {rand_fits}...")
     hdu_list = fits.open(rand_fits)
     if "GAINA" in hdu_list[0].header:
         hdr_ix = 0
@@ -1753,7 +1754,9 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
          extractsources=True, binlightcurves=False, get_masks=1,
          tfa_template_sigclip=5.0, tfa_epdlc_sigclip=5.0, translateimages=True,
          reversesubtract=False, skipepd=True, useimagenotfistar=True,
-         fixedtfatemplate=None, flagvalues=[-1,4,32,36,2080,2052,2084],
+         fixedtfatemplate=None,
+         flagvalues=[-1,4,32,36,2080,2052,2084,16384,16384+4,16384+32,16384+4+32,
+                     16384+2052,16384+2052+32,16384+2052+32+4],
          do_cdips_merge=True
          ):
     """

@@ -410,10 +410,12 @@ def verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.25):
 
 
 
-def parallel_move_badframes(fitslist,
-                            flagvalues=[-1,4,32,36,2052,2080,2084],
-                            nworkers=16,
-                            maxworkertasks=1000):
+def parallel_move_badframes(
+    fitslist,
+    flagvalues=[-1, 4, 32,36, 2052,2080,2084,
+                16384,16384+4,16384+32,16384+4+32,
+                16384+2052,16384+2052+32,16384+2052+32+4],
+    nworkers=16, maxworkertasks=1000):
     '''
     Move the entire frame to "badframe" subdirectory, if it matches particular
     quality flags or time windows.
