@@ -1437,13 +1437,24 @@ def round_two_tfa_selection(cand_template_lcpaths, apnum,
     shutil.copyfile(trendlisttfa_path,dst)
     print('copied {}->{}'.format(trendlisttfa_path,dst))
 
-    # generally should have enough stars.
+    # generally should have enough stars.  if not, ignore the threshold.  the
+    # LS FAP is a kind of meaningless number regardless.
     throw_out = df['fap'] < max_fap
+    if not len(df[~throw_out]) > n_min_tfa_templates:
+        wrnmsg = (
+            'WRN! lcutils.round_two_tfa_selection: in selecting tfa template stars,'
+            'found {} templates of {} candidates, but need at least {}...'
+            'proceeding by random draw from all stars'.
+            format(len(df[~throw_out]), len(df), n_min_tfa_templates)
+        )
+        print(wrnmsg)
+        throw_out = np.zeros(len(df)).astype(bool)
+
     if not len(df[~throw_out]) > n_min_tfa_templates:
         errmsg = (
             'lcutils.round_two_tfa_selection: in selecting tfa template stars,'
-            'found {} templates, but need at least {}'.
-            format(len(df[~throw_out]), n_min_tfa_templates)
+            'found {} templates of {} candidates, but need at least {}'.
+            format(len(df[~throw_out]), len(df), n_min_tfa_templates)
         )
         raise AssertionError(errmsg)
 
