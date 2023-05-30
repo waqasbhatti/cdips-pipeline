@@ -1756,7 +1756,8 @@ def main(fitsdir, fitsglob, projectid, field, camnum, ccdnum,
          reversesubtract=False, skipepd=True, useimagenotfistar=True,
          fixedtfatemplate=None,
          flagvalues=[-1,4,32,36,2080,2052,2084,16384,16384+4,16384+32,16384+4+32,
-                     16384+2052,16384+2052+32,16384+2052+32+4],
+                     16384+2052,16384+2052+32,16384+2052+32+4,
+                     16384+2048,16384+2048+4,16384+2048+32+4],
          do_cdips_merge=True
          ):
     """
