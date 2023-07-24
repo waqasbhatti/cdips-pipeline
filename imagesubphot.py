@@ -1493,6 +1493,26 @@ def genreg(masterphotref_fistar,
                           dtype='f8,f8',
                           names=['x','y'])
 
+    xsize = 2048.
+    ysize = 2048.
+
+    sel = (
+        (srcxy['x']>xsize+1) | (srcxy['x']<0) |
+        (srcxy['y']>ysize+1) | (srcxy['y']<0)
+    )
+    # in *rare* instances (i.e., this happened for one star, in one ccd, out
+    # of the entire TESS cycle1-4 reduction), srcxy can be outside the bounds.
+    # in such cases raise a warning and just "mask" those xy values to 1, since
+    # less than ~10 sources will not affect the photref frame generation
+    if len(srcxy[sel]) > 0:
+        N_off_silicon = len(srcxy[sel])
+        print(f"WARNING! Got {N_off_silicon} sources in genreg from "
+              f"{masterphotref_fistar}.  Masking...")
+        if N_off_silicon > 10:
+            msg = 'This should never happen'
+            raise AssertionError(msg)
+        srcxy[sel] = np.ones_like(srcxy[sel])
+
     # set up the grid (this weirdness is transcribed directly from Chelsea's
     # regslct.py) TODO: figure out WTF this does
 
@@ -1500,8 +1520,6 @@ def genreg(masterphotref_fistar,
     mx = np.zeros(BX*BY)-1
     my = np.zeros(BX*BY)-1
     ma = np.zeros(BX*BY)
-    xsize = 2048.
-    ysize = 2048.
     bx = (srcxy['x']*BX/xsize).astype(int)
     by = (srcxy['y']*BY/ysize).astype(int)
     mx[by*bx+bx] = srcxy['x']
