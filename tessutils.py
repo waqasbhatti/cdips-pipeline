@@ -364,7 +364,7 @@ def verify_badframe_move(fitslist, flagvalues, max_frac_badframes=0.25):
         # sector 8 has an instrument failure.
         # sector 12, camera 1 has extended scattered light (see Kruse's videos)
         # sector 14, camera 1 also has extended scattered light
-        badsectors = ['s0003', 's0008', 's0012', 's0014']
+        badsectors = ['s0003', 's0008', 's0012', 's0014', 's0054']
 
         raise_error = True
         for badsector in badsectors:
