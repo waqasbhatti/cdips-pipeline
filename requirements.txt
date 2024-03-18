@@ -1,7 +1,7 @@
 alembic==0.8.10
 apache-airflow==2.8.0
 asn1crypto==0.24.0
-astropy==2.0.4
+astropy==5.3.3
 astroquery==0.3.8
 attrs==17.4.0
 backports-abc==0.5
