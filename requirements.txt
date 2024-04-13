@@ -38,7 +38,7 @@ GitPython==3.1.41
 gunicorn==19.8.1
 h5py==2.7.1
 html5lib==1.0.1
-idna==2.6
+idna==3.7
 ipaddress==1.0.22
 ipdb==0.11
 ipython==7.16.3
