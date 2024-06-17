@@ -83,7 +83,7 @@ pytz==2017.3
 PyYAML==5.4
 requests==2.31.0
 scandir==1.6
-scikit-learn==0.19.1
+scikit-learn==1.5.0
 scipy==1.0.0
 SecretStorage==2.3.1
 setproctitle==1.1.10
